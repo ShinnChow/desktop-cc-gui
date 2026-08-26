@@ -380,6 +380,8 @@ export type ComposerProps = {
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
   editorSettings?: ComposerEditorSettings;
   sendShortcut?: ComposerSendShortcut;
+  /** 停止按钮悬停提示里展示的中断快捷键（展示值；空则不展示） */
+  interruptShortcutLabel?: string | null;
   textareaHeight?: number;
   onTextareaHeightChange?: (height: number) => void;
   onOpenSkillsSettings?: () => void;
@@ -656,6 +658,7 @@ function ComposerImpl({
   textareaRef: externalTextareaRef,
   editorSettings: _editorSettingsProp,
   sendShortcut = "enter",
+  interruptShortcutLabel,
   textareaHeight = 80,
   onTextareaHeightChange,
   onOpenSkillsSettings: _onOpenSkillsSettings,
@@ -3812,6 +3815,7 @@ function ComposerImpl({
               onNoteCardSelect={handleSelectNoteCard}
               onSelectSkill={handleSelectSkill}
               sendShortcut={sendShortcut}
+              interruptShortcutLabel={interruptShortcutLabel}
               placeholder={
                 collabLocksComposer
                   ? t("multiAgent.entry.collabRunningLock")

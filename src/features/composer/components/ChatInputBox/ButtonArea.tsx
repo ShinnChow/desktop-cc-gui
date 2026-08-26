@@ -163,6 +163,7 @@ export const ButtonArea = ({
   streamingEnabled = true,
   onStreamingEnabledChange,
   sendShortcut = 'enter',
+  interruptShortcutLabel,
   selectedAgent,
   onAgentSelect,
   onOpenAgentSettings,
@@ -616,7 +617,11 @@ export const ButtonArea = ({
               size="icon"
               className={`submit-button stop-button is-${resolvedStopButtonPhase}`}
               onClick={handleStopClick}
-              title={t('chat.stopGeneration')}
+              title={
+                interruptShortcutLabel
+                  ? `${t('chat.stopGeneration')} (${interruptShortcutLabel})`
+                  : t('chat.stopGeneration')
+              }
               data-stream-phase={resolvedStopButtonPhase}
             >
               <Square aria-hidden fill="currentColor" />

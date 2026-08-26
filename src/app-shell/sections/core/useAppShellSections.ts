@@ -4,6 +4,7 @@ import { getWorkspaceFiles } from "../../../services/tauri/workspaceFiles";
 import { revealInFileManager } from "../../../services/tauri/workspaceRuntime";
 import { pushErrorToast } from "../../../services/toasts";
 import { useSoloMode } from "../../../features/layout/hooks/useSoloMode";
+import { formatShortcutLabelOrNull } from "../../../utils/shortcuts";
 import { useLiveEditPreview } from "../../../features/live-edit-preview/hooks/useLiveEditPreview";
 import { useArchiveShortcut } from "../../../features/app/hooks/useArchiveShortcut";
 import type { OpenFileOptions } from "../../../features/app/hooks/useGitPanelController";
@@ -666,6 +667,12 @@ export function useAppShellSections(input: UseAppShellSectionsInput) {
     rightPanelCollapsed,
     isLayoutSwapped: !isCompact && appSettings.layoutMode === "swapped",
     rightPanelAvailable,
+    sidebarShortcutLabel: formatShortcutLabelOrNull(
+      appSettings.toggleLeftConversationSidebarShortcut,
+    ),
+    rightPanelShortcutLabel: formatShortcutLabelOrNull(
+      appSettings.toggleRightConversationSidebarShortcut,
+    ),
     onCollapseSidebar: collapseSidebar,
     onExpandSidebar: expandSidebar,
     onCollapseRightPanel: collapseRightPanel,

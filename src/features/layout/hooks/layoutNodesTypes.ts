@@ -343,6 +343,7 @@ export type LayoutNodesFlatOptions = {
   onCollapseSidebar?: () => void;
   globalSearchShortcut: string | null;
   openChatShortcut: string | null;
+  openSettingsShortcut?: string | null;
   showLoadingProgressDialog?: (config: LoadingProgressDialogConfig) => string;
   hideLoadingProgressDialog?: (requestId: string) => void;
   cycleOpenSessionPrevShortcut: string | null;
@@ -753,6 +754,8 @@ export type LayoutNodesFlatOptions = {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   composerEditorSettings: ComposerEditorSettings;
   composerSendShortcut: "enter" | "cmdEnter";
+  /** 停止按钮悬停提示里展示的中断快捷键（展示值；空则不展示） */
+  composerInterruptShortcutLabel?: string | null;
   textareaHeight: number;
   onTextareaHeightChange: (height: number) => void;
   showComposer: boolean;
@@ -1230,6 +1233,7 @@ export type ComposerLayoutNodesOptions = Pick<
   | "textareaRef"
   | "composerEditorSettings"
   | "composerSendShortcut"
+  | "composerInterruptShortcutLabel"
   | "textareaHeight"
   | "onTextareaHeightChange"
   | "onOpenExperimentalSettings"
@@ -1289,6 +1293,7 @@ export type PanelsLayoutNodesOptions = Pick<
   | "onCollapseSidebar"
   | "globalSearchShortcut"
   | "openChatShortcut"
+  | "openSettingsShortcut"
   | "cycleOpenSessionPrevShortcut"
   | "cycleOpenSessionNextShortcut"
   | "closeCurrentSessionShortcut"

@@ -18,6 +18,14 @@ type MainHeaderActionsOptions = {
   isCompact: boolean;
   rightPanelCollapsed: boolean;
   sidebarToggleProps: SidebarToggleProps;
+  /** 各 action 悬停提示里展示的快捷键（formatShortcutForPlatform 后的展示值；空则不展示） */
+  shortcutLabels?: {
+    rightPanel?: string | null;
+    terminal?: string | null;
+    runtimeConsole?: string | null;
+    browserDock?: string | null;
+    fileCompare?: string | null;
+  };
   showRuntimeConsoleButton?: boolean;
   isRuntimeConsoleVisible?: boolean;
   onToggleRuntimeConsole?: () => void;
@@ -43,6 +51,7 @@ export function useMainHeaderActionItems({
   isCompact,
   rightPanelCollapsed,
   sidebarToggleProps,
+  shortcutLabels,
   showRuntimeConsoleButton = false,
   isRuntimeConsoleVisible = false,
   onToggleRuntimeConsole,
@@ -72,6 +81,8 @@ export function useMainHeaderActionItems({
   } = sidebarToggleProps;
 
   return useMemo(() => {
+    const withShortcut = (label: string, shortcut?: string | null) =>
+      shortcut ? `${label} (${shortcut})` : label;
     const canToggleRuntimeConsole =
       showRuntimeConsoleButton && Boolean(onToggleRuntimeConsole);
     const canToggleTerminal = showTerminalButton && Boolean(onToggleTerminal);
@@ -102,7 +113,10 @@ export function useMainHeaderActionItems({
     if (canToggleRuntimeConsole) {
       actionItems.push({
         id: "runtime-console",
-        label: t("files.openRunConsole"),
+        label: withShortcut(
+          t("files.openRunConsole"),
+          shortcutLabels?.runtimeConsole,
+        ),
         icon: <Construction size={18} aria-hidden />,
         onSelect: () => onToggleRuntimeConsole?.(),
         active: isRuntimeConsoleVisible,
@@ -112,7 +126,10 @@ export function useMainHeaderActionItems({
     if (canToggleTerminal) {
       actionItems.push({
         id: "terminal",
-        label: t("common.toggleTerminalPanel"),
+        label: withShortcut(
+          t("common.toggleTerminalPanel"),
+          shortcutLabels?.terminal,
+        ),
         icon: <TerminalSquare size={18} aria-hidden />,
         onSelect: () => onToggleTerminal?.(),
         active: isTerminalOpen,
@@ -132,7 +149,10 @@ export function useMainHeaderActionItems({
     if (canToggleBrowserDock) {
       actionItems.push({
         id: "browser-dock",
-        label: t("browserAgent.dock.openDock"),
+        label: withShortcut(
+          t("browserAgent.dock.openDock"),
+          shortcutLabels?.browserDock,
+        ),
         icon: <Globe size={18} aria-hidden />,
         onSelect: () => onToggleBrowserDock?.(),
         active: isBrowserDockOpen,
@@ -161,7 +181,10 @@ export function useMainHeaderActionItems({
     if (canOpenFileCompare) {
       actionItems.push({
         id: "file-compare",
-        label: t("files.fileCompare.title"),
+        label: withShortcut(
+          t("files.fileCompare.title"),
+          shortcutLabels?.fileCompare,
+        ),
         icon: <Columns3 size={18} aria-hidden />,
         onSelect: () => onOpenFileCompare?.(),
         active: isFileCompareActive,
@@ -171,7 +194,7 @@ export function useMainHeaderActionItems({
     if (rightPanelAvailable && !isSoloMode) {
       actionItems.push({
         id: "right-panel",
-        label: t(labelKey),
+        label: withShortcut(t(labelKey), shortcutLabels?.rightPanel),
         icon: isCollapsed ? (
           isLayoutSwapped ? (
             <PanelLeftOpen size={18} aria-hidden />
@@ -208,6 +231,7 @@ export function useMainHeaderActionItems({
     onToggleTerminal,
     rightPanelAvailable,
     rightPanelCollapsed,
+    shortcutLabels,
     showClientDocumentationButton,
     showFileCompareButton,
     showRuntimeConsoleButton,
