@@ -24,7 +24,7 @@
 
 - [~] 3.1 [P0] `ComposerRunStatusStrip` 数据源扩展：✅ `useBackgroundTaskPill`（useSyncExternalStore 事件驱动读副本，store 版本号 snapshot，无轮询）→ 「后台任务」pill（live dot / `running/total` 计数 / 全完成态只显 total）；无任务不占位（`hasAny` 参与 strip visible 判定，`anyRunning` 参与 hasLive 折叠态 dot）。数据只在 pi 会话有值，其他引擎自然隐藏。
 - [~] 3.2 [P0] pill 就地展开 panel：✅ running 在上 / 终态折叠其下的分组列表（status 徽标 / 名称 / elapsed 活体 tick / exit code / 「查看日志」reveal_in_file_manager；日志 tail 读取归 P2 2.3）。顶栏入口与任务卡「查看日志」聚焦联动未做（待 P2 watcher 后统一收口）。
-- [ ] 3.3 [P1] Render Perf 自查：pill 事件驱动 ✅、elapsed 面板本地 tick ✅、无根链 setState ✅；完整对照文档走查待收口时补。
+- [x] 3.3 [P1] Render Perf 自查：✅ 2026-08-27 收口补做完整走查（对照 AGENTS.md Render Perf 五条硬红线 + `docs/perf/render-jank-knife-experiments-2026-07-08.md` 四层根因）：① 高频 setState 不挂根链——`backgroundTaskStore` 模块级事件驱动（version+listeners，`emitChange` 仅 apply 触发），`src/app-shell/**` 对 store/pill 零引用，消费者全部挂在 composer strip / message row 组件级；② 无数组追加型根链 setState——store 为 per-(workspace,thread) map 按 taskId upsert；③ 根链零轮询——pill `useSyncExternalStore` 事件驱动，唯一 interval 是 registry watcher 组件级 3s（运行中才计时、空闲即清、状态变了才 apply，不挂根链）；④⑤ 流式通道不适用——bg 更新是低频离散 item upsert，无高频 delta 流；elapsed 活体为 `useElapsedSeconds` 组件本地 1s tick（`active` 门控 + cleanup + `memo`）。四层根因均未命中，详见 verification.md。
 
 ## 4. 文档与校准
 
