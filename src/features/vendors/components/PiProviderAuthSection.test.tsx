@@ -207,7 +207,7 @@ describe("PiProviderAuthSection", () => {
 
   it("requires confirmation before deleting a credential", async () => {
     await renderSection();
-    fireEvent.click(screen.getByText("删除"));
+    fireEvent.click(await screen.findByText("删除"));
     // 确认前不调用后端
     expect(mockDelete).not.toHaveBeenCalled();
     const confirm = await screen.findByText(
@@ -253,13 +253,16 @@ describe("PiProviderAuthSection", () => {
     expect(screen.getByText(/PI_AUTH_CORRUPTED/)).toBeTruthy();
   });
 
-  it("catalog stays aligned with the 35 api-key provider ids", () => {
-    expect(PI_AUTH_APIKEY_PROVIDERS).toHaveLength(35);
+  it("catalog stays aligned with the 37 api-key provider ids", () => {
+    expect(PI_AUTH_APIKEY_PROVIDERS).toHaveLength(37);
     const featured = PI_AUTH_APIKEY_PROVIDERS.filter((p) => p.featured);
     expect(featured).toHaveLength(16);
     const ids = new Set(PI_AUTH_APIKEY_PROVIDERS.map((p) => p.id));
-    expect(ids.size).toBe(35);
+    expect(ids.size).toBe(37);
     expect(ids.has("github-copilot")).toBe(false);
+    // pi 0.84.x env map 补录（providers.md 未收录但 env help 与 bundle map 在）
+    expect(ids.has("moonshotai")).toBe(true);
+    expect(ids.has("moonshotai-cn")).toBe(true);
   });
 
   it("lists custom providers from models.json with api and key state", async () => {
@@ -303,7 +306,7 @@ describe("PiProviderAuthSection", () => {
     await renderSection();
 
     expect(
-      screen.getByText(/models.json 不存在，点击「编辑配置」/),
+      await screen.findByText(/models.json 不存在，点击「编辑配置」/),
     ).toBeTruthy();
 
     fireEvent.click(screen.getByText("编辑配置"));
@@ -323,6 +326,9 @@ describe("PiProviderAuthSection", () => {
       }),
     );
     await renderSection();
+    // 先等 modelsConfig 落进状态（file path chip 只在落地后渲染），
+    // 否则点击早于异步 read 时 modelsDraft 会以空串预填（时序竞态）。
+    await screen.findByText("/home/u/.pi/agent/models.json");
     fireEvent.click(screen.getByText("编辑配置"));
     const textarea = (await screen.findByTestId(
       "pi-models-config-editor",
