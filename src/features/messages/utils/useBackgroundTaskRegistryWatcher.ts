@@ -76,7 +76,8 @@ function runningTasks(
  * P2 会话级 registry watcher（design §D4）：前端复用 `read_workspace_file`
  * 读 `.pi/tasks/session-<pid>-<pid>/<taskId>.json`，把**终态 metadata** 喂回
  * `applyBackgroundTaskUpdate(source:"registry")` —— 这是 post-settle 通知被
- * per-turn forwarder 丢弃后的兜底通道，让任务完成时卡片折叠 / pill 更新。
+ * per-turn forwarder 丢弃后的收敛通道（B 通道，基石设计指定的根治路径；
+ * A 通道 resident 空闲期持续转发明确不做），让任务完成时卡片折叠 / pill 更新。
  *
  * Render Perf 红线：单组件级 interval（运行中有任务才计时，空闲即清），不挂根
  * hook 链、不秒级轮询根链；只在「状态变了」才 apply，读空/无变化跳过。
