@@ -18,6 +18,7 @@ status: active
 - [DSH capability spike](./mossx-dsh-capability-spike.md) — Phase S 实测（`dsh 0.1.0-rc.6` Host RPC / WS mux）；Adapter contract 证据，不是产品 spec。
 - [Qoder capability spike](./mossx-qoder-capability-spike.md) — Phase S 实测（`qodercli 1.1.27` ACP over stdio）；Adapter contract 证据，不是产品 spec。
 - [Qoder engine deferred record](./mossx-qoder-engine-deferred.md) — L1 接入后置项（Shared / L3 / 黄金 turn / elicitation）；不是漏接清单。
+- [PI CLI adaptation deep research](./mossx-pi-cli-adaptation-deep-research-2026-08-27.md) — 现状研究报告（pi@0.84.3 × mossx 0.9.3）：强点 / 遗留 / 未释放能力差集与 gap v3 处置对照；不是实施计划。
 
 ## Historical exploratory research
 
