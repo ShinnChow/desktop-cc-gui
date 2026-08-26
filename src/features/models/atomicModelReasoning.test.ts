@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   enrichModelInfoWithAtomicReasoning,
+  enrichModelReasoningForEngine,
   reconcileAtomicReasoningEffort,
   resolveAtomicDefaultReasoningEffort,
   resolveAtomicReasoningEffort,
@@ -272,6 +273,25 @@ describe("atomicModelReasoning", () => {
     };
     expect(resolveAtomicReasoningOptions("pi", model)).toEqual(["high"]);
     expect(resolveAtomicDefaultReasoningEffort("pi", model)).toBe("high");
+  });
+
+  it("enrichModelReasoningForEngine passes non-PI models through untouched", () => {
+    const claudeModel = { id: "claude-sonnet-4-5", model: "claude-sonnet-4-5" };
+    expect(enrichModelReasoningForEngine("claude", claudeModel)).toBe(
+      claudeModel,
+    );
+    const codexModel = { id: "gpt-5.6-sol", model: "gpt-5.6-sol" };
+    expect(enrichModelReasoningForEngine("codex", codexModel)).toBe(codexModel);
+    expect(enrichModelReasoningForEngine(null, codexModel)).toBe(codexModel);
+    // PI 分支同样恒等直返：capability 已在 catalog 投影阶段填到 ModelOption，
+    // 本函数不做 catalog lookup、不发明元数据。
+    const piModel = {
+      id: "google/gemini-2.5-pro",
+      model: "google/gemini-2.5-pro",
+      supportedReasoningEfforts: ["low", "medium", "high"],
+      defaultReasoningEffort: "high",
+    };
+    expect(enrichModelReasoningForEngine("pi", piModel)).toBe(piModel);
   });
 
   it("PI inherited effort that is still in allowlist is preserved", () => {
