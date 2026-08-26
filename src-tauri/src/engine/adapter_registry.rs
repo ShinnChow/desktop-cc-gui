@@ -47,6 +47,9 @@ pub enum EngineProtocolFamily {
     AppServerJsonRpc,
     DshHostRpc,
     AcpStdio,
+    /// pi 主传输：`pi --mode rpc` 长驻 resident（steer/fork/tree/compact）。
+    /// print-json 是降级路径，不改变登记口径（对齐 codex 登记 persistent 的先例）。
+    PiRpc,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -168,13 +171,16 @@ impl EngineProtocol for BuiltinEngineProtocol {
             EngineType::Codex => EngineProtocolFamily::AppServerJsonRpc,
             EngineType::Dsh => EngineProtocolFamily::DshHostRpc,
             EngineType::Qoder => EngineProtocolFamily::AcpStdio,
+            EngineType::Pi => EngineProtocolFamily::PiRpc,
             _ => EngineProtocolFamily::StreamJsonCli,
         }
     }
 
     fn execution_model(&self) -> EngineExecutionModel {
         match self.engine {
-            EngineType::Codex | EngineType::Dsh => EngineExecutionModel::Persistent,
+            EngineType::Codex | EngineType::Dsh | EngineType::Pi => {
+                EngineExecutionModel::Persistent
+            }
             _ => EngineExecutionModel::OneShot,
         }
     }
@@ -335,6 +341,12 @@ mod tests {
             .expect("qoder");
         assert_eq!(qoder.execution_model, EngineExecutionModel::OneShot);
         assert_eq!(qoder.protocol_family, EngineProtocolFamily::AcpStdio);
+        let pi = registry
+            .get(&EngineId::builtin(EngineType::Pi))
+            .expect("pi");
+        // pi 主传输是 `pi --mode rpc` 长驻 resident；print-json 只是降级路径。
+        assert_eq!(pi.execution_model, EngineExecutionModel::Persistent);
+        assert_eq!(pi.protocol_family, EngineProtocolFamily::PiRpc);
         assert_eq!(
             BuiltinEngineProtocol::new(EngineType::Qoder).executable_name(),
             "qodercli"
