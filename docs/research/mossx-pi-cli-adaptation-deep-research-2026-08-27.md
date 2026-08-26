@@ -116,14 +116,27 @@ append-only entry tree（`get_tree` / `get_entries(since)` 稳定 cursor）、fo
 
 ## 三、遗留点（有决策/文档在案，未完全收尾）
 
+> **2026-08-27 处置回写**：本节六项遗留点已按 `fix/pi-adaptation-legacy` 分支逐项修复（L1 `162ad167b`/`5c0cffc16`、L6 `7e016f0d9`、L3 `2d56a0807`、L2 `dd2f6b62c`、L4 `a7e902be4`、L5 `71b424620`）。逐项处置见 §三.1；下表保留研究时点的事实描述作对照。
+
 | # | 遗留点 | 事实源 | 性质 |
 |---|---|---|---|
 | L1 | **OpenSpec 卫生**：11 个 pi 相关 change 未 archive，多数剩 1–2 个收尾 task；`expand-shared-atomic-reasoning-linkage-to-pi` 实现已落地（commit `d0706f545` + verification.md + 测试）但 tasks.md 39 项 checkbox 全未勾 | `openspec/changes/` 各 tasks.md | 流程债，非功能缺口 |
 | L2 | **registry 元数据失真**：`engineIds.json` / `adapter_registry.rs` 仍标 `stream-json-cli` / `one-shot`，与 RPC 长驻主路径不符（对运行无影响，对治理脚本与心智模型有误导） | `adapter_registry.rs:167-180` | 良性失真，建议随下次 registry 变更顺手改 |
 | L3 | **capability 双源口径不一致**：runtime `capability_state` 对 `input.mid-turn` / `session.fork` / `session.tree` / `rpc.server` 返回 `unknown`，而 spec-generated matrix 标 `supported`（前端以 generated 为权威，实际不影响行为） | `capability_matrix.rs:54-56` vs `.generated.rs:131-152` | 诚实性 hygiene |
 | L4 | **post-settle orphan 通知**：per-turn forwarder 丢弃行为仍在（根治需 A 通道改造），registry watcher 兜底已上线；「兜底 ≠ 根治」的口径需保持 | 基石设计校准行 + `useBackgroundTaskRegistryWatcher.ts:76-90` | 已缓解，观察项 |
-| L5 | **降级路径能力天花板**：print-json 不能 steer；同 session 并发发送被拒绝（消息留队列）；RPC-only 命令（stats/tree/fork/compact）在 RPC 不可用时直接失败，树面板靠 last-good 快照 | `pi.rs:2092-2096` | 设计内降级 |
+| L5 | **降级路径能力天花板**：print-json 不能 steer；同 session 并发发送被拒绝（消息留队列）；RPC-only 命令在 RPC 不可用时直接失败，树面板靠 last-good 快照 | `pi.rs:2092-2096` | 设计内降级 |
 | L6 | **catalog 探测仍是启发式三层链**，慢环境有降级风险（已用 `--no-extensions` + 15s + 防中毒大幅缓解）；auth catalog 对齐 0.84.1，本体已 0.84.3（小漂移） | `status.rs:1249-1294` | 版本跟进项 |
+
+### 三.1 处置结果（2026-08-27，`fix/pi-adaptation-legacy`）
+
+| # | 处置 | 提交 |
+|---|---|---|
+| L1 | 归档 6 个 change（models-json-config 以 headless 等价验证收口 3.3、thinking-level-selector、capability-hygiene `--skip-specs` 先例、catalog-probe 补写 delta、file-wrapper、background-task-experience 补做 3.3 Render Perf 走查）；`expand-shared` 39 task 按代码证据补勾 36 + 补 2 个缺失测试，剩 2 条手测 smoke 为 active gate；4 个 change（真机/安装版/用户复验类）在留并登记真实 gate；两份 README 索引校准 | `162ad167b` `5c0cffc16` |
+| L2 | 新增第五条 Builtin 协议族 `pi-rpc`：pi 登记 `stream-json-cli/one-shot` → `pi-rpc/persistent`，engineIds.json / TS union / Rust enum / daemon 四侧同步（FE 元数据零下游消费，零行为风险）；OpenSpec change `fix-pi-engine-registry-metadata` + 基石 ADR 校准行回写 | `dd2f6b62c` |
+| L3 | `capability_state` 五键（mid-turn/fork/switch/tree/rpc.server）委托 `spec_capability_state`，九引擎 × 五键逐格一致测试钉死；pi `session.switch` 保持 unknown（诚实口径） | `2d56a0807` |
+| L4 | ADR 三处口径统一：B 通道 registry watcher 表述由将来时「P2 根治」改为「已落地为根治路径」，watcher 注释「兜底」→「收敛通道（基石设计指定的根治路径）」；A 通道明确不做、如做需单开 change | `a7e902be4` |
+| L5 | 核查确认降级链路行为如设计（错误文案诚实 / send gate 双证据 / RPC-only last-good，`engine::pi` 80/80）；天花板写进规范：`fix-pi-print-json-fallback-session-isolation` delta 追加「print-json 降级天花板 MUST 诚实表达」三场景 | `71b424620` |
+| L6 | 对齐审计：0.84.1→0.84.3 **零 provider/env 漂移**（providers.md 逐字一致、env help 仅加两条 PI_ 元变量），报告「小漂移」不存在；顺带补录两版都在但 providers.md 未收录的 `moonshotai`/`moonshotai-cn`（MOONSHOT_API_KEY）双侧目录；`google-vertex`（ADC 型）记边界不进目录 | `7e016f0d9` |
 
 ---
 
