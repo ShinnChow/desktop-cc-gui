@@ -458,6 +458,7 @@ fn bounded_codex_scan_uses_recent_candidates_and_counts_unique_sessions() {
         std::slice::from_ref(&root),
         2,
         CodexSessionParseMode::ThreadPreview,
+        None,
     )
     .expect("bounded scan summaries");
     let session_ids = summaries
@@ -473,6 +474,45 @@ fn bounded_codex_scan_uses_recent_candidates_and_counts_unique_sessions() {
         scanned_file_count, 3,
         "duplicate must not consume the unique-session budget"
     );
+
+    fs::remove_dir_all(base).ok();
+}
+
+#[test]
+fn bounded_scan_expired_deadline_aborts_before_parsing_candidates() {
+    // fix-codex-scan-deadline-abort：外层 timeout 只放弃 JoinHandle，扫描线程
+    // 必须靠内层 deadline 真正停止读盘。expired deadline 应在打开任何候选文件
+    // 前返回 Err；远期 deadline 不改变既有行为。
+    let base = std::env::temp_dir().join(format!("ccgui-codex-deadline-{}", Uuid::new_v4()));
+    let root = base.join("sessions");
+    write_named_session_file(
+        &root,
+        "2026-01-19",
+        "rollout-a",
+        &[r#"{"timestamp":"2026-01-19T12:00:00.000Z","type":"session_meta","payload":{"id":"session-a","cwd":"/tmp/project-alpha"}}"#.to_string()],
+    );
+
+    let expired = scan_codex_session_summaries_bounded_with_mode(
+        Some(Path::new("/tmp/project-alpha")),
+        std::slice::from_ref(&root),
+        2,
+        CodexSessionParseMode::ThreadPreview,
+        Some(Instant::now() - StdDuration::from_millis(1)),
+    )
+    .expect_err("expired deadline must abort scan");
+    assert_eq!(expired, CODEX_SCAN_DEADLINE_EXCEEDED);
+
+    let (summaries, scanned_file_count) = scan_codex_session_summaries_bounded_with_mode(
+        Some(Path::new("/tmp/project-alpha")),
+        std::slice::from_ref(&root),
+        2,
+        CodexSessionParseMode::ThreadPreview,
+        Some(Instant::now() + StdDuration::from_secs(60)),
+    )
+    .expect("future deadline keeps scan working");
+    assert_eq!(scanned_file_count, 1);
+    assert_eq!(summaries.len(), 1);
+    assert_eq!(summaries[0].session_id, "session-a");
 
     fs::remove_dir_all(base).ok();
 }
@@ -574,6 +614,7 @@ fn full_codex_scan_merges_duplicate_evidence_before_truncation() {
         std::slice::from_ref(&root),
         1,
         CodexSessionParseMode::Full,
+        None,
     )
     .expect("full scan summaries");
 
