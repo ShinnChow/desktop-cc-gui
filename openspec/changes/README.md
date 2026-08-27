@@ -3,7 +3,7 @@
 本页是 `mossx` OpenSpec proposal 的当前入口。它只维护 active change 的执行状态，并把 archived change 路由到完整历史索引；详细治理快照仍以 [`../project.md`](../project.md) 为准。
 
 - Updated At: `2026-08-27`
-- Active proposals: `70`（以磁盘 `openspec/changes/*` 为准）
+- Active proposals: `71`（以磁盘 `openspec/changes/*` 为准）
 - Archived proposals: `926`（以磁盘 `openspec/changes/archive/<date>-*` 目录为准；本页逐条索引链接 872，历史存量缺口另计）
 - Main capability specs: `544`
 
@@ -11,6 +11,7 @@
 
 | Change | Progress | Current gate | Artifacts |
 | ------ | -------: | ------------ | --------- |
+| [`fix-claude-slash-command-title-truncation-omission`](fix-claude-slash-command-title-truncation-omission/proposal.md) | implementing / TDD | slash-command 会话被索引误剔（0.9.3 用户 desktop-cc-gui：claude 列表恒 0）：`/brainstorming` 信封前缀 >80 字符，`peek_claude_first_user_preview` 截断后 title 无完整 `<command-args>` 标签对 → `should_omit_claude_index_row` 误判裸命令整条剔除；修复 = truncate 前先用 `extract_command_prompt_text` 还原 prompt（与 history 路径同语义）；TDD 红→绿（writers 15/15）、rustfmt clean；与 fix-sidebar-reload-force-index-sync 互补 | [proposal](fix-claude-slash-command-title-truncation-omission/proposal.md) · [tasks](fix-claude-slash-command-title-truncation-omission/tasks.md) · [specs](fix-claude-slash-command-title-truncation-omission/specs/) |
 | [`fix-composer-cross-engine-draft-selection-leak`](fix-composer-cross-engine-draft-selection-leak/proposal.md) | implementing / TDD | 跨引擎模型串台（Claude 会话的 grok4.6/opus5 成为新 Codex 会话默认并进请求，2026-08-27 用户反馈）：draft carry 应用无引擎门禁；apply 点按 `resolveThreadEngine` 双侧一致才放行，未知引擎维持放行；只动 `selectedComposerSession.ts` / `useSelectedComposerSession.ts` + 测试；**不碰 fix-model-picker-send-authority 在途域** | [proposal](fix-composer-cross-engine-draft-selection-leak/proposal.md) · [design](fix-composer-cross-engine-draft-selection-leak/design.md) · [tasks](fix-composer-cross-engine-draft-selection-leak/tasks.md) · [specs](fix-composer-cross-engine-draft-selection-leak/specs/) |
 | [`fix-context-compacted-marker-turn-finality`](fix-context-compacted-marker-turn-finality/proposal.md) | implementing / TDD | 压缩留痕劫持 turn 终态：pi auto-compaction 先于 settle 入库 assistant 消息 → `markLatestAssistantMessageFinal` 误标 → 极简模式锚点错、真实回答被折进 chip（2026-08-27 用户反馈）；新增 `context-event` kind + `compaction_end` reason/token 透传 + i18n 分隔行渲染；**TDD 先红后绿** | [proposal](fix-context-compacted-marker-turn-finality/proposal.md) · [design](fix-context-compacted-marker-turn-finality/design.md) · [tasks](fix-context-compacted-marker-turn-finality/tasks.md) · [specs](fix-context-compacted-marker-turn-finality/specs/) |
 | [`fix-thread-list-timeout-backoff`](fix-thread-list-timeout-backoff/proposal.md) | implemented / await 3.4 hand-test | 切会话卡顿止血（2026-08-27 Windows 用户 0.9.3 实测：claude/codex list 扫描 100% 打满 30s 超时、129 次/49min、永不自愈循环）：full-catalog 自动重扫连续 timeout 指数退避 60s→15min 封顶，success / force refresh 重置 streak；vitest 8/8 + hydration 24/24 绿、openspec validate strict 通过；**待真机复验退避生效后 verify** | [proposal](fix-thread-list-timeout-backoff/proposal.md) · [tasks](fix-thread-list-timeout-backoff/tasks.md) · [specs](fix-thread-list-timeout-backoff/specs/) |

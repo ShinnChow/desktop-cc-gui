@@ -989,7 +989,16 @@ fn peek_claude_first_user_preview(path: &Path) -> Option<String> {
                 } else {
                     cleaned.as_str()
                 };
-                return Some(truncate_title(preview, 80));
+                // Slash-command envelopes must be reduced to their prompt text
+                // before truncation: the fixed <command-message>/<command-name>
+                // prefix alone can exceed the 80-char title budget, and a title
+                // truncated mid-envelope no longer carries a complete
+                // <command-args> pair, so the later should_omit_claude_index_row
+                // re-check would misread it as an empty-args bare command and
+                // drop the whole session from the index.
+                let prompt =
+                    crate::engine::claude_history_entries::extract_command_prompt_text(preview);
+                return Some(truncate_title(&prompt, 80));
             }
         }
         if claude_value_has_media_part(&value) {
@@ -2261,6 +2270,44 @@ mod tests {
         assert!(claude_index_row_from_file(&agent, ws, &titles).is_none());
         let imported = claude_index_row_from_file(&real, ws, &titles).expect("real row");
         assert_eq!(imported.title, "分析左侧栏消失问题");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn claude_slash_command_session_survives_truncated_title_omission() {
+        let dir = std::env::temp_dir().join(format!(
+            "claude-slash-title-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let slash = dir.join("5f1d9a2e-8c34-4b7f-9a61-2d84c0e7b390.jsonl");
+        std::fs::write(
+            &slash,
+            r#"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"<command-message>brainstorming</command-message>\n<command-name>/brainstorming</command-name>\n<command-args>你快速了解下这个项目现在有一个问题就是这个项目使用Claude客户端对话存在加载异常需要排查修复</command-args>"}]}}
+"#,
+        )
+        .expect("slash");
+        let bare = dir.join("7a3c1f5d-2e89-4c6b-8f02-1d95a4c6e817.jsonl");
+        std::fs::write(
+            &bare,
+            r#"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"<command-name>/resume</command-name>"}]}}
+"#,
+        )
+        .expect("bare");
+
+        let ws = Path::new("/tmp/ws");
+        let titles = HashMap::new();
+        let row = claude_index_row_from_file(&slash, ws, &titles)
+            .expect("slash-command session with real args must stay in index");
+        assert_eq!(
+            row.title,
+            "你快速了解下这个项目现在有一个问题就是这个项目使用Claude客户端对话存在加载异常需要排查修复"
+        );
+        assert!(row.native_title.is_none());
+        assert!(claude_index_row_from_file(&bare, ws, &titles).is_none());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
