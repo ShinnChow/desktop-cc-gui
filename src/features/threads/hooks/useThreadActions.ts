@@ -1383,11 +1383,12 @@ export function useThreadActions({
           claudeResult.value.length === 0;
         if (claudeResult.status === "fulfilled") {
           if (shouldMergeNativeClaudeSessions && claudeResult.value === null) {
-            // focus-refresh merge 的 null 是 by-design skip（Promise.resolve(null)），
-            // 不是 30s 超时：不打假 timeout 日志、不记 timeout partialSource，
-            // 否则下游会把整个可见列表误标 partial-thread-list degraded
-            // （2026-08-27 用户数据实锤：129 条假 30s 超时/49min）。
-            if (!isFocusRefreshMerge) {
+            // focus-refresh merge / first-paint 的 null 是 by-design skip
+            // （Promise.resolve(null)），不是 30s 超时：不打假 timeout 日志、
+            // 不记 timeout partialSource，否则下游会把整个可见列表误标
+            // partial-thread-list degraded（2026-08-27 用户数据实锤：
+            // 129 条假 30s 超时/49min）。
+            if (!isFocusRefreshMerge && !isFirstPaintHydration) {
               rememberPartialSource("claude-session-timeout");
               onDebug?.({
                 id: `${Date.now()}-client-claude-session-timeout`,
@@ -1635,9 +1636,13 @@ export function useThreadActions({
           );
         }
         if (projectCatalogResult.status === "fulfilled") {
-          if (projectCatalogValue === null && !isFocusRefreshMerge) {
-            // null 只可能是真 timeout（focus-refresh merge 的 by-design 占位
-            // null 已被门控排除，不再伪造 codex-catalog-timeout）。
+          if (
+            projectCatalogValue === null &&
+            !isFocusRefreshMerge &&
+            !isFirstPaintHydration
+          ) {
+            // null 只可能是真 timeout（focus-refresh merge / first-paint 的
+            // by-design 占位 null 已被门控排除，不再伪造 codex-catalog-timeout）。
             rememberPartialSource("codex-catalog-timeout");
             onDebug?.({
               id: `${Date.now()}-client-codex-catalog-timeout`,

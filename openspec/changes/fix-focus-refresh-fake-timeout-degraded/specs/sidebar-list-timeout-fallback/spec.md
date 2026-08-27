@@ -21,6 +21,13 @@ timeout 判定 MUST 仅适用于「实际发起了该子源请求且 `withTimeou
 - **AND** 系统 MUST NOT 记录 `claude-session-timeout` / `codex-catalog-timeout` partialSource，可见列表 MUST NOT 被标记 `partial-thread-list` degraded
 - **AND** last-good Claude 行 MUST 仍出现在最终列表
 
+#### Scenario: first-paint hydration 跳过子源不产生假 timeout
+
+- **WHEN** `startupHydrationMode === "first-paint"` 的冷启动路径按设计跳过 claude 磁盘 list 与活动 catalog（占位 `null` 结果）
+- **THEN** 系统 MUST NOT 投递 `thread/list claude timeout` / `thread/list codex catalog timeout` 调试事件
+- **AND** 系统 MUST NOT 记录 `claude-session-timeout` / `codex-catalog-timeout` partialSource，可见列表 MUST NOT 被标记 `partial-thread-list` degraded
+- **AND** Session Index seed 行 MUST 仍出现在最终列表
+
 #### Scenario: full-catalog 真实 timeout 语义不变
 
 - **WHEN** 非 focus-refresh 的 full-catalog 路径中 claude/codex 子源 `withTimeout` 真实竞出
