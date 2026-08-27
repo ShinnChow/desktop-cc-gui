@@ -50,8 +50,8 @@
 
 ## 收口
 
-- [ ] 5.1 `openspec validate refactor-composer-selector-layer --strict` 通过
-- [ ] 5.2 全量回归：selectors 族 + ButtonArea + composer 合同批次 + app-shell governance，与 Phase 0 基线对照零新增红
+- [x] 5.1 `openspec validate refactor-composer-selector-layer --strict` 通过 → **valid（4/4 artifacts complete）**
+- [x] 5.2 全量回归：selectors 族 + ButtonArea + composer 合同批次 + app-shell governance，与 Phase 0 基线对照零新增红 → **175/175（=基线 165 − 死组件 10 + SelectorOptionRow 12 + 特征测试 8）+ governance 22/22（`f80e019c8` 提交前终审 `b8061a7fc`）**
 - [ ] 5.3 手测矩阵（真机）：普通 native 会话 / Shared 会话 / New Home 双栏 picker 各开一次 ModelSelect（分组 + channel 子菜单 + 搜索）、ReasoningSelect、ModeSelect、工具菜单 memory-reference 子菜单，确认交互与视觉无变化
-- [ ] 5.4 更新 `openspec/changes/README.md` 索引行；sync specs（`composer-selector-primitives` 新增 + `composer-selector-home-chat-simplification` 修改）
-- [ ] 5.5 archive
+- [x] 5.4 更新 `openspec/changes/README.md` 索引行；sync specs（`composer-selector-primitives` 新增 + `composer-selector-home-chat-simplification` 修改）→ 索引行已更新为 implemented / await 5.3 hand-test；specs sync 与 archive 一并在 5.3 验收后执行
+- [ ] 5.5 archive（待 5.3 手测通过）
