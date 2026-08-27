@@ -331,6 +331,11 @@ export interface ModelInfo {
   description?: string;
   source?: string;
   /**
+   * 后端探测来源（PI: `cli:pi-available-models` = RPC 快照 / `cli:pi-list-models`
+   * = 表格降级，后者拿不到 thinkingLevelMap）。菜单打开的自愈判定依赖此字段。
+   */
+  provenance?: string | null;
+  /**
    * Vendor id used to section slash-catalog CLIs.
    * DSH: host catalog `llm.models` group.id.
    * PI: `pi --list-models` provider column.

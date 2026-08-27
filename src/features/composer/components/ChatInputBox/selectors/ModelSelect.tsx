@@ -70,6 +70,13 @@ import {
 const SUBMENU_FOOTER_BUTTON_CLASS =
   "flex min-h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-md border border-border/70 bg-muted/45 px-2 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50";
 
+/**
+ * PI `--list-models` 表格降级源：解析固定宽度表格、拿不到 thinkingLevelMap，
+ * 推理模型只会投影 off~high 五档。RPC 快照（cli:pi-available-models）不受影响。
+ * 见 openspec/changes/fix-pi-degraded-thinking-catalog-self-heal。
+ */
+const PI_LIST_MODELS_PROVENANCE = "cli:pi-list-models";
+
 interface ModelSelectProps {
   value: string;
   onChange: (modelId: string) => void;
@@ -1212,7 +1219,19 @@ export const ModelSelect = memo(
           const isFallbackOnly =
             groupModels.length > 0 &&
             groupModels.every((model) => (model.source ?? "") === "fallback");
-          if (isFallbackOnly) {
+          // PI `--list-models` 降级目录（source=detected 但缺 thinkingLevelMap）
+          // 是「健康可缓存」数据，cache-first 不会自愈，只能在这里补拉一次；
+          // RPC 探测成功后整组 provenance 变为 cli:pi-available-models，判定失效。
+          const isCapabilityDegradedPi =
+            currentProvider === "pi" &&
+            !isFallbackOnly &&
+            groupModels.length > 0 &&
+            groupModels.every(
+              (model) =>
+                (model.source ?? "") === "detected" &&
+                model.provenance === PI_LIST_MODELS_PROVENANCE,
+            );
+          if (isFallbackOnly || isCapabilityDegradedPi) {
             handleRefreshConfig();
           }
           return;
