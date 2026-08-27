@@ -194,6 +194,25 @@ describe("resolveThreadSelectionOnSwitch · 切会话选择决策核心（Phase 
     expect(decision.writes).toEqual([]);
   });
 
+  it("D6 活路径确认：Home 点选 draft（无来源线程）可把 claude 模型带进 pi pending（现状语义）", () => {
+    const decision = resolveThreadSelectionOnSwitch(
+      makeInput({
+        threadId: "pi-pending-1786864915306-gkk7s0",
+        draft: {
+          value: { modelId: "anthropic/claude-fable-5", effort: null },
+          workspaceId: "ws-1",
+          sourceThreadId: null,
+          applyToNextThread: true,
+        },
+      }),
+    );
+    // 现状：sourceThreadId=null → 引擎门禁放行 → claude 模型被写入 pi 线程账本
+    expect(decision.display).toEqual({ modelId: "anthropic/claude-fable-5", effort: null });
+    expect(decision.writes).toContainEqual(
+      expect.objectContaining({ kind: "thread-ledger", reason: "draft-apply" }),
+    );
+  });
+
   it("跨 workspace 的 draft 不带入：display=null", () => {
     const decision = resolveThreadSelectionOnSwitch(
       makeInput({
