@@ -43,6 +43,8 @@ export type ThreadSelectionSwitchInput = {
   /** fork 父线程的持久账本值 */
   forkParentStoredSelection: ComposerSessionSelection | null;
   draft: ThreadSelectionDraftInput | null;
+  /** D6 闸2：目标线程引擎 catalog 成员资格 key 集（id+model）；null=不可得放行 */
+  targetEngineModelKeys?: readonly string[] | null;
   /** L3c 种入用：注入的 resolveEngineDefaultComposerSelection 输出（含 codex→null）。 */
   engineDefaultSelection: ComposerSessionSelection | null;
   engineDefaultSelectionReady: boolean;
@@ -147,6 +149,7 @@ export function resolveThreadSelectionOnSwitch(
         draftComposerSelection: draftForActiveThread,
         activeThreadId: threadId,
         draftSourceThreadId: input.draft?.sourceThreadId ?? null,
+        targetEngineModelKeys: input.targetEngineModelKeys ?? null,
       })
     ) {
       candidate = draftForActiveThread;

@@ -1,5 +1,7 @@
 import type { DebugEntry } from "../../types";
 import type { RefObject } from "react";
+import { useCallback } from "react";
+import { resolveThreadEngine } from "./selectedComposerSession";
 import { useSelectedComposerSession } from "./useSelectedComposerSession";
 import { useAppShellComposerModelSection } from "./useAppShellComposerModelSection";
 import { useSelectedAgentSession } from "./useSelectedAgentSession";
@@ -60,6 +62,29 @@ export function useComposerDomainHost(input: {
   sendUserMessage: any;
   settingsOpen: boolean;
 }) {
+  // D6 闸2：按线程引擎从 per-engine catalog 投影成员资格 key 集（id+model 双通道）。
+  const resolveEngineModelKeys = useCallback(
+    (threadId: string): readonly string[] | null => {
+      const engine = resolveThreadEngine(threadId);
+      if (!engine) {
+        return null;
+      }
+      const catalog = (input.engineModelCatalogsAsOptions as Record<
+        string,
+        readonly { id: string; model?: string | null }[] | undefined
+      >)[engine];
+      if (!catalog || catalog.length === 0) {
+        return null;
+      }
+      return catalog.flatMap((model) =>
+        [model.id, model.model].filter(
+          (key): key is string => typeof key === "string" && key.length > 0,
+        ),
+      );
+    },
+    [input.engineModelCatalogsAsOptions],
+  );
+
   const {
     selectedComposerSelection,
     selectedComposerSelectionThreadId,
@@ -72,6 +97,7 @@ export function useComposerDomainHost(input: {
     resolveCanonicalThreadId: input.resolveCanonicalThreadId,
     engineDefaultSelectionReady: !input.appSettingsLoading,
     resolveEngineDefaultComposerSelection,
+    resolveEngineModelKeys,
     onDebug: input.addDebugEntry as any,
   });
 

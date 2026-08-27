@@ -174,6 +174,41 @@ describe("resolveThreadSelectionOnSwitch · 切会话选择决策核心（Phase 
     expect(decision.display).toEqual({ modelId: "grok-4", effort: "high" });
   });
 
+  it("D6 闸2红/绿：目标引擎 catalog 成员资格不含 draft 模型 → 拒绝应用（Home draft 引擎盲区封死）", () => {
+    const decision = resolveThreadSelectionOnSwitch(
+      makeInput({
+        threadId: "pi-pending-1786864915306-gkk7s0",
+        draft: {
+          value: { modelId: "anthropic/claude-fable-5", effort: null },
+          workspaceId: "ws-1",
+          sourceThreadId: null,
+          applyToNextThread: true,
+        },
+        // pi 当前 catalog（含 id 与 model 双通道 key）——无 anthropic 模型
+        targetEngineModelKeys: ["kimi-coding/k3", "zai-coding-cn/glm-5.3", "k3"],
+      }),
+    );
+    expect(decision.display).toBeNull();
+    expect(decision.writes).toEqual([]);
+  });
+
+  it("D6 闸2兼容：catalog 不可得（null）时维持既有放行语义", () => {
+    const draftValue: ComposerSelection = { modelId: "kimi-coding/k3", effort: null };
+    const decision = resolveThreadSelectionOnSwitch(
+      makeInput({
+        threadId: "pi-pending-1786864915306-gkk7s0",
+        draft: {
+          value: draftValue,
+          workspaceId: "ws-1",
+          sourceThreadId: null,
+          applyToNextThread: true,
+        },
+        targetEngineModelKeys: null,
+      }),
+    );
+    expect(decision.display).toEqual(draftValue);
+  });
+
   it("无 activeThread（Home）：显示同 workspace 的 draft，无写入", () => {
     const draftValue: ComposerSelection = {
       modelId: "claude-opus-4",

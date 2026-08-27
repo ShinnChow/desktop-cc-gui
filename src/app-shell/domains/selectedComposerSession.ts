@@ -152,6 +152,12 @@ export function shouldApplyDraftComposerSelectionToThread(input: {
   activeThreadId: string | null;
   /** 来源线程 id；carry 自会话时必传，Home 点选等无线程来源为 null。 */
   draftSourceThreadId?: string | null;
+  /**
+   * D6 闸2：目标线程引擎的 catalog 成员资格 key 集（id+model 双通道）。
+   * 提供且非空时，draft 模型不在集合内 → 拒绝应用（封死 Home draft 引擎盲区
+   * 把他引擎模型写进 pending 账本）。null/未提供 = catalog 不可得，维持放行。
+   */
+  targetEngineModelKeys?: readonly string[] | null;
 }): boolean {
   const baseOk = Boolean(
     !input.candidate &&
@@ -174,6 +180,14 @@ export function shouldApplyDraftComposerSelectionToThread(input: {
     sourceEngine !== targetEngine
   ) {
     return false;
+  }
+  // D6 闸2：catalog 成员资格校验（引擎门禁覆盖不到的 Home 无源 draft 在此拦截）
+  const membershipKeys = input.targetEngineModelKeys;
+  if (membershipKeys && membershipKeys.length > 0) {
+    const draftModelId = input.draftComposerSelection?.modelId?.trim() ?? "";
+    if (draftModelId && !membershipKeys.includes(draftModelId)) {
+      return false;
+    }
   }
   return true;
 }

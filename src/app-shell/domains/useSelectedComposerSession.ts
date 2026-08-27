@@ -55,6 +55,11 @@ type UseSelectedComposerSessionOptions = {
   resolveCanonicalThreadId: (threadId: string) => string;
   engineDefaultSelectionReady?: boolean;
   /**
+   * D6 闸2：解析线程所属引擎的 catalog 成员资格 key 集（id+model 双通道）。
+   * 返回 null = catalog 不可得（放行语义）。
+   */
+  resolveEngineModelKeys?: (threadId: string) => readonly string[] | null;
+  /**
    * Supplies the durable per-engine "last used" selection so a brand-new
    * conversation opens with the model/effort the user last chose for that engine.
    * Return null to keep the engine catalog default (e.g. codex, which persists
@@ -90,6 +95,7 @@ export function useSelectedComposerSession({
   resolveCanonicalThreadId,
   engineDefaultSelectionReady = true,
   resolveEngineDefaultComposerSelection,
+  resolveEngineModelKeys,
 }: UseSelectedComposerSessionOptions): UseSelectedComposerSessionResult {
   const [selectedComposerSelectionBySessionKey, setSelectedComposerSelectionBySessionKey] =
     useState<Record<string, ComposerSessionSelection | null>>({});
@@ -114,6 +120,8 @@ export function useSelectedComposerSession({
   const resolveEngineDefaultComposerSelectionRef = useRef(
     resolveEngineDefaultComposerSelection,
   );
+  const resolveEngineModelKeysRef = useRef(resolveEngineModelKeys);
+  resolveEngineModelKeysRef.current = resolveEngineModelKeys;
   resolveEngineDefaultComposerSelectionRef.current =
     resolveEngineDefaultComposerSelection;
 
@@ -273,9 +281,10 @@ export function useSelectedComposerSession({
       activeSessionKey &&
         Object.prototype.hasOwnProperty.call(selectionCache, activeSessionKey),
     );
-    const cachedSelection = hasCacheEntry
-      ? selectionCache[activeSessionKey] ?? null
-      : null;
+    const cachedSelection =
+      hasCacheEntry && activeSessionKey
+        ? selectionCache[activeSessionKey] ?? null
+        : null;
     // fork parent 读取仅在有需要时进行（stored/cache 均未命中）
     let forkParentThreadId: string | null = null;
     let forkParentStoredSelection: ComposerSessionSelection | null = null;
@@ -325,6 +334,9 @@ export function useSelectedComposerSession({
           : null) ?? null,
       engineDefaultSelectionReady: engineDefaultSelectionReady,
       enginePrefEffort,
+      targetEngineModelKeys: activeThreadId
+        ? resolveEngineModelKeysRef.current?.(activeThreadId) ?? null
+        : null,
     });
 
     for (const write of decision.writes) {
