@@ -20,8 +20,12 @@ use crate::state::AppState;
 
 use super::EngineType;
 
-/// Provider catalog aligned with pi v0.84.1 `packages/ai/src/env-api-keys.ts`
-/// (`envMap`). `env_var: None` marks OAuth-only providers (GitHub Copilot).
+/// Provider catalog aligned with pi v0.84.3 env map（bundle 内 `envVar` 对象 +
+/// anthropic 特例分支）。2026-08-27 对齐审计：0.84.1 → 0.84.3 provider/env-key
+/// 零漂移（providers.md 与 env help 逐项 diff），本次补录两版都存在但
+/// providers.md 未收录、此前按文档对齐时漏掉的 `moonshotai` / `moonshotai-cn`
+/// （MOONSHOT_API_KEY）。`google-vertex` 走 ADC/service account（非贴 key 型），
+/// 不进本目录。`env_var: None` marks OAuth-only providers (GitHub Copilot).
 struct PiAuthProviderDef {
     id: &'static str,
     env_var: Option<&'static str>,
@@ -131,6 +135,14 @@ const PI_AUTH_PROVIDER_CATALOG: &[PiAuthProviderDef] = &[
     PiAuthProviderDef {
         id: "kimi-coding",
         env_var: Some("KIMI_API_KEY"),
+    },
+    PiAuthProviderDef {
+        id: "moonshotai",
+        env_var: Some("MOONSHOT_API_KEY"),
+    },
+    PiAuthProviderDef {
+        id: "moonshotai-cn",
+        env_var: Some("MOONSHOT_API_KEY"),
     },
     PiAuthProviderDef {
         id: "minimax",
@@ -551,7 +563,7 @@ mod tests {
         let agent = dir.to_string_lossy().to_string();
         let result = list_pi_auth_providers(Some(&agent)).await.unwrap();
         assert!(!result.auth_file.exists);
-        assert!(result.providers.len() >= 35);
+        assert!(result.providers.len() >= 37);
         assert!(result.providers.iter().all(|item| item.state == "none"));
     }
 

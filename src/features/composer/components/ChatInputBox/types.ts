@@ -691,6 +691,8 @@ export interface ChatInputBoxProps {
 
   /** Send shortcut setting: 'enter' = Enter sends | 'cmdEnter' = Cmd/Ctrl+Enter sends */
   sendShortcut?: 'enter' | 'cmdEnter';
+  /** 停止按钮悬停提示里展示的中断快捷键（formatShortcutForPlatform 后的展示值；空则不展示） */
+  interruptShortcutLabel?: string | null;
 
   /** Currently selected agent */
   selectedAgent?: SelectedAgent | null;
@@ -888,6 +890,8 @@ export interface ButtonAreaProps {
   onStreamingEnabledChange?: (enabled: boolean) => void;
   /** Send shortcut setting */
   sendShortcut?: 'enter' | 'cmdEnter';
+  /** 停止按钮悬停提示里展示的中断快捷键（展示值；空则不展示） */
+  interruptShortcutLabel?: string | null;
   /** Currently selected agent */
   selectedAgent?: SelectedAgent | null;
   /** Agent selection callback */

@@ -756,6 +756,94 @@ describe("useThreadMessaging", () => {
     expect(response).toEqual(committedResponse);
   });
 
+  it("keeps Shared PI reasoning effort at the send boundary (capability-neutral passthrough)", async () => {
+    // send 边界的 PI model ref 只有字符串（无 supportedReasoningEfforts），
+    // reconcile 走 capability-neutral 直通：不发明、不清档（allowlist reconcile
+    // 由 Composer 层带 catalog metadata 完成）。合法档位 high 原样送达。
+    const threadId = "shared:thread-pi-effort-high";
+    const piTarget = {
+      engine: "pi" as const,
+      providerProfileId: "provider-pi",
+      modelCatalogEntryId: "provider-pi:google/gemini-2.5-pro",
+      providerProfileNameSnapshot: "PI Provider",
+      providerProfileSource: "managed" as const,
+      model: "google/gemini-2.5-pro",
+      reasoning: { effort: "high" },
+    };
+    vi.mocked(sendSharedSessionTurnRouted).mockResolvedValueOnce({
+      status: "accepted",
+      runtimeTurnId: "runtime-turn-pi-high",
+      v2: {
+        attemptId: "attempt-pi-high",
+        logicalTurnId: "logical-turn-pi-high",
+        committed: true,
+        duplicate: false,
+      },
+    });
+    const { result } = makeThreadMessagingHook("pi", {
+      activeThreadId: threadId,
+    });
+
+    await act(async () => {
+      await result.current.sendUserMessageToThread(workspace, threadId, "pi boundary high", [], {
+        sharedExecutionTarget: piTarget,
+      });
+    });
+
+    expect(sendSharedSessionTurnRouted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        engine: "pi",
+        model: "google/gemini-2.5-pro",
+        effort: "high",
+        target: piTarget,
+      }),
+    );
+  });
+
+  it("keeps an out-of-band Shared PI effort value at the send boundary instead of inventing a level", async () => {
+    // 边界无 capability metadata 时禁止发明档位：ultra 直通（既不映射 default
+    // 也不清空）；「非法档位收敛到模型 default」由带 metadata 的
+    // reconcileAtomicReasoningEffort 路径负责（atomicModelReasoning.test 覆盖）。
+    const threadId = "shared:thread-pi-effort-ultra";
+    const piTarget = {
+      engine: "pi" as const,
+      providerProfileId: "provider-pi",
+      modelCatalogEntryId: "provider-pi:google/gemini-2.5-pro",
+      providerProfileNameSnapshot: "PI Provider",
+      providerProfileSource: "managed" as const,
+      model: "google/gemini-2.5-pro",
+      reasoning: { effort: "ultra" },
+    };
+    vi.mocked(sendSharedSessionTurnRouted).mockResolvedValueOnce({
+      status: "accepted",
+      runtimeTurnId: "runtime-turn-pi-ultra",
+      v2: {
+        attemptId: "attempt-pi-ultra",
+        logicalTurnId: "logical-turn-pi-ultra",
+        committed: true,
+        duplicate: false,
+      },
+    });
+    const { result } = makeThreadMessagingHook("pi", {
+      activeThreadId: threadId,
+    });
+
+    await act(async () => {
+      await result.current.sendUserMessageToThread(workspace, threadId, "pi boundary ultra", [], {
+        sharedExecutionTarget: piTarget,
+      });
+    });
+
+    expect(sendSharedSessionTurnRouted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        engine: "pi",
+        model: "google/gemini-2.5-pro",
+        effort: "ultra",
+        target: piTarget,
+      }),
+    );
+  });
+
   it("fails closed for a stale unsupported Shared Target", async () => {
     selectNextTarget("ws-1", "shared:thread-1", {
       engine: "gemini",

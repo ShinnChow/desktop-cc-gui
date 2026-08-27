@@ -28,3 +28,10 @@
 - [x] `cargo test engine::pi` 全绿（与 HEAD baseline 对照不引入新 failure）。
 - [x] `openspec validate fix-pi-print-json-fallback-session-isolation` 通过。
 - [ ] 人工目视验收（可选，隔离开发者客户端）：历史会话切模型 → 另一并行 PI 继续 RPC；print-json 在跑时新建 PI 第一句正常。
+
+## 6. L5 降级天花板诚实化（2026-08-27 扩展）
+
+- [x] 核查降级错误文案：`pi.rs` fallback busy 错误已诚实（"rpc unavailable, print-json fallback cannot steer; the message stays queued"——说明降级 + 不可插话 + 消息留队列）；send gate 双证据返回结构化 `pi_engine_unavailable`（`fix-orphan-turn-during-backend-unavailability` F2，3 测）。
+- [x] 核查 RPC-only 命令降级：树面板 last-good + 错误态 + 重试入口（`fix-pi-rpc-latch-cooldown-tree-error-state` 已落地）；RPC-only 命令不回退 print-json（`commands.rs` 注释钉死）。
+- [x] spec delta 追加 ADDED requirement「print-json 降级天花板 MUST 诚实表达」：降级期无 steer（pi `--print` 协议层没有 steering 通道，明确不做）、双证据 gate、RPC-only last-good 三场景规范化。
+- [x] `openspec validate fix-pi-print-json-fallback-session-isolation` 复验通过。

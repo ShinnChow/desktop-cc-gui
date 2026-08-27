@@ -59,6 +59,7 @@ import { debugPiSidebarDrop } from "../../pi-session/store/piSidebarDropDiagnost
 import { isDefaultWorkspacePath } from "../../workspaces/utils/defaultWorkspace";
 import {
   formatShortcutForPlatform,
+  formatShortcutLabelOrNull,
   isMacPlatform,
 } from "../../../utils/shortcuts";
 import { isMacPlatform as isMacDesktopHost } from "../../../utils/platform";
@@ -295,6 +296,7 @@ type SidebarProps = {
   onCollapseSidebar?: () => void;
   globalSearchShortcut: string | null;
   openChatShortcut: string | null;
+  openSettingsShortcut?: string | null;
   isExitedSessionsHidden?: (workspacePath: string) => boolean;
   onToggleExitedSessionsHidden?: (workspacePath: string) => void;
   rootSessionFolderDraftRequestByWorkspaceId?: Record<string, number>;
@@ -407,6 +409,7 @@ function SidebarImpl({
   onCollapseSidebar,
   globalSearchShortcut,
   openChatShortcut,
+  openSettingsShortcut,
   isExitedSessionsHidden: controlledIsExitedSessionsHidden,
   onToggleExitedSessionsHidden: controlledToggleExitedSessionsHidden,
   rootSessionFolderDraftRequestByWorkspaceId:
@@ -440,6 +443,10 @@ function SidebarImpl({
   const quickSearchShortcutLabel = useMemo(
     () => formatShortcutForPlatform(globalSearchShortcut, isMac),
     [globalSearchShortcut, isMac],
+  );
+  const openSettingsShortcutLabel = useMemo(
+    () => formatShortcutLabelOrNull(openSettingsShortcut, isMac),
+    [openSettingsShortcut, isMac],
   );
 
   const [workspaceSettingsOpen, setWorkspaceSettingsOpen] = useState(false);
@@ -2749,6 +2756,7 @@ function SidebarImpl({
               runtimeNoticeHasError={runtimeNoticeHasError}
               showHideThreadsSidebar={showHideThreadsSidebar}
               onCollapseSidebar={onCollapseSidebar}
+              openSettingsShortcutLabel={openSettingsShortcutLabel}
             />
             {/* 锚点保留在侧栏底部供展开面板定位；外显气泡入口已收入设置二级菜单 */}
             {runtimeNoticeDockNode}

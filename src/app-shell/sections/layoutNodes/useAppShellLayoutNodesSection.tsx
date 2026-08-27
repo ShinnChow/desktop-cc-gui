@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { formatShortcutLabelOrNull } from "../../../utils/shortcuts";
 import {
   getClientStoreSync,
   writeClientStoreValue,
@@ -996,10 +997,35 @@ export function useAppShellLayoutNodesSection(
       return next;
     });
   }, [setCenterMode]);
+  const mainHeaderShortcutLabels = useMemo(
+    () => ({
+      rightPanel: formatShortcutLabelOrNull(
+        appSettings.toggleRightConversationSidebarShortcut,
+      ),
+      terminal: formatShortcutLabelOrNull(appSettings.toggleTerminalShortcut),
+      runtimeConsole: formatShortcutLabelOrNull(
+        appSettings.toggleRuntimeConsoleShortcut,
+      ),
+      browserDock: formatShortcutLabelOrNull(
+        appSettings.openBrowserDockShortcut,
+      ),
+      fileCompare: formatShortcutLabelOrNull(
+        appSettings.openFileCompareShortcut,
+      ),
+    }),
+    [
+      appSettings.toggleRightConversationSidebarShortcut,
+      appSettings.toggleTerminalShortcut,
+      appSettings.toggleRuntimeConsoleShortcut,
+      appSettings.openBrowserDockShortcut,
+      appSettings.openFileCompareShortcut,
+    ],
+  );
   const mainHeaderActions = useMainHeaderActionItems({
     isCompact,
     rightPanelCollapsed,
     sidebarToggleProps: mainHeaderSidebarToggleProps,
+    shortcutLabels: mainHeaderShortcutLabels,
     showRuntimeConsoleButton:
       !isCompact &&
       clientUiVisibility.isControlVisible("topTool.runtimeConsole"),
@@ -2424,6 +2450,9 @@ export function useAppShellLayoutNodesSection(
       textareaRef: composerInputRef,
       composerEditorSettings,
       composerSendShortcut: appSettings.composerSendShortcut,
+      composerInterruptShortcutLabel: formatShortcutLabelOrNull(
+        appSettings.interruptShortcut,
+      ),
       textareaHeight,
       onTextareaHeightChange,
       onOpenExperimentalSettings: handleOpenExperimentalSettings,
@@ -2483,6 +2512,7 @@ export function useAppShellLayoutNodesSection(
       onCollapseSidebar: collapseSidebar,
       globalSearchShortcut: appSettings.toggleGlobalSearchShortcut,
       openChatShortcut: appSettings.openChatShortcut,
+      openSettingsShortcut: appSettings.openSettingsShortcut,
       cycleOpenSessionPrevShortcut: appSettings.cycleOpenSessionPrevShortcut,
       cycleOpenSessionNextShortcut: appSettings.cycleOpenSessionNextShortcut,
       closeCurrentSessionShortcut: appSettings.closeCurrentSessionShortcut,

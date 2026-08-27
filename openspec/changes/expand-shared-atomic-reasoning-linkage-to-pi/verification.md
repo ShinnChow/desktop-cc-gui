@@ -70,12 +70,23 @@
 - **`buildProviderExecutionTarget` 与 send boundary 双层 reconcile 冗余**：picker 切换时 seed 一次，send 边界再 reconcile 一次。冗余但行为一致。**已知 design tradeoff**，design §决策 §8 已记录。
 - **DSH / Qoder / Kimi / Grok / OpenCode 引擎不在本 change 范围**：native DSH ReasoningSelect 已接通（ButtonArea 条件已就位），但 Shared 路径同样未接；Qoder ACP `session/set_config_option reasoning_effort` 缺乏用户实证。**out of scope**，由后续 change 各自评估。**不阻塞本 change 收口**。
 
+## 2026-08-27 L1 收口审计（checkbox 与实现对账）
+
+落地 commit `d0706f545` 后 tasks.md 39 项全未勾（进度事实缺失）。本日逐项按 HEAD 代码证据补勾：
+
+- **31/39 直接证据落地**（§1-§3 全部功能 task、§4 大部分测试、§5 文档/ADR、§6 部分、§7 三项）；关键 file:line 对账见 tasks.md 行内注记。
+- **补齐 2 个缺失测试**：`enrichModelReasoningForEngine` 非 PI 直返 passthrough（atomicModelReasoning.test.ts，28/28 绿）；`useThreadMessaging` PI send 边界 2 例（钉死落地契约：边界 model ref 无 capability metadata 时 PI 走 capability-neutral 直通——high 原样保留、ultra 不发明不清；「非法档位收敛 default」由带 metadata 的 Composer 层完成）。§1 验证表第 4 行「含新增 PI send boundary cases」自本日起为真。
+- **口径修正 2 项**：`npm run check` 脚本在仓库从未存在，以 `tsc --noEmit` + eslint 等价执行（2026-08-27 复核 typecheck 0 error）；`useThreadMessaging.test.tsx` 存量 4 failed（非 PI 用例，落地 commit 已做 stash-baseline 对照），本 change 相关用例全绿。
+- **复跑结果（2026-08-27）**：atomicModelReasoning 28/28；Composer.* 9 套件 100/100；ModelSelect 79/79；useThreadMessaging 116 passed / 4 存量 failed（与本 change 无关）。
+- **未勾剩余**：§6 两条手测 smoke（Native PI 0 回归 / Shared PI smoke）与 §7 收口 chore——保留为 active gate，完成后即可 archive。
+
 ## 收口门槛
 
-- [ ] 自动化测试 §1 全部通过
+- [x] 自动化测试 §1 全部通过【2026-08-27 复跑，见上节口径注记】
 - [ ] Native PI 0 回归 smoke §2 通过（手动）
 - [ ] Shared PI smoke §3 通过（手动）
-- [ ] Capability 验证 §4 通过
-- [ ] ADR 校准验证 §5 通过
-- [ ] 已知限制 §豁免 已在 proposal / design 中标注
-- [ ] proposal 8 条 Acceptance 全部覆盖（详见 proposal.md 「Acceptance」）
+- [x] Capability 验证 §4 通过
+- [x] ADR 校准验证 §5 通过
+- [x] 已知限制 §豁免 已在 proposal / design 中标注
+- [ ] proposal 8 条 Acceptance 全部覆盖（详见 proposal.md 「Acceptance」）【依赖两条手测 smoke】
+

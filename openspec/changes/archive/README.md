@@ -2,8 +2,8 @@
 
 本页为 `mossx` 已归档 OpenSpec proposal 的完整可点击索引。目录名中的日期是 archive date，不代表 proposal 首次创建时间。
 
-- Updated At: `2026-08-26`
-- Indexed proposals: `919`
+- Updated At: `2026-08-27`
+- Indexed proposals: `926`（以磁盘 `archive/<date>-*` 目录为准；本页逐条索引链接 872，历史存量缺口另计）
 - Source of truth: `openspec/changes/archive/<archive-date>-<change-id>/proposal.md`
 - Back to current changes: [`../README.md`](../README.md)
 - Back to workspace overview: [`../../project.md`](../../project.md)
@@ -11,6 +11,13 @@
 ## 2026-08
 
 ### 2026-08-26
+
+- [`2026-08-26-add-pi-models-json-config`](2026-08-26-add-pi-models-json-config/proposal.md) — verified implementation，已同步 4 capability requirement；PI 第三配置源 `~/.pi/agent/models.json` 自定义 provider（JSONC 保格式 raw-text 编辑器 + loose validation + 0600 原子写）；3.3 手测以 headless 等价验证收口（临时 `PI_CODING_AGENT_DIR` + `pi --list-models` 实证 openai-responses 中转可见；坏 JSON 拒写由先校验后原子替换 + 单测覆盖，waiver 记录于 verification.md）；2026-08-27 L1 收口批次归档
+- [`2026-08-26-add-pi-thinking-level-selector`](2026-08-26-add-pi-thinking-level-selector/proposal.md) — verified implementation，已同步 `pi-thinking-level-selector`（新 capability）；native PI composer 思考档位选择器：RPC `set_thinking_level` / print `--thinking` + 模型白名单（上游 `getSupportedThinkingLevels` 的 Rust 移植）；cargo pi 41 测 + 前端档位联动测试绿；2026-08-27 L1 收口批次归档（补 verification.md）
+- [`2026-08-26-fix-pi-rpc-file-wrapper-history-display`](2026-08-26-fix-pi-rpc-file-wrapper-history-display/proposal.md) — verified implementation，已同步 `pi-rpc-session-runtime`；历史回放剥离 RPC 时代 `<file path>` 附件包装并按图片/非图片分流，标题 `[图片]`/`[附件]` 标记止泄漏；commit `06c5e7545`；pi_history 单测锚定；2026-08-27 L1 收口批次归档
+- [`2026-08-26-fix-pi-capability-hygiene`](2026-08-26-fix-pi-capability-hygiene/proposal.md) — verified implementation；capability 诚实性（`streaming.tool-output` unsupported 口径入 fixture）+ 移除 PI 无意义权限/规划控件 + PI skills 目录进 slash 发现；engine-capability-matrix delta 未随档（主 spec 已重构为 fixture 生成物治理，pi 行已在 fixture；`--skip-specs`，先例同 `2026-08-24-add-dsh-engine`）；2026-08-27 L1 收口批次归档（补 verification.md）
+- [`2026-08-26-fix-pi-catalog-probe-extension-boot-timeout`](2026-08-26-fix-pi-catalog-probe-extension-boot-timeout/proposal.md) — verified implementation，已同步 `provider-model-catalog-refresh`（收口时补写 ADDED requirement「PI Catalog Probe MUST Skip Extension Boot And Use Widened Budget」）；PI catalog 探测 `--no-session --no-extensions`（实测 10.68s→0.99s）+ PI 专属 15s 预算 + 旧版无 flag 二跳兜底；单测 `pi_catalog_probe_rpc_args_skip_session_and_extension_boot` 钉死；commit `29dc592ed`；2026-08-27 L1 收口批次归档
+- [`2026-08-26-pi-background-task-experience`](2026-08-26-pi-background-task-experience/proposal.md) — verified implementation，已同步 `pi-background-task-experience`（新 capability，6 requirements）；canonical `backgroundTask` item 三路状态表（receipt/notification/registry）+ 任务卡 + composer pill + 历史回灌 + registry watcher 兜底 post-settle 缺口（B 通道为基石设计根治口径）；3.3 Render Perf 完整走查 2026-08-27 补做（五红线零命中，记录于 verification.md）；用户真机全链路验收通过；commit `2eea1cfb8`
 
 - [`2026-08-26-retire-sidebar-empty-session-placeholder`](2026-08-26-retire-sidebar-empty-session-placeholder/proposal.md) — verified implementation，已同步 `workspace-sidebar-session-loading`；侧栏「暂无会话」空态占位下线（曾谎报：settle 无条件标 hydrated 导致 加载中→暂无会话（假）→会话出现）；loading 终态对齐行到达（settle 看结果 + 20s grace 兜底 + armed 集合可重试）；loading 分阶段文案（读索引→完整扫描，组件内 4s 本地计时，刻意不做跨层 plumbing）；vitest 103/103 + tsc 绿；用户目视验收通过
 

@@ -263,6 +263,7 @@ export function ChatInputBoxFooter({
   streamingEnabled,
   onStreamingEnabledChange,
   sendShortcut,
+  interruptShortcutLabel,
   selectedAgent,
   onAgentSelect,
   onOpenAgentSettings,
@@ -334,6 +335,8 @@ export function ChatInputBoxFooter({
   streamingEnabled?: boolean;
   onStreamingEnabledChange?: (enabled: boolean) => void;
   sendShortcut: 'enter' | 'cmdEnter';
+  /** 停止按钮悬停提示里展示的中断快捷键（展示值；空则不展示） */
+  interruptShortcutLabel?: string | null;
   selectedAgent?: SelectedAgent | null;
   onAgentSelect?: (agent: SelectedAgent) => void;
   onOpenAgentSettings?: () => void;
@@ -585,6 +588,7 @@ export function ChatInputBoxFooter({
         streamingEnabled={streamingEnabled}
         onStreamingEnabledChange={onStreamingEnabledChange}
         sendShortcut={sendShortcut}
+        interruptShortcutLabel={interruptShortcutLabel}
         selectedAgent={selectedAgent}
         onAgentSelect={(agent) => onAgentSelect?.(agent)}
         onOpenAgentSettings={onOpenAgentSettings}

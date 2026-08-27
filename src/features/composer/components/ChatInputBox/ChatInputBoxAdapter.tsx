@@ -690,6 +690,8 @@ export interface ChatInputBoxAdapterProps {
   // Header/context bar
   placeholder?: string;
   sendShortcut?: 'enter' | 'cmdEnter';
+  /** 停止按钮悬停提示里展示的中断快捷键（展示值；空则不展示） */
+  interruptShortcutLabel?: string | null;
   activeFile?: string;
   selectedLines?: string;
   onClearContext?: () => void;
@@ -1242,6 +1244,7 @@ export const ChatInputBoxAdapter = memo(forwardRef<ChatInputBoxHandle, ChatInput
       onSelectSkill,
       placeholder,
       sendShortcut = 'enter',
+      interruptShortcutLabel,
       activeFile,
       selectedLines,
       onClearContext,
@@ -2291,6 +2294,7 @@ export const ChatInputBoxAdapter = memo(forwardRef<ChatInputBoxHandle, ChatInput
         workspaceId={workspaceId}
         placeholder={placeholder ?? t('chat.inputPlaceholder')}
         sendShortcut={sendShortcut}
+        interruptShortcutLabel={interruptShortcutLabel}
         selectedModel={resolvedSelectedModelId}
         models={normalizedModels}
         providerModelCatalogs={normalizedProviderModelCatalogs}

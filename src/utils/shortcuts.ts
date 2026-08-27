@@ -199,6 +199,17 @@ export function formatShortcutForPlatform(
   return [...modifiers, keyLabel].join("+");
 }
 
+/**
+ * Tooltip 展示用：未设置时返回 null（调用方据此省略快捷键段），
+ * 区别于 formatShortcutForPlatform 的 "Not set" 占位（设置页表单用语义）。
+ */
+export function formatShortcutLabelOrNull(
+  value: string | null | undefined,
+  isMac: boolean = isMacPlatform(),
+): string | null {
+  return value ? formatShortcutForPlatform(value, isMac) : null;
+}
+
 export function splitShortcutForPlatform(
   value: string | null | undefined,
   isMac: boolean = isMacPlatform(),

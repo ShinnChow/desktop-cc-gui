@@ -44,6 +44,8 @@ type SidebarSettingsMenuProps = {
   /** non-macOS：设置菜单「隐藏对话侧边栏」；mac 用 titlebar */
   showHideThreadsSidebar?: boolean;
   onCollapseSidebar?: () => void;
+  /** 设置齿轮悬停提示里展示的快捷键（formatShortcutForPlatform 后的展示值；空则不展示） */
+  openSettingsShortcutLabel?: string | null;
 };
 
 type SettingsMenuAction = {
@@ -73,6 +75,7 @@ export function SidebarSettingsMenu({
   runtimeNoticeHasError = false,
   showHideThreadsSidebar = false,
   onCollapseSidebar,
+  openSettingsShortcutLabel,
 }: SidebarSettingsMenuProps) {
   const { pinnedIds, togglePinned } = useSidebarSettingsPinnedActions();
   const atPinLimit = pinnedIds.length >= SIDEBAR_SETTINGS_PINNED_MAX;
@@ -268,7 +271,11 @@ export function SidebarSettingsMenu({
           type="button"
           className={`sidebar-primary-nav-item sidebar-primary-nav-item-bottom${isOpen ? " is-active" : ""}`}
           onClick={onToggleOpen}
-          title={t("settings.title")}
+          title={
+            openSettingsShortcutLabel
+              ? `${t("settings.title")} (${openSettingsShortcutLabel})`
+              : t("settings.title")
+          }
           aria-label={t("settings.title")}
           aria-expanded={isOpen}
           aria-haspopup="menu"

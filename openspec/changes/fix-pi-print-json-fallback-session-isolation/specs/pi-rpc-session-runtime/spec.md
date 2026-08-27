@@ -64,3 +64,27 @@ RPC spawn 或握手失败时系统 MUST log warn 并回退既有 `pi --print --m
 - **WHEN** RPC 发送失败回退 print-json
 - **THEN** 系统 MUST 按 `pi_resident_map_key(session_id, turn_id)` 释放本次发送占用的 resident（含 `scratch:{turn_id}` 新会话槽与非法 id 回落槽）
 - **AND** `session_id` 缺失（新会话）时 MUST NOT 跳过释放
+
+## ADDED Requirements
+
+### Requirement: print-json 降级天花板 MUST 诚实表达
+
+print-json 是 spawn-per-turn 降级路径：pi `--print` 模式在协议层没有 steering 通道。降级期间的 capability 表现 MUST 以诚实错误与可恢复语义表达，MUST NOT 静默假装成功或吞掉消息。
+
+#### Scenario: 降级期同会话发送被拒且消息留队列
+
+- **WHEN** RPC 不可用（latch 或 spawn 失败）且该 session 存在活跃 print-json 进程，用户再次发送
+- **THEN** 系统 MUST 拒绝并返回说明降级与不可插话的错误（「rpc unavailable, print-json fallback cannot steer; the message stays queued」语义）
+- **AND** 前端消息队列 MUST 保留该消息等待下轮投递，MUST NOT 丢弃
+
+#### Scenario: 双证据 send gate 快速失败
+
+- **WHEN** workspace 处于 rpc latch 冷却期 AND 同 session 的 print-json fallback 被占用
+- **THEN** `engine_send_message` MUST 返回结构化错误 `pi_engine_unavailable`（不返回 started、不进 turn 状态机，避免孤儿 turn）
+- **AND** 单证据（仅 latch 或仅 busy）MUST 照常放行（存活 resident 复用与 fallback 各自有自愈路径）
+
+#### Scenario: RPC-only 命令降级保留 last-good
+
+- **WHEN** RPC 不可用时调用 `pi_get_session_tree` / `pi_get_session_stats` / `pi_compact` / `pi_fork` / `pi_get_fork_messages`
+- **THEN** 命令 MUST 返回可重试错误（树面板保留 last-good 快照 + 错误态与重试入口）
+- **AND** MUST NOT 静默返回过期数据假装成功；这些命令 MUST NOT 回退 print-json（无等价 CLI 面）

@@ -883,6 +883,7 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
           onCollapseSidebar={options.onCollapseSidebar}
           globalSearchShortcut={options.globalSearchShortcut}
           openChatShortcut={options.openChatShortcut}
+          openSettingsShortcut={options.openSettingsShortcut}
           showLoadingProgressDialog={options.showLoadingProgressDialog}
           hideLoadingProgressDialog={options.hideLoadingProgressDialog}
           onOpenSpecHub={options.onOpenSpecHub}
@@ -918,6 +919,7 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
       options.engineOptions,
       options.getPinTimestamp,
       options.globalSearchShortcut,
+      options.openSettingsShortcut,
       options.groupedWorkspaces,
       options.hasWorkspaceGroups,
       options.hideLoadingProgressDialog,
@@ -1909,6 +1911,7 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
           textareaRef={options.textareaRef}
           editorSettings={options.composerEditorSettings}
           sendShortcut={options.composerSendShortcut}
+          interruptShortcutLabel={options.composerInterruptShortcutLabel}
           textareaHeight={options.textareaHeight}
           onTextareaHeightChange={options.onTextareaHeightChange}
           onOpenSkillsSettings={options.onOpenSkillsSettings}
@@ -2072,6 +2075,7 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
       options.textareaRef,
       options.composerEditorSettings,
       options.composerSendShortcut,
+      options.composerInterruptShortcutLabel,
       options.textareaHeight,
       options.onTextareaHeightChange,
       options.onOpenSkillsSettings,

@@ -23,4 +23,4 @@
 
 - [x] 3.1 创建 change `add-pi-models-json-config`（proposal / design / tasks / specs）
 - [x] 3.2 `openspec validate add-pi-models-json-config --strict --no-interactive` 通过
-- [ ] 3.3 手测：配一个 Grok 中转（openai-responses）→ 保存 → pi `/model` 可见可选；故意写坏 JSON → 保存被拒且原文件不变
+- [x] 3.3 手测：配一个 Grok 中转（openai-responses）→ 保存 → pi `/model` 可见可选；故意写坏 JSON → 保存被拒且原文件不变【2026-08-27 收口以 headless 等价验证代替 GUI 目测，waiver 记录于 verification.md：① 临时 `PI_CODING_AGENT_DIR` 写入 openai-responses Grok 中转（`providers` 包裹 schema）→ `pi --list-models --no-extensions`（pi@0.84.3）列出 `mossx-grok-relay grok-4-relay`；② 坏 JSON 拒写由 `write_pi_models_config` 先校验后原子替换保证（`pi_models_config.rs`「on ANY failure the existing file stays byte-identical」），`validation_rejects_hard_errors` 单测覆盖；GUI 编辑器为已测 Tauri command 的薄壳】
