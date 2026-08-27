@@ -135,14 +135,18 @@ type SelectorOptionRowProps = {
 
 裁决规则：形状可映射 → ModelSelect 内部级联改调 targetPicker 纯函数 + 等价性测试；形状不可映射或语义确有分叉 → 逐条裁决「哪边是产品语义」留档 §5，**不做静默合并**。
 
-## 5. 级联分叉裁决表（Phase 4 实施时回填）
+## 5. 级联分叉裁决表（2026-08-27 审计回填）
 
-| # | 审计维度 | targetPicker 行为 | ModelSelect 行为 | 裁决 | 处置 |
+**审计总裁决：不合并（裁决留档收口）**——且审计发现关键事实：`targetPicker.ts` 为**零消费死代码**（全仓 grep：`targetPicker` / `buildTargetPickerOptions` / `applyPickerSelection` / `validatePickerSelection` 除自身测试外零引用；Wave 4 B.1.3 产物 `fe81e9212`，shared-session 目标选择 UI 实际演进为 ModelSelect 直驱）。级联语义的活实现只在 ModelSelect 侧，「双轨收敛」命题不成立。
+
+| # | 审计维度 | targetPicker 行为（已死代码，存档） | ModelSelect 行为（活实现） | 裁决 | 处置 |
 | --- | ---------- | ------------------- | ------------------ | ------ | ------ |
-| 1 | 换 engine 重置范围 | （待审计） | （待审计） | | |
-| 2 | 换 provider profile 重置范围 | （待审计） | （待审计） | | |
-| 3 | 换 model 时 reasoning 保留 | （待审计） | （待审计） | | |
-| 4 | 空档 / disabled 回退 | （待审计） | （待审计） | | |
+| 1 | 换 engine 重置范围 | `applyPickerSelection('engine')` → `{ engine }` skeleton（provider/model/reasoning 全空，等用户逐级选） | 跨引擎 channel 切换 `sameEngine ? executionTarget : null` + `buildProviderExecutionTarget` 产出完整 resolved target（模型 + capability-seeded reasoning） | 有意分叉：skeleton 逐级选 vs 模型菜单直选，交互模型不同 | 保持 ModelSelect 单轨；targetPicker 死代码建议另案清退 |
+| 2 | 换 provider profile 重置范围 | `applyPickerSelection('provider')` → `{ engine, providerProfileId }`，model/reasoning 直接置空 | `handleChannelSwitch`：同引擎时 `keptModel` 保留（新渠道 catalog 内找当前 model，找不到回退首项）；reasoning 经 `buildProviderExecutionTarget(inherit=false)` 按 capability 重播种；override 竞态有 rollback | 有意分叉：ModelSelect 的 keptModel 保留是产品语义（Shared 切渠道不断模型） | 同上 |
+| 3 | 换 model 时 reasoning 保留 | `{ ...current, model }` 无条件保留，注释声明由 UI 层判定 | `resolveAtomicReasoningEffort({ inherit: sameProfile })`：同 engine+profile 且 previous effort 仍在 supportedReasoningEfforts 内才保留，否则落模型默认档 | 语义一致、机制不同；targetPicker 零消费故无对齐义务 | 同上 |
+| 4 | 空档 / disabled 回退 | `validatePickerSelection` 逐级标 invalidLevel | `isAtomicEmptyModelSelection` 合法空选态（模板编辑器）；`rollbackOverride` 竞态回滚；catalog 加载失败回退已有 projection | 有意分叉：校验器 vs 合法态 + 乐观回滚 | 同上 |
+
+**后续动作**：`targetPicker.ts`（4735 B）+ `targetPicker.test.ts`（12 用例）清退建议**另立 change**（本 change 边界声明不动 shared-session/target 域；死代码清退 capability 契约已在 `composer-selector-primitives` spec 覆盖 selector 族，shared-session 域清退需其归属 change 处理）。
 
 ## 6. 风险表
 

@@ -37,16 +37,16 @@
 - [x] 3.4 ModelSelect.tsx 主文件改 import 并删除已迁出代码（L144-592 切除 + import 修剪：resolveAtomicReasoningEffort / EngineIcon / ProviderBrandIconImg / brandIcon 系 / 10 个 profile 常量 / Dialog 系 / resolveModelMappingValue）；组件导出面不变 → **2027 → 1524 行**
 - [x] 3.5 全量改跨 feature import：`ChatInputBox.tsx` / `Composer.tsx` / `useProviderTargetCatalogOwners.test.tsx` / `ModelSelect.test.tsx`（实际 import 方比 proposal Impact 表预估小：useModels / app-shell / StageTargetPicker / atomicModelReasoning 均不直接 import ModelSelect 纯函数，proposal 表高估）
 - [x] 3.6 ModelSelect.test.tsx 仅改 import 路径，用例体不动；83 用例全绿
-- [ ] 3.7 【验证】typecheck 零 error；0.2 基线 + ModelSelect.test 全量复跑逐条一致；`npm run check:app-shell:governance` 通过；主文件行数对照 design §2 目标记录实际值
-- [ ] 3.8 提交：`refactor(composer): 拆分 ModelSelect 纯函数与 channel picker 到 model-select 子模块`
+- [x] 3.7 【验证】typecheck 零 error；0.2 基线 + ModelSelect.test 全量复跑逐条一致；`npm run check:app-shell:governance` 通过；主文件行数对照 design §2 目标记录实际值 → **我的文件 tsc 零 error（残留全在并行会话在途域）；175/175（=167+8）绿；governance 22/22；主文件实际 1524 行（design 目标 ≤800 量级未达，剩余为四级 picker 菜单 JSX 主体——按 design「不重设计交互」边界，菜单 JSX 拆分另案）**
+- [x] 3.8 提交：`refactor(composer): 拆分 ModelSelect 纯函数与 channel picker 到 model-select 子模块` → **`f80e019c8`（15 文件 +904/−620）；Composer.tsx 仅 import hunk 级 stage，并行会话在途零混入**
 
 ## Phase 4 · 级联语义收敛（审计驱动，允许「仅裁决不合并」收口）
 
-- [ ] 4.1 【审计】按 design §4 四维度对照 `targetPicker.ts` 与 ModelSelect 内部级联逻辑，回填 design §5 裁决表（含代码行级证据）
-- [ ] 4.2 【红】对每个「改调 targetPicker 纯函数」的收敛点先写等价性测试：同一输入（engine/profile/model/reasoning + catalog fixture）改前后同一输出
-- [ ] 4.3 【绿】执行形状允许的收敛；形状不允许的按裁决表留档跳过
-- [ ] 4.4 【验证】基线复跑零新增红；若结论为「不合并」，在 design §5 写明成本/收益依据后视为完成
-- [ ] 4.5 提交：`refactor(composer): 收敛 ModelSelect 与 targetPicker 级联语义分叉`（或 `docs(composer): 记录级联语义双轨裁决` ）
+- [x] 4.1 【审计】按 design §4 四维度对照 `targetPicker.ts` 与 ModelSelect 内部级联逻辑，回填 design §5 裁决表（含代码行级证据）→ **关键发现：targetPicker 为零消费死代码（Wave 4 B.1.3 产物，全仓 grep 四个导出符号零引用），「双轨收敛」命题不成立，ModelSelect 是唯一活实现；四维度均为有意分叉或语义一致机制不同，裁决表已回填**
+- [x] 4.2 【红】对每个「改调 targetPicker 纯函数」的收敛点先写等价性测试：同一输入（engine/profile/model/reasoning + catalog fixture）改前后同一输出 → **N/A：裁决为不合并（无收敛点），等价性测试义务不触发**
+- [x] 4.3 【绿】执行形状允许的收敛；形状不允许的按裁决表留档跳过 → **全部跳过（留档）**
+- [x] 4.4 【验证】基线复跑零新增红；若结论为「不合并」，在 design §5 写明成本/收益依据后视为完成 → **依据：targetPicker 死代码（成本=为死代码做桥接），非「成本>收益」权衡；targetPicker 清退另案（超出本 change 边界）**
+- [ ] 4.5 提交：`refactor(composer): 收敛 ModelSelect 与 targetPicker 级联语义分叉`（或 `docs(composer): 记录级联语义双轨裁决`）→ 走 docs 提交
 
 ## 收口
 
