@@ -3,7 +3,7 @@
 本页是 `mossx` OpenSpec proposal 的当前入口。它只维护 active change 的执行状态，并把 archived change 路由到完整历史索引；详细治理快照仍以 [`../project.md`](../project.md) 为准。
 
 - Updated At: `2026-08-27`
-- Active proposals: `71`（以磁盘 `openspec/changes/*` 为准）
+- Active proposals: `72`（以磁盘 `openspec/changes/*` 为准）
 - Archived proposals: `926`（以磁盘 `openspec/changes/archive/<date>-*` 目录为准；本页逐条索引链接 872，历史存量缺口另计）
 - Main capability specs: `544`
 
@@ -11,6 +11,7 @@
 
 | Change | Progress | Current gate | Artifacts |
 | ------ | -------: | ------------ | --------- |
+| [`refactor-composer-selector-layer`](refactor-composer-selector-layer/proposal.md) | proposed / TDD 待实施 | Composer selector 族结构债四项一体：删 ProviderSelect/ShortcutActionsSelect 死代码（~460 行零渲染引用）+ 抽 `SelectorOptionRow` 选项行原语（收敛 6+ 处手写，DOM/class 契约逐一等价）+ ModelSelect 2027 行拆 `model-select/` 子模块（纯函数跨 feature import 全量改路径，83 测试恒绿）+ ModelSelect 与 shared `targetPicker.ts` 级联语义分叉审计裁决；**不改任何用户可见行为；native/shared 三态编排层不动** | [proposal](refactor-composer-selector-layer/proposal.md) · [design](refactor-composer-selector-layer/design.md) · [tasks](refactor-composer-selector-layer/tasks.md) · [specs](refactor-composer-selector-layer/specs/) |
 | [`fix-claude-slash-command-title-truncation-omission`](fix-claude-slash-command-title-truncation-omission/proposal.md) | implementing / TDD | slash-command 会话被索引误剔（0.9.3 用户 desktop-cc-gui：claude 列表恒 0）：`/brainstorming` 信封前缀 >80 字符，`peek_claude_first_user_preview` 截断后 title 无完整 `<command-args>` 标签对 → `should_omit_claude_index_row` 误判裸命令整条剔除；修复 = truncate 前先用 `extract_command_prompt_text` 还原 prompt（与 history 路径同语义）；TDD 红→绿（writers 15/15）、rustfmt clean；与 fix-sidebar-reload-force-index-sync 互补 | [proposal](fix-claude-slash-command-title-truncation-omission/proposal.md) · [tasks](fix-claude-slash-command-title-truncation-omission/tasks.md) · [specs](fix-claude-slash-command-title-truncation-omission/specs/) |
 | [`fix-composer-cross-engine-draft-selection-leak`](fix-composer-cross-engine-draft-selection-leak/proposal.md) | implementing / TDD | 跨引擎模型串台（Claude 会话的 grok4.6/opus5 成为新 Codex 会话默认并进请求，2026-08-27 用户反馈）：draft carry 应用无引擎门禁；apply 点按 `resolveThreadEngine` 双侧一致才放行，未知引擎维持放行；只动 `selectedComposerSession.ts` / `useSelectedComposerSession.ts` + 测试；**不碰 fix-model-picker-send-authority 在途域** | [proposal](fix-composer-cross-engine-draft-selection-leak/proposal.md) · [design](fix-composer-cross-engine-draft-selection-leak/design.md) · [tasks](fix-composer-cross-engine-draft-selection-leak/tasks.md) · [specs](fix-composer-cross-engine-draft-selection-leak/specs/) |
 | [`fix-context-compacted-marker-turn-finality`](fix-context-compacted-marker-turn-finality/proposal.md) | implementing / TDD | 压缩留痕劫持 turn 终态：pi auto-compaction 先于 settle 入库 assistant 消息 → `markLatestAssistantMessageFinal` 误标 → 极简模式锚点错、真实回答被折进 chip（2026-08-27 用户反馈）；新增 `context-event` kind + `compaction_end` reason/token 透传 + i18n 分隔行渲染；**TDD 先红后绿** | [proposal](fix-context-compacted-marker-turn-finality/proposal.md) · [design](fix-context-compacted-marker-turn-finality/design.md) · [tasks](fix-context-compacted-marker-turn-finality/tasks.md) · [specs](fix-context-compacted-marker-turn-finality/specs/) |
@@ -62,6 +63,8 @@
 | [`add-linux-native-menu-localization`](add-linux-native-menu-localization/proposal.md) | 4/5 | NOT READY archive — Linux non-default language native menu smoke（原 GTK 缺陷边界，未在本机验证） | [proposal](add-linux-native-menu-localization/proposal.md) · [design](add-linux-native-menu-localization/design.md) · [tasks](add-linux-native-menu-localization/tasks.md) · [specs](add-linux-native-menu-localization/specs/) · [verification](add-linux-native-menu-localization/verification.md) |
 
 ## Active backlog notes（2026-08-08）
+
+- **新增提案** `refactor-composer-selector-layer`（2026-08-27）：Composer selector 族重构四合一（死代码清退 / SelectorOptionRow 原语 / ModelSelect 拆文件 / 级联语义裁决），TDD 四 Phase 独立提交；proposal/design/tasks/specs 已建，strict validate 通过，待实施。
 
 - **已归档** `fix-shared-owned-native-sidebar-leak` → `archive/2026-08-22-fix-shared-owned-native-sidebar-leak`：Shared live Target 认主 + ensureThread 闸 + hide 未就绪不放出新 grok/pi/qoder；用户 2026-08-22 手测通过；main specs 已同步 `shared-session-thread` / `shared-hide-list-prefilter`。
 
