@@ -1108,7 +1108,13 @@ export function useThreadTurnEvents({
       const timestamp = Date.now();
       const targetThreadIds = collectCompactionTargetThreadIds(threadId);
       const wasCodexCompacting = targetThreadIds.some(isCodexCompactionInFlight);
-      const isCodexCompaction = payload
+      // 引擎判定恢复「事件带 auto/manual flags 才按线程引擎判定」的旧语义：
+      // dispatch 层为透传 pi reason/token 恒传 payload 对象，Boolean(payload)
+      // 已不等价于「flags 存在」；codex 原生 compacted notification 无 flags，
+      // 不得触发 completed fallback 补挂（appendIfAlreadyCompleted 放宽）。
+      const payloadHasSourceFlags =
+        payload?.auto != null || payload?.manual != null;
+      const isCodexCompaction = payloadHasSourceFlags
         ? targetThreadIds.some((targetThreadId) => isCodexContextCompaction(targetThreadId))
         : wasCodexCompacting;
       setCodexCompactionInFlight(targetThreadIds, false);
@@ -1132,7 +1138,8 @@ export function useThreadTurnEvents({
       });
       const resolvedTurnId = turnId || `auto-${timestamp}`;
       if (isCodexCompaction) {
-        const shouldAppendCompletedFallback = Boolean(payload) && !wasCodexCompacting;
+        const shouldAppendCompletedFallback =
+          payloadHasSourceFlags && !wasCodexCompacting;
         targetThreadIds.forEach((targetThreadId) => {
           dispatch({
             type: "settleCodexCompactionMessage",

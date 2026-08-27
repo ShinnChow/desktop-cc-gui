@@ -17,6 +17,8 @@ B 的问题：三处消费点（finality、折叠 prose 判定、完成邮件聚
 
 `appendCodexCompactionMessage` / `settleCodexCompactionMessage` 是 Codex 专属形态（有 in-flight 状态机与 completed settle 语义），文案已 i18n，且 Codex 线程的极简折叠走独立判定，不受本 bug 影响。迁移它会扩大回归面，不做过。
 
+（2026-08-27 追加轮补强证据链）时序侧核实：Codex auto-compaction 由 Rust 侧 watermark 门控（`app_server_auto_compaction.rs::evaluate_auto_compaction_state`——`is_processing || pending_user_dispatch || in_flight` 时不触发），即 `thread/compacted` 恒晚于 `turn/completed` 到达；手动压缩同样只在 idle 触发（`try_reserve_manual_compaction` 拒绝 processing 窗口）。因此 `markLatestAssistantMessageFinal` 早已打在真实回答上，后到的 codex fallback 留痕无 `isFinal`、极简锚点回溯天然跳过——与 pi 的「compaction_end 先于 agent_settled」不同型，锚点劫持在 Codex 链路结构上不成立。
+
 ## 渲染形态
 
 `context-event` 行 = 居中细分割线 + 弱化小字：`已自动压缩上下文 · 236.5k → 41.2k tokens`（manual 则「已手动压缩上下文」，无 token 数据则只显示文案）。默认模式与极简模式同形态，均不进 chip、不参与折叠统计。命名沿用 `context-event` 而非 `context-compacted`，为未来同类引擎侧上下文事件（如溢出告警）留扩展位（`eventType` 判别字段）。

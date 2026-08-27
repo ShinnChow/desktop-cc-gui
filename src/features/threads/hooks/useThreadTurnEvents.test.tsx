@@ -2413,6 +2413,10 @@ describe("useThreadTurnEvents", () => {
       type: "appendContextCompacted",
       threadId: "thread-1",
       turnId: "turn-9",
+      reason: null,
+      tokensBefore: null,
+      estimatedTokensAfter: null,
+      timestampMs: expect.any(Number),
     });
     expect(recordThreadActivity).toHaveBeenCalledWith("ws-1", "thread-1", 2222);
     expect(safeMessageActivity).toHaveBeenCalled();
@@ -2629,6 +2633,10 @@ describe("useThreadTurnEvents", () => {
       type: "appendContextCompacted",
       threadId: "thread-1",
       turnId: "auto-3333",
+      reason: null,
+      tokensBefore: null,
+      estimatedTokensAfter: null,
+      timestampMs: expect.any(Number),
     });
 
     nowSpy.mockRestore();
@@ -2667,7 +2675,6 @@ describe("useThreadTurnEvents", () => {
         manual: false,
       });
     });
-
     expect(dispatch).toHaveBeenCalledWith({
       type: "markContextCompacting",
       threadId: "thread-1",
@@ -2685,6 +2692,42 @@ describe("useThreadTurnEvents", () => {
     });
     expect(dispatch).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: "appendContextCompacted" }),
+    );
+  });
+
+  it("treats flagless compaction payload as non-codex-settle even on a codex thread", () => {
+    // dispatch 层为透传 pi reason/token 恒传 payload 对象；codex 原生
+    // thread/compacted notification 不带 auto/manual flags。引擎判定必须
+    // 恢复「flags 存在才按引擎判定」的旧语义（Boolean(payload) ≡ flags），
+    // 否则意外的 completed fallback 留痕会被补挂（appendIfAlreadyCompleted
+    // 放宽）。见 fix-context-compacted-marker-turn-finality 追加轮。
+    const { result, dispatch } = makeOptions();
+
+    act(() => {
+      result.current.onContextCompacted("ws-1", "thread-1", "turn-flagless", {
+        reason: null,
+        tokensBefore: null,
+        estimatedTokensAfter: null,
+      });
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "appendContextCompacted",
+      threadId: "thread-1",
+      turnId: "turn-flagless",
+      reason: null,
+      tokensBefore: null,
+      estimatedTokensAfter: null,
+      timestampMs: expect.any(Number),
+    });
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "settleCodexCompactionMessage" }),
+    );
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "markContextCompacting",
+        completionStatus: "completed",
+      }),
     );
   });
 

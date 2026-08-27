@@ -37,6 +37,14 @@ TDD：每个实现 task 前置其失败测试；测试与实现同 task 收口�
 - [x] 全量：`npx tsc --noEmit`；vitest 跑 `useThreadsReducer` / `messagesViewModel` / `TimelineRowRenderer` / `Composer.context-dual-view` 相关文件；`cargo test engine::events`。
 - [x] `openspec validate fix-context-compacted-marker-turn-finality --strict` 通过。
 
+## 6b. 追加轮（2026-08-27 review 收尾）：flagless payload 语义恢复 + 断言补齐
+
+- [x] 红：`useThreadTurnEvents.test.tsx` 新增 `treats flagless compaction payload as non-codex-settle even on a codex thread`——dispatch 层为透传 pi reason/token 恒传 payload 对象后，codex 原生 `thread/compacted`（无 auto/manual flags）在 codex 线程上会误触发 `settleCodexCompactionMessage(appendIfAlreadyCompleted: true)` 的 fallback 补挂（`Boolean(payload)` 不再等价于「flags 存在」）。
+- [x] 绿：`onContextCompacted` 的 `isCodexCompaction` 与 `shouldAppendCompletedFallback` 判定改为 `payloadHasSourceFlags`（`payload?.auto != null || payload?.manual != null`）——恢复 8d5c68eee 之前的 codex 语义，pi reason/token 透传不受影响。
+- [x] 补齐 8d5c68eee 遗漏的两处精确断言（`appends a context compacted message` / `falls back to synthetic turn id`：`appendContextCompacted` dispatch 新增的 reason/tokens/timestampMs 字段）——HEAD 即红（当时漏跑该文件全量），本轮修复。
+- [x] 全量：`useThreadTurnEvents.test.tsx` 82/82（HEAD 基线 79 passed + 2 存量修复 + 1 新用例）。
+- [x] D3 补强：Codex 不迁移的时序证据链写入 design.md（watermark 门控恒 idle 触发 → compacted 晚于 turn settle → fallback 无 isFinal 不劫持锚点）。
+
 ## 7. 收口
 
 - [x] 提交拆分：OpenSpec 工件 / Rust 透传 / 前端实现+测试（中文 Conventional Commits）。
