@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import CheckIcon from 'lucide-react/dist/esm/icons/check';
 import { AVAILABLE_MODES, type PermissionMode } from '../types';
 import xuanzhonIcon from '../../../../../assets/xuanzhong.svg';
+import { SelectorOptionRow } from './SelectorOptionRow';
 import {
   MODE_SELECT_FLASH_DURATION_MS,
   MODE_SELECT_FLASH_EVENT,
@@ -11,7 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
@@ -225,35 +224,30 @@ export const ModeSelect = memo(({
         </DropdownMenuSubTrigger>
         <DropdownMenuSubContent className="composer-tool-menu-sub-content">
           {modeOptions.map((mode) => (
-            <button
+            <SelectorOptionRow
               key={mode.id}
-              type="button"
-              data-mode-id={mode.id}
-              className={`composer-tool-menu-option${mode.id === selectedModeId ? ' is-selected' : ''}${mode.disabled ? ' is-disabled' : ''}`}
+              variant="tool-menu"
+              dataAttrs={{ 'data-mode-id': mode.id }}
+              icon={
+                <span
+                  className={`codicon ${mode.icon} composer-tool-menu-option-icon`}
+                  aria-hidden="true"
+                />
+              }
+              label={getModeText(mode.id, 'label')}
+              description={getModeText(mode.id, 'description')}
+              selected={mode.id === selectedModeId}
               disabled={mode.disabled}
-              onClick={() => handleSelect(mode.id, mode.disabled)}
               title={getModeText(mode.id, 'tooltip')}
-            >
-              <span
-                className={`codicon ${mode.icon} composer-tool-menu-option-icon`}
-                aria-hidden="true"
-              />
-              <span className="composer-tool-menu-option-body">
-                <span className="composer-tool-menu-option-label">
-                  {getModeText(mode.id, 'label')}
-                </span>
-                <span className="composer-tool-menu-option-description">
-                  {getModeText(mode.id, 'description')}
-                </span>
-              </span>
-              {mode.id === selectedModeId && (
+              checkIndicator={
                 <img
                   src={xuanzhonIcon}
                   className="composer-tool-menu-option-check"
                   aria-hidden
                 />
-              )}
-            </button>
+              }
+              onSelect={() => handleSelect(mode.id, mode.disabled)}
+            />
           ))}
         </DropdownMenuSubContent>
       </DropdownMenuSub>
@@ -281,32 +275,23 @@ export const ModeSelect = memo(({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" sideOffset={4} className="w-72">
         {modeOptions.map((mode) => (
-          <DropdownMenuItem
+          <SelectorOptionRow
             key={mode.id}
-            data-mode-id={mode.id}
-            data-selected={mode.id === selectedModeId ? 'true' : undefined}
+            variant="dropdown"
+            dataAttrs={{ 'data-mode-id': mode.id }}
+            icon={
+              <span
+                className={`codicon ${mode.icon} mt-0.5 shrink-0`}
+                aria-hidden="true"
+              />
+            }
+            label={getModeText(mode.id, 'label')}
+            description={getModeText(mode.id, 'description')}
+            selected={mode.id === selectedModeId}
             disabled={mode.disabled}
-            onSelect={(event) => {
-              event.preventDefault();
-              handleSelect(mode.id, mode.disabled);
-            }}
             title={getModeText(mode.id, 'tooltip')}
-            className="items-start gap-2"
-          >
-            <span
-              className={`codicon ${mode.icon} mt-0.5 shrink-0`}
-              aria-hidden="true"
-            />
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-sm font-medium">{getModeText(mode.id, 'label')}</span>
-              <span className="text-xs text-muted-foreground whitespace-normal">
-                {getModeText(mode.id, 'description')}
-              </span>
-            </div>
-            {mode.id === selectedModeId && (
-              <CheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-            )}
-          </DropdownMenuItem>
+            onSelect={() => handleSelect(mode.id, mode.disabled)}
+          />
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

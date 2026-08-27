@@ -32,13 +32,13 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { SelectorOptionRow } from './selectors/SelectorOptionRow';
 
 // Stable no-op callbacks to avoid re-renders when optional handlers are not provided
 const NOOP_MODE = (_mode: PermissionMode) => {};
@@ -498,40 +498,27 @@ export const ButtonArea = ({
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent className="composer-tool-menu-sub-content">
                           {memoryReferenceDismissed && onRestoreMemoryReference ? (
-                            <DropdownMenuItem
-                              className="composer-tool-menu-option"
+                            <SelectorOptionRow
+                              variant="tool-menu"
+                              host="menu-item"
+                              label={t("composer.memoryReferenceRestore", {
+                                defaultValue: "恢复记忆参考",
+                              })}
                               onSelect={() => onRestoreMemoryReference()}
-                            >
-                              <span className="composer-tool-menu-option-body">
-                                <span className="composer-tool-menu-option-label">
-                                  {t("composer.memoryReferenceRestore", {
-                                    defaultValue: "恢复记忆参考",
-                                  })}
-                                </span>
-                              </span>
-                            </DropdownMenuItem>
+                            />
                           ) : null}
                           {MEMORY_REFERENCE_OPTIONS.map((option) => (
-                            <DropdownMenuItem
+                            <SelectorOptionRow
                               key={option.mode}
-                              className={`composer-tool-menu-option${
+                              variant="tool-menu"
+                              host="menu-item"
+                              label={t(option.labelKey, { defaultValue: option.fallback })}
+                              selected={
                                 !memoryReferenceDismissed &&
                                 memoryReferenceMode === option.mode
-                                  ? ' is-selected'
-                                  : ''
-                              }`}
+                              }
                               onSelect={() => onSetMemoryReferenceMode?.(option.mode)}
-                            >
-                              <span className="composer-tool-menu-option-body">
-                                <span className="composer-tool-menu-option-label">
-                                  {t(option.labelKey, { defaultValue: option.fallback })}
-                                </span>
-                              </span>
-                              {!memoryReferenceDismissed &&
-                                memoryReferenceMode === option.mode && (
-                                <span className="codicon codicon-check composer-tool-menu-option-check" aria-hidden="true" />
-                              )}
-                            </DropdownMenuItem>
+                            />
                           ))}
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>

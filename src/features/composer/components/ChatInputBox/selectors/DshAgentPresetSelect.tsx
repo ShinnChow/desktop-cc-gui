@@ -1,12 +1,11 @@
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import CheckIcon from "lucide-react/dist/esm/icons/check";
 import LockIcon from "lucide-react/dist/esm/icons/lock";
 import { pushErrorToast } from "../../../../../services/toasts";
+import { SelectorOptionRow } from "./SelectorOptionRow";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -86,35 +85,25 @@ export const DshAgentPresetSelect = memo(
           {DSH_AGENT_PRESET_OPTIONS.map((option) => {
             const selected = option.id === current.id;
             return (
-              <DropdownMenuItem
+              <SelectorOptionRow
                 key={option.id}
-                data-preset-id={option.id}
-                data-selected={selected ? "true" : undefined}
-                onSelect={(event) => {
-                  event.preventDefault();
-                  onChange(option.id);
-                  setIsOpen(false);
-                }}
-                className="items-start gap-2"
-              >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-sm font-medium">
-                    {t(option.labelKey, { defaultValue: option.labelFallback })}
-                  </span>
-                  <span className="text-xs text-muted-foreground whitespace-normal">
-                    {t(option.descriptionKey, {
-                      defaultValue: option.descriptionFallback,
-                    })}
-                  </span>
-                </div>
-                {selected ? (
-                  <CheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-                ) : (
+                variant="dropdown"
+                dataAttrs={{ "data-preset-id": option.id }}
+                label={t(option.labelKey, { defaultValue: option.labelFallback })}
+                description={t(option.descriptionKey, {
+                  defaultValue: option.descriptionFallback,
+                })}
+                selected={selected}
+                trailing={
                   <span className="mt-0.5 shrink-0 font-mono text-[10.5px] text-muted-foreground">
                     {option.id}
                   </span>
-                )}
-              </DropdownMenuItem>
+                }
+                onSelect={() => {
+                  onChange(option.id);
+                  setIsOpen(false);
+                }}
+              />
             );
           })}
         </DropdownMenuContent>

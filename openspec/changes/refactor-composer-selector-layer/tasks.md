@@ -12,21 +12,21 @@
 ## Phase 1 · 删除死代码（零行为变化）
 
 - [x] 1.1 【证明】grep 全仓确认 `ProviderSelect` / `ShortcutActionsSelect` 渲染引用为零（静态 import + 动态 `import(`），把输出贴进 PR 描述 → 组件本体+barrel+各自 test+ButtonArea.test mock 行（L57/L83，无断言使用）以外零引用；同名命中均为 `ProviderSelectionSource` / `onProviderSelect` 回调等误报
-- [ ] 1.2 删 `ProviderSelect.tsx` / `ProviderSelect.test.tsx` / `ShortcutActionsSelect.tsx` / `ShortcutActionsSelect.test.tsx`
-- [ ] 1.3 清理 `selectors/index.ts` barrel 两行导出
-- [ ] 1.4 【验证】typecheck 零新增 error；selectors 族 + ButtonArea 测试与 0.2 基线逐条一致；`grep -r "ProviderSelect\|ShortcutActionsSelect" src/` 仅剩无害文档注释（如有）
-- [ ] 1.5 提交（单提交）：`refactor(composer): 删除零引用的 ProviderSelect 与 ShortcutActionsSelect 死代码`
+- [x] 1.2 删 `ProviderSelect.tsx` / `ProviderSelect.test.tsx` / `ShortcutActionsSelect.tsx` / `ShortcutActionsSelect.test.tsx`
+- [x] 1.3 清理 `selectors/index.ts` barrel 两行导出
+- [x] 1.4 【验证】typecheck 零新增 error；selectors 族 + ButtonArea 测试与 0.2 基线逐条一致；`grep -r "ProviderSelect\|ShortcutActionsSelect" src/` 仅剩无害文档注释（如有）→ 155/155（基线 165 − 死组件测试 10）；顺带修 providerIconTone.test 读盘断言、ButtonArea.test 两个死 mock、三处过期注释（已随提交）
+- [x] 1.5 提交（单提交）：`refactor(composer): 删除零引用的 ProviderSelect 与 ShortcutActionsSelect 死代码` → **`248449592`（12 文件 +17/−723）**
 
 ## Phase 2 · SelectorOptionRow 原语（先红后绿，逐处替换）
 
-- [ ] 2.1 【红】写 `SelectorOptionRow.test.tsx`：variant × selected/disabled × icon/description 有无矩阵，断言 DOM 结构与 class 与 design §3 契约逐一等价（`composer-tool-menu-option*` 全系、`DropdownMenuItem` + `data-selected` + CheckIcon 出现条件、onClick/aria-disabled 语义）
-- [ ] 2.2 【绿】实现 `SelectorOptionRow.tsx`（variant='dropdown' 走 DropdownMenuItem；variant='tool-menu' 按 `as` 语义区分 div 与 DropdownMenuItem 两种宿主）
-- [ ] 2.3 替换 ReasoningSelect inline + standalone 分支（design §3 清单 #1 #2）→ 跑 ReasoningSelect.test + 锚点对照
-- [ ] 2.4 替换 ModeSelect 两分支（#3 #4）→ 跑 ModeSelect.test
-- [ ] 2.5 替换 ConfigSelect inline 分支 option 行（#5）→ 跑 ConfigSelect.test
-- [ ] 2.6 替换 ButtonArea memory-reference 子菜单（#6）→ 跑 ButtonArea.test
-- [ ] 2.7 评估 DshAgentPresetSelect（#7 前置）：option 行形状匹配则替换并跑测试；不匹配则在本 tasks 记录原因跳过
-- [ ] 2.8 【验证】0.2 基线全量复跑零新增红；typecheck 零新增；锚点清单对照无漂移；prettier 仅检查本 change 触及文件（存量 dirty 文件只保证自己 hunk 干净）
+- [x] 2.1 【红】写 `SelectorOptionRow.test.tsx`：variant × selected/disabled × icon/description 有无矩阵，断言 DOM 结构与 class 与 design §3 契约逐一等价（`composer-tool-menu-option*` 全系、`DropdownMenuItem` + `data-selected` + CheckIcon 出现条件、onClick/aria-disabled 语义）
+- [x] 2.2 【绿】实现 `SelectorOptionRow.tsx`（variant='dropdown' 走 DropdownMenuItem；variant='tool-menu' 按 `host` 区分 button 与 DropdownMenuItem 两种宿主）→ 12/12 绿；契约补 `checkIndicator`（ModeSelect img 指示器）与 `trailing`（Dsh 未选中徽标）两个覆盖位
+- [x] 2.3 替换 ReasoningSelect inline + standalone 分支（design §3 清单 #1 #2）→ 跑 ReasoningSelect.test + 锚点对照 → 7/7 绿
+- [x] 2.4 替换 ModeSelect 两分支（#3 #4）→ 跑 ModeSelect.test → 9/9 绿（首轮 2 红为测试运行与连续编辑的竞态假象，复跑全绿）
+- [x] 2.5 替换 ConfigSelect inline 分支 option 行（#5）→ 跑 ConfigSelect.test → 10/10 绿（loading 占位 div 非交互行保留手写）
+- [x] 2.6 替换 ButtonArea memory-reference 子菜单（#6）→ 跑 ButtonArea.test → 绿
+- [x] 2.7 评估 DshAgentPresetSelect（#7 前置）：`trailing` 覆盖「未选中显示 mono id 徽标」形态，形状契合 → 已替换，2/2 绿
+- [x] 2.8 【验证】0.2 基线全量复跑零新增红；typecheck 零新增；锚点清单对照无漂移；prettier 仅检查本 change 触及文件（存量 dirty 文件只保证自己 hunk 干净）→ **167/167（=165−10+12）；tsc 唯一 error 在并行会话在途文件 useThreadMessaging.ts（nativeTurnTargetLedger），与 selector 改动零关联；仓库无 prettier 配置（dev-guidelines 明文），全部外科式编辑合规**
 - [ ] 2.9 提交：`refactor(composer): 抽取 SelectorOptionRow 选项行原语并替换六处手写渲染`
 
 ## Phase 3 · ModelSelect 拆文件（行为零变化，测试恒绿）
