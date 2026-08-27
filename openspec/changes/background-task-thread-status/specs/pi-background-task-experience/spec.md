@@ -2,24 +2,25 @@
 
 ## ADDED Requirements
 
-### Requirement: 存在运行中后台任务时会话行 SHALL 显示独立第四态
+### Requirement: 存在运行中后台任务时会话行 SHALL 显示独立第四态（右侧 meta 区）
 
-当某会话存在未终态后台任务（running 计数 > 0）且该会话不在模型生成中（`isProcessing` / `isReviewing` 均为 false）时，sidebar 会话行状态点 MUST 显示 `bg-running` 态（紫色呼吸），MUST NOT 复用蓝色 `processing` 态（语义混淆：模型生成 vs 后台任务等待），MUST NOT 保持 `ready` / `unread` 静态态（丢失「未完成」信号）。状态优先级 MUST 为 reviewing > processing > bg-running > unread > ready。`prefers-reduced-motion` 下 MUST 降级为静态紫点。
+当某会话存在未终态后台任务（running 计数 > 0）且该会话不在模型生成中（`isProcessing` / `isReviewing` 均为 false）时，sidebar 会话行**右侧 meta 区**运行状态点（`thread-runtime-dot`）MUST 显示 `bg-running` 态（紫色呼吸），MUST NOT 复用蓝色 `processing` 态（语义混淆：模型生成 vs 后台任务等待），MUST NOT 丢失「未完成」信号。左侧 `thread-status` 点 MUST 保持原有四态分流（reviewing / processing / unread / ready）不变，MUST NOT 新增 `bg-running` 态。右侧运行状态点优先级 MUST 为 reviewing > processing > bg-running > completed(unread)。`prefers-reduced-motion` 下 MUST 降级为静态紫点。
 
-#### Scenario: bg_run 后切走会话紫灯亮起
+#### Scenario: bg_run 后切走会话右侧紫灯亮起
 
 - **WHEN** pi 会话经 `bg_run` 拉起后台任务（receipt 到达，status=running）且 turn 已 settle（`isProcessing=false`）
-- **THEN** 该会话行状态点 MUST 渲染 `.thread-status.bg-running`（紫色呼吸）
-- **AND** MUST NOT 渲染 `.thread-status.ready` 或 `.thread-status.unread`
+- **THEN** 该会话行右侧 MUST 渲染 `.thread-runtime-dot--bg-running`（紫色呼吸）
+- **AND** 左侧 `.thread-status` MUST 按原四态分流（此时为 `ready`），MUST NOT 渲染 `bg-running`
 
 #### Scenario: 模型生成中优先蓝灯
 
 - **WHEN** 会话同时处于 `isProcessing=true` 且后台任务 running 计数 > 0
-- **THEN** 状态点 MUST 保持 `processing`（蓝呼吸），MUST NOT 切为 `bg-running`
+- **THEN** 右侧运行状态点 MUST 保持 `processing`（蓝呼吸），MUST NOT 切为 `bg-running`
+- **AND** 计数徽标 MUST 仍然渲染（蓝灯+徽标并存）
 
-### Requirement: 运行计数 SHALL 以徽标形式上会话行
+### Requirement: 运行计数 SHALL 以徽标形式上会话行右侧
 
-后台任务 running 计数 MUST 以徽标渲染在会话行状态点旁，且显示条件独立于状态点颜色分流（蓝灯与徽标可并存）。计数 MUST 源自 `backgroundTaskStore` 的 running 过滤语义（status 非 completed / failed / killed，排除 receipt 前占位记录），MUST NOT 引入新的轮询。
+后台任务 running 计数 MUST 以徽标渲染在会话行右侧 meta 区（紧贴运行状态点），且显示条件独立于运行状态点颜色分流（蓝灯与徽标可并存）。计数 MUST 源自 `backgroundTaskStore` 的 running 过滤语义（status 非 completed / failed / killed，排除 receipt 前占位记录），MUST NOT 引入新的轮询。
 
 #### Scenario: 多任务计数可见
 

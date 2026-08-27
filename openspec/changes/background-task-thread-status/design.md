@@ -48,6 +48,7 @@ backgroundTaskStore 任意一路写入（started / receipt / notification / regi
 - **D5 徽标独立于灯色优先级**：`runningCount > 0` 即渲染徽标，与 statusClass 分流解耦——蓝灯（模型生成中）+ 徽标可并存，信息不丢失。
 - **D6 topbar tabs 只扩类型不渲染**：共享投影位扩第四位是机械改动，topbar 消费方类型自然兼容，但不加新 UI（用户裁决范围：列表行 + 雷达）。
 - **D7 不触发基石校准 Gate**：零 Rust 改动、零 canonical event 契约改动（只消费既有 `BackgroundTaskStarted/Updated` 的前端派生态），不在「更新触发器」清单内。
+- **D8 第四态位置在右侧 meta 区（2026-08-27 真机验收反馈修订）**：紫呼吸点与计数徽标渲染在会话行右侧 meta 区（`thread-runtime-dot--bg-running` + `thread-bg-task-count`），左侧 `thread-status` 保持原有四态不动。初版曾把 `bg-running` 插进左侧 statusClass 分流，真机看到后用户拍板改右侧——左侧点紧贴缩进/引擎徽标视觉拥挤，且右侧本就是「运行态」语义位（processing/reviewing/completed dot 所在）。
 
 ## 3. 各层设计
 
@@ -97,19 +98,20 @@ export function listBackgroundTaskRunningCounts(): Array<{
 
 ### 3.5 渲染（`ThreadList.tsx` + `sidebar.css`）
 
-statusClass 分流（优先级从高到低）：
+左侧 `thread-status` 点：保持原有四态分流不变（reviewing > processing > unread > ready）。
+
+右侧 meta 区运行状态点（`runtimeIndicator` → `thread-runtime-dot--*`）分流（优先级从高到低，D8）：
 
 ```
 isReviewing        → reviewing（静浅蓝，不变）
 isProcessing       → processing（蓝呼吸，不变）
 bgCount > 0        → bg-running（紫呼吸，新）
-hasUnread          → unread（静橙，不变）
-兜底               → ready（静绿，不变）
+hasUnread          → completed（静绿，不变）
 ```
 
-- 徽标：状态点后渲染 `<span className="thread-bg-task-count">{count}</span>`，`count > 0` 即显示，与灯色分流解耦（D5）；样式对齐 meta-area 既有小徽标形态。
-- CSS：`.thread-status.bg-running { background: #a55eea; box-shadow: 同款 halo; animation: sidebar-thread-status-breathe 1.8s ease-in-out infinite; }`；`prefers-reduced-motion` 覆盖规则（`sidebar.css:2977`）追加 `.thread-status.bg-running { animation: none; }`。
-- `runtimeIndicator` label 分支同步补 `bg-running`（tooltip 文案「后台任务运行中」）。
+- 徽标：紫点前渲染 `<span className="thread-bg-task-count">{count}</span>`，`count > 0` 即显示，与运行点颜色分流解耦（D5）；蓝灯（processing）+ 徽标并存。
+- CSS：`.thread-runtime-dot--bg-running { background: #a55eea; box-shadow: 同款 halo; animation: sidebar-thread-status-breathe 1.8s ease-in-out infinite; }` + `.thread-bg-task-count` 徽标样式（均含 light 主题变体）；`prefers-reduced-motion` 覆盖 `.thread-runtime-dot--bg-running { animation: none; }`。
+- `runtimeIndicator` label 分支补 `bg-running`（tooltip 文案「后台任务运行中」，i18n key `threads.runtimeBackgroundTasks`）。
 
 ### 3.6 雷达（`workspaceSessionActivityCompose.ts`）
 

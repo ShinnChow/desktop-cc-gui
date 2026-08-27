@@ -259,16 +259,15 @@ const ThreadRowItem = memo(function ThreadRowItem({
     ? "reviewing"
     : rowProjection.isProcessing
       ? "processing"
-      : backgroundTaskRunningCount > 0
-        ? "bg-running"
-        : rowProjection.hasUnread
-          ? "unread"
-          : "ready";
+      : rowProjection.hasUnread
+        ? "unread"
+        : "ready";
   // Live / completion status uses a compact meta-area dot (not a text pill):
   // - processing: blue breathe
   // - reviewing: static light blue
-  // - bg-running (pi durable background tasks in flight): purple breathe
+  // - bg-running (pi durable background tasks in flight): purple breathe + count badge
   // - unread (finished while away): green; cleared on select via setActiveThreadId
+  // 左侧 thread-status 保持原有四态；后台任务第四态只表达在右侧 meta 区。
   const runtimeIndicator = status?.isReviewing
     ? { label: t("threads.runtimeReviewing"), severity: "reviewing" as const }
     : status?.isProcessing
@@ -316,19 +315,6 @@ const ThreadRowItem = memo(function ThreadRowItem({
   const leadingChrome = (
     <>
       <span className={`thread-status ${statusClass}`} aria-hidden />
-      {backgroundTaskRunningCount > 0 ? (
-        <span
-          className="thread-bg-task-count"
-          title={t("threads.runtimeBackgroundTasks", {
-            defaultValue: "Background tasks running",
-          })}
-          aria-label={t("threads.runtimeBackgroundTasks", {
-            defaultValue: "Background tasks running",
-          })}
-        >
-          {backgroundTaskRunningCount}
-        </span>
-      ) : null}
       {canPin && onToggleThreadPin && !isRenaming ? (
         <span
           className={`thread-pin-toggle${isPinned ? " is-pinned" : ""}`}
@@ -510,6 +496,19 @@ const ThreadRowItem = memo(function ThreadRowItem({
             title={providerLabel}
           >
             {providerLabel}
+          </span>
+        ) : null}
+        {backgroundTaskRunningCount > 0 ? (
+          <span
+            className="thread-bg-task-count"
+            title={t("threads.runtimeBackgroundTasks", {
+              defaultValue: "Background tasks running",
+            })}
+            aria-label={t("threads.runtimeBackgroundTasks", {
+              defaultValue: "Background tasks running",
+            })}
+          >
+            {backgroundTaskRunningCount}
           </span>
         ) : null}
         {runtimeIndicator ? (

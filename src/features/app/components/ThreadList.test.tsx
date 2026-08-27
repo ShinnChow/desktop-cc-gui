@@ -103,7 +103,7 @@ const baseProps = {
 };
 
 describe("ThreadList background task row status", () => {
-  it("renders bg-running breathe dot with count badge when bg tasks run and turn settled", () => {
+  it("renders right-side bg-running breathe dot with count badge when bg tasks run and turn settled", () => {
     const { container } = render(
       <ThreadList
         {...baseProps}
@@ -119,9 +119,14 @@ describe("ThreadList background task row status", () => {
     );
 
     const row = container.querySelector(".thread-row");
-    expect(row?.querySelector(".thread-status")?.className).toContain(
-      "bg-running",
-    );
+    // 第四态只表达在右侧 meta 区 runtime dot；左侧 thread-status 回退原四态。
+    expect(
+      row?.querySelector(".thread-runtime-dot")?.className,
+    ).toContain("bg-running");
+    expect(
+      row?.querySelector(".thread-status")?.className,
+    ).not.toContain("bg-running");
+    expect(row?.querySelector(".thread-status")?.className).toContain("ready");
     const badge = row?.querySelector(".thread-bg-task-count");
     expect(badge?.textContent).toBe("2");
   });
@@ -146,8 +151,8 @@ describe("ThreadList background task row status", () => {
       "processing",
     );
     expect(
-      row?.querySelector(".thread-status")?.className,
-    ).not.toContain("bg-running");
+      row?.querySelector(".thread-runtime-dot")?.className,
+    ).toContain("processing");
     expect(row?.querySelector(".thread-bg-task-count")?.textContent).toBe("1");
   });
 

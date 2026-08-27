@@ -17,8 +17,8 @@
 
 - [x] 3.1 `useSidebarThreadStatusProjection.ts`：`SidebarThreadRowStatus` / `SourceThreadStatus` / reusePrevious 判定扩第四位
 - [x] 3.2 `threadRowStatusStore.tsx`：`ThreadStatusMap` 与 `areThreadRowStatusesEqual` 扩第四位
-- [x] 3.3 `ThreadList.tsx`：statusClass 分流插 `bg-running`（reviewing > processing > bg-running > unread > ready）；`statusVersion` memo 键追加 count 段；状态点旁渲染 `thread-bg-task-count` 徽标（count > 0 即显示）；`runtimeIndicator` 补 label 分支；`isExitedThread` 把后台任务运行中的会话视为未退出（hideExitedSessions 过滤下保持可见）
-- [x] 3.4 `sidebar.css`：`.thread-status.bg-running`（紫 `#a55eea`，复用 breathe keyframes 与同款 halo）+ `.thread-runtime-dot--bg-running` + `.thread-bg-task-count` 徽标样式；`prefers-reduced-motion` 覆盖追加 bg-running 两个 class
+- [x] 3.3 `ThreadList.tsx`：右侧 meta 运行状态点分流插 `bg-running`（reviewing > processing > bg-running > completed；左侧 `thread-status` 保持原四态，D8 真机验收反馈修订：第四态从左侧改右侧）；`statusVersion` memo 键追加 count 段；运行点旁渲染 `thread-bg-task-count` 徽标（count > 0 即显示）；`runtimeIndicator` 补 label 分支；`isExitedThread` 把后台任务运行中的会话视为未退出（hideExitedSessions 过滤下保持可见）
+- [x] 3.4 `sidebar.css`：`.thread-runtime-dot--bg-running`（紫 `#a55eea`，复用 breathe keyframes 与同款 halo）+ `.thread-bg-task-count` 徽标样式（均含 light 变体）；`prefers-reduced-motion` 覆盖追加 `.thread-runtime-dot--bg-running`
 - [x] 3.5 测试：projection 第四位引用稳定；ThreadList class 分流 / 徽标渲染 / 蓝灯+徽标并存
 
 ## 4. Phase 4 · 雷达接入与收口验证

@@ -23,7 +23,7 @@ pi 会话经 `bg_run` 拉起后台任务后，turn 在工具返回时即 settle�
 
 - **S1 状态位**：`ThreadActivityStatus` 新增 `backgroundTaskRunningCount?: number`；threads reducer 新增 action `markBackgroundTaskActivity { workspaceId, threadId, runningCount }`，值不变时保持引用稳定；0 跨越 + 非活跃判定在 reducer 内完成（跨到 0 且 `activeThreadIdByWorkspace[workspaceId] !== threadId` 时同步置 `hasUnread = true`）。
 - **S2 单订阅 sync**：新模块 `threadBackgroundTaskStatusSync` 订阅 `backgroundTaskStore` 版本号，枚举各 `(workspaceId, threadId)` 的 runningCount 与上次快照 diff，仅变化的线程 dispatch S1 action。一处接线覆盖全部四路写入（item/started、receipt/notification、registry watcher、历史 hydrate）+ `clearBackgroundTasks`，不侵入 loader。
-- **S3 投影与渲染**：`useSidebarThreadStatusProjection` / `threadRowStatusStore` 投影位与 equality 扩第四位；`ThreadList.tsx` statusClass 分流插入 `bg-running`（优先级 reviewing > processing > bg-running > unread > ready）；状态点旁渲染计数徽标（独立于灯色，`runningCount > 0` 即显示）；`sidebar.css` 新增 `.thread-status.bg-running`（复用 breathe keyframes，紫色）+ 加入 `prefers-reduced-motion` 覆盖。
+- **S3 投影与渲染**：`useSidebarThreadStatusProjection` / `threadRowStatusStore` 投影位与 equality 扩第四位；`ThreadList.tsx` 右侧 meta 运行状态点（`thread-runtime-dot`）分流插入 `bg-running`（优先级 reviewing > processing > bg-running > completed，左侧 `thread-status` 保持原四态）；运行点旁渲染计数徽标（独立于运行点颜色，`runningCount > 0` 即显示）；`sidebar.css` 新增 `.thread-runtime-dot--bg-running`（复用 breathe keyframes，紫色）与 `.thread-bg-task-count` 徽标样式 + `prefers-reduced-motion` 覆盖。
 - **S4 雷达**：`workspaceSessionActivityCompose.ts` 的 `threadIsProcessing` 改为 `isProcessing || backgroundTaskRunningCount > 0`。
 
 ## 非目标
@@ -63,7 +63,7 @@ pi 会话经 `bg_run` 拉起后台任务后，turn 在工具返回时即 settle�
 
 ## 验收标准
 
-- pi 会话 `bg_run` 后切到别的会话：原会话行显示紫色呼吸灯 + 运行计数徽标；模型生成中（蓝灯）与后台任务并存时蓝灯 + 徽标同显。
+- pi 会话 `bg_run` 后切到别的会话：原会话行右侧显示紫色呼吸点 + 运行计数徽标（左侧状态点保持原四态）；模型生成中（蓝点）与后台任务并存时蓝点 + 徽标同显。
 - 全部后台任务转终态（含 failed / killed）：紫灯熄灭；非活跃会话行出现未读点，活跃会话不出现。
 - 会话雷达把「仅后台任务在跑」的会话计为活跃。
 - 重开 app 历史加载后：已终态任务不误亮紫灯（hydrate 只补缺、按状态计数）。
