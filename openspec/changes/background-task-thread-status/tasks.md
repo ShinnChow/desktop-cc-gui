@@ -5,6 +5,7 @@
 - [x] 1.1 `threadReducerTypes.ts`：`ThreadActivityStatus` 追加 `backgroundTaskRunningCount?: number`；`ThreadAction` 追加 `markBackgroundTaskActivity { workspaceId, threadId, runningCount }`
 - [x] 1.2 `useThreadsReducer.ts`：实现 action——count 与 `hasUnread` 均不变时返回原引用；`prev > 0 && next === 0 && 非活跃线程` 时同步置 `hasUnread = true`
 - [x] 1.3 reducer 单测：写入 / 引用稳定 / 0 跨越触发 unread / 活跃线程不触发 / 同值重复 dispatch no-op / 已删除线程无异常
+- [x] 1.4 修复 status 写点抹除（D9 真机事故）：`markProcessing`（true/false）与 `markContextCompacting` 显式枚举补 `backgroundTaskRunningCount` 保留；回归测试锁定 markProcessing / markContextCompacting 往返不丢计数
 
 ## 2. Phase 2 · store 枚举 API + 单订阅 sync
 

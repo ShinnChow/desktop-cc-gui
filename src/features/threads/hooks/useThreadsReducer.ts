@@ -1025,6 +1025,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
               hasUnread: previous?.hasUnread ?? false,
               isReviewing: previous?.isReviewing ?? false,
               isContextCompacting: previous?.isContextCompacting ?? false,
+              backgroundTaskRunningCount:
+                previous?.backgroundTaskRunningCount ?? 0,
               processingStartedAt:
                 wasProcessing && startedAt ? startedAt : action.timestamp,
               lastDurationMs,
@@ -1073,6 +1075,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
             hasUnread: nextHasUnread,
             isReviewing: previous?.isReviewing ?? false,
             isContextCompacting: previous?.isContextCompacting ?? false,
+            backgroundTaskRunningCount:
+              previous?.backgroundTaskRunningCount ?? 0,
             processingStartedAt: null,
             lastDurationMs: nextDuration,
             heartbeatPulse: 0,
@@ -1143,6 +1147,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
             hasUnread: previous?.hasUnread ?? false,
             isReviewing: previous?.isReviewing ?? false,
             isContextCompacting: action.isCompacting,
+            backgroundTaskRunningCount:
+              previous?.backgroundTaskRunningCount ?? 0,
             processingStartedAt: nextStartedAt,
             lastDurationMs: nextDuration,
             heartbeatPulse: previous?.heartbeatPulse ?? 0,

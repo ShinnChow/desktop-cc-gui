@@ -49,6 +49,7 @@ backgroundTaskStore 任意一路写入（started / receipt / notification / regi
 - **D6 topbar tabs 只扩类型不渲染**：共享投影位扩第四位是机械改动，topbar 消费方类型自然兼容，但不加新 UI（用户裁决范围：列表行 + 雷达）。
 - **D7 不触发基石校准 Gate**：零 Rust 改动、零 canonical event 契约改动（只消费既有 `BackgroundTaskStarted/Updated` 的前端派生态），不在「更新触发器」清单内。
 - **D8 第四态位置在右侧 meta 区（2026-08-27 真机验收反馈修订）**：紫呼吸点与计数徽标渲染在会话行右侧 meta 区（`thread-runtime-dot--bg-running` + `thread-bg-task-count`），左侧 `thread-status` 保持原有四态不动。初版曾把 `bg-running` 插进左侧 statusClass 分流，真机看到后用户拍板改右侧——左侧点紧贴缩进/引擎徽标视觉拥挤，且右侧本就是「运行态」语义位（processing/reviewing/completed dot 所在）。
+- **D9 status 写点必须保留 backgroundTaskRunningCount（2026-08-27 真机事故修复）**：`markProcessing`（true/false 两分支）与 `markContextCompacting` 是显式逐字段枚举重建 status，不含新字段——turn settle 的一次 `markProcessing(false)` 就把计数抹掉，且 store 无新事件时 sync 不会补发，紫灯永久熄灭（真机复现：pill 2/4 亮着、行上无灯无徽标、时间照常显示）。三处写点已补 `backgroundTaskRunningCount: previous?.backgroundTaskRunningCount ?? 0`，并以回归测试锁定（markProcessing / markContextCompacting 往返保留计数）。审计结论：其余写点走 `withThreadStatusDefaults` 或 `...previous` 展开，天然保留。
 
 ## 3. 各层设计
 

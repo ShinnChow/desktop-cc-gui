@@ -161,4 +161,47 @@ describe("threadReducer markBackgroundTaskActivity", () => {
       state.threadStatusById["thread-never-ensured"]?.backgroundTaskRunningCount,
     ).toBe(1);
   });
+
+  // 回归：真实事故链——turn settle 的 markProcessing(false) 显式重建 status，
+  // 曾把计数抹掉导致紫灯永久熄灭（store 无新事件、sync 不补发）。
+  it("preserves backgroundTaskRunningCount across markProcessing transitions", () => {
+    let state = ensureThread(initialState, THREAD);
+    state = markBackgroundTaskActivity(state, THREAD, 2);
+
+    state = threadReducer(state, {
+      type: "markProcessing",
+      threadId: THREAD,
+      isProcessing: true,
+      timestamp: NOW,
+    });
+    expect(state.threadStatusById[THREAD]?.backgroundTaskRunningCount).toBe(2);
+
+    state = threadReducer(state, {
+      type: "markProcessing",
+      threadId: THREAD,
+      isProcessing: false,
+      timestamp: NOW + 1_000,
+    });
+    expect(state.threadStatusById[THREAD]?.backgroundTaskRunningCount).toBe(2);
+  });
+
+  it("preserves backgroundTaskRunningCount across markContextCompacting", () => {
+    let state = ensureThread(initialState, THREAD);
+    state = markBackgroundTaskActivity(state, THREAD, 1);
+
+    state = threadReducer(state, {
+      type: "markContextCompacting",
+      threadId: THREAD,
+      isCompacting: true,
+    });
+    expect(state.threadStatusById[THREAD]?.backgroundTaskRunningCount).toBe(1);
+
+    state = threadReducer(state, {
+      type: "markContextCompacting",
+      threadId: THREAD,
+      isCompacting: false,
+      completionStatus: "completed",
+    });
+    expect(state.threadStatusById[THREAD]?.backgroundTaskRunningCount).toBe(1);
+  });
 });
