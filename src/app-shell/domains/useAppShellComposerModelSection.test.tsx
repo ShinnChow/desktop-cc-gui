@@ -289,6 +289,48 @@ describe("useAppShellComposerModelSection handleSelectModel", () => {
     expect(persistComposerSelectionForThread).not.toHaveBeenCalled();
   });
 
+
+  it("D1红/绿裁决：同引擎（codex→codex）切换窗口不得把上一线程模型写进目标线程账本", () => {
+    const persistComposerSelectionForThread = vi.fn();
+    renderSection({
+      activeEngine: "codex",
+      activeThreadId: "thread-local-codex-B",
+      // 账本同步标志仍指向线程 A：切换窗口（reload 未 commit B 前）
+      selectedComposerSelectionThreadId: "thread-local-codex-A",
+      persistComposerSelectionForThread,
+      // 共享 codex catalog 同时含 A/B 两线程的模型（modelsReady=true）
+      models: [
+        makeModel("model-from-A"),
+        makeModel("model-of-B", { isDefault: true }),
+      ],
+      // 切换窗口：selectedComposerSelection 仍是线程 A 的账本值（reload 未 commit B 前的渲染帧）
+      selectedComposerSelection: {
+        modelId: "model-from-A",
+        effort: "high",
+      },
+    });
+    // 期望（现状可疑为红）：不产生任何 repair 写入
+    expect(persistComposerSelectionForThread).not.toHaveBeenCalled();
+  });
+
+  it("D3红/绿裁决：目标线程账本 miss + 全局残留（上一线程模型）时不得经 repair 固化", () => {
+    const persistComposerSelectionForThread = vi.fn();
+    renderSection({
+      activeEngine: "codex",
+      activeThreadId: "thread-local-codex-C",
+      persistComposerSelectionForThread,
+      models: [makeModel("model-from-A"), makeModel("default-codex", { isDefault: true })],
+      // B/C 线程无自身账本：selectedComposerSelection=null（已切到位）
+      selectedComposerSelection: null,
+      // useModels 全局残留 = 上一线程 A 的模型
+      selectedModelId: "model-from-A",
+      selectedEffort: "high",
+    });
+    // 期望：账本为 null 的线程不得被全局残留种入（engine default 才是合法种入路径，
+    // 且仅 pending 线程；本线程为已定稿本地 codex 线程）
+    expect(persistComposerSelectionForThread).not.toHaveBeenCalled();
+  });
+
   it("still runs Codex repair on an unprefixed local thread without rewriting unknown ids", () => {
     const persistComposerSelectionForThread = vi.fn();
     const { result } = renderSection({

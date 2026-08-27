@@ -68,6 +68,8 @@ type UseSelectedComposerSessionOptions = {
 
 type UseSelectedComposerSessionResult = {
   selectedComposerSelection: ComposerSessionSelection | null;
+  /** D1 防竞态：最近一次 commit 对应的线程 id（切换窗口内与 activeThreadId 不一致） */
+  selectedComposerSelectionThreadId: string | null;
   selectedComposerSelectionRef: MutableRefObject<ComposerSessionSelection | null>;
   handleSelectComposerSelection: (selection: ComposerSessionSelection | null) => void;
   persistComposerSelectionForThread: (
@@ -101,6 +103,10 @@ export function useSelectedComposerSession({
   const draftComposerSelectionSourceThreadIdRef = useRef<string | null>(null);
   const [selectedComposerSelection, setSelectedComposerSelection] =
     useState<ComposerSessionSelection | null>(null);
+  // D1 防竞态：记录最近一次 commit 对应的线程 id；切换窗口内它与 activeThreadId
+  // 不一致，repair 等回写方据此拒绝把 stale 账本固化进目标线程。
+  const [selectedComposerSelectionThreadId, setSelectedComposerSelectionThreadId] =
+    useState<string | null>(null);
   const selectedComposerSelectionRef = useRef<ComposerSessionSelection | null>(null);
   const draftComposerSelectionWorkspaceIdRef = useRef<string | null>(null);
   const shouldApplyDraftToNextThreadRef = useRef(false);
@@ -333,6 +339,7 @@ export function useSelectedComposerSession({
       cacheSelectionForSessionKey(activeSessionKey, decision.display);
     }
     commitSelectedComposerSelection(decision.display);
+    setSelectedComposerSelectionThreadId(activeThreadId);
   }, [
     activeThreadId,
     activeWorkspaceId,
@@ -470,6 +477,7 @@ export function useSelectedComposerSession({
 
   return {
     selectedComposerSelection,
+    selectedComposerSelectionThreadId,
     selectedComposerSelectionRef,
     handleSelectComposerSelection,
     persistComposerSelectionForThread,

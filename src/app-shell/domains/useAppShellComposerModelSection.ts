@@ -50,6 +50,7 @@ export function useAppShellComposerModelSection({
   selectedCollaborationMode,
   selectedCollaborationModeId,
   selectedComposerSelection,
+  selectedComposerSelectionThreadId,
   selectedEffort,
   selectedModelId,
   setAppSettings,
@@ -81,6 +82,7 @@ export function useAppShellComposerModelSection({
     activeThreadId,
     engineModelsAsOptions,
     selectedComposerSelection,
+    selectedComposerSelectionThreadId,
   ]);
   const effectiveModels = useMemo<ModelOption[]>(() => {
     if (
@@ -529,7 +531,12 @@ export function useAppShellComposerModelSection({
       (threadEngine !== null && threadEngine !== "codex") ||
       !activeThreadId ||
       !selectedComposerSelection ||
-      !modelsReady
+      !modelsReady ||
+      // D1：账本尚未同步到当前线程（切换窗口）时，selectedComposerSelection
+      // 是上一线程的 stale 值——此刻 repair 会把它写进目标线程持久账本。
+      // 无标志信息（null/undefined）时保持放行（向后兼容旧接线）。
+      (selectedComposerSelectionThreadId != null &&
+        selectedComposerSelectionThreadId !== activeThreadId)
     ) {
       return;
     }

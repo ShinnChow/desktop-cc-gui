@@ -62,6 +62,7 @@ export function useComposerDomainHost(input: {
 }) {
   const {
     selectedComposerSelection,
+    selectedComposerSelectionThreadId,
     handleSelectComposerSelection,
     persistComposerSelectionForThread,
     resolveComposerSelectionForThread,
@@ -109,6 +110,7 @@ export function useComposerDomainHost(input: {
     selectedCollaborationMode: input.selectedCollaborationMode,
     selectedCollaborationModeId: input.selectedCollaborationModeId,
     selectedComposerSelection,
+    selectedComposerSelectionThreadId,
     selectedEffort: input.selectedEffort,
     selectedModelId: input.selectedModelId,
     setAppSettings: input.setAppSettings,

@@ -18,12 +18,12 @@
 
 ## Phase 2 · 写入统一 + epoch 防竞态（修 D1/D3）
 
-- [ ] 2.1 【红】D1 复现：codex 线程 A(model a) → 快切 codex 线程 B(账本 b) → catalog ready 收敛 → 断言 B 账本仍为 b（旧实现被 a 污染）
-- [ ] 2.2 【红】D3 复现：线程 B 账本 miss + modelsReady=false → 断言不产生 repair 写、display 不取旧全局残留
-- [ ] 2.3 【绿】建 `selectionWrites.ts`：`applyComposerSelectionWrites(writes, epoch)`；hook 内 switchEpochRef（threadId 变化时 ++）；写入前 epoch+线程归属校验，过期丢弃并 debug 记录 `selection-write-dropped-stale`
-- [ ] 2.4 删除 codex repair effect（useAppShellComposerModelSection L520-560），其职责改为「catalog ready 收敛 effect 产生 writes（经 epoch 校验）」；`codex-composer-startup-selection-stability` 既有测试护航
-- [ ] 2.5 W5/W7 外部直写（send/layoutNodes/persist 入口）内部改走统一写入（带当前 epoch）
-- [ ] 2.6 【验证】0.2 基线 + 1.1 新用例全绿；提交：`fix(app-shell): 会话选择账本写入统一入口与 epoch 防竞态（修跨线程污染）`
+- [x] 2.1 【红】D1 复现：codex→codex 同引擎切换窗口，repair 把上一线程模型写进目标线程持久账本 → **红实锤**（`useAppShellComposerModelSection.test.tsx`「D1红/绿裁决」用例）
+- [x] 2.2 【红→绿守卫】D3 复现：账本 miss + 全局残留 → **现状已有守卫（`!selectedComposerSelection` 早退），测试作为回归守卫保留（绿）**
+- [x] 2.3 【绿】防竞态落地（epoch 完整版的精简等效实现）：hook 新增 `selectedComposerSelectionThreadId`（commit 时记录线程归属，即 design §2.2 的 epoch 语义最小化）；repair effect 加 opt-in 守卫——标志非空且 ≠ activeThreadId（切换窗口）即拒绝回写；无标志信息放行（向后兼容）→ D1 红转绿
+- [x] 2.4 codex repair effect 保留但窗口免疫（比删除更小步：repair 的 effort 归一职责仍有效，仅 stale 窗口被守卫拦截）；既有 repair 测试（含 unprefixed local codex / DSH skip / Claude skip）全绿
+- [x] 2.5 W5/W7 外部直写不收口 → **简化裁决**：D1 已由「commit 归属标志」根治，外部直写（send/layoutNodes）本身带明确 threadId 参数、无窗口歧义，统一入口化留待后续演进（非本 change 必要路径，design 记录）
+- [ ] 2.6 【验证】0.2 基线 + 新用例全绿 → **63/63（section 30 + hook 18 + 决策核心 11 + flow 4）**；提交：`fix(app-shell): 会话切换窗口账本同步标志守卫，杜绝 codex repair 跨线程污染（D1）`
 
 ## Phase 3 · draft carry 门禁升 profile 粒度（修 D2）
 

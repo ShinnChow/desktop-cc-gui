@@ -86,6 +86,10 @@ type ThreadSelectionSwitchDecision = {
 - W2 repair effect 删除，其职责并入决策核心：切线程决策不含 repair；repair 只在「用户点选」与「catalog ready 收敛」两个明确时机由点选路径/收敛 effect 产生 writes，且经 epoch 校验。
 - W5/W7 外部直写保留接口但内部走 `applyComposerSelectionWrites`（带当前 epoch）。
 
+### 2.3 实施注记（Phase 2 简化裁决）
+
+epoch 完整版（单调计数 + 写入携带）精简为「commit 归属标志」：`useSelectedComposerSession` 在 reload commit 时记录 `selectedComposerSelectionThreadId`；所有依赖账本状态的回写方（当前唯一 = codex repair effect）在标志与 activeThreadId 不一致的窗口内拒绝写入。语义与 epoch 等效（窗口判定），实现面小一个数量级；若未来出现多写入方竞争再升级为完整 epoch 通道。
+
 ## 3. 漂移候选 → 修复映射
 
 | # | 候选 | 修复 Phase | 红测试最小场景 |
@@ -104,11 +108,11 @@ P1（纯函数抽取）是地基；P2 依赖 P1 的 writes 通道；P3/P4 相对
 
 | # | 红测试（文件/用例名） | 修复提交 | 验证 |
 | --- | --------------------- | -------- | ---- |
-| D1 | （待实施回填） | | |
-| D2 | （待实施回填） | | |
-| D3 | （待实施回填） | | |
-| D4 | （待实施回填） | | |
-| D5 | （待实施回填） | | |
+| D1 | useAppShellComposerModelSection.test.tsx「D1红/绿裁决：同引擎切换窗口」——红实锤 | Phase 2（本 change） | 修复=commit 归属标志守卫；63/63 绿 |
+| D2 | （Phase 3 待实施） | | |
+| D3 | 「D3红/绿裁决：账本 miss + 全局残留」——现状已有守卫（绿），保留为回归守卫 | N/A（无需修复） | N/A |
+| D4 | （Phase 4 待实施） | | |
+| D5 | （Phase 4 待实施） | | |
 
 ## 6. 风险表
 
