@@ -154,3 +154,12 @@ type SelectorOptionRowProps = {
 | 并行会话同期改 selectors（ModelSelect.tsx 高频改动区） | 中 | 中 | 每 Phase 小步独立提交；开工前 `git status` 确认目标目录干净；发现他方在途改动即停手协调 |
 | Phase 4 强行合并导致级联行为回归 | 低 | 高 | 裁决表留档 + 等价性测试双保险；允许「不合并，仅裁决留档」收口 |
 | 删除死代码后 barrel 导出残留引用 | 低 | 低 | grep + typecheck 双查 |
+
+## 附录 A · 锚点清单（Phase 0.4 基线，2026-08-27）
+
+Phase 2/3 重构后以下锚点集合 MUST 不变（提取自 ReasoningSelect / ModeSelect / ConfigSelect / ButtonArea 现状渲染输出）：
+
+- **composer-tool-menu 全系**：`composer-tool-menu-action(-label)` / `composer-tool-menu-item-(body|icon|label|value)` / `composer-tool-menu-option(-body|-check|-description|-icon|-label)` / `composer-tool-menu-sub-(content|trigger)` / `composer-tool-menu-surface-row` / `composer-tool-menu-toggle(-label|-switch)`
+- **selector-button 系**：`selector-button` / `selector-button-mode-(chevron|icon|trigger)` / `selector-button-text`
+- **selector-option 系（ConfigSelect standalone）**：`selector-option` / `selector-option-agent-icon` / `selector-option-fork-quick` / `selector-option-plan-mode` / `selector-option-review-quick` / `selector-option-speed(-fast|-standard)` / `selector-option-streaming-toggle` / `selector-option-thinking-toggle`
+- **data 锚点**：`data-selected` / `data-reasoning-id` / `data-testid="composer-session-control-hud"`

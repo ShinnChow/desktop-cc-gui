@@ -436,7 +436,7 @@ export function useSidebarMenus({
   opencodeProviderProfiles = [],
 }: SidebarMenuHandlers) {
   const { t } = useTranslation();
-  // 与 Composer ProviderSelect 同源：AppSettings.disabledCliEngines 的前台可见性。
+  // 与 Composer 四级 target picker（ModelSelect）同源：AppSettings.disabledCliEngines 的前台可见性。
   const disabledCliEngineIds = useCliEngineVisibility();
   const [workspaceMenuState, setWorkspaceMenuState] =
     useState<WorkspaceMenuState | null>(null);

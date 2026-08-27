@@ -3,8 +3,8 @@
 // 事实源是 AppSettings.disabledCliEngines(黑名单,默认 [] = 全部启用)。
 // 若沿 providerAvailability 的路径做 prop drilling,需要穿透 Composer →
 // ChatInputBoxAdapter → ChatInputBox → Footer → ButtonArea 五层;改为与
-// composerEnginePrefsStore 同构的外部 store 后,只有订阅可见性的 ProviderSelect
-// 会重渲染。seed 由 useAppShellComposerPrefsPersistence 在设置变化时调用。
+// composerEnginePrefsStore 同构的外部 store 后,只有订阅可见性的
+// selector(四级 target picker 等)会重渲染。seed 由 useAppShellComposerPrefsPersistence 在设置变化时调用。
 
 import { useSyncExternalStore } from "react";
 

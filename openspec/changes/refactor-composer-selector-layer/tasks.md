@@ -4,14 +4,14 @@
 
 ## Phase 0 · 基线与 Gate 前置
 
-- [ ] 0.1 `git status` 确认 `src/features/composer/components/ChatInputBox/selectors/`、`ButtonArea.tsx`、`features/multi-agent/` 工作区干净；不干净即停手协调
-- [ ] 0.2 跑基线：`npx vitest run src/features/composer/components/ChatInputBox/selectors/ src/features/composer/components/ChatInputBox/ButtonArea.test.tsx` 记录通过/失败清单（存量失败逐条记录，作为零新增红对照）
+- [x] 0.1 `git status` 确认 `src/features/composer/components/ChatInputBox/selectors/`、`ButtonArea.tsx`、`features/multi-agent/` 工作区干净；不干净即停手协调
+- [x] 0.2 跑基线：`npx vitest run src/features/composer/components/ChatInputBox/selectors/ src/features/composer/components/ChatInputBox/ButtonArea.test.tsx` 记录通过/失败清单（存量失败逐条记录，作为零新增红对照）→ **165/165 全绿（13 文件，2026-08-27）**
 - [ ] 0.3 `npx tsc --noEmit`（或项目 typecheck script）记录基线 error 数
-- [ ] 0.4 记录锚点清单：grep 提取 selectors 族渲染输出中的 class / testid / aria 键集合，存 `design.md` 附录或本 tasks 备注，供 Phase 2/3 后对照
+- [x] 0.4 记录锚点清单：grep 提取 selectors 族渲染输出中的 class / testid / aria 键集合，存 `design.md` 附录或本 tasks 备注，供 Phase 2/3 后对照 → **design.md 附录 A（含 ButtonArea）**
 
 ## Phase 1 · 删除死代码（零行为变化）
 
-- [ ] 1.1 【证明】grep 全仓确认 `ProviderSelect` / `ShortcutActionsSelect` 渲染引用为零（静态 import + 动态 `import(`），把输出贴进 PR 描述
+- [x] 1.1 【证明】grep 全仓确认 `ProviderSelect` / `ShortcutActionsSelect` 渲染引用为零（静态 import + 动态 `import(`），把输出贴进 PR 描述 → 组件本体+barrel+各自 test+ButtonArea.test mock 行（L57/L83，无断言使用）以外零引用；同名命中均为 `ProviderSelectionSource` / `onProviderSelect` 回调等误报
 - [ ] 1.2 删 `ProviderSelect.tsx` / `ProviderSelect.test.tsx` / `ShortcutActionsSelect.tsx` / `ShortcutActionsSelect.test.tsx`
 - [ ] 1.3 清理 `selectors/index.ts` barrel 两行导出
 - [ ] 1.4 【验证】typecheck 零新增 error；selectors 族 + ButtonArea 测试与 0.2 基线逐条一致；`grep -r "ProviderSelect\|ShortcutActionsSelect" src/` 仅剩无害文档注释（如有）
