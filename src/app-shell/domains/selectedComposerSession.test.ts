@@ -71,6 +71,118 @@ describe("selectedComposerSession", () => {
     ).toBe(false);
   });
 
+  // fix-composer-cross-engine-draft-selection-leak：
+  // carry 来源线程引擎已知时，draft 只允许进入同引擎 pending（composer-session-selection-isolation）。
+  it("applies a same-engine draft onto its own pending thread", () => {
+    expect(
+      shouldApplyDraftComposerSelectionToThread({
+        candidate: null,
+        shouldApplyDraftToNextThread: true,
+        draftComposerSelection: draftSelection,
+        activeThreadId: "claude-pending-2",
+        draftSourceThreadId: "claude:session-1",
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects a cross-engine draft (Claude draft onto Codex pending)", () => {
+    expect(
+      shouldApplyDraftComposerSelectionToThread({
+        candidate: null,
+        shouldApplyDraftToNextThread: true,
+        draftComposerSelection: draftSelection,
+        activeThreadId: "codex-pending-1",
+        draftSourceThreadId: "claude:session-1",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps legacy behavior when the draft has no source thread (home pick)", () => {
+    expect(
+      shouldApplyDraftComposerSelectionToThread({
+        candidate: null,
+        shouldApplyDraftToNextThread: true,
+        draftComposerSelection: draftSelection,
+        activeThreadId: "codex-pending-1",
+        draftSourceThreadId: null,
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps legacy behavior when either side resolves no engine", () => {
+    expect(
+      shouldApplyDraftComposerSelectionToThread({
+        candidate: null,
+        shouldApplyDraftToNextThread: true,
+        draftComposerSelection: draftSelection,
+        activeThreadId: "codex-pending-1",
+        draftSourceThreadId: "unprefixed-local-thread",
+      }),
+    ).toBe(true);
+    expect(
+      shouldApplyDraftComposerSelectionToThread({
+        candidate: null,
+        shouldApplyDraftToNextThread: true,
+        draftComposerSelection: draftSelection,
+        activeThreadId: "shared-pending-9",
+        draftSourceThreadId: "unprefixed-local-thread",
+      }),
+    ).toBe(true);
+  });
+
+  // composer-session-selection-isolation 的引擎无关性锁：
+  // resolveThreadEngine 登记的全部 native CLI 两两组合都必须被同一道闸口拦截。
+  const ENGINE_SOURCE_THREAD_IDS: Record<string, string> = {
+    claude: "claude:a",
+    codex: "codex:b",
+    gemini: "gemini:c",
+    grok: "grok:d",
+    kimi: "kimi:e",
+    opencode: "opencode:f",
+    pi: "pi:g",
+    dsh: "dsh:h",
+    qoder: "qoder:i",
+  };
+
+  for (const [sourceEngine, sourceThreadId] of Object.entries(
+    ENGINE_SOURCE_THREAD_IDS,
+  )) {
+    it(`rejects ${sourceEngine} drafts onto every other engine's pending thread`, () => {
+      for (const [targetEngine] of Object.entries(ENGINE_SOURCE_THREAD_IDS)) {
+        if (targetEngine === sourceEngine) {
+          continue;
+        }
+        expect(
+          shouldApplyDraftComposerSelectionToThread({
+            candidate: null,
+            shouldApplyDraftToNextThread: true,
+            draftComposerSelection: { modelId: "some-model", effort: null },
+            activeThreadId: `${targetEngine}-pending-1`,
+            draftSourceThreadId: sourceThreadId,
+          }),
+          `${sourceEngine} draft must not apply to ${targetEngine} pending`,
+        ).toBe(false);
+      }
+    });
+  }
+
+  it("still applies drafts within every single engine", () => {
+    for (const [engine, sourceThreadId] of Object.entries(
+      ENGINE_SOURCE_THREAD_IDS,
+    )) {
+      expect(
+        shouldApplyDraftComposerSelectionToThread({
+          candidate: null,
+          shouldApplyDraftToNextThread: true,
+          draftComposerSelection: { modelId: "some-model", effort: null },
+          activeThreadId: `${engine}-pending-2`,
+          draftSourceThreadId: sourceThreadId,
+        }),
+        `same-engine ${engine} carry must keep working`,
+      ).toBe(true);
+    }
+  });
+
   // 并行 native：离开会话 A 后 draft 不得污染历史会话 B（finalized）。
   it("does not apply MiniMax draft onto a finalized DeepSeek-bound historical session", () => {
     const minimaxDraft: ComposerSessionSelection = {

@@ -96,6 +96,9 @@ export function useSelectedComposerSession({
   >({});
   const [draftComposerSelection, setDraftComposerSelection] =
     useState<ComposerSessionSelection | null>(null);
+  // composer-session-selection-isolation：carry 时记下来源线程 id，
+  // apply 点据此拒绝把 draft 落进异引擎 pending。同步 ref，不进 state。
+  const draftComposerSelectionSourceThreadIdRef = useRef<string | null>(null);
   const [selectedComposerSelection, setSelectedComposerSelection] =
     useState<ComposerSessionSelection | null>(null);
   const selectedComposerSelectionRef = useRef<ComposerSessionSelection | null>(null);
@@ -207,10 +210,13 @@ export function useSelectedComposerSession({
           selectionsEqual(current, normalized) ? current : normalized,
         );
         draftComposerSelectionWorkspaceIdRef.current = activeWorkspaceId ?? null;
+        // 无线程来源（Home 点选）：引擎身份未知，门禁按放行语义处理。
+        draftComposerSelectionSourceThreadIdRef.current = null;
         shouldApplyDraftToNextThreadRef.current = Boolean(normalized);
         return;
       }
       shouldApplyDraftToNextThreadRef.current = false;
+      draftComposerSelectionSourceThreadIdRef.current = null;
       persistComposerSelectionForThread(activeWorkspaceId, activeThreadId, normalized);
     },
     [activeThreadId, activeWorkspaceId, persistComposerSelectionForThread],
@@ -322,6 +328,7 @@ export function useSelectedComposerSession({
           shouldApplyDraftToNextThread: shouldApplyDraftToNextThreadRef.current,
           draftComposerSelection: draftSelectionForActiveThread,
           activeThreadId,
+          draftSourceThreadId: draftComposerSelectionSourceThreadIdRef.current,
         });
       if (shouldApplyDraftSelection) {
         candidate = draftSelectionForActiveThread;
@@ -383,6 +390,8 @@ export function useSelectedComposerSession({
       const latestSelection = selectedComposerSelectionRef.current;
       setDraftComposerSelection(latestSelection ?? null);
       draftComposerSelectionWorkspaceIdRef.current = activeWorkspaceId ?? null;
+      // 记录草稿来源线程，apply 点用它做引擎一致性判定。
+      draftComposerSelectionSourceThreadIdRef.current = previousThreadId;
       shouldApplyDraftToNextThreadRef.current = Boolean(latestSelection);
     }
     previousThreadIdForDraftCarryRef.current = activeThreadId ?? null;

@@ -103,4 +103,51 @@ describe("selected composer session flow", () => {
     expect(state[workspaceAKey]).toEqual({ modelId: "gpt-5.4", effort: "high" });
     expect(state[workspaceBKey]).toEqual({ modelId: "gpt-5.5", effort: "medium" });
   });
+
+  // fix-composer-cross-engine-draft-selection-leak：
+  // 离开 Claude 会话产生的草稿不得写进下一条 Codex pending 的账本；
+  // 同引擎（grok）链路保持既有继承行为。
+  it("rejects carrying a Claude draft onto a Codex pending session", () => {
+    const claudeThreadId = "claude:session-1";
+    const codexPendingThreadId = "codex-pending-2001";
+    const claudeDraft: ComposerSessionSelection = {
+      modelId: "grok-4.6",
+      effort: "high",
+    };
+
+    expect(
+      shouldApplyDraftComposerSelectionToThread({
+        candidate: null,
+        shouldApplyDraftToNextThread: true,
+        draftComposerSelection: claudeDraft,
+        activeThreadId: codexPendingThreadId,
+        draftSourceThreadId: claudeThreadId,
+      }),
+    ).toBe(false);
+  });
+
+  it("still carries a grok draft onto a new grok pending session", () => {
+    const grokDraft: ComposerSessionSelection = {
+      modelId: "grok-4.6",
+      effort: "high",
+    };
+    const sessionMap: SessionMap = {};
+    const targetSessionKey = getThreadComposerSelectionStorageKey(
+      "ws-frontend",
+      "grok-pending-3001",
+    );
+    const shouldApply = shouldApplyDraftComposerSelectionToThread({
+      candidate: sessionMap[targetSessionKey] ?? null,
+      shouldApplyDraftToNextThread: true,
+      draftComposerSelection: grokDraft,
+      activeThreadId: "grok-pending-3001",
+      draftSourceThreadId: "grok:session-0",
+    });
+
+    expect(shouldApply).toBe(true);
+    if (shouldApply) {
+      sessionMap[targetSessionKey] = grokDraft;
+    }
+    expect(sessionMap[targetSessionKey]).toEqual(grokDraft);
+  });
 });

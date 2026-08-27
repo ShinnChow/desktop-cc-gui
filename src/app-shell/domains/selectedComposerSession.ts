@@ -150,14 +150,32 @@ export function shouldApplyDraftComposerSelectionToThread(input: {
   shouldApplyDraftToNextThread: boolean;
   draftComposerSelection: ComposerSessionSelection | null;
   activeThreadId: string | null;
+  /** 来源线程 id；carry 自会话时必传，Home 点选等无线程来源为 null。 */
+  draftSourceThreadId?: string | null;
 }): boolean {
-  return Boolean(
+  const baseOk = Boolean(
     !input.candidate &&
       input.shouldApplyDraftToNextThread &&
       input.draftComposerSelection &&
       input.activeThreadId &&
       input.activeThreadId.includes("-pending-"),
   );
+  if (!baseOk) {
+    return false;
+  }
+  // composer-session-selection-isolation：draft 只允许落在同引擎 pending。
+  // 与迁移路径 hasEngineMismatch 同构——任一侧引擎解析不出（Home 点选 /
+  // Shared / 无前缀 id）保持既有放行语义，不在此处引入回归。
+  const sourceEngine = resolveThreadEngine(input.draftSourceThreadId ?? "");
+  const targetEngine = resolveThreadEngine(input.activeThreadId ?? "");
+  if (
+    sourceEngine !== null &&
+    targetEngine !== null &&
+    sourceEngine !== targetEngine
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function shouldMigrateComposerSelectionBetweenThreadIds(input: {
