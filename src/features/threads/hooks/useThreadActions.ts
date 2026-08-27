@@ -1383,17 +1383,23 @@ export function useThreadActions({
           claudeResult.value.length === 0;
         if (claudeResult.status === "fulfilled") {
           if (shouldMergeNativeClaudeSessions && claudeResult.value === null) {
-            rememberPartialSource("claude-session-timeout");
-            onDebug?.({
-              id: `${Date.now()}-client-claude-session-timeout`,
-              timestamp: Date.now(),
-              source: "client",
-              label: "thread/list claude timeout",
-              payload: {
-                workspaceId: workspace.id,
-                timeoutMs: NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
-              },
-            });
+            // focus-refresh merge 的 null 是 by-design skip（Promise.resolve(null)），
+            // 不是 30s 超时：不打假 timeout 日志、不记 timeout partialSource，
+            // 否则下游会把整个可见列表误标 partial-thread-list degraded
+            // （2026-08-27 用户数据实锤：129 条假 30s 超时/49min）。
+            if (!isFocusRefreshMerge) {
+              rememberPartialSource("claude-session-timeout");
+              onDebug?.({
+                id: `${Date.now()}-client-claude-session-timeout`,
+                timestamp: Date.now(),
+                source: "client",
+                label: "thread/list claude timeout",
+                payload: {
+                  workspaceId: workspace.id,
+                  timeoutMs: NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
+                },
+              });
+            }
             // 在 partial-source merge 之前先 seed last-good Claude 条目，
             // 避免下游 catalog merge / archive merge 因看到空 Claude 子源而形成残缺基底。
             // 即便下游 partial-source 路径被绕过或将来重构，最终列表也不会丢失 Claude 历史。
@@ -1629,7 +1635,9 @@ export function useThreadActions({
           );
         }
         if (projectCatalogResult.status === "fulfilled") {
-          if (projectCatalogValue === null) {
+          if (projectCatalogValue === null && !isFocusRefreshMerge) {
+            // null 只可能是真 timeout（focus-refresh merge 的 by-design 占位
+            // null 已被门控排除，不再伪造 codex-catalog-timeout）。
             rememberPartialSource("codex-catalog-timeout");
             onDebug?.({
               id: `${Date.now()}-client-codex-catalog-timeout`,
