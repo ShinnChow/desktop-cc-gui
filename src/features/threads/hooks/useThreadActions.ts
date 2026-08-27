@@ -18,6 +18,7 @@ import {
   getOpenCodeSessionList as getOpenCodeSessionListService,
   listSessionIndexForWorkspace as listSessionIndexForWorkspaceService,
   rememberSessionIndexWorkspacePath,
+  scheduleTombstoneClaudeForkIndexRow,
 } from "../../../services/tauri";
 import {
   buildNativeIndexEarlyPaintSummaries,
@@ -2964,6 +2965,9 @@ export function useThreadActions({
       for (const result of results) {
         if (result.ok || isSessionDeleteSuccessCode(result.code)) {
           removeThreadFromCachedSummaries(workspaceId, result.sessionId);
+          // 合成 fork ID 的 mangled 孪生键后端点查/占位都够不到，前端补一刀
+          // tombstone，清掉存量僵尸行（新写入已在 sessionIndex 层禁止）。
+          scheduleTombstoneClaudeForkIndexRow(result.sessionId);
         }
       }
       return results;

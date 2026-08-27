@@ -22,6 +22,7 @@ vi.mock("../../../../../services/tauri", () => ({
   archiveWorkspaceSessionsV2: vi.fn(),
   unarchiveWorkspaceSessionsV2: vi.fn(),
   deleteWorkspaceSessions: vi.fn(),
+  scheduleTombstoneClaudeForkIndexRow: vi.fn(),
 }));
 
 vi.mock("../../../../threads/utils/sessionDeleteV2", async (importOriginal) => {

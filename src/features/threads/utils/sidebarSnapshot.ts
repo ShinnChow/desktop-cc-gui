@@ -339,3 +339,87 @@ export function saveSidebarSnapshotAllThreads(
     threadsByWorkspace: nextThreadsByWorkspace,
   });
 }
+
+let removalQueueByWorkspace = new Map<string, Set<string>>();
+let removalFlushScheduled = false;
+let scheduledRemovalTimer: ReturnType<typeof setTimeout> | null = null;
+
+function flushQueuedRemovals(): void {
+  removalFlushScheduled = false;
+  scheduledRemovalTimer = null;
+  const queue = removalQueueByWorkspace;
+  removalQueueByWorkspace = new Map();
+  if (queue.size === 0) {
+    return;
+  }
+  const current = loadSidebarSnapshot();
+  if (!current) {
+    return;
+  }
+  const nextThreadsByWorkspace = { ...current.threadsByWorkspace };
+  let changed = false;
+  for (const [workspaceId, threadIds] of queue) {
+    const threads = current.threadsByWorkspace[workspaceId];
+    if (!threads || threads.length === 0) {
+      continue;
+    }
+    const filtered = threads.filter((thread) => !threadIds.has(thread.id));
+    if (filtered.length === threads.length) {
+      continue;
+    }
+    nextThreadsByWorkspace[workspaceId] = filtered;
+    changed = true;
+  }
+  if (!changed) {
+    return;
+  }
+  writeClientStoreValue("threads", SIDEBAR_SNAPSHOT_KEY, {
+    ...current,
+    updatedAt: Date.now(),
+    threadsByWorkspace: nextThreadsByWorkspace,
+  });
+}
+
+/**
+ * 已删 / 归档行必须同步从持久化 sidebarSnapshot 摘除，否则部分源（partial /
+ * degraded）触发 last-good floor 时会从磁盘副本把已删会话重新 union 回侧栏并
+ * 再次持久化。合并排队：批量删除排 N 个 id 只付一次 load+write。
+ */
+export function queueRemoveThreadsFromSidebarSnapshot(
+  workspaceId: string,
+  threadId: string,
+): void {
+  const normalizedWorkspaceId = workspaceId.trim();
+  const normalizedThreadId = threadId.trim();
+  if (!normalizedWorkspaceId || !normalizedThreadId) {
+    return;
+  }
+  let threadIds = removalQueueByWorkspace.get(normalizedWorkspaceId);
+  if (!threadIds) {
+    threadIds = new Set<string>();
+    removalQueueByWorkspace.set(normalizedWorkspaceId, threadIds);
+  }
+  threadIds.add(normalizedThreadId);
+  if (!removalFlushScheduled) {
+    removalFlushScheduled = true;
+    scheduledRemovalTimer = setTimeout(flushQueuedRemovals, 0);
+  }
+}
+
+/** 测试专用：清空待清理队列与 flush 调度状态。 */
+export function resetSidebarSnapshotRemovalQueueForTests(): void {
+  removalQueueByWorkspace = new Map();
+  removalFlushScheduled = false;
+}
+
+/** 测试专用：立即执行一次合并 flush（绕过定时器）。 */
+export function flushQueuedRemovalsSyncForTests(): void {
+  if (removalFlushScheduled) {
+    const timer = scheduledRemovalTimer;
+    if (timer != null) {
+      clearTimeout(timer);
+    }
+    removalFlushScheduled = false;
+    flushQueuedRemovals();
+  }
+}
