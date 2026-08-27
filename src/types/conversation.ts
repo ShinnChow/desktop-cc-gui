@@ -136,6 +136,19 @@ export type RuntimeModelReceipt = {
   contextWindowSource?: RuntimeModelReceiptWindowSource | null;
 };
 
+/** 发送边界固化的执行目标快照；native 侧复用为 `MessageSendOptions.nativeExecutionTarget`。 */
+export type ExecutionTargetSnapshot = {
+  engine: EngineType;
+  providerProfileId?: string | null;
+  modelCatalogEntryId?: string | null;
+  model?: string | null;
+  reasoning?: { effort: string } | null;
+  providerProfileNameSnapshot?: string | null;
+  providerProfileSource?: string | null;
+  runtimeCapabilityFingerprint?: string | null;
+  providerAvailable?: boolean;
+};
+
 export type ConversationItem =
   | {
       id: string;
@@ -144,17 +157,7 @@ export type ConversationItem =
       text: string;
       turnId?: string | null;
       engineSource?: EngineType;
-      executionTargetSnapshot?: {
-        engine: EngineType;
-        providerProfileId?: string | null;
-        modelCatalogEntryId?: string | null;
-        model?: string | null;
-        reasoning?: { effort: string } | null;
-        providerProfileNameSnapshot?: string | null;
-        providerProfileSource?: string | null;
-        runtimeCapabilityFingerprint?: string | null;
-        providerAvailable?: boolean;
-      };
+      executionTargetSnapshot?: ExecutionTargetSnapshot;
       runtimeReceipt?: RuntimeModelReceipt;
       isFinal?: boolean;
       finalCompletedAt?: number;
@@ -586,6 +589,11 @@ export type MessageSendOptions = {
   createSessionTarget?: ComposerCreateSessionTarget;
   /** Queue/Fusion 专用：发送边界必须优先使用该冻结目标，禁止重读 Picker。 */
   sharedExecutionTarget?: SharedQueuedExecutionTarget;
+  /**
+   * Native 发送边界冻结的执行目标快照（对齐 sharedExecutionTarget 冻结模式）。
+   * messaging 层记账进 nativeTurnTargetLedger，供幕布 turn-target 显示条标注本轮 provenance。
+   */
+  nativeExecutionTarget?: ExecutionTargetSnapshot;
   /** Shared Session one-shot Multi-Agent request；target 仍由 sharedExecutionTarget 冻结。 */
   squadRequest?: true;
   /** DSH create-time Agent Preset; ignored by other engines. */

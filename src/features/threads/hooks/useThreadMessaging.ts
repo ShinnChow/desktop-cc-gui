@@ -22,6 +22,7 @@ import type {
   IntentCanvasContextSendAttachment,
   SelectedAgentOption,
   SharedQueuedExecutionTarget,
+  ExecutionTargetSnapshot,
   SkillInvocation,
 } from "../../../types";
 import type { AutoSessionMetadata } from "../../../services/tauri";
@@ -69,6 +70,11 @@ import {
   isResolvedExecutionTarget,
 } from "../../shared-session/target/types";
 import { rememberRuntimeReceipt } from "../utils/runtimeModelReceipt";
+import {
+  recordNativeTurnTarget,
+  resolveNativeSendExecutionTarget,
+} from "../utils/nativeTurnTargetLedger";
+import { appendTurnTargetBadge } from "../utils/turnTargetBadgeStorage";
 import { requestAgentPlan } from "../../multi-agent/runtime/executor";
 import { injectCollabSkillContext } from "../../multi-agent/runtime/skillContextInjection";
 import { injectMainCanvasContext } from "../../multi-agent/runtime/mainCanvasContextInjection";
@@ -334,6 +340,8 @@ type SendMessageOptions = {
   codexInvalidThreadRetryAttempted?: boolean;
   autoSession?: AutoSessionMetadata | null;
   sharedExecutionTarget?: SharedQueuedExecutionTarget;
+  /** Native 发送边界冻结的执行目标快照（Composer 传入；缺失时按 resolved 值兜底）。 */
+  nativeExecutionTarget?: ExecutionTargetSnapshot;
   squadRequest?: true;
   originKind?: "shared-provider-retry";
   providerRetryAttempt?: number;
@@ -2817,6 +2825,32 @@ export function useThreadMessaging({
                     threadProviderProfileId,
                   }))
                 : resolveSendProviderProfileId({ threadProviderProfileId });
+            // Native 发送边界固化本轮执行目标（对齐 Shared 的 beginTurn /
+            // send.request receipt 时序）：queue drain / recovery resend 等
+            // 无 composer options 的路径走 resolved 值兜底合成。
+            {
+              const nativeTurnExecutionSnapshot =
+                resolveNativeSendExecutionTarget({
+                  frozen: options?.nativeExecutionTarget ?? null,
+                  engine: resolvedEngine,
+                  providerProfileId,
+                  modelCatalogEntryId: selectedModelId,
+                  model: modelForSend ?? sanitizedModel,
+                  effort: resolvedEffort,
+                });
+              recordNativeTurnTarget(
+                workspace.id,
+                threadId,
+                nativeTurnExecutionSnapshot,
+              );
+              appendTurnTargetBadge(threadId, nativeTurnExecutionSnapshot);
+            }
+            if (modelForSend) {
+              rememberRuntimeReceipt(workspace.id, threadId, {
+                model: modelForSend,
+                modelSource: "send.request",
+              });
+            }
             response = await engineSendMessageService(workspace.id, {
               text: finalText,
               engine: resolvedEngine,

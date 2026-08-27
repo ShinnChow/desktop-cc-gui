@@ -627,7 +627,7 @@ describe("useAppServerEvents token usage", () => {
     });
   });
 
-  it("ignores native Claude runtime model sidecar", async () => {
+  it("captures native Claude runtime model sidecar as an assistant receipt", async () => {
     const handlers: Handlers = {
       onAssistantRuntimeReceipt: vi.fn(),
     };
@@ -649,7 +649,14 @@ describe("useAppServerEvents token usage", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    expect(handlers.onAssistantRuntimeReceipt).not.toHaveBeenCalled();
+    expect(handlers.onAssistantRuntimeReceipt).toHaveBeenCalledWith(
+      "ws-1",
+      "claude:session-1",
+      expect.objectContaining({
+        model: "deepseek-v4-pro-0813[1m]",
+        modelSource: "assistant.message.model",
+      }),
+    );
 
     await act(async () => {
       root.unmount();

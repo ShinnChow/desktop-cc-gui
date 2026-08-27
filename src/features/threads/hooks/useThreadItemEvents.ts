@@ -52,6 +52,7 @@ import {
   resolveLiveAssistantSettlementText,
   updateLiveAssistantTextSnapshot,
 } from "../utils/liveAssistantTextChannel";
+import { getNativeTurnIngestMeta } from "../utils/nativeTurnTargetLedger";
 import {
   appendLiveItemDelta,
   clearLiveItemDeltaForItem,
@@ -745,6 +746,7 @@ export function useThreadItemEvents({
           hasCustomName: Boolean(
             getCustomName(operation.workspaceId, threadId),
           ),
+          ...getNativeTurnIngestMeta(operation.workspaceId, threadId),
         });
         const dispatchCostMs = readHighResolutionNowMs() - dispatchStartedAt;
         noteThreadReducerWorkMeasured(threadId, {
@@ -1696,6 +1698,7 @@ export function useThreadItemEvents({
               itemId: liveTextTail.itemId,
               delta: liveTextTail.tailDelta,
               hasCustomName: true,
+              ...getNativeTurnIngestMeta(workspaceId, threadId),
             });
           }
         }
@@ -1741,6 +1744,7 @@ export function useThreadItemEvents({
                 itemId: previousTail.itemId,
                 delta: previousTail.tailDelta,
                 hasCustomName: true,
+                ...getNativeTurnIngestMeta(workspaceId, threadId),
               });
             }
           }
@@ -1764,6 +1768,7 @@ export function useThreadItemEvents({
               itemId,
               delta: settledSnapshotText,
               hasCustomName: Boolean(getCustomName(workspaceId, threadId)),
+              ...getNativeTurnIngestMeta(workspaceId, threadId),
             });
             const dispatchCostMs =
               readHighResolutionNowMs() - dispatchStartedAt;
@@ -1859,18 +1864,29 @@ export function useThreadItemEvents({
                   resolveCollaborationUiMode?.(threadId) ?? null,
               }
             : normalizedConverted;
+        // Native turn-target 显示条：转换型 assistant message 缺快照时补账本值
+        // （shared canonical 注入的既有值绝不覆盖）。
+        const stampedItem =
+          normalizedItem.kind === "message" &&
+          normalizedItem.role === "assistant" &&
+          !normalizedItem.executionTargetSnapshot
+            ? {
+                ...normalizedItem,
+                ...getNativeTurnIngestMeta(workspaceId, threadId),
+              }
+            : normalizedItem;
         dispatch({
           type: "upsertItem",
           workspaceId,
           threadId,
-          item: normalizedItem,
+          item: stampedItem,
           hasCustomName: Boolean(getCustomName(workspaceId, threadId)),
         });
         if (
           !shouldMarkProcessing &&
           inferEngineFromThreadId(threadId) === "claude" &&
-          normalizedItem.kind === "tool" &&
-          isClaudeExitPlanModeTool(normalizedItem)
+          stampedItem.kind === "tool" &&
+          isClaudeExitPlanModeTool(stampedItem)
         ) {
           onExitPlanModeToolCompleted?.({
             workspaceId,
@@ -2173,6 +2189,7 @@ export function useThreadItemEvents({
             hasCustomName: Boolean(getCustomName(workspaceId, threadId)),
             timestamp,
             isActiveThread: threadId === activeThreadId,
+            ...getNativeTurnIngestMeta(workspaceId, threadId),
           });
           clearLiveAssistantText(threadId);
           recordThreadActivity(workspaceId, threadId, timestamp);
@@ -2214,6 +2231,7 @@ export function useThreadItemEvents({
         hasCustomName,
         timestamp,
         isActiveThread: threadId === activeThreadId,
+        ...getNativeTurnIngestMeta(workspaceId, threadId),
       });
       // A4：终稿已全量落 reducer，清 live 通道；订阅行在同一批提交内
       // 切回读 item.text（终稿），无闪烁。

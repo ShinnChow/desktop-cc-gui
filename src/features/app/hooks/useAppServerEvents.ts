@@ -45,6 +45,7 @@ import {
   getRuntimeReceipt,
   rememberRuntimeReceipt,
 } from "../../threads/utils/runtimeModelReceipt";
+import { getNativeTurnTarget } from "../../threads/utils/nativeTurnTargetLedger";
 import { updateSharedSessionNativeBinding as updateSharedSessionNativeBindingService } from "../../shared-session/services/sharedSessions";
 import { noteThreadAppServerEventReceived } from "../../threads/utils/streamLatencyDiagnostics";
 import {
@@ -390,7 +391,13 @@ function maybeCaptureRuntimeReceipt(
     return;
   }
   const threadId = sharedThreadId || extractThreadIdFromParams(params);
-  if (!threadId || !threadId.startsWith("shared:")) {
+  if (
+    !threadId ||
+    // 排除式门：Shared canonical attribution 之外，协作画布与 shared-pending
+    // 别名不入账；其余（含 native 各引擎与 shared 本体）同吃 source-rank 回写链。
+    threadId.startsWith("agent-canvas:") ||
+    threadId.includes("-pending-shared-")
+  ) {
     return;
   }
   const result = asRecord(params.result);
@@ -1805,12 +1812,25 @@ function tryRouteNormalizedRealtimeEvent({
     return false;
   }
   const isSharedOwnerProjection = effectiveThreadId.startsWith("shared:");
-  const runtimeReceipt = isSharedOwnerProjection
-    ? getRuntimeReceipt(workspaceId, effectiveThreadId)
-    : null;
-  if (shouldInjectThreadId || isSharedOwnerProjection) {
+  const isAgentCanvasProjection = isAgentCanvasThreadId(effectiveThreadId);
+  // Shared 投影读同一 store；native 打开同款注入，Ⓡ 尾巴与展开面板随之可用。
+  const runtimeReceipt =
+    isSharedOwnerProjection || (!isAgentCanvasProjection && !sharedBinding)
+      ? getRuntimeReceipt(workspaceId, effectiveThreadId)
+      : null;
+  // Native turn-target：codex 等走 normalized 直达路由的引擎也按发送边界账本
+  // 标注本轮 provenance（shared canonical / attempt 注入优先级不变）。
+  const nativeExecutionTargetSnapshot =
+    !isSharedOwnerProjection && !isAgentCanvasProjection
+      ? getNativeTurnTarget(workspaceId, effectiveThreadId)
+      : null;
+  if (
+    shouldInjectThreadId ||
+    isSharedOwnerProjection ||
+    Boolean(nativeExecutionTargetSnapshot)
+  ) {
     // agent-canvas: 事件写到隔离 thread，但 activeTurn 挂在 shared: 上
-    const activeTurnThreadId = isAgentCanvasThreadId(effectiveThreadId)
+    const activeTurnThreadId = isAgentCanvasProjection
       ? parseAgentCanvasThreadId(effectiveThreadId)?.sharedThreadId ??
         effectiveThreadId
       : effectiveThreadId;
@@ -1822,7 +1842,7 @@ function tryRouteNormalizedRealtimeEvent({
             activeTurnThreadId,
             sharedBinding.attemptId,
           )
-        : null);
+        : null) ?? nativeExecutionTargetSnapshot;
     if (shouldInjectThreadId || isSharedOwnerProjection) {
       normalized.threadId = effectiveThreadId;
     }

@@ -3,8 +3,10 @@ import type {
   ApprovalRequest,
   AutoSessionMetadata,
   ConversationItem,
+  ExecutionTargetSnapshot,
   RateLimitSnapshot,
   RequestUserInputRequest,
+  RuntimeModelReceipt,
   SharedRuntimeControlOwner,
   ThreadSummary,
   ThreadTokenUsage,
@@ -197,6 +199,10 @@ export type ThreadAction =
       itemId: string;
       delta: string;
       hasCustomName: boolean;
+      /** Native turn-target 显示条：建壳落地、existing 缺失补；绝不覆盖既有值。 */
+      executionTargetSnapshot?: ExecutionTargetSnapshot;
+      /** 同上：pi 等无回执事件的引擎靠发送时 send.request 记账补 Ⓡ 尾巴。 */
+      runtimeReceipt?: RuntimeModelReceipt;
     }
   | {
       type: "completeAgentMessage";
@@ -206,6 +212,8 @@ export type ThreadAction =
       text: string;
       hasCustomName: boolean;
       timestamp?: number;
+      executionTargetSnapshot?: ExecutionTargetSnapshot;
+      runtimeReceipt?: RuntimeModelReceipt;
     }
   | {
       /**
@@ -223,6 +231,9 @@ export type ThreadAction =
       hasCustomName: boolean;
       timestamp: number;
       isActiveThread: boolean;
+      /** Native turn-target 显示条：终稿合并保留已有值，仅缺失时落地。 */
+      executionTargetSnapshot?: ExecutionTargetSnapshot;
+      runtimeReceipt?: RuntimeModelReceipt;
     }
   | {
       type: "upsertItem";

@@ -2760,6 +2760,13 @@ function ComposerImpl({
           model: null,
         },
       );
+      // Native 发送边界固化执行目标快照（Shared / create-picker 各有自己的冻结通道）。
+      const nativeExecutionTarget =
+        !isSharedSessionResolved &&
+        !createSessionTargetPicker &&
+        selectedAtomicTarget
+          ? freezeTurnSnapshot(selectedAtomicTarget)
+          : undefined;
       const sendOptions: MessageSendOptions | undefined =
         skillInvocations.length > 0 ||
         selectedMemoryIds.length > 0 ||
@@ -2768,6 +2775,7 @@ function ComposerImpl({
         hasBrowserContextAttachment ||
         createSessionTarget !== null ||
         isAgentSubmission ||
+        Boolean(nativeExecutionTarget) ||
         (selectedAtomicTarget?.engine ?? selectedEngine) === "dsh"
           ? {
               ...((selectedAtomicTarget?.engine ?? selectedEngine) === "dsh"
@@ -2794,6 +2802,7 @@ function ComposerImpl({
                 : {}),
               ...(browserContextAttachment ? { browserContextAttachment } : {}),
               ...(createSessionTarget ? { createSessionTarget } : {}),
+              ...(nativeExecutionTarget ? { nativeExecutionTarget } : {}),
               ...(isAgentSubmission &&
               isResolvedExecutionTarget(selectedAtomicTarget)
                 ? {

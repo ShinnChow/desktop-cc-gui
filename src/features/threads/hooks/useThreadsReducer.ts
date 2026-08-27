@@ -1,4 +1,10 @@
-import type { ConversationItem, ThreadSummary, ThreadTokenUsage } from "../../../types";
+import type {
+  ConversationItem,
+  ExecutionTargetSnapshot,
+  RuntimeModelReceipt,
+  ThreadSummary,
+  ThreadTokenUsage,
+} from "../../../types";
 import type { SidebarSnapshot } from "../utils/sidebarSnapshot";
 import {
   MAX_ITEM_TEXT,
@@ -10,6 +16,7 @@ import {
   upsertItem,
 } from "../../../utils/threadItems";
 import { settlePlanInProgressSteps } from "../utils/threadNormalize";
+import { mergeTurnTargetBadgesIntoItems } from "../utils/turnTargetBadgeStorage";
 import { isMultiAgentHistFoldItemId } from "../../multi-agent/utils/canvasItems";
 import {
   isCollabWorkerNativeThreadId,
@@ -138,6 +145,7 @@ export type { ThreadAction, ThreadState } from "./threadReducerTypes";
 
 const REDUCER_NOOP_GUARD_ENABLED = isReducerNoopGuardEnabled();
 const INCREMENTAL_DERIVATION_ENABLED = isIncrementalDerivationEnabled();
+
 const PENDING_THREAD_LAST_AGENT_ANCHOR_TTL_MS = 5 * 60 * 1000;
 // Continuation evidence arrives once per engine event (heartbeat/delta/item/*)
 // via raw dispatch, bypassing the delta batching layers. Consumers only do
@@ -1562,6 +1570,12 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         list = sourceItems.slice();
         list[index] = {
           ...nextBase,
+          ...(!nextBase.executionTargetSnapshot && action.executionTargetSnapshot
+            ? { executionTargetSnapshot: action.executionTargetSnapshot }
+            : {}),
+          ...(!nextBase.runtimeReceipt && action.runtimeReceipt
+            ? { runtimeReceipt: action.runtimeReceipt }
+            : {}),
           id: nextId,
           text: nextText,
           isFinal: keepFinalMetadata ? true : false,
@@ -1613,6 +1627,10 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
             role: "assistant",
             text: action.delta,
             isFinal: false,
+            ...(action.executionTargetSnapshot
+              ? { executionTargetSnapshot: action.executionTargetSnapshot }
+              : {}),
+            ...(action.runtimeReceipt ? { runtimeReceipt: action.runtimeReceipt } : {}),
           },
         ];
       }
@@ -1637,7 +1655,7 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       };
     }
     case "completeAgentMessage": {
-      // \u00a76.1: \u4ee3\u7406\u7ed9 applyCompleteAgentMessageToState, \u4fdd\u8bc1\u65e7\u8c03\u7528\u8def\u5f84\u8bed\u4e49\u4e0d\u53d8\u3002
+      // §6.1: 代理给 applyCompleteAgentMessageToState, 保证旧调用路径语义不变。
       const applied = applyCompleteAgentMessageToState(state, {
         workspaceId: action.workspaceId,
         threadId: action.threadId,
@@ -1645,6 +1663,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         text: action.text,
         hasCustomName: action.hasCustomName,
         timestamp: action.timestamp ?? Date.now(),
+        executionTargetSnapshot: action.executionTargetSnapshot,
+        runtimeReceipt: action.runtimeReceipt,
       });
       if (applied.noop) {
         return state;
@@ -1665,6 +1685,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         text: action.text,
         hasCustomName: action.hasCustomName,
         timestamp: action.timestamp,
+        executionTargetSnapshot: action.executionTargetSnapshot,
+        runtimeReceipt: action.runtimeReceipt,
       });
 
       // 1) setThreadTimestamp
@@ -2129,9 +2151,12 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           ? [...mergedItems, ...preservedFoldItems]
           : mergedItems;
       // Cold reload / history path: fill missing final footer meta from local sidecar.
-      const itemsWithSidecarMeta = mergeTurnFinalMetaIntoItems(
+      const itemsWithSidecarMeta = mergeTurnTargetBadgesIntoItems(
         action.threadId,
-        mergedWithFolds,
+        mergeTurnFinalMetaIntoItems(
+          action.threadId,
+          mergedWithFolds,
+        ),
       );
       const preserveMessageTextIds = new Set<string>();
       for (const item of itemsWithSidecarMeta) {
@@ -3421,6 +3446,9 @@ function applyCompleteAgentMessageToState(
     text: string;
     hasCustomName: boolean;
     timestamp: number;
+    /** Native turn-target：仅 existing 缺失时落地（existing-first 不变式）。 */
+    executionTargetSnapshot?: ExecutionTargetSnapshot;
+    runtimeReceipt?: RuntimeModelReceipt;
   },
 ): { itemsByThread: ThreadState["itemsByThread"]; threadsByWorkspace: ThreadState["threadsByWorkspace"]; noop: boolean } {
   const segmentedItemId = resolveLiveAssistantMessageId(
@@ -3495,6 +3523,12 @@ function applyCompleteAgentMessageToState(
     computedCompletedItem = withAssistantTurnTokenCounts(
       {
         ...nextBase,
+        ...( !nextBase.executionTargetSnapshot && params.executionTargetSnapshot
+          ? { executionTargetSnapshot: params.executionTargetSnapshot }
+          : {}),
+        ...(!nextBase.runtimeReceipt && params.runtimeReceipt
+          ? { runtimeReceipt: params.runtimeReceipt }
+          : {}),
         id: targetItemId,
         text: mergeCompletedAgentText(
           existingItem.text,
@@ -3521,6 +3555,10 @@ function applyCompleteAgentMessageToState(
         isFinal: true,
         finalCompletedAt: completedAt,
         ...(derivedDuration !== null ? { finalDurationMs: derivedDuration } : {}),
+        ...(params.executionTargetSnapshot
+          ? { executionTargetSnapshot: params.executionTargetSnapshot }
+          : {}),
+        ...(params.runtimeReceipt ? { runtimeReceipt: params.runtimeReceipt } : {}),
       },
       state.tokenUsageByThread[params.threadId],
     );

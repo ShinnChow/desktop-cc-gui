@@ -32,6 +32,7 @@ import { previewThreadName } from "../../../utils/threadItems";
 import { resolveThreadStabilityDiagnostic } from "../utils/stabilityDiagnostics";
 import type { TurnExecutionSnapshot } from "../../shared-session/target/types";
 import { renameRuntimeReceipt } from "../utils/runtimeModelReceipt";
+import { renameNativeTurnTarget } from "../utils/nativeTurnTargetLedger";
 import { noteSharedProviderRetryTurnSettled } from "../../shared-session/provider-retry/noteSharedProviderRetryTurn";
 import { getSharedTargetState } from "../../shared-session/target/targetStore";
 import { isSharedSessionThreadId } from "../../shared-session/utils/sharedSessionIdentity";
@@ -1661,6 +1662,8 @@ export function useThreadTurnEvents({
       ) {
         renameRuntimeReceipt(workspaceId, sourceThreadId, newThreadId);
       }
+      // Native turn-target 账本：pending → 正式 id 迁移（move-if-absent）。
+      renameNativeTurnTarget(workspaceId, sourceThreadId, newThreadId);
       renameCustomNameKey(workspaceId, sourceThreadId, newThreadId);
       renameAutoTitlePendingKey(workspaceId, sourceThreadId, newThreadId);
       renamePendingMemoryCaptureKey(sourceThreadId, newThreadId);
