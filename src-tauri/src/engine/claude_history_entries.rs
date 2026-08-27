@@ -285,7 +285,11 @@ fn find_tag_content<'a>(text: &'a str, tag: &str) -> Option<&'a str> {
 /// to the command description/name, so session title previews surface the
 /// prompt instead of raw markup.
 pub(crate) fn extract_command_prompt_text(text: &str) -> String {
-    if !text.contains("<command-") {
+    // Only envelopes that actually START with a command tag are extracted:
+    // mid-text quotes of <command-args> snippets (e.g. a developer pasting a
+    // transcript for debugging) are ordinary prose and must keep the original
+    // text, otherwise the session title gets replaced by the quoted fragment.
+    if !text.trim_start().starts_with("<command-") {
         return text.to_string();
     }
     [
