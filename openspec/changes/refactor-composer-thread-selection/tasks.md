@@ -4,17 +4,17 @@
 
 ## Phase 0 · 基线与 Gate 前置
 
-- [ ] 0.1 `git status` 确认 `app-shell/domains/`、`app-shell/sections/`、`features/models/hooks/useModels.ts` 工作区干净；不干净即停手协调
-- [ ] 0.2 基线：`npx vitest run src/app-shell/domains/useSelectedComposerSession.test.tsx src/app-shell/domains/selectedComposerSession.test.ts src/app-shell/sections/selectedComposerSession.flow.test.ts src/app-shell/domains/modelSelection.test.ts` 记录通过/失败清单（存量失败逐条记录作零新增红对照）
-- [ ] 0.3 `npx tsc --noEmit` 记录基线（当前已知：并行会话在途 threads 域 error，与本 change 无关）
-- [ ] 0.4 验证 `resolveThreadEngine` 对 pending/真实线程的映射表（红测试 fixture 依赖），存本文件备注
+- [x] 0.1 `git status` 确认 `app-shell/domains/`、`app-shell/sections/`、`features/models/hooks/useModels.ts` 工作区干净；不干净即停手协调
+- [x] 0.2 基线：`npx vitest run ...（选择域四文件）` 记录通过/失败清单 → **120/120 全绿（modelSelection 65 + 纯函数 33 + hook 18 + flow 4，2026-08-27 21:55）**
+- [x] 0.3 `npx tsc --noEmit` 记录基线 → **1 error（并行会话在途 useThreadMessaging 域，与本 change 无关）**
+- [x] 0.4 验证 `resolveThreadEngine` 对 pending/真实线程的映射表（红测试 fixture 依赖），存本文件备注 → **约定：`<engine>:`（真实）/ `<engine>-pending-`（新建）/ `claude-fork:`（fork）；effort 约束：claude/grok/dsh/pi 有白名单集合，gemini/kimi/opencode 恒 null，codex 不 fill 不 seed**
 
 ## Phase 1 · 决策核心纯函数化（行为零变化，既有用例恒绿）
 
-- [ ] 1.1 【红】写 `composer-selection/resolveThreadSelectionOnSwitch.test.ts` 显式用例：5 层优先级（stored / cache / fork 继承 / draft carry / engine default-pending）+ effort 回填 + thread-id 迁移，各至少 1 例直接作用于纯函数（先行红：模块未建）
-- [ ] 1.2 【绿】建 `resolveThreadSelectionOnSwitch.ts`：组合既有 4 个 `should*` 纯函数（不重写），输出 `{display, writes, clears}`；hook `reloadSelectedComposerSelection` 收缩为「组装 input → 调决策 → 应用 writes」薄壳
-- [ ] 1.3 18 个 hook 用例 + 25 纯函数用例不改断言全绿；DSH seed / Claude fork / 双 workspace 隔离场景逐一对照
-- [ ] 1.4 【验证】0.2 基线复跑零新增红；tsc 零新增；提交：`refactor(app-shell): 切会话选择解析抽为 resolveThreadSelectionOnSwitch 决策核心`
+- [x] 1.1 【红】写 `composer-selection/resolveThreadSelectionOnSwitch.test.ts` 显式用例：5 层优先级（stored / cache / fork 继承 / draft carry / engine default-pending）+ effort 回填 + thread-id 迁移，各至少 1 例直接作用于纯函数（先行红：模块未建）→ 11 契约用例；红阶段抓出两处 fixture 错误（fork 前缀实为 `claude-fork:`、键名漂移）
+- [x] 1.2 【绿】建 `resolveThreadSelectionOnSwitch.ts`：组合既有 4 个 `should*` 纯函数（不重写），输出 `{display, writes, clears}`；hook `reloadSelectedComposerSelection` 收缩为「组装 input → 调决策 → 应用 writes」薄壳（~130 行 → 80 行）→ **实现中发现并忠实保留原实现的「双取数通道」语义：L3c 种入走注入 resolver（含 codex 除外）、L4 回填直接读 store——合一会语义漂移（hook 测试 2 红实证），已拆回 `engineDefaultSelection` + `enginePrefEffort` 两输入**
+- [x] 1.3 18 个 hook 用例 + 25 纯函数用例不改断言全绿；DSH seed / Claude fork / 双 workspace 隔离场景逐一对照 → **131/131（=120 基线 + 11 新）零回归**
+- [x] 1.4 【验证】0.2 基线复跑零新增红；tsc 零新增；提交：`refactor(app-shell): 切会话选择解析抽为 resolveThreadSelectionOnSwitch 决策核心` → **131/131（=120+11）+ 66/66 复验 + tsc 过滤后零 error；两处 nullable 类型错误（stored 读取 key / resolver 入参）已修**
 
 ## Phase 2 · 写入统一 + epoch 防竞态（修 D1/D3）
 
