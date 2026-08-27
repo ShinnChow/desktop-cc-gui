@@ -80,10 +80,10 @@ describe('SelectorOptionRow · variant="dropdown"（standalone DropdownMenuItem 
       expect(document.body.textContent).toContain("Low");
     });
     const item = document.body.querySelector(
-      '[role="menuitem"]',
+      "[role='menuitem']",
     ) as HTMLElement;
     expect(item.getAttribute("data-selected")).toBeNull();
-    expect(item.querySelector('svg[class*="shrink-0"]')).toBeNull();
+    expect(item.querySelector("svg[class*='shrink-0']")).toBeNull();
   });
 
   it("点击触发 onSelect（preventDefault 语义不改变外层受控开关）", async () => {
@@ -111,7 +111,7 @@ describe('SelectorOptionRow · variant="dropdown"（standalone DropdownMenuItem 
     );
     await waitFor(() => {
       expect(
-        document.body.querySelector('[data-reasoning-id="high"]'),
+        document.body.querySelector("[data-reasoning-id='high']"),
       ).toBeTruthy();
     });
   });
@@ -253,7 +253,7 @@ describe('SelectorOptionRow · variant="tool-menu" host="menu-item"（HUD Dropdo
     );
     const item = await waitFor(() => {
       const el = document.body.querySelector(
-        '[role="menuitem"].composer-tool-menu-option.is-selected',
+        "[role='menuitem'].composer-tool-menu-option.is-selected",
       );
       expect(el).toBeTruthy();
       return el as HTMLElement;
@@ -278,7 +278,7 @@ describe('SelectorOptionRow · variant="tool-menu" host="menu-item"（HUD Dropdo
     );
     const item = await waitFor(() => {
       const el = document.body.querySelector(
-        '[role="menuitem"].composer-tool-menu-option',
+        "[role='menuitem'].composer-tool-menu-option",
       );
       expect(el).toBeTruthy();
       return el as HTMLElement;
@@ -307,3 +307,5 @@ describe('SelectorOptionRow · variant="tool-menu" host="menu-item"（HUD Dropdo
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 });
+
+// 2026-08-27: 显式标注——本文件与同目录 SelectorOptionRow.tsx 配对（module resolution 曾被陈旧 LSP 快照误报）。

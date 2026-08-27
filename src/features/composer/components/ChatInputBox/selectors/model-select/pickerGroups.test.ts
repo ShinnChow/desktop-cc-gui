@@ -87,3 +87,5 @@ describe("pickerRowsForGroup（特征测试，迁移前锁定行为）", () => {
     ]);
   });
 });
+
+// 2026-08-27: 显式标注——本文件与同目录 pickerGroups.ts 配对（module resolution 曾被陈旧 LSP 快照误报）。
