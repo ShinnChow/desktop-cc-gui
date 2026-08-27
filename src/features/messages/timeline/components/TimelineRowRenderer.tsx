@@ -18,6 +18,7 @@ import { Button } from "../../../../components/ui/button";
 import { TooltipIconButton } from "../../../../components/ui/tooltip-icon-button";
 import { parseReasoning } from "../../presentation/messagesReasoning";
 import { resolveUserMessagePresentation } from "../../presentation/messagesUserPresentation";
+import { ContextEventRow } from "../../rows/components/ContextEventRow";
 import {
   buildAssistantFinalBoundaryMetaText,
   shouldHideCodexCanvasCommandCard,
@@ -588,6 +589,10 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
           onToggle={toggleExpanded}
         />
       );
+    }
+    if (renderKind === "context-event" && renderItem.kind === "context-event") {
+      // 引擎侧上下文事件留痕（压缩完成）：独立系统行，不折叠、不进 chip。
+      return <ContextEventRow key={`context-event:${renderItem.id}`} item={renderItem} />;
     }
     return null;
   };

@@ -24,6 +24,9 @@ export const NORMALIZED_ITEM_KINDS = [
   "explore",
   "generatedImage",
   "tool",
+  // 引擎侧上下文事件留痕（压缩完成等）：合成 item，不经引擎事件归一化产生，
+  // 但随 reducer 流转需要在 kind 字典里可表达。
+  "context-event",
 ] as const;
 
 export type NormalizedConversationItemKind = (typeof NORMALIZED_ITEM_KINDS)[number];

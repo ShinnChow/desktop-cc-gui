@@ -2421,17 +2421,25 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       if (list.some((entry) => entry.id === id)) {
         return state;
       }
-      const compactedMessage: ConversationItem = {
+      // 压缩留痕是引擎侧系统事件，不是模型说的话：独立 context-event kind，
+      // 让 finality / 折叠 / prose 聚合的既有谓词按类型天然排除（否则
+      // markLatestAssistantMessageFinal 会把 isFinal 打在留痕上，极简模式
+      // 锚点被劫持、真实回答被折进 chip——2026-08-27 用户反馈回归）。
+      const compactedMarker: ConversationItem = {
         id,
-        kind: "message",
-        role: "assistant",
-        text: "Context compacted.",
+        kind: "context-event",
+        eventType: "compacted",
+        reason: action.reason ?? null,
+        tokensBefore: action.tokensBefore ?? null,
+        estimatedTokensAfter: action.estimatedTokensAfter ?? null,
+        turnId: action.turnId,
+        timestampMs: action.timestampMs ?? Date.now(),
       };
       return {
         ...state,
         itemsByThread: {
           ...state.itemsByThread,
-          [action.threadId]: prepareThreadItems([...list, compactedMessage]),
+          [action.threadId]: prepareThreadItems([...list, compactedMarker]),
         },
       };
     }

@@ -1076,11 +1076,15 @@ export function mergeHistoryProjectionItems(
   let lastMatchedUserIndex = -1;
 
   for (const overlayItem of overlayItems) {
-    const engine = overlayItem.engineSource ?? meta.engine;
+    const engine =
+      (overlayItem.kind === "context-event" ? null : overlayItem.engineSource) ??
+      meta.engine;
     const turnId =
       overlayItem.kind === "message" || overlayItem.kind === "tool"
         ? overlayItem.turnId ?? null
-        : null;
+        : overlayItem.kind === "context-event"
+          ? overlayItem.turnId ?? null
+          : null;
     const event = {
       engine,
       threadId: meta.threadId,

@@ -243,6 +243,20 @@ export type ConversationItem =
       senderThreadId?: string;
       receiverThreadIds?: string[];
       agentStatus?: Record<string, { status?: string } | string>;
+    }
+  | {
+      /** 引擎侧上下文事件留痕（如压缩完成）。不是模型说的话： MUST NOT
+       * 伪装 assistant message——finality / 折叠 / prose 聚合的既有谓词
+       * 均按 kind 排除，杜绝「留痕劫持 turn 终态锚点」的回归。 */
+      id: string;
+      kind: "context-event";
+      eventType: "compacted";
+      /** pi: threshold/overflow/manual；缺失（未知/异常 payload）为 null。 */
+      reason: "threshold" | "overflow" | "manual" | null;
+      tokensBefore: number | null;
+      estimatedTokensAfter: number | null;
+      turnId?: string | null;
+      timestampMs: number;
     };
 
 export type AutoSessionVisibility = "hidden" | "system-auto" | "user-visible";

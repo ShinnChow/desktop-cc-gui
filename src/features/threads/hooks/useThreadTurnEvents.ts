@@ -136,6 +136,10 @@ function settleLiveAssistantFullText(
 type ContextCompactionSourcePayload = {
   auto?: boolean | null;
   manual?: boolean | null;
+  /** pi compaction_end 透传的触发原因与 token 前后值；缺失为 null。 */
+  reason?: "threshold" | "overflow" | "manual" | null;
+  tokensBefore?: number | null;
+  estimatedTokensAfter?: number | null;
 };
 
 function resolveCompactionSource(
@@ -1147,6 +1151,10 @@ export function useThreadTurnEvents({
             type: "appendContextCompacted",
             threadId: targetThreadId,
             turnId: resolvedTurnId,
+            reason: payload?.reason ?? null,
+            tokensBefore: payload?.tokensBefore ?? null,
+            estimatedTokensAfter: payload?.estimatedTokensAfter ?? null,
+            timestampMs: timestamp,
           });
         });
       }

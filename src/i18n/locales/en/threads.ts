@@ -162,6 +162,9 @@ const threads = {
       "Codex is compacting background information. The response will continue after it finishes.",
     codexCompactionCompleted:
       "Codex completed background information compaction.",
+    contextCompactedAuto: "Context compacted automatically",
+    contextCompactedManual: "Context compacted manually",
+    contextCompactedNeutral: "Context compacted",
     contextCompactionFailed: "Context compaction failed.",
     contextCompactionFailedWithMessage:
       "Context compaction failed: {{message}}",

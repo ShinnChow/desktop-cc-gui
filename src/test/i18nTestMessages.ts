@@ -1160,6 +1160,9 @@ export const mockTranslate = (key: string, params?: Record<string, unknown>) => 
         "settings.unableToOpenConfig": "Unable to open config.",
         // Thread error messages
         "threads.sessionStopped": "会话已停止。",
+        "threads.contextCompactedAuto": "已自动压缩上下文",
+        "threads.contextCompactedManual": "已手动压缩上下文",
+        "threads.contextCompactedNeutral": "上下文已压缩",
         "threads.sessionStoppedForFusion": "正在切换到融合回复，等待新的接续事件…",
         "threads.turnFailed": "会话失败。",
         "threads.turnFailedWithMessage": "会话失败：{{message}}",

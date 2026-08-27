@@ -267,6 +267,11 @@ export type ThreadAction =
       type: "appendContextCompacted";
       threadId: string;
       turnId: string;
+      /** pi compaction_end 的触发原因；缺失（未知 payload）为 undefined → 落库 null。 */
+      reason?: "threshold" | "overflow" | "manual" | null;
+      tokensBefore?: number | null;
+      estimatedTokensAfter?: number | null;
+      timestampMs?: number;
     }
   | { type: "appendReasoningContent"; threadId: string; itemId: string; delta: string }
   | { type: "dropReasoningItems"; threadId: string }

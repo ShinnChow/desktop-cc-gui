@@ -172,6 +172,10 @@ export type AppServerEventHandlers = {
     payload?: {
       auto?: boolean | null;
       manual?: boolean | null;
+      /** pi compaction_end 透传；缺失为 null。 */
+      reason?: "threshold" | "overflow" | "manual" | null;
+      tokensBefore?: number | null;
+      estimatedTokensAfter?: number | null;
     },
   ) => void;
   onContextCompactionFailed?: (
@@ -447,6 +451,26 @@ function extractCompactionSourceFlags(params: Record<string, unknown>) {
     return null;
   }
   return { auto, manual };
+}
+
+/** pi compaction_end 的触发原因（threshold/overflow/manual）；缺失为 null。 */
+function parseCompactionReason(value: unknown): "threshold" | "overflow" | "manual" | null {
+  return value === "threshold" || value === "overflow" || value === "manual"
+    ? value
+    : null;
+}
+
+function parseNullableTokenCount(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
 function asStringArray(value: unknown): string[] {
@@ -1802,17 +1826,21 @@ function tryRouteNormalizedRealtimeEvent({
     if (shouldInjectThreadId || isSharedOwnerProjection) {
       normalized.threadId = effectiveThreadId;
     }
-    normalized.item = {
-      ...normalized.item,
-      engineSource: engine,
-      ...(normalized.item.kind === "message" &&
-      normalized.item.role === "assistant"
-        ? {
-            ...(executionTargetSnapshot ? { executionTargetSnapshot } : {}),
-            ...(runtimeReceipt ? { runtimeReceipt } : {}),
-          }
-        : {}),
-    };
+    normalized.item =
+      // context-event 留痕不携带 engineSource（合成 item，非引擎产物）。
+      normalized.item.kind === "context-event"
+        ? normalized.item
+        : {
+            ...normalized.item,
+            engineSource: engine,
+            ...(normalized.item.kind === "message" &&
+            normalized.item.role === "assistant"
+              ? {
+                  ...(executionTargetSnapshot ? { executionTargetSnapshot } : {}),
+                  ...(runtimeReceipt ? { runtimeReceipt } : {}),
+                }
+              : {}),
+          };
     if (normalized.rawItem) {
       normalized.rawItem = {
         ...normalized.rawItem,
@@ -2957,16 +2985,20 @@ export function dispatchAppServerEvent(
     const turnId = extractTurnIdFromParams(params);
     if (threadId) {
       const sourceFlags = extractCompactionSourceFlags(params);
-      if (sourceFlags) {
-        handlers.onContextCompacted?.(
-          workspace_id,
-          threadId,
-          turnId,
-          sourceFlags,
-        );
-      } else {
-        handlers.onContextCompacted?.(workspace_id, threadId, turnId);
-      }
+      const compactionMarkerPayload = {
+        ...(sourceFlags ?? {}),
+        reason: parseCompactionReason(params.reason),
+        tokensBefore: parseNullableTokenCount(params.tokensBefore),
+        estimatedTokensAfter: parseNullableTokenCount(
+          params.estimatedTokensAfter,
+        ),
+      };
+      handlers.onContextCompacted?.(
+        workspace_id,
+        threadId,
+        turnId,
+        compactionMarkerPayload,
+      );
     }
     return;
   }
