@@ -290,6 +290,24 @@ describe("useAppShellComposerModelSection handleSelectModel", () => {
   });
 
 
+
+  it("D4 裁决守卫：线程 A 用户锁模型不得压制线程 B 自身账本（切换后显示）", () => {
+    const { result } = renderSection({
+      activeEngine: "codex",
+      activeThreadId: "thread-local-codex-B",
+      // B 的账本值
+      selectedComposerSelection: {
+        modelId: "model-of-B",
+        effort: "medium",
+      },
+      // useModels 全局残留 = A 的模型 + A 时代 effort
+      selectedModelId: "model-from-A",
+      selectedEffort: "high",
+      models: [makeModel("model-from-A"), makeModel("model-of-B", { isDefault: true })],
+    });
+    expect(result.current.effectiveSelectedModelId).toBe("model-of-B");
+  });
+
   it("D1红/绿裁决：同引擎（codex→codex）切换窗口不得把上一线程模型写进目标线程账本", () => {
     const persistComposerSelectionForThread = vi.fn();
     renderSection({

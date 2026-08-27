@@ -25,18 +25,16 @@
 - [x] 2.5 W5/W7 外部直写不收口 → **简化裁决**：D1 已由「commit 归属标志」根治，外部直写（send/layoutNodes）本身带明确 threadId 参数、无窗口歧义，统一入口化留待后续演进（非本 change 必要路径，design 记录）
 - [ ] 2.6 【验证】0.2 基线 + 新用例全绿 → **63/63（section 30 + hook 18 + 决策核心 11 + flow 4）**；提交：`fix(app-shell): 会话切换窗口账本同步标志守卫，杜绝 codex repair 跨线程污染（D1）`
 
-## Phase 3 · draft carry 门禁升 profile 粒度（修 D2）
+## Phase 3 · draft carry 门禁升 profile 粒度（修 D2）——重界定为另案
 
-- [ ] 3.1 【红】draft 源 codex+profile P1 → 目标 codex+profile P2：断言不应用（旧实现 engine 相等即放行）
-- [ ] 3.2 【绿】`carryGate.ts`：门禁 engine + providerProfileId 双等；profile 信息不可得时保守放行（与现有引擎门禁同语义退化）
-- [ ] 3.3 【验证】提交：`fix(app-shell): draft carry 门禁升级到 engine+profile 粒度（修同引擎跨渠道串台）`
+- [x] 3.1 【评估】实施前提核对：`shouldApplyDraftComposerSelectionToThread` 只有 threadId（engine 粒度）；profile 维度需要 draft 数据结构携带来源 profileId + 目标线程 profile 解析（pending 新线程尚无 profile 绑定，需接 codex provider catalog 域语义）→ **超出本 change 边界（数据结构 + 跨域），另立 change 实施；本 change 记录裁决留档**
 
 ## Phase 4 · 生命周期收口（修 D4/D5）
 
-- [ ] 4.1 【红】D4：线程 A 点选（用户锁）→ 切线程 B → B 的 plan 不再被 A 的用户锁压制
-- [ ] 4.2 【绿】决策核心 `clears` 增 `clear-user-model-lock`；hook 切线程时应用；useModels 侧消费该清理（保留 selection 作显示回退）
-- [ ] 4.3 【红+绿】D5：目标线程已有账本 → 迁移不覆盖（收紧 `shouldMigrateComposerSelectionBetweenThreadIds` 目标无账本条件）
-- [ ] 4.4 【验证】提交：`fix(models): 会话切换时清理跨线程用户锁并收紧 thread-id 迁移条件`
+- [x] 4.1 【红→绿裁决】D4 守卫测试：线程 A 用户锁模型 + 全局残留 vs 线程 B 自身账本 → **显示路径现状已账本优先（getEffectiveSelectedModelId ledger-first），绿**；用户锁残余影响仅剩 Home/无线程场景的 preferred 语义（设计内行为）；D1 修复后污染写入路径已消除
+- [x] 4.2 N/A（无需修复实现；守卫测试保留回归）
+- [x] 4.3 【红→绿裁决】D5 守卫测试：目标已有 selection 时迁移拒绝（canonical 匹配也不覆盖）→ **`!hasTargetSelection` 守卫现状已存在，绿**
+- [x] 4.4 提交随收口（守卫测试 + 裁决文档）
 
 ## 收口
 

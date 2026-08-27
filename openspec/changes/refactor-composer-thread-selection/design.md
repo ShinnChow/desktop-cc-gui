@@ -109,10 +109,10 @@ P1（纯函数抽取）是地基；P2 依赖 P1 的 writes 通道；P3/P4 相对
 | # | 红测试（文件/用例名） | 修复提交 | 验证 |
 | --- | --------------------- | -------- | ---- |
 | D1 | useAppShellComposerModelSection.test.tsx「D1红/绿裁决：同引擎切换窗口」——红实锤 | Phase 2（本 change） | 修复=commit 归属标志守卫；63/63 绿 |
-| D2 | （Phase 3 待实施） | | |
+| D2 | 重界定另案：需 draft 结构携带 profile + 目标线程 profile 解析（pending 线程无 profile 绑定，交叉 codex provider catalog 域） | 另立 change | 本 change 仅裁决留档 |
 | D3 | 「D3红/绿裁决：账本 miss + 全局残留」——现状已有守卫（绿），保留为回归守卫 | N/A（无需修复） | N/A |
-| D4 | （Phase 4 待实施） | | |
-| D5 | （Phase 4 待实施） | | |
+| D4 | 「D4 裁决守卫」——显示路径现状已 ledger-first（绿）；用户锁残余仅 Home preferred 语义（设计内） | N/A | 守卫测试保留 |
+| D5 | 「D5 裁决守卫」——`!hasTargetSelection` 现状已守卫（绿） | N/A | 守卫测试保留 |
 
 ## 6. 风险表
 

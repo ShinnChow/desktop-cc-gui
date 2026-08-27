@@ -561,3 +561,19 @@ describe("selectedComposerSession", () => {
     });
   });
 });
+
+describe("D5 裁决守卫：thread-id 迁移不得覆盖目标线程已有账本", () => {
+  it("目标已有 selection 时拒绝迁移（canonical 匹配也不覆盖）", () => {
+    expect(
+      shouldMigrateComposerSelectionBetweenThreadIds({
+        previousThreadId: "codex-pending-1",
+        activeThreadId: "codex:real-1",
+        previousSessionKey: "k-prev",
+        activeSessionKey: "k-active",
+        hasSourceSelection: true,
+        hasTargetSelection: true,
+        resolveCanonicalThreadId: (id: string) => id.replace("codex-pending-1", "codex:real-1"),
+      }),
+    ).toBe(false);
+  });
+});
