@@ -14,6 +14,7 @@ import {
   appendTurnTargetBadge,
   loadTurnTargetBadgesForThread,
   mergeTurnTargetBadgesIntoItems,
+  renameTurnTargetBadgeThread,
 } from "./turnTargetBadgeStorage";
 import type { ConversationItem } from "../../../types";
 
@@ -92,6 +93,40 @@ describe("turnTargetBadgeStorage history sidecar", () => {
     appendTurnTargetBadge("kimi-pending-shared-x", SNAPSHOT_A, 3_000);
     expect(clientStorageMocks.writeClientStoreValue).not.toHaveBeenCalled();
     expect(loadTurnTargetBadgesForThread("shared:t1")).toEqual([]);
+  });
+
+  it("migrates pending-id entries onto the finalized thread id", () => {
+    appendTurnTargetBadge("pi-pending-abc", SNAPSHOT_A, 1_000);
+
+    renameTurnTargetBadgeThread("pi-pending-abc", "pi:s1");
+
+    expect(loadTurnTargetBadgesForThread("pi:s1")).toHaveLength(1);
+    expect(loadTurnTargetBadgesForThread("pi-pending-abc")).toEqual([]);
+  });
+
+  it("merges rename chronologically when the finalized id already has entries", () => {
+    appendTurnTargetBadge("pi:s1", SNAPSHOT_B, 5_000);
+    appendTurnTargetBadge("pi-pending-abc", SNAPSHOT_A, 1_000);
+
+    renameTurnTargetBadgeThread("pi-pending-abc", "pi:s1");
+
+    const entries = loadTurnTargetBadgesForThread("pi:s1");
+    expect(entries.map((entry) => entry.recordedAt)).toEqual([1_000, 5_000]);
+    expect(loadTurnTargetBadgesForThread("pi-pending-abc")).toEqual([]);
+  });
+
+  it("no-ops rename when ids match or the source has no entries", () => {
+    appendTurnTargetBadge("pi:s1", SNAPSHOT_A, 1_000);
+    const writesBefore =
+      clientStorageMocks.writeClientStoreValue.mock.calls.length;
+
+    renameTurnTargetBadgeThread("pi:s1", "pi:s1");
+    renameTurnTargetBadgeThread("pi-pending-abc", "pi:s1");
+
+    expect(clientStorageMocks.writeClientStoreValue.mock.calls.length).toBe(
+      writesBefore,
+    );
+    expect(loadTurnTargetBadgesForThread("pi:s1")).toHaveLength(1);
   });
 
   it("merges ring entries tail-aligned to user turns without overwriting", () => {

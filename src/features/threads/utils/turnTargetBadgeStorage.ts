@@ -191,6 +191,36 @@ export function appendTurnTargetBadge(
 }
 
 /**
+ * pending → 正式 thread id 迁移：旧 key 的轮次记录按 recordedAt 合并进新 key
+ * （不覆盖目标已有记录——resume 换绑同一正式 id 时两段轮次都保留）。缺这步
+ * 迁移时，历史冷加载按正式 id 读侧车，改名前（通常首轮）的 badge 会丢。
+ */
+export function renameTurnTargetBadgeThread(
+  oldThreadId: string,
+  newThreadId: string,
+): void {
+  const from = oldThreadId.trim();
+  const to = newThreadId.trim();
+  if (!from || !to || from === to) {
+    return;
+  }
+  const map = normalizeTurnTargetBadgeMap(
+    getClientStoreSync<unknown>("threads", TURN_TARGET_BADGE_STORE_KEY),
+  );
+  const sourceEntries = map[from];
+  if (!sourceEntries || sourceEntries.length === 0) {
+    return;
+  }
+  delete map[from];
+  map[to] = pruneEntries(
+    [...(map[to] ?? []), ...sourceEntries].sort(
+      (a, b) => a.recordedAt - b.recordedAt,
+    ),
+  );
+  writeClientStoreValue("threads", TURN_TARGET_BADGE_STORE_KEY, pruneMap(map));
+}
+
+/**
  * 历史加载补挂：按用户消息切分轮次、从尾部对齐最近 K 轮 ring 记录，
  * 仅给缺失 executionTargetSnapshot 的助手消息落地。不做任何覆盖。
  */

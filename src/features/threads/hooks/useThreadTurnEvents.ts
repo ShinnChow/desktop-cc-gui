@@ -33,6 +33,7 @@ import { resolveThreadStabilityDiagnostic } from "../utils/stabilityDiagnostics"
 import type { TurnExecutionSnapshot } from "../../shared-session/target/types";
 import { renameRuntimeReceipt } from "../utils/runtimeModelReceipt";
 import { renameNativeTurnTarget } from "../utils/nativeTurnTargetLedger";
+import { renameTurnTargetBadgeThread } from "../utils/turnTargetBadgeStorage";
 import { noteSharedProviderRetryTurnSettled } from "../../shared-session/provider-retry/noteSharedProviderRetryTurn";
 import { getSharedTargetState } from "../../shared-session/target/targetStore";
 import { isSharedSessionThreadId } from "../../shared-session/utils/sharedSessionIdentity";
@@ -1662,8 +1663,10 @@ export function useThreadTurnEvents({
       ) {
         renameRuntimeReceipt(workspaceId, sourceThreadId, newThreadId);
       }
-      // Native turn-target 账本：pending → 正式 id 迁移（move-if-absent）。
+      // Native turn-target：内存账本（move-if-absent）与持久化侧车（按时间
+      // 合并）随 pending → 正式 id 迁移，否则历史冷加载读不到改名前的 badge。
       renameNativeTurnTarget(workspaceId, sourceThreadId, newThreadId);
+      renameTurnTargetBadgeThread(sourceThreadId, newThreadId);
       renameCustomNameKey(workspaceId, sourceThreadId, newThreadId);
       renameAutoTitlePendingKey(workspaceId, sourceThreadId, newThreadId);
       renamePendingMemoryCaptureKey(sourceThreadId, newThreadId);

@@ -6,6 +6,8 @@ import {
 } from "../utils/claudeForkThread";
 import { renameLiveAssistantTextThread } from "../utils/liveAssistantTextChannel";
 import { renameLiveItemDeltaThread } from "../utils/liveItemDeltaChannel";
+import { renameNativeTurnTarget } from "../utils/nativeTurnTargetLedger";
+import { renameTurnTargetBadgeThread } from "../utils/turnTargetBadgeStorage";
 import { loadClaudeSession as loadClaudeSessionService } from "../../../services/tauri";
 import { parseClaudeHistoryMessagesWithShadowRecovery } from "../loaders/claudeHistoryLoader";
 import type { ThreadAction } from "./useThreadsReducer";
@@ -322,6 +324,10 @@ export function useThreadMessagingThreadResolution({
         // A4 live-text 外部化：随迁通道条目（流式早期可能已在累计）。
         renameLiveAssistantTextThread(pendingThreadId, finalizedThreadId);
         renameLiveItemDeltaThread(pendingThreadId, finalizedThreadId);
+        // Native turn-target：发送可能在 pending id 下已记账，内存账本与
+        // 持久化侧车随改名迁移，否则改名后实时与历史冷加载都读不到 badge。
+        renameNativeTurnTarget(workspace.id, pendingThreadId, finalizedThreadId);
+        renameTurnTargetBadgeThread(pendingThreadId, finalizedThreadId);
         claudePendingThreadAwaitingNativeSessionRef.current.delete(
           pendingThreadId,
         );

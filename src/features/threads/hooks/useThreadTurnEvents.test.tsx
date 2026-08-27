@@ -23,6 +23,7 @@ import {
   getLiveAssistantTextSnapshot,
   resetLiveAssistantTextChannelForTests,
 } from "../utils/liveAssistantTextChannel";
+import { renameTurnTargetBadgeThread } from "../utils/turnTargetBadgeStorage";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
 import {
   clearSharedSessionBindingsForSharedThread,
@@ -31,6 +32,11 @@ import {
 import { initialState, threadReducer } from "./useThreadsReducer";
 import type { ThreadAction, ThreadState } from "./useThreadsReducer";
 import { workspaceScopedHas } from "./workspaceScopedMap";
+
+vi.mock("../utils/turnTargetBadgeStorage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../utils/turnTargetBadgeStorage")>()),
+  renameTurnTargetBadgeThread: vi.fn(),
+}));
 
 vi.mock("../../../services/tauri", () => ({
   engineInterrupt: vi.fn(),
@@ -1141,6 +1147,11 @@ describe("useThreadTurnEvents", () => {
     );
     expect(renameThreadTitleMapping).toHaveBeenCalledWith(
       "ws-1",
+      "claude-pending-abc",
+      "claude:session-xyz",
+    );
+    // 持久化 badge 侧车必须随改名迁移，否则历史冷加载读不到首轮 badge。
+    expect(renameTurnTargetBadgeThread).toHaveBeenCalledWith(
       "claude-pending-abc",
       "claude:session-xyz",
     );

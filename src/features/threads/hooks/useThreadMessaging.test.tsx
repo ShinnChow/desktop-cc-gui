@@ -49,6 +49,14 @@ import {
   resetSharedTargetStoreForTests,
   selectNextTarget,
 } from "../../shared-session/target/targetStore";
+import { renameTurnTargetBadgeThread } from "../utils/turnTargetBadgeStorage";
+
+// 该文件把 getClientStoreSync 桩成恒 undefined，真实侧车迁移读不到缓存；
+// 只替换 rename 为 spy 断言接线（迁移逻辑由 turnTargetBadgeStorage.test 覆盖）。
+vi.mock("../utils/turnTargetBadgeStorage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../utils/turnTargetBadgeStorage")>()),
+  renameTurnTargetBadgeThread: vi.fn(),
+}));
 
 const CLAUDE_PENDING_NATIVE_SESSION_WAIT_MESSAGE =
   "Claude session is still initializing. Wait for the session to finish binding, then send again.";
@@ -1818,6 +1826,11 @@ describe("useThreadMessaging", () => {
       oldThreadId: "claude-pending-abc",
       newThreadId: "claude:session-xyz",
     });
+    // candidate reconcile 改名必须随迁 badge 侧车，否则首轮 badge 冷加载丢失。
+    expect(renameTurnTargetBadgeThread).toHaveBeenCalledWith(
+      "claude-pending-abc",
+      "claude:session-xyz",
+    );
     expect(engineSendMessage).toHaveBeenNthCalledWith(
       2,
       "ws-1",
