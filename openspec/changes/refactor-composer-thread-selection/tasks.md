@@ -38,8 +38,8 @@
 
 ## 收口
 
-- [ ] 5.1 `openspec validate refactor-composer-thread-selection --strict` 通过；design §5 回填表补齐
-- [ ] 5.2 全量回归：Phase 0 基线 + 新增 D1-D5 红转绿用例全绿；`check:app-shell:governance`；tsc 零新增
+- [x] 5.1 `openspec validate refactor-composer-thread-selection --strict` 通过；design §5 回填表补齐 → **valid（D1-D5 全回填：D1 修复 / D2 另案 / D3/D4/D5 守卫裁决）**
+- [x] 5.2 全量回归：Phase 0 基线 + 新增 D1-D5 红转绿用例全绿；`check:app-shell:governance`；tsc 零新增 → **163/163（=基线 120 + 决策核心 11 + 裁决/守卫 4 + section 28）；governance 22/22；tsc 过滤后零 error（唯一残留=并行会话域）**
 - [ ] 5.3 真机手测矩阵：同引擎多会话快切 5+ 轮（claude/codex 各一组）、跨引擎互切、codex managed↔三方互切、新会话↔老会话混切、fork 会话——每次切回断言下拉显示 = 该会话上次模型
-- [ ] 5.4 README 索引行；sync specs（新增 `composer-thread-selection-resolution` + MODIFIED `codex-composer-startup-selection-stability`）
+- [ ] 5.4 README 索引行（✅ `34f1a82b1`）；sync specs（新增 `composer-thread-selection-resolution` + MODIFIED `codex-composer-startup-selection-stability`）——**与 archive 一并在 5.3 通过后执行**
 - [ ] 5.5 archive（待 5.3 通过）
