@@ -8,7 +8,7 @@ import {
   resetProviderTargetCatalogForTests,
   useAtomicProviderTargetCatalog,
 } from "./useProviderTargetCatalogOwners";
-import { buildProviderExecutionTarget } from "../selectors/ModelSelect";
+import { buildProviderExecutionTarget } from "../selectors/model-select/executionTarget";
 import { seedCliEngineVisibility } from "../../../hooks/cliEngineVisibilityStore";
 import { isResolvedExecutionTarget } from "../../../../shared-session/target/types";
 import {

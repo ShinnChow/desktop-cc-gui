@@ -87,7 +87,7 @@ import {
 } from "../hooks/composerEnginePrefsStore";
 import { ComposerLight } from "./ComposerLight";
 import type { ChatInputBoxHandle } from "./ChatInputBox/ChatInputBoxAdapter";
-import { isSameProviderExecutionProfile } from "./ChatInputBox/selectors/ModelSelect";
+import { isSameProviderExecutionProfile } from "./ChatInputBox/selectors/model-select/executionTarget";
 import {
   accessModeToPermissionMode,
   permissionModeToAccessMode,

@@ -5,15 +5,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildProviderExecutionTarget,
-  isAtomicEmptyModelSelection,
-  isSameProviderExecutionProfile,
-  ModelSelect,
   normalizeExecutionProviderProfileId,
   resolveActiveProviderProfileId,
+} from "./model-select/executionTarget";
+import {
+  isAtomicEmptyModelSelection,
   resolveAtomicSelectedModelDisplay,
   resolveClaudeCatalogModelLabel,
-  resolveModelIdForIcon,
-} from "./ModelSelect";
+} from "./model-select/display";
+import { resolveModelIdForIcon } from "./model-select/icon";
+import { isSameProviderExecutionProfile } from "./model-select/executionTarget";
+import { ModelSelect } from "./ModelSelect";
 import { STORAGE_KEYS } from "../../../types/provider";
 import type { ExecutionTarget } from "../../../../shared-session/target/types";
 import type { ProviderTargetGroup } from "../hooks/useProviderTargetCatalogOwners";

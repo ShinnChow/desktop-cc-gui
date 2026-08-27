@@ -31,12 +31,12 @@
 
 ## Phase 3 · ModelSelect 拆文件（行为零变化，测试恒绿）
 
-- [ ] 3.1 【补测】对覆盖不足的纯函数补特征测试（`pickerRowsForGroup` / `resolveRuntimeModel` / `isSelectedExecutionModel` 至少各一用例；既有覆盖足够的跳过并在 PR 记录）
-- [ ] 3.2 建 `selectors/model-select/` 子模块：按 design §2 切分 `executionTarget` / `providerProfile` / `display` / `icon` / `pickerGroups` / `atomicSelection` 纯函数文件（代码平移不改逻辑，允许 import 归组微调）
-- [ ] 3.3 拆 `ChannelPickerSubMenu.tsx`（channel / provider profile 子菜单 JSX + 其 handler 内聚迁出；props 注入，不从父组件读 store）
-- [ ] 3.4 ModelSelect.tsx 主文件改 import 并删除已迁出代码；`ModelSelect` 组件本体与既有导出面（组件 + 纯函数 re-export 位置变更）按 design §2 「直接改」口径处理
-- [ ] 3.5 全量改跨 feature import：`useModels.ts` / `app-shell/domains`（3 处）/ `StageTargetPicker.tsx` / `atomicModelReasoning.ts` / `resolveComposerAtomicSelectedModelId.ts`
-- [ ] 3.6 ModelSelect.test.tsx 仅改 import 路径，用例体不动；83 用例全绿
+- [x] 3.1 【补测】对覆盖不足的纯函数补特征测试（`pickerRowsForGroup` / `resolveRuntimeModel` / `isSelectedExecutionModel` 至少各一用例；既有覆盖足够的跳过并在 PR 记录）→ `model-select/pickerGroups.test.ts` 2 用例 + `display.test.ts` 6 用例，8/8 绿；特征测试抓到两处理解偏差（key 含完整 model.id、disambiguate 仅同节内统计）已按实际行为锁定；其余符号在 ModelSelect.test.tsx 已有覆盖（build 13 / resolveActive 11 / display 9 / normalize 5 / claudeLabel 5 / icon 4 / isSame 3 / isEmpty 3）
+- [x] 3.2 建 `selectors/model-select/` 子模块：按 design §2 切分 `executionTarget`（151 行）/ `providerProfile` 并入 `executionTarget` / `display`（130）/ `icon`（145）/ `pickerGroups`（79）纯函数文件（代码平移不改逻辑，允许 import 归组微调）→ providerProfile 并入 executionTarget（归组微调 ±1 文件口径内）；icon 因含 JSX 用 .tsx
+- [x] 3.3 拆 `ChannelPickerDialog.tsx`（channel picker Dialog JSX + handler 内聚迁出；props 注入 `group/onClose/onSelectProfile`，不从父组件读 store）→ 73 行
+- [x] 3.4 ModelSelect.tsx 主文件改 import 并删除已迁出代码（L144-592 切除 + import 修剪：resolveAtomicReasoningEffort / EngineIcon / ProviderBrandIconImg / brandIcon 系 / 10 个 profile 常量 / Dialog 系 / resolveModelMappingValue）；组件导出面不变 → **2027 → 1524 行**
+- [x] 3.5 全量改跨 feature import：`ChatInputBox.tsx` / `Composer.tsx` / `useProviderTargetCatalogOwners.test.tsx` / `ModelSelect.test.tsx`（实际 import 方比 proposal Impact 表预估小：useModels / app-shell / StageTargetPicker / atomicModelReasoning 均不直接 import ModelSelect 纯函数，proposal 表高估）
+- [x] 3.6 ModelSelect.test.tsx 仅改 import 路径，用例体不动；83 用例全绿
 - [ ] 3.7 【验证】typecheck 零 error；0.2 基线 + ModelSelect.test 全量复跑逐条一致；`npm run check:app-shell:governance` 通过；主文件行数对照 design §2 目标记录实际值
 - [ ] 3.8 提交：`refactor(composer): 拆分 ModelSelect 纯函数与 channel picker 到 model-select 子模块`
 

@@ -55,7 +55,7 @@ import { useAtomicProviderTargetCatalog } from './hooks/useProviderTargetCatalog
 import {
   buildProviderExecutionTarget,
   resolveActiveProviderProfileId,
-} from './selectors/ModelSelect';
+} from './selectors/model-select/executionTarget';
 import { LOCAL_PROVIDER_PROFILE_DISPLAY_NAME } from '../../../threads/constants/codexProviderProfiles';
 import type { EngineType } from '../../../../types';
 import {

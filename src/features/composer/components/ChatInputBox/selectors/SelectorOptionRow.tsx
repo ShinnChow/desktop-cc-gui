@@ -1,6 +1,6 @@
-import { memo, type ReactNode } from 'react';
-import CheckIcon from 'lucide-react/dist/esm/icons/check';
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { memo, type ReactNode } from "react";
+import CheckIcon from "lucide-react/dist/esm/icons/check";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 /**
  * SelectorOptionRow —— Composer selector 族共享选项行原语。
@@ -18,9 +18,9 @@ import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
  * 产出的 DOM 结构与 class 必须与替换前的手写实现等价，测试锚点不动。
  */
 export type SelectorOptionRowProps = {
-  variant: 'dropdown' | 'tool-menu';
+  variant: "dropdown" | "tool-menu";
   /** tool-menu 宿主元素：'button'（inline 子菜单）/ 'menu-item'（HUD 子菜单）。默认 'button'。 */
-  host?: 'button' | 'menu-item';
+  host?: "button" | "menu-item";
   /** 图标节点（含 class 的 span/组件），由调用方按各自形态构造后传入 */
   icon?: ReactNode;
   label: ReactNode;
@@ -44,24 +44,37 @@ export type SelectorOptionRowProps = {
   dataAttrs?: Record<string, string | undefined>;
 };
 
-function defaultCheckIndicator(variant: SelectorOptionRowProps['variant']): ReactNode {
-  if (variant === 'dropdown') {
+function defaultCheckIndicator(
+  variant: SelectorOptionRowProps["variant"],
+): ReactNode {
+  if (variant === "dropdown") {
     return <CheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden />;
   }
   return (
-    <span className="codicon codicon-check composer-tool-menu-option-check" aria-hidden="true" />
+    <span
+      className="codicon codicon-check composer-tool-menu-option-check"
+      aria-hidden="true"
+    />
   );
 }
 
 const toolMenuClass = (selected: boolean, disabled: boolean) =>
-  `composer-tool-menu-option${selected ? ' is-selected' : ''}${disabled ? ' is-disabled' : ''}`;
+  `composer-tool-menu-option${selected ? " is-selected" : ""}${disabled ? " is-disabled" : ""}`;
 
-function ToolMenuBody({ label, description }: { label: ReactNode; description?: ReactNode }) {
+function ToolMenuBody({
+  label,
+  description,
+}: {
+  label: ReactNode;
+  description?: ReactNode;
+}) {
   return (
     <span className="composer-tool-menu-option-body">
       <span className="composer-tool-menu-option-label">{label}</span>
       {description != null && (
-        <span className="composer-tool-menu-option-description">{description}</span>
+        <span className="composer-tool-menu-option-description">
+          {description}
+        </span>
       )}
     </span>
   );
@@ -69,7 +82,7 @@ function ToolMenuBody({ label, description }: { label: ReactNode; description?: 
 
 export const SelectorOptionRow = memo(function SelectorOptionRow({
   variant,
-  host = 'button',
+  host = "button",
   icon,
   label,
   description,
@@ -82,13 +95,15 @@ export const SelectorOptionRow = memo(function SelectorOptionRow({
   trailing,
   dataAttrs,
 }: SelectorOptionRowProps) {
-  const indicator = selected ? (checkIndicator ?? defaultCheckIndicator(variant)) : trailing;
+  const indicator = selected
+    ? (checkIndicator ?? defaultCheckIndicator(variant))
+    : trailing;
 
-  if (variant === 'dropdown') {
+  if (variant === "dropdown") {
     return (
       <DropdownMenuItem
         {...dataAttrs}
-        data-selected={selected ? 'true' : undefined}
+        data-selected={selected ? "true" : undefined}
         disabled={disabled}
         title={title}
         className="items-start gap-2"
@@ -115,7 +130,7 @@ export const SelectorOptionRow = memo(function SelectorOptionRow({
     );
   }
 
-  if (host === 'menu-item') {
+  if (host === "menu-item") {
     return (
       <DropdownMenuItem
         {...dataAttrs}
