@@ -26,7 +26,8 @@ import {
 import {
   clearFullCatalogAutoRetryCooldown,
   isFullCatalogAutoRetryBlocked,
-  markFullCatalogAutoRetryCooldown,
+  noteFullCatalogAutoRetrySuccess,
+  noteFullCatalogAutoRetryTimeout,
 } from "../../features/startup-orchestration/utils/fullCatalogAutoRetry";
 import {
   clearFullCatalogFresh,
@@ -811,11 +812,15 @@ export function useWorkspaceThreadListHydration({
               workspace.id,
             );
             if (settledAsTimeout) {
-              markFullCatalogAutoRetryCooldown(workspace.id, "timeout");
+              // 连续 timeout 指数退避（60s→15min 封顶），打破「永不成功扫描
+              // + 固定 60s 冷却 + 清 freshness」的常驻风暴回路（2026-08-27
+              // Windows 用户实测：129 次 30s 超时 / 49 分钟）。
+              noteFullCatalogAutoRetryTimeout(workspace.id);
               clearFullCatalogFresh(workspace.id);
             } else {
               // Successful multi-engine settle — block soft re-scans (focus-refresh).
               markFullCatalogFresh(workspace.id);
+              noteFullCatalogAutoRetrySuccess(workspace.id);
             }
             // MUST NOT stamp startup-gate-ready from full-catalog settle.
           } else if (isStillActive) {
