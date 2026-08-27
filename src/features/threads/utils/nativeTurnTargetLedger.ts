@@ -138,10 +138,3 @@ export function getNativeTurnIngestMeta(
     ...(runtimeReceipt ? { runtimeReceipt } : {}),
   };
 }
-
-/** 历史（重开/重载后）侧车补挂入口；key 约定见 turnTargetBadgeStorage。 */
-export function nativeTurnTargetStorageKeyOf(
-  workspaceId: string,
-): string {
-  return workspaceId;
-}

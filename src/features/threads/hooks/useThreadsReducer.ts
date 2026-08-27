@@ -146,6 +146,34 @@ export type { ThreadAction, ThreadState } from "./threadReducerTypes";
 const REDUCER_NOOP_GUARD_ENABLED = isReducerNoopGuardEnabled();
 const INCREMENTAL_DERIVATION_ENABLED = isIncrementalDerivationEnabled();
 
+/**
+ * Native turn-target（badge 快照 + 回执）的统一落地规则：仅当 item 缺失时
+ * 采纳 incoming，绝不覆盖既有值；无字段可加时保持原引用以便 fast-path
+ * 等价短路。action/params 不携带时原样返回。
+ */
+type TurnBadgeMetadataCarrier = {
+  executionTargetSnapshot?: ExecutionTargetSnapshot;
+  runtimeReceipt?: RuntimeModelReceipt;
+};
+
+function withMissingTurnBadgeMetadata<T extends object>(
+  base: T,
+  incoming?: TurnBadgeMetadataCarrier,
+): T {
+  if (!incoming) {
+    return base;
+  }
+  const carrier = base as TurnBadgeMetadataCarrier;
+  let patch: Partial<TurnBadgeMetadataCarrier> | null = null;
+  if (!carrier.executionTargetSnapshot && incoming.executionTargetSnapshot) {
+    patch = { executionTargetSnapshot: incoming.executionTargetSnapshot };
+  }
+  if (!carrier.runtimeReceipt && incoming.runtimeReceipt) {
+    patch = { ...(patch ?? {}), runtimeReceipt: incoming.runtimeReceipt };
+  }
+  return patch ? ({ ...base, ...patch } as T) : base;
+}
+
 const PENDING_THREAD_LAST_AGENT_ANCHOR_TTL_MS = 5 * 60 * 1000;
 // Continuation evidence arrives once per engine event (heartbeat/delta/item/*)
 // via raw dispatch, bypassing the delta batching layers. Consumers only do
@@ -1568,18 +1596,15 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           ? existing
           : clearAssistantFinalMetadata(existing);
         list = sourceItems.slice();
-        list[index] = {
-          ...nextBase,
-          ...(!nextBase.executionTargetSnapshot && action.executionTargetSnapshot
-            ? { executionTargetSnapshot: action.executionTargetSnapshot }
-            : {}),
-          ...(!nextBase.runtimeReceipt && action.runtimeReceipt
-            ? { runtimeReceipt: action.runtimeReceipt }
-            : {}),
-          id: nextId,
-          text: nextText,
-          isFinal: keepFinalMetadata ? true : false,
-        };
+        list[index] = withMissingTurnBadgeMetadata(
+          {
+            ...nextBase,
+            id: nextId,
+            text: nextText,
+            isFinal: keepFinalMetadata ? true : false,
+          },
+          action,
+        );
         if (
           canUseLiveAssistantDeltaFastPath({
             threadId: action.threadId,
@@ -1621,17 +1646,16 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       } else {
         list = [
           ...sourceItems,
-          {
-            id: segmentedItemId,
-            kind: "message",
-            role: "assistant",
-            text: action.delta,
-            isFinal: false,
-            ...(action.executionTargetSnapshot
-              ? { executionTargetSnapshot: action.executionTargetSnapshot }
-              : {}),
-            ...(action.runtimeReceipt ? { runtimeReceipt: action.runtimeReceipt } : {}),
-          },
+          withMissingTurnBadgeMetadata<ConversationItem>(
+            {
+              id: segmentedItemId,
+              kind: "message",
+              role: "assistant",
+              text: action.delta,
+              isFinal: false,
+            },
+            action,
+          ),
         ];
       }
       const updatedItems = prepareThreadItems(list, {
@@ -3520,47 +3544,43 @@ function applyCompleteAgentMessageToState(
     const nextBase = keepFinalMetadata
       ? existingItem
       : clearAssistantFinalMetadata(existingItem);
-    computedCompletedItem = withAssistantTurnTokenCounts(
-      {
-        ...nextBase,
-        ...( !nextBase.executionTargetSnapshot && params.executionTargetSnapshot
-          ? { executionTargetSnapshot: params.executionTargetSnapshot }
-          : {}),
-        ...(!nextBase.runtimeReceipt && params.runtimeReceipt
-          ? { runtimeReceipt: params.runtimeReceipt }
-          : {}),
-        id: targetItemId,
-        text: mergeCompletedAgentText(
-          existingItem.text,
-          params.text,
-          true,
-        ),
-        isFinal: true,
-        finalCompletedAt: nextBase.finalCompletedAt ?? completedAt,
-        ...(typeof nextBase.finalDurationMs === "number"
-          ? { finalDurationMs: nextBase.finalDurationMs }
-          : derivedDuration !== null
-            ? { finalDurationMs: derivedDuration }
-            : {}),
-      },
-      state.tokenUsageByThread[params.threadId],
+    computedCompletedItem = withMissingTurnBadgeMetadata(
+      withAssistantTurnTokenCounts(
+        {
+          ...nextBase,
+          id: targetItemId,
+          text: mergeCompletedAgentText(
+            existingItem.text,
+            params.text,
+            true,
+          ),
+          isFinal: true,
+          finalCompletedAt: nextBase.finalCompletedAt ?? completedAt,
+          ...(typeof nextBase.finalDurationMs === "number"
+            ? { finalDurationMs: nextBase.finalDurationMs }
+            : derivedDuration !== null
+              ? { finalDurationMs: derivedDuration }
+              : {}),
+        },
+        state.tokenUsageByThread[params.threadId],
+      ),
+      params,
     );
   } else {
-    computedCompletedItem = withAssistantTurnTokenCounts(
-      {
-        id: targetItemId,
-        kind: "message",
-        role: "assistant",
-        text: params.text,
-        isFinal: true,
-        finalCompletedAt: completedAt,
-        ...(derivedDuration !== null ? { finalDurationMs: derivedDuration } : {}),
-        ...(params.executionTargetSnapshot
-          ? { executionTargetSnapshot: params.executionTargetSnapshot }
-          : {}),
-        ...(params.runtimeReceipt ? { runtimeReceipt: params.runtimeReceipt } : {}),
-      },
-      state.tokenUsageByThread[params.threadId],
+    computedCompletedItem = withMissingTurnBadgeMetadata(
+      withAssistantTurnTokenCounts(
+        {
+          id: targetItemId,
+          kind: "message",
+          role: "assistant",
+          text: params.text,
+          isFinal: true,
+          finalCompletedAt: completedAt,
+          ...(derivedDuration !== null ? { finalDurationMs: derivedDuration } : {}),
+        },
+        state.tokenUsageByThread[params.threadId],
+      ),
+      params,
     );
   }
   if (

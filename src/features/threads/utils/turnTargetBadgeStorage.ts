@@ -4,6 +4,7 @@ import type {
   ExecutionTargetSnapshot,
   RuntimeModelReceipt,
 } from "../../../types";
+import { isNativeTurnTargetLedgerScope } from "./nativeTurnTargetLedger";
 
 /**
  * Native turn-target badge 历史侧车。
@@ -32,16 +33,6 @@ export type TurnTargetBadgeMap = Record<string, TurnTargetBadgeRecord[]>;
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNonSharedNativeThreadId(threadId: string): boolean {
-  const id = threadId.trim();
-  return (
-    id.length > 0 &&
-    !id.startsWith("shared:") &&
-    !id.startsWith("agent-canvas:") &&
-    !id.includes("-pending-shared-")
-  );
 }
 
 /** 只保留足以渲染显示条的字段；未知/畸形值丢弃，不伪造 provenance。 */
@@ -160,7 +151,7 @@ export function loadTurnTargetBadgesForThread(
   threadId: string,
 ): TurnTargetBadgeRecord[] {
   const normalizedThreadId = threadId.trim();
-  if (!normalizedThreadId || !isNonSharedNativeThreadId(normalizedThreadId)) {
+  if (!normalizedThreadId || !isNativeTurnTargetLedgerScope(normalizedThreadId)) {
     return [];
   }
   const raw = getClientStoreSync<unknown>("threads", TURN_TARGET_BADGE_STORE_KEY);
@@ -178,7 +169,7 @@ export function appendTurnTargetBadge(
   recordedAt: number = Date.now(),
 ): void {
   const normalizedThreadId = threadId.trim();
-  if (!normalizedThreadId || !isNonSharedNativeThreadId(normalizedThreadId)) {
+  if (!normalizedThreadId || !isNativeTurnTargetLedgerScope(normalizedThreadId)) {
     return;
   }
   const record = normalizeRecord({ snapshot, recordedAt });
@@ -211,7 +202,7 @@ export function mergeTurnTargetBadgesIntoItems(
   const normalizedThreadId = threadId.trim();
   if (
     !normalizedThreadId ||
-    !isNonSharedNativeThreadId(normalizedThreadId) ||
+    !isNativeTurnTargetLedgerScope(normalizedThreadId) ||
     entries.length === 0 ||
     items.length === 0
   ) {
