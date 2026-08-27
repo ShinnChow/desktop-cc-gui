@@ -7,6 +7,7 @@ const threads = {
     runtimeProcessing: "运行中",
     runtimeReviewing: "复核中",
     runtimeCompleted: "已完成",
+    runtimeBackgroundTasks: "后台任务运行中",
     archive: "归档",
     delete: "删除",
     openSessionManagement: "在会话管理中批量删除…",

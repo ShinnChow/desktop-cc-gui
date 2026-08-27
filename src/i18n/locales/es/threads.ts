@@ -10,6 +10,7 @@ const threads = {
     "runtimeProcessing": "En ejecución",
     "runtimeReviewing": "Revisando",
     "runtimeCompleted": "Completado",
+    "runtimeBackgroundTasks": "Tareas en segundo plano en ejecución",
     "archive": "Archivar",
     "delete": "Eliminar",
     "openSessionManagement": "Eliminación masiva en Gestión de sesiones…",

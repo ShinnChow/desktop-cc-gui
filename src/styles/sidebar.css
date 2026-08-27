@@ -2736,6 +2736,40 @@
   background: #1dd1a1;
 }
 
+/* 第四态：后台任务运行中（turn 已 settle，durable 任务仍在跑）——紫色呼吸。
+   与 unread 橙点错开色系：终态瞬间紫呼吸熄灭→橙静态亮起，切换可辨。 */
+.thread-status.bg-running {
+  background: #a55eea;
+  box-shadow: 0 0 0 3px rgba(165, 94, 234, 0.16);
+  animation: sidebar-thread-status-breathe 1.8s ease-in-out infinite;
+}
+
+:root[data-theme="light"] .thread-status.bg-running {
+  background: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.14);
+}
+
+/* 后台任务运行计数徽标（状态点旁，独立于灯色：蓝灯+徽标可并存）。 */
+.thread-bg-task-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 14px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: #a55eea;
+  background: rgba(165, 94, 234, 0.12);
+}
+
+:root[data-theme="light"] .thread-bg-task-count {
+  color: #7c3aed;
+  background: rgba(139, 92, 246, 0.12);
+}
+
 .thread-engine-badge {
   display: flex;
   align-items: center;
@@ -2896,6 +2930,18 @@
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
 }
 
+/* Background tasks in flight — purple breathe, mirrors .thread-status.bg-running. */
+.thread-runtime-dot--bg-running {
+  background: #a55eea;
+  box-shadow: 0 0 0 3px rgba(165, 94, 234, 0.16);
+  animation: sidebar-thread-status-breathe 1.8s ease-in-out infinite;
+}
+
+:root[data-theme="light"] .thread-runtime-dot--bg-running {
+  background: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.14);
+}
+
 .thread-provider-label {
   max-width: 116px;
   overflow: hidden;
@@ -2984,7 +3030,9 @@
   }
 
   .thread-status.processing,
+  .thread-status.bg-running,
   .thread-runtime-dot--processing,
+  .thread-runtime-dot--bg-running,
   .thread-engine-badge.is-processing {
     animation: none;
   }

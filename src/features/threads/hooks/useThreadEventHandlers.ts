@@ -17,6 +17,7 @@ import type {
 } from "../../../types";
 import { useThreadApprovalEvents } from "./useThreadApprovalEvents";
 import { useThreadItemEvents } from "./useThreadItemEvents";
+import { useThreadBackgroundTaskStatusSync } from "../utils/threadBackgroundTaskStatusSync";
 import { isSalvageableTerminalAssistantComplete } from "../contracts/realtimeEventContract";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
 import { queryTurnReconciliationStatusWithTimeout } from "./threadReconciliationStatusQuery";
@@ -116,6 +117,9 @@ export function useThreadEventHandlers({
   onExitPlanModeToolCompleted,
   domainEventController = null,
 }: ThreadEventHandlersOptions) {
+  // 后台任务 running 计数 → threadStatusById 单订阅 sync（app 级单例挂载，
+  // 见 threadBackgroundTaskStatusSync 头注释）。
+  useThreadBackgroundTaskStatusSync(dispatch);
   const threadLifecycleSnapshotRef = useRef<Map<string, ThreadLifecycleSnapshot>>(new Map());
   const turnDiagnosticsRef = useRef<Map<string, TurnDiagnosticState>>(new Map());
   const turnFirstDeltaTimerRef = useRef<Map<string, number>>(new Map());

@@ -10,6 +10,7 @@ const threads = {
     "runtimeProcessing": "चल रहा है",
     "runtimeReviewing": "समीक्षा कर रहे हैं",
     "runtimeCompleted": "पूर्ण",
+    "runtimeBackgroundTasks": "बैकग्राउंड कार्य चल रहे हैं",
     "archive": "आर्काइव करें",
     "delete": "हटाएं",
     "openSessionManagement": "सत्र प्रबंधन में सामूहिक हटाना…",

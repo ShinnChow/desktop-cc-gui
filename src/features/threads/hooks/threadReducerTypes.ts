@@ -26,6 +26,8 @@ export type ThreadActivityStatus = {
   hasUnread: boolean;
   isReviewing: boolean;
   isContextCompacting?: boolean;
+  /** 后台任务运行中计数（0/undefined = 无）；驱动会话行第四态呼吸灯与计数徽标。 */
+  backgroundTaskRunningCount?: number;
   processingStartedAt: number | null;
   lastDurationMs: number | null;
   heartbeatPulse?: number;
@@ -156,6 +158,13 @@ export type ThreadAction =
     }
   | { type: "markReviewing"; threadId: string; isReviewing: boolean }
   | { type: "markUnread"; threadId: string; hasUnread: boolean }
+  | {
+      /** 后台任务 running 计数同步（单订阅 sync diff 后 dispatch）；0 跨越且非活跃线程时收口 hasUnread。 */
+      type: "markBackgroundTaskActivity";
+      workspaceId: string;
+      threadId: string;
+      runningCount: number;
+    }
   | {
       type: "addAssistantMessage";
       threadId: string;

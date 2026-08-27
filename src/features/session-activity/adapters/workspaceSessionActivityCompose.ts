@@ -642,7 +642,10 @@ export function resolveWorkspaceSessionActivityContext({
         threadParentById,
         fallbackParentById,
       ),
-      threadIsProcessing: Boolean(threadStatusById[thread.id]?.isProcessing),
+      // 后台任务运行中（turn 已 settle）同样计为活跃：pi durable 任务仍在跑。
+      threadIsProcessing:
+        Boolean(threadStatusById[thread.id]?.isProcessing) ||
+        (threadStatusById[thread.id]?.backgroundTaskRunningCount ?? 0) > 0,
       inheritedTurnSemantic: thread.id === rootThreadId ? undefined : rootTurnSemantic || undefined,
     })),
   };

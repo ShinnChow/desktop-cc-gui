@@ -2,8 +2,11 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   applyBackgroundTaskUpdate,
+  clearBackgroundTasks,
   hydrateBackgroundTasksFromHistory,
   listBackgroundTasks,
+  listBackgroundTaskRunningCounts,
+  noteBackgroundTaskStarted,
   resetBackgroundTaskStoreForTests,
 } from "./backgroundTaskStore";
 import { collectPiHistoryBackgroundTasks } from "../../threads/loaders/piHistoryParser";
@@ -82,5 +85,72 @@ describe("hydrateBackgroundTasksFromHistory", () => {
   it("no-ops for empty merged lists", () => {
     hydrateBackgroundTasksFromHistory(WS, THREAD, []);
     expect(listBackgroundTasks(WS, THREAD)).toHaveLength(0);
+  });
+});
+
+describe("listBackgroundTaskRunningCounts", () => {
+  beforeEach(() => {
+    resetBackgroundTaskStoreForTests();
+  });
+
+  it("enumerates per-thread running counts across workspaces", () => {
+    applyBackgroundTaskUpdate(WS, THREAD, {
+      toolId: "tool-a",
+      task: { id: "t-a", status: "running" },
+      source: "receipt",
+    });
+    applyBackgroundTaskUpdate(WS, THREAD, {
+      toolId: "tool-b",
+      task: { id: "t-b", status: "running" },
+      source: "receipt",
+    });
+    applyBackgroundTaskUpdate(WS, THREAD, {
+      toolId: "tool-c",
+      task: { id: "t-c", status: "completed" },
+      source: "notification",
+    });
+    applyBackgroundTaskUpdate("ws-2", "pi:s2", {
+      toolId: "tool-d",
+      task: { id: "t-d", status: "failed" },
+      source: "registry",
+    });
+
+    const entries = listBackgroundTaskRunningCounts();
+    expect(entries).toHaveLength(2);
+    expect(entries).toContainEqual({
+      workspaceId: WS,
+      threadId: THREAD,
+      runningCount: 2,
+    });
+    expect(entries).toContainEqual({
+      workspaceId: "ws-2",
+      threadId: "pi:s2",
+      runningCount: 0,
+    });
+  });
+
+  it("excludes receipt 前的 tool: 占位记录", () => {
+    noteBackgroundTaskStarted(WS, THREAD, {
+      id: "tool-pending",
+      type: "backgroundTask",
+    });
+
+    const entries = listBackgroundTaskRunningCounts();
+    expect(entries).toContainEqual({
+      workspaceId: WS,
+      threadId: THREAD,
+      runningCount: 0,
+    });
+  });
+
+  it("drops the thread entry after clearBackgroundTasks", () => {
+    applyBackgroundTaskUpdate(WS, THREAD, {
+      toolId: "tool-a",
+      task: { id: "t-a", status: "running" },
+      source: "receipt",
+    });
+    clearBackgroundTasks(WS, THREAD);
+
+    expect(listBackgroundTaskRunningCounts()).toHaveLength(0);
   });
 });

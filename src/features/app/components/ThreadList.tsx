@@ -242,10 +242,11 @@ const ThreadRowItem = memo(function ThreadRowItem({
     renameInputRef.current?.select();
   }, [isRenaming]);
   const status = useThreadRowStatus(thread.id);
+  const backgroundTaskRunningCount = status?.backgroundTaskRunningCount ?? 0;
   const rowProjection = getThreadRowProjection({
     workspaceId: nestedWorkspaceId,
     threadId: thread.id,
-    statusVersion: `${status?.isProcessing ? "1" : "0"}:${status?.hasUnread ? "1" : "0"}:${status?.isReviewing ? "1" : "0"}`,
+    statusVersion: `${status?.isProcessing ? "1" : "0"}:${status?.hasUnread ? "1" : "0"}:${status?.isReviewing ? "1" : "0"}:${backgroundTaskRunningCount}`,
     isProcessing: Boolean(status?.isProcessing),
     hasUnread: Boolean(status?.hasUnread),
     backgroundActivityLabel: status?.isReviewing
@@ -258,12 +259,15 @@ const ThreadRowItem = memo(function ThreadRowItem({
     ? "reviewing"
     : rowProjection.isProcessing
       ? "processing"
-      : rowProjection.hasUnread
-        ? "unread"
-        : "ready";
+      : backgroundTaskRunningCount > 0
+        ? "bg-running"
+        : rowProjection.hasUnread
+          ? "unread"
+          : "ready";
   // Live / completion status uses a compact meta-area dot (not a text pill):
   // - processing: blue breathe
   // - reviewing: static light blue
+  // - bg-running (pi durable background tasks in flight): purple breathe
   // - unread (finished while away): green; cleared on select via setActiveThreadId
   const runtimeIndicator = status?.isReviewing
     ? { label: t("threads.runtimeReviewing"), severity: "reviewing" as const }
@@ -272,14 +276,21 @@ const ThreadRowItem = memo(function ThreadRowItem({
           label: t("threads.runtimeProcessing"),
           severity: "processing" as const,
         }
-      : status?.hasUnread
+      : backgroundTaskRunningCount > 0
         ? {
-            label: t("threads.runtimeCompleted", {
-              defaultValue: "Completed",
+            label: t("threads.runtimeBackgroundTasks", {
+              defaultValue: "Background tasks running",
             }),
-            severity: "completed" as const,
+            severity: "bg-running" as const,
           }
-        : null;
+        : status?.hasUnread
+          ? {
+              label: t("threads.runtimeCompleted", {
+                defaultValue: "Completed",
+              }),
+              severity: "completed" as const,
+            }
+          : null;
   const isProcessing = rowProjection.isProcessing;
   const showProxyBadge = systemProxyEnabled && isProcessing;
   const indentStyle =
@@ -305,6 +316,19 @@ const ThreadRowItem = memo(function ThreadRowItem({
   const leadingChrome = (
     <>
       <span className={`thread-status ${statusClass}`} aria-hidden />
+      {backgroundTaskRunningCount > 0 ? (
+        <span
+          className="thread-bg-task-count"
+          title={t("threads.runtimeBackgroundTasks", {
+            defaultValue: "Background tasks running",
+          })}
+          aria-label={t("threads.runtimeBackgroundTasks", {
+            defaultValue: "Background tasks running",
+          })}
+        >
+          {backgroundTaskRunningCount}
+        </span>
+      ) : null}
       {canPin && onToggleThreadPin && !isRenaming ? (
         <span
           className={`thread-pin-toggle${isPinned ? " is-pinned" : ""}`}
@@ -634,7 +658,13 @@ export function ThreadList({
         return false;
       }
       const status = threadStatusById[thread.id];
-      return !status?.isProcessing && !status?.isReviewing;
+      // 后台任务运行中的会话不算「已退出」：hideExitedSessions 过滤下仍需
+      // 可见（紫灯是「未完成」信号，行被过滤掉信号就没了）。
+      return (
+        !status?.isProcessing &&
+        !status?.isReviewing &&
+        (status?.backgroundTaskRunningCount ?? 0) === 0
+      );
     },
     [threadStatusById],
   );

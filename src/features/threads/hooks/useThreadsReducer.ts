@@ -1355,6 +1355,41 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           },
         },
       };
+    case "markBackgroundTaskActivity": {
+      const previous = state.threadStatusById[action.threadId];
+      const previousCount = previous?.backgroundTaskRunningCount ?? 0;
+      // 0 跨越收口：最后一个后台任务转终态且用户不在该会话 → 标 unread
+      // （对齐 markProcessing 非活跃结算语义）；活跃线程只熄灯，靠时间线
+      // 活体卡原地折叠表达完成。
+      const crossedToZeroWhileAway =
+        previousCount > 0 &&
+        action.runningCount === 0 &&
+        !isThreadActiveInState(
+          state.activeThreadIdByWorkspace,
+          action.threadId,
+          action.workspaceId,
+        );
+      const nextHasUnread = crossedToZeroWhileAway
+        ? true
+        : (previous?.hasUnread ?? false);
+      if (
+        previousCount === action.runningCount &&
+        (previous?.hasUnread ?? false) === nextHasUnread
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        threadStatusById: {
+          ...state.threadStatusById,
+          [action.threadId]: {
+            ...withThreadStatusDefaults(previous),
+            backgroundTaskRunningCount: action.runningCount,
+            hasUnread: nextHasUnread,
+          },
+        },
+      };
+    }
     case "addAssistantMessage": {
       const list = state.itemsByThread[action.threadId] ?? [];
       const message: ConversationItem = {

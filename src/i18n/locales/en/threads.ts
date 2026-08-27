@@ -7,6 +7,7 @@ const threads = {
     runtimeProcessing: "Running",
     runtimeReviewing: "Reviewing",
     runtimeCompleted: "Completed",
+    runtimeBackgroundTasks: "Background tasks running",
     archive: "Archive",
     delete: "Delete",
     openSessionManagement: "Bulk Delete in Session Management…",
