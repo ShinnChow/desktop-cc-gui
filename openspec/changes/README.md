@@ -3,16 +3,14 @@
 本页是 `mossx` OpenSpec proposal 的当前入口。它只维护 active change 的执行状态，并把 archived change 路由到完整历史索引；详细治理快照仍以 [`../project.md`](../project.md) 为准。
 
 - Updated At: `2026-08-27`
-- Active proposals: `72`（以磁盘 `openspec/changes/*` 为准）
-- Archived proposals: `926`（以磁盘 `openspec/changes/archive/<date>-*` 目录为准；本页逐条索引链接 872，历史存量缺口另计）
+- Active proposals: `70`（以磁盘 `openspec/changes/*` 为准）
+- Archived proposals: `928`（以磁盘 `openspec/changes/archive/<date>-*` 目录为准；本页逐条索引链接 872，历史存量缺口另计）
 - Main capability specs: `544`
 
 ## Active Proposals
 
 | Change | Progress | Current gate | Artifacts |
 | ------ | -------: | ------------ | --------- |
-| [`refactor-composer-thread-selection`](refactor-composer-thread-selection/proposal.md) | implemented / await 5.3 hand-test | 切会话选择跟随收拢重写完成：P1 决策核心 `resolveThreadSelectionOnSwitch`（`373e5f1b7`，131/131）；**P2 修 D1 实锤（`504a40595`）——切换窗口 repair 污染持久账本（用户主诉主因），commit 归属标志守卫根治**；P3 D2 重界定另案（需 draft 结构带 profile）；P4 D4/D5 裁决=现状已守卫（`343bfaaaf`，双绿+回归守卫）；收口回归 163/163；**待真机手测（codex 双会话快切 5+ 轮）后 sync + archive** | [proposal](refactor-composer-thread-selection/proposal.md) · [design](refactor-composer-thread-selection/design.md) · [tasks](refactor-composer-thread-selection/tasks.md) · [specs](refactor-composer-thread-selection/specs/) |
-| [`refactor-composer-selector-layer`](refactor-composer-selector-layer/proposal.md) | implemented / await 5.3 hand-test | Composer selector 族结构债四项一体已落地（TDD 四 Phase 独立提交）：删 ProviderSelect/ShortcutActionsSelect 死代码（`248449592`，−723 行）+ 抽 `SelectorOptionRow` 原语收敛六处手写（`1966fc9a4`，DOM/class 锚点逐一等价）+ ModelSelect 2027→1524 行拆 `model-select/` 子模块含特征测试（`f80e019c8`）+ 级联语义裁决：targetPicker 实为零消费死代码、ModelSelect 单轨保持（`1997d87c4`）；selectors+ButtonArea 175/175 绿、tsc 零 error、governance 22/22；**待真机手测（native/Shared/New Home 三态 picker + 工具菜单）后 sync + archive** | [proposal](refactor-composer-selector-layer/proposal.md) · [design](refactor-composer-selector-layer/design.md) · [tasks](refactor-composer-selector-layer/tasks.md) · [specs](refactor-composer-selector-layer/specs/) |
 | [`fix-claude-slash-command-title-truncation-omission`](fix-claude-slash-command-title-truncation-omission/proposal.md) | implementing / TDD | slash-command 会话被索引误剔（0.9.3 用户 desktop-cc-gui：claude 列表恒 0）：`/brainstorming` 信封前缀 >80 字符，`peek_claude_first_user_preview` 截断后 title 无完整 `<command-args>` 标签对 → `should_omit_claude_index_row` 误判裸命令整条剔除；修复 = truncate 前先用 `extract_command_prompt_text` 还原 prompt（与 history 路径同语义）；TDD 红→绿（writers 15/15）、rustfmt clean；与 fix-sidebar-reload-force-index-sync 互补 | [proposal](fix-claude-slash-command-title-truncation-omission/proposal.md) · [tasks](fix-claude-slash-command-title-truncation-omission/tasks.md) · [specs](fix-claude-slash-command-title-truncation-omission/specs/) |
 | [`fix-composer-cross-engine-draft-selection-leak`](fix-composer-cross-engine-draft-selection-leak/proposal.md) | implementing / TDD | 跨引擎模型串台（Claude 会话的 grok4.6/opus5 成为新 Codex 会话默认并进请求，2026-08-27 用户反馈）：draft carry 应用无引擎门禁；apply 点按 `resolveThreadEngine` 双侧一致才放行，未知引擎维持放行；只动 `selectedComposerSession.ts` / `useSelectedComposerSession.ts` + 测试；**不碰 fix-model-picker-send-authority 在途域** | [proposal](fix-composer-cross-engine-draft-selection-leak/proposal.md) · [design](fix-composer-cross-engine-draft-selection-leak/design.md) · [tasks](fix-composer-cross-engine-draft-selection-leak/tasks.md) · [specs](fix-composer-cross-engine-draft-selection-leak/specs/) |
 | [`fix-context-compacted-marker-turn-finality`](fix-context-compacted-marker-turn-finality/proposal.md) | implementing / TDD | 压缩留痕劫持 turn 终态：pi auto-compaction 先于 settle 入库 assistant 消息 → `markLatestAssistantMessageFinal` 误标 → 极简模式锚点错、真实回答被折进 chip（2026-08-27 用户反馈）；新增 `context-event` kind + `compaction_end` reason/token 透传 + i18n 分隔行渲染；**TDD 先红后绿** | [proposal](fix-context-compacted-marker-turn-finality/proposal.md) · [design](fix-context-compacted-marker-turn-finality/design.md) · [tasks](fix-context-compacted-marker-turn-finality/tasks.md) · [specs](fix-context-compacted-marker-turn-finality/specs/) |
@@ -65,8 +63,9 @@
 
 ## Active backlog notes（2026-08-08）
 
-- **新增提案** `refactor-composer-thread-selection`（2026-08-27）：切会话选择跟随整体收拢（决策核心纯函数 + 写入统一 epoch 防竞态 + 5 漂移修复），TDD 四 Phase；proposal/design/tasks/specs 已建，strict validate 通过，待实施。
-- **新增提案** `refactor-composer-selector-layer`（2026-08-27）：Composer selector 族重构四合一（死代码清退 / SelectorOptionRow 原语 / ModelSelect 拆文件 / 级联语义裁决），TDD 四 Phase 独立提交；proposal/design/tasks/specs 已建，strict validate 通过，待实施。
+- **已归档** `refactor-composer-thread-selection` → `archive/2026-08-27-refactor-composer-thread-selection`：切会话选择跟随收拢重写（决策核心纯函数 + 归属标志防竞态 + D6 闸2）；main spec 已同步 `composer-thread-selection-resolution`（新）+ `codex-composer-startup-selection-stability`（修改）。
+- **已归档** `refactor-composer-selector-layer` → `archive/2026-08-27-refactor-composer-selector-layer`：Composer selector 族四合一重构（死代码清退 / SelectorOptionRow 原语 / ModelSelect 拆文件 / 级联裁决）；main spec 已同步 `composer-selector-primitives`（新）+ `composer-selector-home-chat-simplification`（修改）。
+
 
 - **已归档** `fix-shared-owned-native-sidebar-leak` → `archive/2026-08-22-fix-shared-owned-native-sidebar-leak`：Shared live Target 认主 + ensureThread 闸 + hide 未就绪不放出新 grok/pi/qoder；用户 2026-08-22 手测通过；main specs 已同步 `shared-session-thread` / `shared-hide-list-prefilter`。
 

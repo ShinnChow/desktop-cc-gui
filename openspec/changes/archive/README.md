@@ -3,12 +3,17 @@
 本页为 `mossx` 已归档 OpenSpec proposal 的完整可点击索引。目录名中的日期是 archive date，不代表 proposal 首次创建时间。
 
 - Updated At: `2026-08-27`
-- Indexed proposals: `926`（以磁盘 `archive/<date>-*` 目录为准；本页逐条索引链接 872，历史存量缺口另计）
+- Indexed proposals: `928`（以磁盘 `archive/<date>-*` 目录为准；本页逐条索引链接 874，历史存量缺口另计）
 - Source of truth: `openspec/changes/archive/<archive-date>-<change-id>/proposal.md`
 - Back to current changes: [`../README.md`](../README.md)
 - Back to workspace overview: [`../../project.md`](../../project.md)
 
 ## 2026-08
+
+### 2026-08-27
+
+- [`2026-08-27-refactor-composer-thread-selection`](2026-08-27-refactor-composer-thread-selection/proposal.md) — verified implementation，已同步 `composer-thread-selection-resolution`（新 capability，4 requirements）+ `codex-composer-startup-selection-stability`（MODIFIED 幂等性新增切换窗口守卫场景）；切会话选择跟随收拢重写：决策核心 `resolveThreadSelectionOnSwitch` 纯函数单源 + 账本 commit 归属标志防竞态（修 D1 切换窗口污染持久账本）+ draft carry catalog 成员资格闸（修 D6 Home 点选引擎盲区）；TDD 四 Phase（131→163 用例零回归），真机手测暂定通过；commits `373e5f1b7`/`504a40595`/`343bfaaaf`/`a56a7a56e`/`bf967cdaf`
+- [`2026-08-27-refactor-composer-selector-layer`](2026-08-27-refactor-composer-selector-layer/proposal.md) — verified implementation，已同步 `composer-selector-primitives`（新 capability，2 requirements）+ `composer-selector-home-chat-simplification`（MODIFIED 收敛为共享原语引用）；Composer selector 族四合一重构：删 ProviderSelect/ShortcutActionsSelect 死代码（−723 行）+ 抽 `SelectorOptionRow` 选项行原语收敛六处手写 + ModelSelect 2027→1524 行拆 `model-select/` 子模块（纯函数跨 feature import 全量改路径）+ 级联语义裁决（targetPicker 实为零消费死代码）；TDD 四 Phase（165→175 用例零回归），真机手测暂定通过；commits `248449592`/`1966fc9a4`/`f80e019c8`/`1997d87c4`
 
 ### 2026-08-26
 
