@@ -22,10 +22,9 @@
 - [x] 3.4 `sidebar.css`：`.thread-runtime-dot--bg-running`（紫 `#a55eea`，复用 breathe keyframes 与同款 halo）+ `.thread-bg-task-count` 徽标样式（均含 light 变体）；`prefers-reduced-motion` 覆盖追加 `.thread-runtime-dot--bg-running`
 - [x] 3.5 测试：projection 第四位引用稳定；ThreadList class 分流 / 徽标渲染 / 蓝灯+徽标并存
 
-## 4. Phase 4 · 雷达接入与收口验证
-
 - [x] 4.1 `workspaceSessionActivityCompose.ts`：`threadIsProcessing` 并入 `backgroundTaskRunningCount > 0`（`ThreadStatusSnapshot` 补字段）+ compose 单测（仅后台任务运行时计活跃）
 - [x] 4.2 i18n：`threads.runtimeBackgroundTasks` 文案（10 个 locale 全量）
 - [x] 4.3 回归：`npm run check:app-shell:governance` 22/22、session-activity 201/201、投影/rowStatus 消费方与 i18n parity 全绿；`git diff --stat` 自查无格式化噪音；tsc 仅剩在途工作的存量错误
-- [ ] 4.4 真机手工验收：pi 会话 bg_run → 切走 → 紫灯 + ⚙N 徽标；全部终态 → 灯灭 + 非活跃会话未读点；模型生成中蓝灯 + 徽标并存；reduced-motion 降级静态；重启后已终态任务不误亮
+- [x] 4.6 registry watcher 上收 app 级（D10 真机事故修复）：`useBackgroundTaskRegistryWatcherForRunningThreads` 枚举 running>0 会话探测，挂 `useThreadEventHandlers`；strip 旧挂载移除；probeThreadTasks 抽取复用；切走会话后终态经 sink 全路径回写时间线卡片
+- [ ] 4.4 真机手工验收：pi 会话 bg_run → 切走 → 紫灯 + ⚙N 徽标；全部终态 → 灯灭 + 非活跃会话未读点；模型生成中蓝灯 + 徽标并存；reduced-motion 降级静态；重启后已终态任务不误亮；**任务结束后幕布卡片 ≤3s 内原地折叠（无需切会话/重开）**
 - [ ] 4.5 收口：`openspec` validate / archive 流程，同步 capability spec
