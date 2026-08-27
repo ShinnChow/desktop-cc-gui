@@ -3,7 +3,7 @@
 本页是 `mossx` OpenSpec proposal 的当前入口。它只维护 active change 的执行状态，并把 archived change 路由到完整历史索引；详细治理快照仍以 [`../project.md`](../project.md) 为准。
 
 - Updated At: `2026-08-27`
-- Active proposals: `69`（以磁盘 `openspec/changes/*` 为准）
+- Active proposals: `70`（以磁盘 `openspec/changes/*` 为准）
 - Archived proposals: `926`（以磁盘 `openspec/changes/archive/<date>-*` 目录为准；本页逐条索引链接 872，历史存量缺口另计）
 - Main capability specs: `544`
 
@@ -11,6 +11,7 @@
 
 | Change | Progress | Current gate | Artifacts |
 | ------ | -------: | ------------ | --------- |
+| [`fix-context-compacted-marker-turn-finality`](fix-context-compacted-marker-turn-finality/proposal.md) | implementing / TDD | 压缩留痕劫持 turn 终态：pi auto-compaction 先于 settle 入库 assistant 消息 → `markLatestAssistantMessageFinal` 误标 → 极简模式锚点错、真实回答被折进 chip（2026-08-27 用户反馈）；新增 `context-event` kind + `compaction_end` reason/token 透传 + i18n 分隔行渲染；**TDD 先红后绿** | [proposal](fix-context-compacted-marker-turn-finality/proposal.md) · [design](fix-context-compacted-marker-turn-finality/design.md) · [tasks](fix-context-compacted-marker-turn-finality/tasks.md) · [specs](fix-context-compacted-marker-turn-finality/specs/) |
 | [`fix-client-store-ipc-jank-and-markdown-worker-churn`](fix-client-store-ipc-jank-and-markdown-worker-churn/proposal.md) | implementing / TDD | 2026-08-26 实测双慢点：client store write/patch 嵌套对象图过 WKWebView 桥（274KB patch 同步段 3338ms、4021ms 帧间隙）改 raw-string `payloadJson` 通道 + fast-markdown-worker 崩溃循环（fallback 负缓存 + 指数退避 + messageHash 指纹）+ `thread/session:reasoning-text-delta` 进 threadSessionLog 黑名单；**TDD 先红后绿** | [proposal](fix-client-store-ipc-jank-and-markdown-worker-churn/proposal.md) · [tasks](fix-client-store-ipc-jank-and-markdown-worker-churn/tasks.md) · [specs](fix-client-store-ipc-jank-and-markdown-worker-churn/specs/) |
 | [`fix-orphan-turn-during-backend-unavailability`](fix-orphan-turn-during-backend-unavailability/proposal.md) | implemented / await 4.3 hand-test | 后端不可用窗口孤儿 turn：F1 前端零首事件看门狗（90s 可重试 settle，engine-agnostic，14 测）+ F2 PI send gate 双证据快速失败（3 测）+ F3 detached send panic 兜底（3 测）；typecheck 0 / rustfmt clean / threads hooks 对照 HEAD 零新增红；**待 tauri dev 重启窗口真机手测后 verify** | [proposal](fix-orphan-turn-during-backend-unavailability/proposal.md) · [design](fix-orphan-turn-during-backend-unavailability/design.md) · [tasks](fix-orphan-turn-during-backend-unavailability/tasks.md) · [specs](fix-orphan-turn-during-backend-unavailability/specs/) · [分析](../../docs/analysis/pi-orphan-turn-during-dev-restart-2026-08-26.md) |
 | [`fix-codex-third-party-provider-model-catalog`](fix-codex-third-party-provider-model-catalog/proposal.md) | implemented / advisory reviewed / committing | Codex 三方供应商模型目录三类事实修复：provider-owned 模型补 reasoning 默认档（catalog-identity 优先）+ Codex managed scope 不拼官方 generated fallback + usage 事件不再伪造 200K context window（含前端 legacy resolver 同语义与测试锁定）+ discovery 提取保留 runtime reasoning metadata；前端 160/160、cargo provider_catalog 4/4 + codex_adapter 7/7 + status 39/39、typecheck 0 / governance / rustfmt / strict 全绿；advisory review 已过（死参数清理 + codex 不伪造测试补锁），**按 4 批次提交中** | [proposal](fix-codex-third-party-provider-model-catalog/proposal.md) · [tasks](fix-codex-third-party-provider-model-catalog/tasks.md) · [specs](fix-codex-third-party-provider-model-catalog/specs/) |
