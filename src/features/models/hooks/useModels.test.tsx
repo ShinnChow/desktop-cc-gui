@@ -43,6 +43,83 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+describe("useModels · D4-Live：用户模型锁不跨线程存活", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+  afterEach(async () => {
+    cleanup();
+    await Promise.resolve();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  it("切线程后旧线程的用户锁模型不再压制默认收敛（claude 线程点选 → 切 pi 线程）", async () => {
+    vi.mocked(getModelList).mockResolvedValue({
+      ok: true,
+      result: {
+        data: [
+          {
+            id: "kimi-coding/k3",
+            model: "kimi-coding/k3",
+            displayName: "K3",
+            provider: null,
+            protocol: null,
+            provenance: null,
+            observedAt: null,
+            lastVerifiedAt: null,
+            lifecycle: null,
+            providerProfileId: null,
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: true,
+          },
+          {
+            id: "anthropic/claude-fable-5",
+            model: "anthropic/claude-fable-5",
+            displayName: "Claude Fable 5",
+            provider: null,
+            protocol: null,
+            provenance: null,
+            observedAt: null,
+            lastVerifiedAt: null,
+            lifecycle: null,
+            providerProfileId: null,
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: false,
+          },
+        ],
+      },
+    });
+    vi.mocked(getConfigModel).mockResolvedValue(null);
+
+    const initialProps = { activeThreadId: "claude:thread-a" as string | null };
+    const { result, rerender } = renderHook(
+      ({ activeThreadId }) => useModels({ activeWorkspace: workspace, activeThreadId }),
+      { initialProps },
+    );
+
+    await waitFor(() => expect(result.current.models.length).toBeGreaterThan(0));
+
+    // 用户在 claude 线程显式点选 claude 模型（用户锁 = true）
+    await act(async () => {
+      result.current.setSelectedModelId("anthropic/claude-fable-5");
+    });
+    await waitFor(() =>
+      expect(result.current.selectedModelId).toBe("anthropic/claude-fable-5"),
+    );
+
+    // 切到 pi 线程：锁应被清理，selection 收敛回默认（kimi-coding/k3）
+    await act(async () => {
+      rerender({ activeThreadId: "pi:thread-b" });
+    });
+    await waitFor(() =>
+      expect(result.current.selectedModelId).toBe("kimi-coding/k3"),
+    );
+  });
+});
+
 describe("useModels", () => {
   beforeEach(() => {
     window.localStorage.clear();

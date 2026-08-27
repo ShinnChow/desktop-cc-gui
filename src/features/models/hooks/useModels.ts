@@ -23,6 +23,12 @@ import { buildSelectionApplyEpochKey } from "./modelSelectionApplyCircuit";
 
 type UseModelsOptions = {
   activeWorkspace: WorkspaceInfo | null;
+  /**
+   * D4-Live：切线程时清用户模型/档位锁（保留 selection state 作显示回退）。
+   * 防止上一线程（如 claude）的 freeform 保留把模型 id 压进另一引擎线程的
+   * 选择收敛与触发器显示（nativeSessionTarget 的 propModelId 路径）。
+   */
+  activeThreadId?: string | null;
   onDebug?: (entry: DebugEntry) => void;
   preferredModelId?: string | null;
   preferredEffort?: string | null;
@@ -461,6 +467,7 @@ type ComposerSelectionState = {
 
 export function useModels({
   activeWorkspace,
+  activeThreadId,
   onDebug,
   preferredModelId = null,
   preferredEffort = null,
@@ -487,6 +494,22 @@ export function useModels({
   const hasUserSelectedModel = useRef(false);
   const hasUserSelectedEffort = useRef(false);
   const lastWorkspaceId = useRef<string | null>(null);
+  // D4-Live：切线程清用户锁（不动 selection state；线程内选择语义不变）。
+  // epoch 自增驱动同步收敛 layout effect 重评估（ref 变化不触发渲染）。
+  const [userLockEpoch, setUserLockEpoch] = useState(0);
+  const lastThreadIdForUserLockRef = useRef<string | null>(
+    activeThreadId ?? null,
+  );
+  useEffect(() => {
+    const nextThreadId = activeThreadId ?? null;
+    if (lastThreadIdForUserLockRef.current === nextThreadId) {
+      return;
+    }
+    lastThreadIdForUserLockRef.current = nextThreadId;
+    hasUserSelectedModel.current = false;
+    hasUserSelectedEffort.current = false;
+    setUserLockEpoch((epoch) => epoch + 1);
+  }, [activeThreadId]);
   const catalogOwnerLeaseRef = useRef<{ superseded: boolean } | null>(null);
   /** catalog/preferred epoch 熔断：同 epoch 超限 apply 直接停，防冷启 #185 白屏 */
   const selectionApplyEpochRef = useRef<string | null>(null);
@@ -1059,6 +1082,7 @@ export function useModels({
     stablePreferredEffort,
     stablePreferredModelId,
     stablePreferredSelectionReady,
+    userLockEpoch,
   ]);
 
   return {
