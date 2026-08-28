@@ -134,6 +134,10 @@ export type ResumeThreadForWorkspaceOptions = {
   mergeHydratedPrefix?: boolean;
 };
 
+// harden-pi-session-curtain-fidelity：pi load 连续失败达上限后置 loaded
+// 停止自动重试，防止会话文件永久缺失时每次切回都全量扫盘。
+const PI_HISTORY_LOAD_MAX_ATTEMPTS = 3;
+
 type ResumeThreadForWorkspaceContext = UseThreadActionsOptions & {
   reconcileMissingClaudeThread: (
     workspaceId: string,
@@ -196,6 +200,10 @@ export function useThreadActionsResumeThreadForWorkspace(
   } = deps;
   const resumeRequestGenerationByScopeRef = useRef<Record<string, number>>({});
   const automaticRecoveryFailedByScopeRef = useRef<Record<string, true>>({});
+  // harden-pi-session-curtain-fidelity：pi load 失败重试计数（按线程）。
+  const piHistoryLoadFailureCountByThreadRef = useRef<Record<string, number>>(
+    {},
+  );
   // Late Shared projection merge must read the live canvas, not resume-start snapshot.
   const itemsByThreadRef = useRef(itemsByThread);
   itemsByThreadRef.current = itemsByThread;
@@ -360,9 +368,28 @@ export function useThreadActionsResumeThreadForWorkspace(
         // fix-claude-history-window-message-loss：post-turn reconcile（force+replace）
         // 的 hydrated window 只覆盖尾部，整体替换会裁掉窗口之外已展示的旧消息。
         // preserve-prefix merge：锚点对齐保留前缀；无法对齐时回退信任磁盘。
-        const effectiveItems = mergeHydratedPrefix
-          ? mergeHydratedItemsPreservePrefix(localItems, items)
-          : items;
+        let effectiveItems = items;
+        if (mergeHydratedPrefix) {
+          const merged = mergeHydratedItemsPreservePrefix(localItems, items);
+          // harden-pi-session-curtain-fidelity：锚点 miss 时 merge 返回
+          // hydrated 原引用（回退信任磁盘整体替换）。这是「吞」感知的
+          // 高危路径，打点留痕供 debug 面板归因；纯观测，不改合并结果。
+          if (localItems.length > 0 && merged === items) {
+            onDebug?.({
+              id: `${Date.now()}-client-hydrated-anchor-miss-fallback`,
+              timestamp: Date.now(),
+              source: "client",
+              label: "thread/hydrated merge anchor-miss fallback-to-disk",
+              payload: {
+                workspaceId,
+                threadId: targetThreadId,
+                itemCountBefore: localItems.length,
+                itemCountAfter: merged.length,
+              },
+            });
+          }
+          effectiveItems = merged;
+        }
         const result = await dispatchThreadItemsProgressively(
           dispatch,
           targetThreadId,
@@ -1810,11 +1837,44 @@ export function useThreadActionsResumeThreadForWorkspace(
               threadId,
               timestamp: Date.now(),
             });
+            delete piHistoryLoadFailureCountByThreadRef.current[threadId];
           } catch {
-            // Failed to load PI session history — not fatal
+            // harden-pi-session-curtain-fidelity：load 失败不再无条件置
+            // loaded——置位会阻止 20s 切回 refresh 与下次选中重试，形成
+            // 「吞了刷新也回不来」的 sticky 丢失。降级记录只打 debug entry
+            //（不走 markHistoryRecoveryFailure：那会置 automatic-recovery-
+            // failed 拦截后续 resume，关死重试通道）；连续失败达上限后置
+            // loaded 防风暴。
+            const failureCount =
+              (piHistoryLoadFailureCountByThreadRef.current[threadId] ?? 0) + 1;
+            piHistoryLoadFailureCountByThreadRef.current[threadId] =
+              failureCount;
+            onDebug?.(
+              createThreadHistoryReadableSurfaceDebugEntry({
+                workspaceId,
+                threadId,
+                sourceThreadId: threadId,
+                reopenOutcome:
+                  (itemsByThread[threadId]?.length ?? 0) > 0
+                    ? "degraded-readable"
+                    : "failed",
+                reasonCode:
+                  (itemsByThread[threadId]?.length ?? 0) > 0
+                    ? "last-good-local-items-preserved"
+                    : "pi-history-load-failed",
+                localItemCount: itemsByThread[threadId]?.length ?? 0,
+                snapshotItemCount: 0,
+                fallbackWarningCount: failureCount,
+              }),
+            );
+            if (failureCount >= PI_HISTORY_LOAD_MAX_ATTEMPTS) {
+              setThreadLoaded(threadId, true);
+            }
           }
         }
-        loadedThreadsRef.current[threadId] = true;
+        if (!piHistoryLoadFailureCountByThreadRef.current[threadId]) {
+          loadedThreadsRef.current[threadId] = true;
+        }
         return threadId;
       }
       if (threadId.startsWith("qoder:")) {

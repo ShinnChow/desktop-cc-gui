@@ -84,16 +84,27 @@ vi.mock("../../../services/tauri", () => ({
   writeWorkspaceFile: vi.fn(),
 }));
 
-vi.mock("../../../utils/threadItems", () => ({
-  buildItemsFromThread: vi.fn(),
-  extractClaudeApprovalResumeEntries: vi.fn(() => []),
-  getThreadTimestamp: vi.fn(),
-  isReviewingFromThread: vi.fn(),
-  mergeThreadItems: vi.fn(),
-  normalizeItem: vi.fn((item: ConversationItem) => item),
-  previewThreadName: vi.fn(),
-  stripClaudeApprovalResumeArtifacts: vi.fn((text: string) => text),
-}));
+vi.mock("../../../utils/threadItems", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("../../../utils/threadItems")
+  >();
+  return {
+    buildItemsFromThread: vi.fn(),
+    extractClaudeApprovalResumeEntries: vi.fn(() => []),
+    getThreadTimestamp: vi.fn(),
+    isReviewingFromThread: vi.fn(),
+    mergeThreadItems: vi.fn(),
+    normalizeItem: vi.fn((item: ConversationItem) => item),
+    previewThreadName: vi.fn(),
+    stripClaudeApprovalResumeArtifacts: vi.fn((text: string) => text),
+    // harden-pi-session-curtain-fidelity：原生历史 parse（pi/qoder 等）
+    // 依赖真实 item builder；此前 mock 缺失导致 parse 在测试环境必抛，
+    // pi 成功路径永远走 catch、被旧 catch 的无条件置 loaded 掩盖。
+    buildConversationItem: actual.buildConversationItem,
+    buildConversationItemFromThreadItem:
+      actual.buildConversationItemFromThreadItem,
+  };
+});
 
 vi.mock("../utils/threadStorage", () => ({
   makeCustomNameKey: (workspaceId: string, threadId: string) =>

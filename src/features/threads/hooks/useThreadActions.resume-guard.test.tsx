@@ -102,4 +102,116 @@ describe("useThreadActions resume guards", () => {
       loadedThreadsRef.current["pi:019ffb7b-dedc-7b36-8d2f-f85f35501036"],
     ).toBe(true);
   });
+
+  // harden-pi-session-curtain-fidelity：pi load 失败不再置 loaded——置位会
+  // 阻止 20s 切回 refresh 与下次选中重试，形成「吞了刷新也回不来」的
+  // sticky 丢失。失败须留下降级记录，且下一次 resume 重新 load。
+  it("keeps a failed PI history load retryable and records the recovery failure", async () => {
+    const piThreadId = "pi:019ffb7b-dedc-7b36-8d2f-f85f35501037";
+    vi.mocked(loadPiSession).mockRejectedValueOnce(
+      new Error("[SESSION_NOT_FOUND] PI session not found"),
+    );
+    const onDebug = vi.fn();
+    const { result, loadedThreadsRef } = renderActions({
+      resolveWorkspacePath: () => workspace.path,
+      onDebug,
+    });
+
+    await act(async () => {
+      await result.current.resumeThreadForWorkspace("ws-1", piThreadId);
+    });
+
+    expect(loadPiSession).toHaveBeenCalledTimes(1);
+    // 未置位（undefined/false 均可）：置位会阻止后续 resume 重新 load。
+    expect(loadedThreadsRef.current[piThreadId]).not.toBe(true);
+    const recoveryFailureEntry = onDebug.mock.calls
+      .map((call) => call[0] as { label?: string; payload?: { reasonCode?: string } })
+      .find((entry) => entry?.payload?.reasonCode === "pi-history-load-failed");
+    expect(recoveryFailureEntry).toBeDefined();
+
+    vi.mocked(loadPiSession).mockResolvedValue({
+      messages: [
+        {
+          id: "pi-user-1",
+          kind: "message",
+          role: "user",
+          text: "recovered",
+        },
+      ],
+    });
+    await act(async () => {
+      await result.current.resumeThreadForWorkspace("ws-1", piThreadId);
+    });
+
+    expect(loadPiSession).toHaveBeenCalledTimes(2);
+    expect(loadedThreadsRef.current[piThreadId]).toBe(true);
+  });
+
+  it("stops retrying a permanently failing PI history load after the attempt cap", async () => {
+    const piThreadId = "pi:019ffb7b-dedc-7b36-8d2f-f85f35501038";
+    vi.mocked(loadPiSession).mockRejectedValue(
+      new Error("[SESSION_NOT_FOUND] PI session not found"),
+    );
+    const { result, loadedThreadsRef } = renderActions({
+      resolveWorkspacePath: () => workspace.path,
+    });
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await act(async () => {
+        await result.current.resumeThreadForWorkspace("ws-1", piThreadId);
+      });
+    }
+
+    expect(loadPiSession).toHaveBeenCalledTimes(3);
+    expect(loadedThreadsRef.current[piThreadId]).toBe(true);
+  });
+
+  // harden-pi-session-curtain-fidelity：merge 锚点 miss 回退「信任磁盘整体
+  // 替换」时必须留 debug 痕迹（纯观测，合并结果不变）。
+  it("logs an anchor-miss fallback debug entry during merge without changing the merge result", async () => {
+    const piThreadId = "pi:019ffb7b-dedc-7b36-8d2f-f85f35501039";
+    vi.mocked(loadPiSession).mockResolvedValue({
+      messages: [
+        {
+          id: "pi-disk-1",
+          kind: "message",
+          role: "user",
+          text: "from disk",
+        },
+      ],
+    });
+    const onDebug = vi.fn();
+    const { result } = renderActions({
+      resolveWorkspacePath: () => workspace.path,
+      onDebug,
+      itemsByThread: {
+        [piThreadId]: [
+          {
+            id: "pi-live-only",
+            kind: "message",
+            role: "assistant",
+            text: "live item not on disk",
+          },
+        ],
+      },
+    });
+
+    await act(async () => {
+      await result.current.resumeThreadForWorkspace(
+        "ws-1",
+        piThreadId,
+        true,
+        true,
+        { mergeHydratedPrefix: true },
+      );
+    });
+
+    const anchorMissEntry = onDebug.mock.calls
+      .map((call) => call[0] as { label?: string })
+      .find(
+        (entry) =>
+          entry?.label === "thread/hydrated merge anchor-miss fallback-to-disk",
+      );
+    expect(anchorMissEntry).toBeDefined();
+  });
 });

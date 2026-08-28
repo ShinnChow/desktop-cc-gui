@@ -19,6 +19,7 @@ describe("useThreadRealtimeHistoryReconcile", () => {
     itemsByThread?: Record<string, ConversationItem[]>;
     isProcessing?: boolean;
     refreshImpl?: (workspaceId: string, threadId: string) => Promise<unknown>;
+    threadsByWorkspace?: ThreadState["threadsByWorkspace"][string];
   }) {
     const itemsByThreadRef = {
       current: options?.itemsByThread ?? ({} as Record<string, ConversationItem[]>),
@@ -65,15 +66,16 @@ describe("useThreadRealtimeHistoryReconcile", () => {
         resolveCanonicalThreadId: (threadId) => threadId,
         threadStatusByIdRef,
         threadsByWorkspace: {
-          "ws-1": [
-            {
-              id: "claude:session-1",
-              name: "session",
-              updatedAt: Date.now(),
-              engineSource: "claude",
-              threadKind: "native",
-            },
-          ],
+          "ws-1":
+            options?.threadsByWorkspace ?? [
+              {
+                id: "claude:session-1",
+                name: "session",
+                updatedAt: Date.now(),
+                engineSource: "claude",
+                threadKind: "native",
+              },
+            ],
         },
       }),
     );
@@ -221,5 +223,76 @@ describe("useThreadRealtimeHistoryReconcile", () => {
     });
     expect(refreshThread).toHaveBeenCalledWith("ws-1", "claude:session-1");
     expect(itemsByThreadRef.current["claude:session-1"]).toBeDefined();
+  });
+
+  // harden-pi-session-curtain-fidelity：pi 线程永不进入 codex post-turn
+  // reconcile。pi 无 window 加载、无 cursor 语义，refresh 分支对其是错误
+  // 分支；merge 锚点 miss 回退整体替换时会裁掉磁盘 flush 前的 live 尾部。
+  it("does not reconcile a pi thread that is missing from the sidebar list", async () => {
+    const { result, refreshThread } = createHarness({
+      threadsByWorkspace: [],
+    });
+
+    act(() => {
+      result.current.handleTurnCompletedForHistoryReconcile({
+        workspaceId: "ws-1",
+        threadId: "pi:session-pi-1",
+        turnId: "turn-1",
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(refreshThread).not.toHaveBeenCalled();
+  });
+
+  it("does not reconcile a pi-pending thread before its rename lands", async () => {
+    const { result, refreshThread } = createHarness({
+      threadsByWorkspace: [],
+    });
+
+    act(() => {
+      result.current.handleTurnCompletedForHistoryReconcile({
+        workspaceId: "ws-1",
+        threadId: "pi-pending-1728000000000-ab12",
+        turnId: "turn-1",
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(refreshThread).not.toHaveBeenCalled();
+  });
+
+  it("does not reconcile a healthy pi thread with engineSource pi", async () => {
+    const { result, refreshThread } = createHarness({
+      threadsByWorkspace: [
+        {
+          id: "pi:session-pi-2",
+          name: "pi session",
+          updatedAt: Date.now(),
+          engineSource: "pi",
+          threadKind: "native",
+        },
+      ],
+    });
+
+    act(() => {
+      result.current.handleTurnCompletedForHistoryReconcile({
+        workspaceId: "ws-1",
+        threadId: "pi:session-pi-2",
+        turnId: "turn-1",
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(refreshThread).not.toHaveBeenCalled();
   });
 });
