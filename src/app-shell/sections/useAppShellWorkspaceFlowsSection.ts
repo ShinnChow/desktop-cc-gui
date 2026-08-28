@@ -313,6 +313,9 @@ export function useAppShellWorkspaceFlowsSection(
         return;
       }
       closeSettings();
+      // 终端 dock 只挂在 workspace 视图（showWorkspace）内：home 态下仅关设置
+      // 会露出首页且 dock 不挂载，xterm 永不 ready，命令写不进去（PI /login 断链根因）。
+      setHomeOpen(false);
       const terminalId = ensureTerminalWithTitle(
         activeWorkspace.id,
         detail.terminalId,
@@ -353,6 +356,7 @@ export function useAppShellWorkspaceFlowsSection(
     ensureTerminalWithTitle,
     openTerminal,
     restartTerminalSession,
+    setHomeOpen,
   ]);
 
   useEffect(() => {

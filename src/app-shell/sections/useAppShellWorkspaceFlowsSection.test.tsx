@@ -595,6 +595,9 @@ describe("useAppShellWorkspaceFlowsSection", () => {
       );
       // 设置页等覆盖层会遮挡终端：处理事件时先退出设置
       expect(context.closeSettings).toHaveBeenCalledTimes(1);
+      // 终端 dock 只挂在 workspace 视图内：home 态必须一并关闭，
+      // 否则设置关了露出首页、dock 不挂载，命令永远写不进终端
+      expect(context.setHomeOpen).toHaveBeenCalledWith(false);
       expect(context.openTerminal).toHaveBeenCalledTimes(1);
       expect(restartTerminalSession).toHaveBeenCalledWith("ws-1", "pi-terminal");
 
