@@ -1657,14 +1657,12 @@ export function useThreadTurnEvents({
       // 才能继续读到累计文本。
       renameLiveAssistantTextThread(sourceThreadId, newThreadId);
       renameLiveItemDeltaThread(sourceThreadId, newThreadId);
-      if (
-        sourceThreadId.startsWith("shared:") ||
-        newThreadId.startsWith("shared:")
-      ) {
-        renameRuntimeReceipt(workspaceId, sourceThreadId, newThreadId);
-      }
       // Native turn-target：内存账本（move-if-absent）与持久化侧车（按时间
       // 合并）随 pending → 正式 id 迁移，否则历史冷加载读不到改名前的 badge。
+      // runtime 回执账本必须同迁：send.request 记账落在发送边的 pending id
+      // 上，只迁 shared 会漏 native 引擎——pi 等无回执事件的引擎在实时链路
+      // 查不到回执，Ⓡ 尾巴只剩历史冷加载（sidecar 派生）才有。
+      renameRuntimeReceipt(workspaceId, sourceThreadId, newThreadId);
       renameNativeTurnTarget(workspaceId, sourceThreadId, newThreadId);
       renameTurnTargetBadgeThread(sourceThreadId, newThreadId);
       renameCustomNameKey(workspaceId, sourceThreadId, newThreadId);

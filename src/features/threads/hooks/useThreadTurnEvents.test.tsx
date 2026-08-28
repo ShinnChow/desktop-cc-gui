@@ -23,6 +23,11 @@ import {
   getLiveAssistantTextSnapshot,
   resetLiveAssistantTextChannelForTests,
 } from "../utils/liveAssistantTextChannel";
+import {
+  getRuntimeReceipt,
+  rememberRuntimeReceipt,
+  resetRuntimeReceiptsForTests,
+} from "../utils/runtimeModelReceipt";
 import { renameTurnTargetBadgeThread } from "../utils/turnTargetBadgeStorage";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
 import {
@@ -191,6 +196,7 @@ describe("useThreadTurnEvents", () => {
     clearGlobalRuntimeNotices();
     resetCodexPendingPrewarmForTests();
     resetLiveAssistantTextChannelForTests();
+    resetRuntimeReceiptsForTests();
     vi.mocked(engineInterrupt).mockResolvedValue();
     vi.mocked(engineInterruptTurn).mockResolvedValue();
   });
@@ -1155,6 +1161,34 @@ describe("useThreadTurnEvents", () => {
       "claude-pending-abc",
       "claude:session-xyz",
     );
+  });
+
+  it("migrates the runtime receipt when pi pending thread gets real session id", () => {
+    // 发送边界在 pending id 下记 send.request 回执（pi 事件流无 model，这是
+    // 实时 Ⓡ 尾巴的唯一来源）；改名后入列咽喉按正式 id 取 ingest meta，
+    // 回执不随迁 = 实时丢尾巴、历史冷加载反而有。
+    rememberRuntimeReceipt("ws-1", "pi-pending-abc", {
+      model: "minimax-cn/MiniMax-M2.7-highspeed",
+      modelSource: "send.request",
+    });
+    const { result } = makeOptions();
+
+    act(() => {
+      result.current.onThreadSessionIdUpdated(
+        "ws-1",
+        "pi-pending-abc",
+        "session-xyz",
+      );
+    });
+
+    expect(
+      getRuntimeReceipt("ws-1", "pi:session-xyz")?.model,
+    ).toBe("minimax-cn/MiniMax-M2.7-highspeed");
+    expect(getRuntimeReceipt("ws-1", "pi:session-xyz")?.modelSource).toBe(
+      "send.request",
+    );
+    // 旧 key 不残留，避免同名 pending id 复用陈旧回执。
+    expect(getRuntimeReceipt("ws-1", "pi-pending-abc")).toBeNull();
   });
 
   it("renames local mappings when dsh pending thread gets real session id", () => {

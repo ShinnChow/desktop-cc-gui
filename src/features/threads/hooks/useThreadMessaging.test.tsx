@@ -50,6 +50,11 @@ import {
   selectNextTarget,
 } from "../../shared-session/target/targetStore";
 import { renameTurnTargetBadgeThread } from "../utils/turnTargetBadgeStorage";
+import {
+  getRuntimeReceipt,
+  rememberRuntimeReceipt,
+  resetRuntimeReceiptsForTests,
+} from "../utils/runtimeModelReceipt";
 
 // 该文件把 getClientStoreSync 桩成恒 undefined，真实侧车迁移读不到缓存；
 // 只替换 rename 为 spy 断言接线（迁移逻辑由 turnTargetBadgeStorage.test 覆盖）。
@@ -1770,6 +1775,7 @@ describe("useThreadMessaging", () => {
   });
 
   it("rebinds claude pending follow-up after candidate transcript validates", async () => {
+    resetRuntimeReceiptsForTests();
     const workspaceWithTrailingSpace = { ...workspace, path: "/tmp/mossx " };
     vi.mocked(engineSendMessage)
       .mockResolvedValueOnce({
@@ -1811,6 +1817,14 @@ describe("useThreadMessaging", () => {
       );
     });
 
+    // runtime 回执账本同迁：发送边界在 pending id 下记 send.request 回执
+    //（pi 等无回执事件的引擎靠它出实时 Ⓡ 尾巴），candidate reconcile 改名
+    // 后实时链路按正式 id 取 ingest meta，不迁则实时丢尾巴、历史反而有。
+    rememberRuntimeReceipt("ws-1", "claude-pending-abc", {
+      model: "claude-sonnet-4-6",
+      modelSource: "send.request",
+    });
+
     await act(async () => {
       await result.current.sendUserMessageToThread(
         workspaceWithTrailingSpace,
@@ -1830,6 +1844,12 @@ describe("useThreadMessaging", () => {
     expect(renameTurnTargetBadgeThread).toHaveBeenCalledWith(
       "claude-pending-abc",
       "claude:session-xyz",
+    );
+    expect(getRuntimeReceipt("ws-1", "claude:session-xyz")?.model).toBe(
+      "claude-sonnet-4-6",
+    );
+    expect(getRuntimeReceipt("ws-1", "claude:session-xyz")?.modelSource).toBe(
+      "send.request",
     );
     expect(engineSendMessage).toHaveBeenNthCalledWith(
       2,

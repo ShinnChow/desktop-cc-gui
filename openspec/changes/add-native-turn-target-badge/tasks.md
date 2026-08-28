@@ -29,6 +29,7 @@
 - [x] 5.1 `maybeCaptureRuntimeReceipt` 门改排除式（修复初版误排 `shared:` 的回归，shared 用例恢复全绿）
 - [x] 5.2 tokenUsage 集成测试改断言 native sidecar 捕获为新语义
 - [x] 5.3 咽喉 action 增加 `runtimeReceipt` 可选字段并注入 `getRuntimeReceipt()` 记账：pi 等引擎出现 Ⓡ 尾巴与可展开面板
+- [x] 5.4 pending → 正式 id 改名点补 `renameRuntimeReceipt` 同迁（修复 pi 首轮实时 Ⓡ 尾巴丢失：7294029c0 的 shared-only 门未随 native 接入放宽，`pi-pending-*` 下记的 send.request 回执改名后查不到，历史冷加载反有；含 claude candidate reconcile 同类缺口）
 
 ## 6. 历史 sidecar（真机验收后补）
 
