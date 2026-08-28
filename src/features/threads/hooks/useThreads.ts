@@ -23,11 +23,13 @@ import {
   type CodexOwnershipFallbackCandidateInput,
   type PendingAssistantCompletionBucket,
   type PendingMemoryCaptureBucket,
+  THREAD_ITEM_CACHE_RECENT_SWITCH_WINDOW_MS,
   THREAD_ITEM_CACHE_TRIM_WATERMARK,
   computeThreadItemCacheMax,
   deletePendingMemoryEntry,
   getPendingMemoryEntries,
   isCodexOwnershipFallbackCandidate,
+  selectEvictableThreadIds,
   setPendingMemoryEntry,
   shouldKeepPendingCaptureForAdditionalAssistantSegments,
 } from "./threadRuntimeOwnershipHelpers";
@@ -306,6 +308,9 @@ export function useThreads({
   const activeWorkspaceRef = useRef(activeWorkspace);
   const activeThreadIdRef = useRef<string | null>(null);
   const loadedThreadLastRefreshAtRef = useRef<Record<string, number>>({});
+  // F3（perf-cold-start-click-storm-convergence）：threadId → 最近一次切换时刻。
+  // 驱逐选择对「10 分钟内切换过」的会话给保护名额（上限 8），来回点击不整轮驱逐。
+  const recentThreadSwitchesRef = useRef<Map<string, number>>(new Map());
   const emptySurfaceResumeAtByThreadRef = useRef<Record<string, number>>({});
   const lazyResumeTimerByWorkspaceRef = useRef<
     Record<string, ReturnType<typeof setTimeout> | null>
@@ -2400,6 +2405,7 @@ export function useThreads({
           return;
         }
         loadedThreadLastRefreshAtRef.current[canonicalThreadId] = Date.now();
+        recentThreadSwitchesRef.current.set(canonicalThreadId, Date.now());
         void resumeThreadForWorkspace(
           targetId,
           canonicalThreadId,
@@ -2435,6 +2441,14 @@ export function useThreads({
       (status) => status?.isProcessing,
     ).length;
     const cacheMax = computeThreadItemCacheMax(inFlightCount);
+    // F3 review 补缺：recent 记录剪枝必须在水位线 early-return 之前——
+    // 否则低负载期从不驱逐、剪枝从不执行，Map 随切换无界增长。
+    const nowMs = Date.now();
+    for (const [threadId, switchedAt] of recentThreadSwitchesRef.current) {
+      if (nowMs - switchedAt >= THREAD_ITEM_CACHE_RECENT_SWITCH_WINDOW_MS) {
+        recentThreadSwitchesRef.current.delete(threadId);
+      }
+    }
     if (loadedThreadIds.length <= cacheMax + THREAD_ITEM_CACHE_TRIM_WATERMARK) {
       return;
     }
@@ -2466,39 +2480,31 @@ export function useThreads({
       }
     });
 
-    const protectedLoadedCount = loadedThreadIds.filter((threadId) => {
-      if (protectedThreadIds.has(threadId)) {
-        return true;
-      }
+    // F3（perf-cold-start-click-storm-convergence）：pinned 并入 protected
+    // （原语义 pinned 不参与驱逐），近期切换保护集由 selector 内部按
+    // activity LRU 施加上限。历史候选选择整体收口到纯函数。
+    loadedThreadIds.forEach((threadId) => {
       const workspaceId = threadWorkspaceMap.get(threadId);
-      return workspaceId ? isThreadPinned(workspaceId, threadId) : false;
-    }).length;
-    const keepableSlots = Math.max(0, cacheMax - protectedLoadedCount);
-
-    const evictableCandidates = loadedThreadIds
-      .filter((threadId) => {
-        if (protectedThreadIds.has(threadId)) {
-          return false;
-        }
-        const workspaceId = threadWorkspaceMap.get(threadId);
-        if (workspaceId && isThreadPinned(workspaceId, threadId)) {
-          return false;
-        }
-        return (state.itemsByThread[threadId]?.length ?? 0) > 0;
-      })
-      .map((threadId) => {
+      if (workspaceId && isThreadPinned(workspaceId, threadId)) {
+        protectedThreadIds.add(threadId);
+      }
+    });
+    const evictedThreadIds = selectEvictableThreadIds({
+      loadedThreadIds,
+      cacheMax,
+      protectedThreadIds,
+      recentSwitches: recentThreadSwitchesRef.current,
+      nowMs,
+      itemCount: (threadId) => state.itemsByThread[threadId]?.length ?? 0,
+      activityAt: (threadId) => {
         const workspaceId = threadWorkspaceMap.get(threadId) ?? "";
-        const activityTimestamp =
+        return (
           threadActivityRef.current[workspaceId]?.[threadId] ??
           state.lastAgentMessageByThread[threadId]?.timestamp ??
-          0;
-        return { threadId, activityTimestamp };
-      })
-      .sort((left, right) => right.activityTimestamp - left.activityTimestamp);
-
-    const evictedThreadIds = evictableCandidates
-      .slice(keepableSlots)
-      .map((entry) => entry.threadId);
+          0
+        );
+      },
+    });
     if (evictedThreadIds.length === 0) {
       return;
     }
