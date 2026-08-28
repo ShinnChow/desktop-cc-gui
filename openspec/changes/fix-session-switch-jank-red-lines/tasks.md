@@ -45,4 +45,4 @@
 ## 收口
 
 - [x] 5.1 `openspec validate fix-session-switch-jank-red-lines --strict --no-interactive` 通过；`openspec/changes/README.md` 索引更新。
-- [ ] 5.2 全部批次 `git log` review：每批次独立 commit、diff 限于本 change hunk、无全文件重排（4 批次 commit 后核对）。
+- [x] 5.2 全部批次 `git log` review（2026-08-28）：6 commit（立项 + 4 批次 + 收口）各自独立、范围限于本 change hunk、无全文件重排；并行 agent 在途文件（src-tauri/src/engine/*、refactor-engine-detection-pipeline）零裹挟。
