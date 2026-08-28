@@ -32,7 +32,7 @@
 
 ## 收口
 
-- [ ] 4.1 `openspec validate optimize-pi-first-packet-latency --strict --no-interactive` 通过
-- [ ] 4.2 三平台目视验收记录（macOS 实测；Win/Linux 按窗口安排补记）
-- [ ] 4.3 ADR 校准回写评估：D1 触及 resident lifecycle（engine registry 调整面），核对 `docs/research/mossx-multi-cli-provider-session-foundation-design.md` 更新触发器，命中则回写「最近校准」与「零、当前实现校准」表
-- [ ] 4.4 changes/README.md 索引更新 + sync 流程
+- [x] 4.1 `openspec validate optimize-pi-first-packet-latency --strict --no-interactive` 通过（proposal/design/tasks 定稿后复核）
+- [ ] 4.2 三平台目视验收记录（macOS 实测；Win/Linux 按窗口安排补记）——**待真机验收后勾选**
+- [x] 4.3 ADR 校准回写：命中 engine registry / resident lifecycle 触发器，已回写 `docs/research/mossx-multi-cli-provider-session-foundation-design.md`「最近校准」2026-08-28 节 + 头部标注（commit `ac604bb68`）
+- [x] 4.4 changes/README.md 索引更新（active 72）；verify/sync 待 4.2 真机验收后执行
