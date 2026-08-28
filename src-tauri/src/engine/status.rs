@@ -120,20 +120,6 @@ fn public_models_for_engine(engine_type: EngineType) -> Vec<ModelInfo> {
     }
 }
 
-/// B-fix 共通方法：models 已从 detect 解耦的引擎（慢目录链）在启动轻量分支
-/// 回填静态 generated catalog 快照。全部条目带 source="fallback"：
-/// ① PI 专属防中毒判定（is_fallback_only_catalog）可识别 → 不会钉死缓存，
-///   每次 get_engine_models 都会重探真实链并权威覆盖；
-/// ② 前端 providerModelCatalogs 立即非空，思考档/模型列表不再有空白窗口
-///   （真实探测由 on-demand 22s 预算保证到达）。Qoder 为 ACP runtime-only
-///   无静态 roster，回填为空。
-fn detached_catalog_snapshot(engine_type: EngineType) -> Vec<ModelInfo> {
-    match engine_type {
-        EngineType::Pi | EngineType::OpenCode => public_models_for_engine(engine_type),
-        _ => Vec::new(),
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UnlistedRuntimeModelPolicy {
     Allow,
@@ -822,7 +808,8 @@ pub async fn detect_opencode_status_with_options(
             }
         }
     } else {
-        (detached_catalog_snapshot(EngineType::OpenCode), None)
+        // 快照回填撤销：同 PI（乐观选中/默认解析消费权威链路）。
+        (Vec::new(), None)
     };
     let default_model = models.iter().find(|m| m.default).map(|m| m.id.clone());
 
@@ -949,8 +936,11 @@ pub async fn detect_pi_status_with_options(
         if !installed {
             return not_installed_status(EngineType::Pi, error);
         }
-        let snapshot = detached_catalog_snapshot(EngineType::Pi);
-        let default_model = snapshot.iter().find(|m| m.default).map(|m| m.id.clone());
+        // 快照回填已撤销（P0 教训）：EngineStatus.models 会被引擎切换的乐观
+        // 选中 / 新会话默认解析当作**可选模型**消费——静态 fallback 条目
+        // （auto，default=true）曾把错误模型绑进 PI 会话（dispatch 解析为
+        // 「跟随配置默认」→ 跳过对账 → resident 落 broken 默认链）。目录
+        // 只能由 get_engine_models 的真实探测权威填充（on-demand 22s 预算）。
         return EngineStatus {
             engine_type: EngineType::Pi,
             auth_state: crate::engine::AuthState::default(),
@@ -958,8 +948,8 @@ pub async fn detect_pi_status_with_options(
             version,
             bin_path: Some(bin.to_string()),
             home_dir: get_pi_home_dir().map(|p| p.to_string_lossy().to_string()),
-            models: snapshot,
-            default_model,
+            models: Vec::new(),
+            default_model: None,
             features: EngineFeatures::pi(),
             error: None,
         };
@@ -1225,7 +1215,7 @@ pub async fn detect_qoder_distribution_status_with_options(
         )
         .await
     } else {
-        (detached_catalog_snapshot(EngineType::Qoder), None)
+        (Vec::new(), None)
     };
     let models = scope_qoder_models_to_distribution(distribution, models);
     let default_model = models.iter().find(|m| m.default).map(|m| m.id.clone());
@@ -4080,11 +4070,8 @@ opencode/gpt-5-nano
             "detect_all_engines must not spawn `opencode models` probe"
         );
         assert!(
-            opencode
-                .models
-                .iter()
-                .all(|model| model.source == "fallback"),
-            "lightweight detection carries a fallback snapshot only"
+            opencode.models.is_empty(),
+            "lightweight detection must not carry selectable snapshot models"
         );
         let _ = fs::remove_file(&script_path);
         let _ = fs::remove_file(&marker);
@@ -4329,11 +4316,13 @@ opencode/gpt-5-nano
         let _ = fs::remove_dir_all(script_path.parent().unwrap_or(std::path::Path::new("")));
     }
 
-    /// B-fix：解耦引擎的启动轻量分支 MUST 回填 source=fallback 静态快照
-    /// （providerModelCatalogs 立即非空；防中毒判定可识别不钉死缓存）。
+    /// P0 回归锁定：轻量分支 MUST NOT 回填静态快照——EngineStatus.models 是
+    /// 乐观选中/新会话默认解析的消费源，静态条目（auto，default=true）曾把
+    /// 错误模型绑进 PI 会话（多引擎切换后必现模型错乱 + 发送失败）。目录
+    /// 只允许 get_engine_models 真实探测权威填充。
     #[cfg(unix)]
     #[tokio::test]
-    async fn detect_pi_light_backfills_fallback_catalog_snapshot() {
+    async fn detect_pi_light_must_not_carry_snapshot_models() {
         let marker = unique_test_marker("pi-light-backfill");
         let script_path = write_unix_test_cli_named(
             &format!(
@@ -4348,12 +4337,8 @@ opencode/gpt-5-nano
 
         assert!(status.installed);
         assert!(
-            !status.models.is_empty(),
-            "detached engine light detection must carry a fallback snapshot"
-        );
-        assert!(
-            status.models.iter().all(|model| model.source == "fallback"),
-            "every snapshot entry must be marked source=fallback (poison-guard recognizable)"
+            status.models.is_empty() && status.default_model.is_none(),
+            "light detection must not carry selectable snapshot models (poisons optimistic selection)"
         );
         let _ = fs::remove_file(&script_path);
         let _ = fs::remove_file(&marker);
