@@ -3,6 +3,7 @@ import { act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConversationItem } from "../../../types";
 import { resetUseThreadActionsTestMocks } from "./useThreadActions.test-mocks";
+import { appendRendererDiagnosticMock } from "./useThreadActions.test-mocks";
 import {
   connectWorkspace,
   getOpenCodeSessionList,
@@ -241,6 +242,43 @@ describe("useThreadActions", () => {
       expect.objectContaining({
         type: "setThreadItems",
         threadId: "thread-unified",
+      }),
+    );
+  });
+
+  it("leaves perf.thread-switch timing evidence after a unified hydrate", async () => {
+    // F4（enhance-perf-diagnostics-evidence）：切会话 hydrate 必须留下计时证据，
+    // 供真机对照「慢在加载还是渲染」；threadId 以短哈希落盘（隐私口径）。
+    const assistantItem: ConversationItem = {
+      id: "assistant-switch-1",
+      kind: "message",
+      role: "assistant",
+      text: "switch evidence",
+    };
+    vi.mocked(resumeThread).mockResolvedValue({
+      result: { thread: { turns: [] } },
+    });
+    vi.mocked(loadCodexSession).mockResolvedValue({ entries: [] });
+    vi.mocked(buildItemsFromThread).mockReturnValue([assistantItem]);
+
+    const { result } = renderActions({
+      useUnifiedHistoryLoader: true,
+    });
+
+    await act(async () => {
+      await result.current.resumeThreadForWorkspace("ws-1", "thread-switch-probe");
+    });
+
+    expect(appendRendererDiagnosticMock).toHaveBeenCalledWith(
+      "perf.thread-switch",
+      expect.objectContaining({
+        durationMs: expect.any(Number),
+        itemCount: 1,
+        displayedCount: 1,
+        mode: "tail-first",
+        engineSource: "codex",
+        threadIdHash: expect.stringMatching(/^[a-z0-9]{1,16}$/i),
+        fallbackWarningCount: 0,
       }),
     );
   });

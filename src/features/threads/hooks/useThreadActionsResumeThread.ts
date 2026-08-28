@@ -47,6 +47,10 @@ import {
   mergeHistoryProjectionItems,
 } from "../assembly/conversationAssembler";
 import { asString } from "../utils/threadNormalize";
+import {
+  appendRendererDiagnostic,
+  hashDiagnosticText,
+} from "../../../services/rendererDiagnostics";
 import { mergeHydratedItemsPreservePrefix } from "../utils/mergeHydratedItemsPreservePrefix";
 import {
   collectKnownCodexThreadIds,
@@ -400,7 +404,7 @@ export function useThreadActionsResumeThreadForWorkspace(
           },
         );
         if (!isCurrentResumeRequest()) {
-          return false;
+          return null;
         }
         if (result.remainingOlderCount > 0) {
           rememberFullHistoryForWindow(
@@ -411,7 +415,9 @@ export function useThreadActionsResumeThreadForWorkspace(
         } else {
           clearPendingOlderHistory(targetThreadId);
         }
-        return true;
+        // F4（enhance-perf-diagnostics-evidence）：返回 dispatch 结果供
+        // perf.thread-switch 计时证据使用（null = 请求失效）。
+        return result;
       };
       const localItems = itemsByThread[threadId] ?? [];
       if (isPendingThreadId(threadId) || isClaudeForkThreadId(threadId)) {
@@ -544,8 +550,12 @@ export function useThreadActionsResumeThreadForWorkspace(
           options?: { mode?: "tail-first" | "atomic" },
         ) => Promise<boolean> = async () => false;
 
-        const createHistoryLoader = (targetThreadId: string) =>
-          createThreadHistoryLoaderForThread({
+        // F4（enhance-perf-diagnostics-evidence）：loader 发起时刻，供
+        // perf.thread-switch 计时（loader 发起 → items 落库）。首份证据消费后清除。
+        const loaderStartedAtMsByThread: Record<string, number> = {};
+
+        const createHistoryLoader = (targetThreadId: string) => {
+          const loader = createThreadHistoryLoaderForThread({
             targetThreadId,
             workspaceId,
             workspacePath:
@@ -646,6 +656,18 @@ export function useThreadActionsResumeThreadForWorkspace(
               );
             },
           });
+          return {
+            load: async (
+              ...loadArgs: Parameters<typeof loader.load>
+            ) => {
+              loaderStartedAtMsByThread[targetThreadId] =
+                typeof performance !== "undefined"
+                  ? performance.now()
+                  : Date.now();
+              return loader.load(...loadArgs);
+            },
+          };
+        };
         hydrateHistorySnapshot = async (
           effectiveThreadId: string,
           snapshot: Awaited<
@@ -748,6 +770,26 @@ export function useThreadActionsResumeThreadForWorkspace(
             historyNextCursor: assembledSnapshot.meta.historyNextCursor ?? null,
             tokenUsage: snapshot.tokenUsage ?? undefined,
           });
+          // F4（enhance-perf-diagnostics-evidence）：切会话计时证据。loader 发起 →
+          // items 落库（本组合 action）耗时；threadId 以短哈希落盘（隐私口径）。
+          // 首份证据消费后清掉起点，同一 resume 的后续 merge 不重复计时。
+          const loaderStartedAtMs = loaderStartedAtMsByThread[effectiveThreadId];
+          if (typeof loaderStartedAtMs === "number") {
+            delete loaderStartedAtMsByThread[effectiveThreadId];
+            const durationMs =
+              (typeof performance !== "undefined"
+                ? performance.now()
+                : Date.now()) - loaderStartedAtMs;
+            appendRendererDiagnostic("perf.thread-switch", {
+              durationMs: Math.round(durationMs),
+              itemCount: snapshotItems.length,
+              displayedCount: applied?.displayedCount ?? snapshotItems.length,
+              mode: options?.mode ?? "tail-first",
+              engineSource: assembledSnapshot.meta.engine ?? null,
+              threadIdHash: hashDiagnosticText(effectiveThreadId),
+              fallbackWarningCount: snapshot.fallbackWarnings.length,
+            });
+          }
           onDebug?.(
             createThreadHistoryReadableSurfaceDebugEntry({
               workspaceId,

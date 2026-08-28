@@ -388,7 +388,7 @@ function clipDiagnosticString(value: string, maxLength: number): string {
 // 与 features/files/utils/fileMarkdownDocument 的 hashStableString 同算法
 // （31 乘子 + base36），保证 fast-markdown-worker 崩溃指纹与这里同指纹空间。
 // 本地实现避免 services → features 的反向依赖。
-function hashDiagnosticText(text: string): string {
+export function hashDiagnosticText(text: string): string {
   let hash = 0;
   for (let index = 0; index < text.length; index += 1) {
     hash = (hash * 31 + text.charCodeAt(index)) >>> 0;

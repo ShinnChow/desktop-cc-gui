@@ -123,6 +123,18 @@ vi.mock("../../../services/globalRuntimeNotices", async () => {
   return actual;
 });
 
+// F4（enhance-perf-diagnostics-evidence）：perf.thread-switch 证据走
+// appendRendererDiagnostic；spy 掉避免真实落盘，同时供断言。
+export const appendRendererDiagnosticMock = vi.fn();
+vi.mock("../../../services/rendererDiagnostics", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../services/rendererDiagnostics")>();
+  return {
+    ...actual,
+    appendRendererDiagnostic: appendRendererDiagnosticMock,
+  };
+});
+
 export function resetUseThreadActionsTestMocks() {
   vi.clearAllMocks();
   vi.useRealTimers();
