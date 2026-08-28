@@ -43,7 +43,9 @@ import { hydrateBackgroundTasksFromHistory } from "../../messages/utils/backgrou
 import { parseQoderHistoryMessages } from "../loaders/qoderHistoryParser";
 import { parseQoderSessionIdentity } from "../utils/qoderSessionIdentity";
 import {
+  createHydrateHistoryWorkingSet,
   hydrateHistory,
+  hydrateItemsIntoWorkingSet,
   mergeHistoryProjectionItems,
 } from "../assembly/conversationAssembler";
 import { asString } from "../utils/threadNormalize";
@@ -683,7 +685,29 @@ export function useThreadActionsResumeThreadForWorkspace(
             typeof performance !== "undefined"
               ? performance.now()
               : Date.now();
-          const assembledSnapshot = hydrateHistory(snapshot);
+          // 组装段（fix-session-load-bridge-freeze）：只同步组装尾部窗口
+          // （首屏 shown=300 + 预备 prepend 余量），2140 条大会话的首屏组装从
+          // ~3s 降到数百 ms；窗口外的更早消息在首屏上屏后分片渐进组装，
+          // 完成后并入 pendingOlderHistory（「更早/All」语义不变）。
+          const TAIL_ASSEMBLE_WINDOW = 400;
+          const rawHistoryItems = snapshot.items;
+          const tailRaw =
+            rawHistoryItems.length > TAIL_ASSEMBLE_WINDOW
+              ? rawHistoryItems.slice(
+                  rawHistoryItems.length - TAIL_ASSEMBLE_WINDOW,
+                )
+              : rawHistoryItems;
+          const remainderRaw =
+            rawHistoryItems.length > TAIL_ASSEMBLE_WINDOW
+              ? rawHistoryItems.slice(
+                  0,
+                  rawHistoryItems.length - TAIL_ASSEMBLE_WINDOW,
+                )
+              : [];
+          const assembledSnapshot = hydrateHistory({
+            ...snapshot,
+            items: tailRaw,
+          });
           const assembledAtMs =
             typeof performance !== "undefined"
               ? performance.now()
@@ -782,6 +806,47 @@ export function useThreadActionsResumeThreadForWorkspace(
           // F4（enhance-perf-diagnostics-evidence）：切会话计时证据。loader 发起 →
           // items 落库（本组合 action）耗时；threadId 以短哈希落盘（隐私口径）。
           // 首份证据消费后清掉起点，同一 resume 的后续 merge 不重复计时。
+          if (remainderRaw.length > 0) {
+            const remainderForBackground = remainderRaw;
+            const backgroundThreadId = effectiveThreadId;
+            const backgroundEngine = assembledSnapshot.meta.engine;
+            const tailItems = snapshotItems;
+            const displayedCount = applied?.displayedCount ?? tailItems.length;
+            void (async () => {
+              const workingSet = createHydrateHistoryWorkingSet();
+              const chunkSize = 150;
+              for (
+                let offset = 0;
+                offset < remainderForBackground.length;
+                offset += chunkSize
+              ) {
+                if (!isCurrentResumeRequest()) {
+                  return;
+                }
+                hydrateItemsIntoWorkingSet(
+                  workingSet,
+                  remainderForBackground.slice(offset, offset + chunkSize),
+                  {
+                    engine: backgroundEngine,
+                    threadId: backgroundThreadId,
+                  },
+                );
+                // 每片之间让出主线程（setTimeout 全栈可用，Win WebView2 / WKWebView 一致）
+                await new Promise((resolve) => {
+                  setTimeout(resolve, 0);
+                });
+              }
+              if (!isCurrentResumeRequest()) {
+                return;
+              }
+              // 已组装余量并入 pendingOlderHistory：「更早/All」消费语义不变
+              rememberFullHistoryForWindow(
+                backgroundThreadId,
+                [...workingSet.items, ...tailItems],
+                displayedCount,
+              );
+            })();
+          }
           const loaderStartedAtMs = loaderStartedAtMsByThread[effectiveThreadId];
           if (typeof loaderStartedAtMs === "number") {
             delete loaderStartedAtMsByThread[effectiveThreadId];

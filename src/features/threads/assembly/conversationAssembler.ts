@@ -947,26 +947,65 @@ export function appendEvent(
   };
 }
 
-export function hydrateHistory(snapshot: NormalizedHistorySnapshot): ConversationState {
-  const workingSet: SnapshotWorkingSet = {
+export type HydrateHistoryWorkingSet = SnapshotWorkingSet;
+
+export function createHydrateHistoryWorkingSet(): HydrateHistoryWorkingSet {
+  return {
     items: [],
     identityIndexByKey: new Map(),
   };
+}
+
+/**
+ * 把一段原始 items 按组装语义（身份去重/回声折叠/段落去重）并入 workingSet。
+ * 供 hydrateHistory（全量一次组装）与 resume 链的「尾部先行 + 余量分片后台
+ * 组装」（fix-session-load-bridge-freeze 组装段）共用同一条组装路径。
+ */
+export function hydrateItemsIntoWorkingSet(
+  workingSet: HydrateHistoryWorkingSet,
+  items: readonly ConversationItem[],
+  context: { engine: NormalizedHistorySnapshot["engine"]; threadId: string },
+): ConversationItem[] {
   const event = {
-    engine: snapshot.engine,
-    threadId: snapshot.threadId,
+    engine: context.engine,
+    threadId: context.threadId,
     turnId: null,
     source: "history" as const,
   };
-  for (const item of snapshot.items) {
+  for (const item of items) {
     upsertSnapshotItem(workingSet.items, item, event, workingSet);
   }
+  return workingSet.items;
+}
+
+export function hydrateHistory(snapshot: NormalizedHistorySnapshot): ConversationState {
+  const workingSet = createHydrateHistoryWorkingSet();
+  const items = hydrateItemsIntoWorkingSet(workingSet, snapshot.items, {
+    engine: snapshot.engine,
+    threadId: snapshot.threadId,
+  });
   return {
-    items: workingSet.items,
+    items,
     plan: snapshot.plan,
     userInputQueue: [...snapshot.userInputQueue],
     meta: snapshot.meta,
   };
+}
+
+// fix-session-load-bridge-freeze（组装段）：comparable 文本按 item 对象 memo。
+// upsert 的 assistant 分支对全部已组装项做前缀比较，每次比较都重算 7 趟正则的
+// comparable 文本 → O(N²×len)（实测 assistant×1000 = 30s）。item 对象在本模块
+// 内不可变（全部 spread-replace），WeakMap memo 安全且随对象生命周期回收。
+const assistantComparableTextCache = new WeakMap<ConversationItem, string>();
+
+function assistantComparableText(item: AssistantMessageItem): string {
+  const cached = assistantComparableTextCache.get(item);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const computed = compactComparableConversationText(item.text);
+  assistantComparableTextCache.set(item, computed);
+  return computed;
 }
 
 function findAssistantPrefixMatchIndex(
@@ -982,7 +1021,7 @@ function findAssistantPrefixMatchIndex(
     if (!isAssistantMessageItem(candidate)) {
       continue;
     }
-    const candidateComparable = compactComparableConversationText(candidate.text);
+    const candidateComparable = assistantComparableText(candidate);
     if (
       candidateComparable &&
       (candidateComparable.startsWith(incomingComparable) ||

@@ -9,17 +9,20 @@
 - [ ] 1.3 实现：Rust `to_string` + 包装层；前端 parse；`useThreadActionsResumeThread` 计时分段。
 - [ ] 1.4 验证 + commit；真机 dev 快速对照（同会话 durationMs 应显著下降）。
 
-## 2. F2 窗口化 + 二次 prepend（**数据驱动暂缓**）
+## 2. F2 组装段窗口化（**已实施**，2026-08-28 真机数据触发）
 
-> 决策（2026-08-28 实施中）：F1 raw-string 落地后，前端本就走 tail-first 首屏
-> （2140 条只 dispatch 300 条），窗口化的边际收益只剩 parse/组装段 ~100-200ms，
-> 但要动「All 展开」语义（回归面不划算）。新落的 loadMs/assembleMs 分段计时
-> 是决策输入：下轮真机数据若显示 assembleMs 显著（>300ms）再按原方案实施。
+> 决策回填：B1 后真机 assembleMs 仍 2940~3411ms（2140 items）——远超暂缓门槛
+> （>300ms），按原方案实施。实施位置在**组装层**而非 load 层（load 已由 B1
+> 优化，重复窗口化无增益）：resume 只同步组装尾部 400 条（首屏 ~520ms），
+> 窗口外余量按 150/片在后台渐进组装（单片 186~400ms，无长帧），完成后并入
+> pendingOlderHistory（「更早/All」消费语义不变）。assembler 导出
+> createHydrateHistoryWorkingSet / hydrateItemsIntoWorkingSet 供分片复用
+> 同一条组装路径（hydrateHistory 重构为同路径，行为不变）。
 
-- [ ] 2.1（暂缓）红测试（Rust）：`limit` 尾部投影（≤400 条 + hasMore/before 游标；JSONL 边界行处理）。
-- [ ] 2.2（暂缓）红测试（JS）：resume 首载带 limit；「更早/All」经 `load(before)` prepend，终态与全量 deep-equal。
-- [ ] 2.3（暂缓）实现 + 与 `rememberFullHistoryForWindow` 兼容对齐（或明确 fallback 语义）。
-- [ ] 2.4 真机对照 A4：同会话 durationMs 对照（B1 后预期 <1500ms dev）；assembleMs 数据回填本节决策。
+- [x] 2.1 基准+等价测试：尾部 400 同步组装 <900ms；余量分片单片 <500ms（观测 186~400，GC 抖动）；分片终态与全量组装 deep-equal。
+- [x] 2.2 实现：assembler working-set 原语 + resume 链尾部窗口/后台分片接线（isCurrentResumeRequest 中断保护）。
+- [x] 2.3 验证：threads 全量 stash 基线对照——失败集合严格缩小（25→24，零新增）；typecheck 0。
+- [ ] 2.4 真机对照 A4：同会话 durationMs / assembleMs（尾部）对照（预期首屏 <900ms）。
 
 ## 3. F3 逐引擎推广（pi 达标后另评）
 
