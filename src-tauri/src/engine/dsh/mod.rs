@@ -4,6 +4,7 @@
 //! Keys and provider profiles stay in `$DSH_HOME`. The only settings write
 //! is the narrow image-admission claim in `image_admission`.
 
+pub mod breaker;
 pub mod events;
 pub mod history;
 pub mod host;

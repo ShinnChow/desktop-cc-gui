@@ -89,6 +89,7 @@ import {
 } from "../utils/stabilityDiagnostics";
 import { isClaudeForkThreadId } from "../utils/claudeForkThread";
 import { createThreadHistoryLoaderForThread } from "./useThreadActions.historyLoaderFactory";
+import { parseDshHostDownError } from "../../vendors/utils/dshHostStatus";
 import {
   RELATED_THREAD_LOAD_CONCURRENCY,
   THREAD_LIST_LOAD_OLDER_PAGE_SIZE,
@@ -1361,6 +1362,26 @@ export function useThreadActionsResumeThreadForWorkspace(
             return threadId;
           }
           if (threadId.startsWith("shared:")) {
+            // F4（perf-cold-start-click-storm-convergence）：宿主熔断 Down 是
+            // 不可重试信号——记单条 down 状态事件，不计入 loader error 刷屏。
+            const downSignal = parseDshHostDownError(error);
+            if (downSignal) {
+              onDebug?.({
+                id: `${Date.now()}-dsh-host-down`,
+                timestamp: Date.now(),
+                source: "client",
+                label: "thread/dsh host down",
+                payload: {
+                  workspaceId,
+                  threadId,
+                  reason: downSignal.reason,
+                  retryAfterMs: downSignal.retryAfterMs,
+                },
+              });
+              setThreadLoaded(threadId, false);
+              setThreadHistoryRecoveryFailed(threadId, false);
+              return threadId;
+            }
             const diagnostic =
               error instanceof Error
                 ? resolveThreadStabilityDiagnostic(error.message)
@@ -1481,6 +1502,24 @@ export function useThreadActionsResumeThreadForWorkspace(
                 },
               });
             }
+          }
+          // F4：宿主熔断 Down 不可重试，也不落 legacy fallback（同宿主注定再败）。
+          const downSignal = parseDshHostDownError(error);
+          if (downSignal) {
+            onDebug?.({
+              id: `${Date.now()}-dsh-host-down`,
+              timestamp: Date.now(),
+              source: "client",
+              label: "thread/dsh host down",
+              payload: {
+                workspaceId,
+                threadId,
+                reason: downSignal.reason,
+                retryAfterMs: downSignal.retryAfterMs,
+              },
+            });
+            setThreadLoaded(threadId, false);
+            return threadId;
           }
           const stabilityDiagnostic =
             error instanceof Error

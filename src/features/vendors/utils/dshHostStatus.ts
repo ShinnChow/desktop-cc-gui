@@ -105,6 +105,50 @@ export function dshConnectionSummary(
 
 export type DshHostErrorKind = "transport" | "missing" | "generic";
 
+// perf-cold-start-click-storm-convergence F4：Rust 传输层熔断 open 期内返回的
+// 结构化 Down 错误串（`dsh host.down {"reason":"breaker-open","retryAfterMs":N}`，
+// 常量语义源 src-tauri/src/engine/dsh/breaker.rs `DSH_HOST_DOWN_PREFIX`）。
+const DSH_HOST_DOWN_PREFIX = "dsh host.down ";
+
+export type DshHostDownSignal = { reason: string; retryAfterMs: number };
+
+/**
+ * 识别 dsh 宿主熔断快速失败：命中 → 打开路径按「不可重试」处理，直接走
+ * V0/本地可读回退并归因为 down 状态事件，MUST NOT 计入 `thread/history
+ * loader error` 刷屏。未命中（普通 transport/HTTP/信封错误）返回 null。
+ */
+export function parseDshHostDownError(error: unknown): DshHostDownSignal | null {
+  const text =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : "";
+  if (!text.startsWith(DSH_HOST_DOWN_PREFIX)) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(text.slice(DSH_HOST_DOWN_PREFIX.length)) as {
+      reason?: unknown;
+      retryAfterMs?: unknown;
+    };
+    if (typeof payload?.reason !== "string" || payload.reason.length === 0) {
+      return null;
+    }
+    return {
+      reason: payload.reason,
+      retryAfterMs:
+        typeof payload.retryAfterMs === "number" &&
+        Number.isFinite(payload.retryAfterMs) &&
+        payload.retryAfterMs > 0
+          ? payload.retryAfterMs
+          : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function classifyDshHostError(error: string | null | undefined): DshHostErrorKind | null {
   if (!error?.trim()) {
     return null;
