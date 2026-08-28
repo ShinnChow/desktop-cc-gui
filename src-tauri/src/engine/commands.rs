@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::io::AsyncWriteExt;
 use tokio::time::timeout;
@@ -1175,12 +1176,24 @@ pub async fn detect_engines(
     let manager = &state.engine_manager;
     let settings = read_app_settings_snapshot(&state).await;
     let disabled_engines = crate::engine::detection_disabled_engines(&settings);
+    // B4 逐引擎事件：探测完成即 emit ccgui:engine-status-updated（每引擎每轮
+    // 恰好一次，detectRunId 单调），前端逐项 reveal 不再全量等待。
+    let app_for_events = app.clone();
+    let on_status: Option<crate::engine::status::EngineStatusEventSink> = Some(Arc::new(
+        move |detect_run_id: u64, status: crate::engine::EngineStatus| {
+            let _ = app_for_events.emit(
+                "ccgui:engine-status-updated",
+                serde_json::json!({ "detectRunId": detect_run_id, "status": status }),
+            );
+        },
+    ));
     Ok(manager
         .detect_engines_cached(
             force,
             engines.as_deref(),
             settings.gemini_enabled,
             &disabled_engines,
+            on_status,
         )
         .await)
 }

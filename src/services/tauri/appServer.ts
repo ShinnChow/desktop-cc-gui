@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { EngineModelInfo, EngineStatus, EngineType, SkillInvocation } from "../../types";
 import type { AutoSessionMetadata } from "./sessionManagement";
 import {
@@ -104,6 +105,41 @@ export async function detectEngines(): Promise<EngineStatus[]> {
     }
     throw error;
   }
+}
+
+/**
+ * 逐引擎检测事件（refactor-engine-detection-pipeline B4）：后端每完成一个
+ * 引擎探测即 emit `ccgui:engine-status-updated`（detectRunId 单调递增）。
+ * 前端逐项 reveal，不再等 detect_engines 全量返回。
+ */
+export type EngineStatusUpdatedEvent = {
+  detectRunId: number;
+  status: EngineStatus;
+};
+
+export function subscribeEngineStatusEvents(
+  listener: (event: EngineStatusUpdatedEvent) => void,
+): () => void {
+  let disposed = false;
+  let unlisten: (() => void) | null = null;
+
+  void listen<EngineStatusUpdatedEvent>(
+    "ccgui:engine-status-updated",
+    (event) => {
+      listener(event.payload);
+    },
+  ).then((fn) => {
+    if (disposed) {
+      fn();
+      return;
+    }
+    unlisten = fn;
+  });
+
+  return () => {
+    disposed = true;
+    unlisten?.();
+  };
 }
 
 /**

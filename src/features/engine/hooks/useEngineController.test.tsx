@@ -41,6 +41,31 @@ vi.mock("../../../services/clientStorage", () => ({
   getClientStoreSync: vi.fn(),
   writeClientStoreValue: vi.fn(),
 }));
+const engineStatusEventListeners = new Set<
+  (event: {
+    detectRunId: number;
+    status: EngineStatus;
+  }) => void
+>();
+vi.mock("../../../services/tauri/appServer", () => ({
+  subscribeEngineStatusEvents: vi.fn(
+    (
+      listener: (event: { detectRunId: number; status: EngineStatus }) => void,
+    ) => {
+      engineStatusEventListeners.add(listener);
+      return () => {
+        engineStatusEventListeners.delete(listener);
+      };
+    },
+  ),
+}));
+
+function emitEngineStatusEvent(event: {
+  detectRunId: number;
+  status: EngineStatus;
+}): void {
+  engineStatusEventListeners.forEach((listener) => listener(event));
+}
 
 const detectEnginesMock = vi.mocked(detectEngines);
 const getActiveEngineMock = vi.mocked(getActiveEngine);
@@ -75,6 +100,7 @@ function createEngineStatus(
 
 describe("useEngineController", () => {
   beforeEach(() => {
+  engineStatusEventListeners.clear();
     vi.clearAllMocks();
     window.localStorage.clear();
     isWebServiceRuntimeMock.mockReturnValue(false);
@@ -1889,5 +1915,98 @@ describe("useEngineController", () => {
     } finally {
       runSpy.mockRestore();
     }
+  });
+});
+
+// ==================== B4 逐引擎事件 ====================
+
+describe("useEngineController per-engine status events", () => {
+  it("merges per-engine events into engineStatuses (progressive reveal)", async () => {
+    detectEnginesMock.mockResolvedValue([
+      createEngineStatus("kimi", false),
+      createEngineStatus("grok", false),
+    ]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+    expect(
+      result.current.engineStatuses.find((status) => status.engineType === "kimi")
+        ?.installed,
+    ).toBe(false);
+
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 1,
+        status: createEngineStatus("kimi", true, []),
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "kimi")
+          ?.installed,
+      ).toBe(true);
+    });
+    // 其他引擎不受影响（逐项 merge，非整体替换）
+    expect(
+      result.current.engineStatuses.find((status) => status.engineType === "grok")
+        ?.installed,
+    ).toBe(false);
+  });
+
+  it("drops late events from older detection runs", async () => {
+    detectEnginesMock.mockResolvedValue([createEngineStatus("kimi", false)]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 5,
+        status: createEngineStatus("kimi", true, []),
+      });
+    });
+    await waitFor(() => {
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "kimi")
+          ?.installed,
+      ).toBe(true);
+    });
+
+    // 旧 run 的迟到事件 MUST 被丢弃（detectRunId 单调守卫）
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 3,
+        status: createEngineStatus("kimi", false, []),
+      });
+    });
+    expect(
+      result.current.engineStatuses.find((status) => status.engineType === "kimi")
+        ?.installed,
+    ).toBe(true);
   });
 });

@@ -5,7 +5,7 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::process::Command;
 use tokio::time::timeout;
@@ -2411,15 +2411,24 @@ fn format_opencode_model_name(provider: &str, model_id: &str) -> String {
     format!("{}/{}", provider_name, model_name)
 }
 
+/// 逐引擎检测完成事件回调（B4）：`(detectRunId, status)`，每引擎每轮恰好
+/// 一次；前端据此刻画逐项 reveal（ccgui:engine-status-updated）。
+pub type EngineStatusEventSink = Arc<dyn Fn(u64, EngineStatus) + Send + Sync>;
+
 /// Wrap a single engine probe in its own task：任一引擎探测 panic / abort
 /// 只落该引擎 error，MUST NOT 影响其他引擎的探测与结果（隔离铁律，
-/// refactor-engine-detection-pipeline D10）。
-async fn run_engine_detection_isolated<F, Fut>(engine_type: EngineType, probe: F) -> EngineStatus
+/// refactor-engine-detection-pipeline D10）。探测完成即回调 sink（B4 逐项推送）。
+async fn run_engine_detection_isolated<F, Fut>(
+    engine_type: EngineType,
+    probe: F,
+    detect_run_id: u64,
+    on_status: Option<EngineStatusEventSink>,
+) -> EngineStatus
 where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = EngineStatus> + Send + 'static,
 {
-    match tokio::spawn(probe()).await {
+    let status = match tokio::spawn(probe()).await {
         Ok(status) => status,
         Err(join_error) => {
             let mut status = disabled_engine_status(engine_type);
@@ -2427,7 +2436,11 @@ where
             status.error = Some(format!("engine detection task failed: {join_error}"));
             status
         }
+    };
+    if let Some(on_status) = on_status.as_ref() {
+        on_status(detect_run_id, status.clone());
     }
+    status
 }
 
 /// Detect all supported engines
@@ -2455,6 +2468,8 @@ pub async fn detect_all_engines(
         dsh_settings,
         gemini_enabled,
         &[],
+        0,
+        None,
     )
     .await
 }
@@ -2474,6 +2489,8 @@ pub async fn detect_all_engines_scoped(
     dsh_settings: &crate::engine::dsh::supervisor::DshRuntimeSettings,
     gemini_enabled: bool,
     disabled_engines: &[EngineType],
+    detect_run_id: u64,
+    on_status: Option<EngineStatusEventSink>,
 ) -> Vec<EngineStatus> {
     // 参数 owned 化：per-engine 独立 task 要求 'static（隔离铁律）。
     let claude_bin = claude_bin.map(str::to_string);
@@ -2493,6 +2510,8 @@ pub async fn detect_all_engines_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Claude,
                 move || async move { detect_claude_status(claude_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2504,6 +2523,8 @@ pub async fn detect_all_engines_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Codex,
                 move || async move { detect_codex_status(codex_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2515,6 +2536,8 @@ pub async fn detect_all_engines_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Gemini,
                 move || async move { detect_gemini_status(gemini_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2528,6 +2551,8 @@ pub async fn detect_all_engines_scoped(
                 move || async move {
                     detect_opencode_status_with_options(opencode_bin.as_deref(), false).await
                 },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2539,6 +2564,8 @@ pub async fn detect_all_engines_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Kimi,
                 move || async move { detect_kimi_status(kimi_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Kimi)))
@@ -2548,6 +2575,8 @@ pub async fn detect_all_engines_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Grok,
                 move || async move { detect_grok_status(grok_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Grok)))
@@ -2557,6 +2586,8 @@ pub async fn detect_all_engines_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Pi,
                 move || async move { detect_pi_status_with_options(pi_bin.as_deref(), false).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Pi)))
@@ -2568,6 +2599,8 @@ pub async fn detect_all_engines_scoped(
                 move || async move {
                     detect_qoder_status_with_options(qoder_bin.as_deref(), false).await
                 },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2579,6 +2612,8 @@ pub async fn detect_all_engines_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Dsh,
                 move || async move { crate::engine::dsh::detect_dsh_status(&dsh_settings).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Dsh)))
@@ -2653,6 +2688,8 @@ pub async fn detect_preferred_engine(
         qoder_bin,
         dsh_settings,
         &[],
+        0,
+        None,
     )
     .await
 }
@@ -2670,6 +2707,8 @@ pub async fn detect_preferred_engine_scoped(
     qoder_bin: Option<&str>,
     dsh_settings: Option<&crate::engine::dsh::supervisor::DshRuntimeSettings>,
     disabled_engines: &[EngineType],
+    detect_run_id: u64,
+    on_status: Option<EngineStatusEventSink>,
 ) -> EngineType {
     let default_dsh = crate::engine::dsh::supervisor::DshRuntimeSettings::default();
     let dsh_settings = dsh_settings.unwrap_or(&default_dsh);
@@ -2690,6 +2729,8 @@ pub async fn detect_preferred_engine_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Claude,
                 move || async move { detect_claude_status(claude_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2701,6 +2742,8 @@ pub async fn detect_preferred_engine_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Codex,
                 move || async move { detect_codex_status(codex_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2712,6 +2755,8 @@ pub async fn detect_preferred_engine_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Gemini,
                 move || async move { detect_gemini_status(gemini_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2725,6 +2770,8 @@ pub async fn detect_preferred_engine_scoped(
                 move || async move {
                     detect_opencode_status_with_options(opencode_bin.as_deref(), false).await
                 },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2736,6 +2783,8 @@ pub async fn detect_preferred_engine_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Kimi,
                 move || async move { detect_kimi_status(kimi_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Kimi)))
@@ -2745,6 +2794,8 @@ pub async fn detect_preferred_engine_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Grok,
                 move || async move { detect_grok_status(grok_bin.as_deref()).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Grok)))
@@ -2754,6 +2805,8 @@ pub async fn detect_preferred_engine_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Pi,
                 move || async move { detect_pi_status_with_options(pi_bin.as_deref(), false).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Pi)))
@@ -2765,6 +2818,8 @@ pub async fn detect_preferred_engine_scoped(
                 move || async move {
                     detect_qoder_status_with_options(qoder_bin.as_deref(), false).await
                 },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(
@@ -2776,6 +2831,8 @@ pub async fn detect_preferred_engine_scoped(
             Box::pin(run_engine_detection_isolated(
                 EngineType::Dsh,
                 move || async move { crate::engine::dsh::detect_dsh_status(&dsh_settings).await },
+                detect_run_id,
+                on_status.clone(),
             ))
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Dsh)))
@@ -2901,6 +2958,8 @@ pub async fn resolve_engine_type(
         qoder_bin,
         None,
         disabled_engines,
+        0,
+        None,
     ))
     .await
 }
@@ -4092,6 +4151,8 @@ opencode/gpt-5-nano
             &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
             false,
             &[EngineType::Kimi],
+            0,
+            None,
         )
         .await;
 
@@ -4120,17 +4181,27 @@ opencode/gpt-5-nano
     /// MUST 只落该引擎 error，其他引擎结果不受影响。
     #[tokio::test]
     async fn engine_detection_isolation_contains_panicking_probe() {
-        let healthy = run_engine_detection_isolated(EngineType::Kimi, || async {
-            let mut status = disabled_engine_status(EngineType::Kimi);
-            status.installed = true;
-            status.version = Some("1.0.0".to_string());
-            status
-        });
-        let panicking = run_engine_detection_isolated(EngineType::Grok, || async {
-            panic!("probe exploded");
-            #[allow(unreachable_code)]
-            disabled_engine_status(EngineType::Grok)
-        });
+        let healthy = run_engine_detection_isolated(
+            EngineType::Kimi,
+            || async {
+                let mut status = disabled_engine_status(EngineType::Kimi);
+                status.installed = true;
+                status.version = Some("1.0.0".to_string());
+                status
+            },
+            0,
+            None,
+        );
+        let panicking = run_engine_detection_isolated(
+            EngineType::Grok,
+            || async {
+                panic!("probe exploded");
+                #[allow(unreachable_code)]
+                disabled_engine_status(EngineType::Grok)
+            },
+            0,
+            None,
+        );
         let (healthy, panicking) = tokio::join!(healthy, panicking);
 
         assert!(
@@ -4147,6 +4218,76 @@ opencode/gpt-5-nano
             "panic must be contained as a per-engine error, got {:?}",
             panicking.error
         );
+    }
+
+    /// refactor-engine-detection-pipeline B4：逐引擎事件——每引擎探测完成
+    /// 恰好 emit 一次（runId 单调由 manager 计数保证，这里断言 sink 收集）。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn detect_all_engines_emits_per_engine_status_events() {
+        use std::sync::Mutex as StdMutex;
+
+        let marker = unique_test_marker("kimi-emit");
+        let script_path = write_unix_test_cli_named(
+            &format!(
+                "#!/bin/sh\nprintf x >> '{}'\necho '1.2.3'\n",
+                marker.display()
+            ),
+            "kimi",
+        );
+        let kimi_bin = script_path.to_string_lossy().to_string();
+
+        let events: Arc<StdMutex<Vec<(u64, EngineType)>>> = Arc::new(StdMutex::new(Vec::new()));
+        let sink_events = Arc::clone(&events);
+        let on_status: EngineStatusEventSink = Arc::new(move |run_id, status| {
+            sink_events
+                .lock()
+                .expect("events lock")
+                .push((run_id, status.engine_type));
+        });
+
+        // 仅保留 kimi 启用：事件数 = 实际探测的引擎数（禁用引擎不探测不 emit）。
+        let statuses = detect_all_engines_scoped(
+            None,
+            None,
+            None,
+            None,
+            Some(&kimi_bin),
+            None,
+            None,
+            None,
+            &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
+            false,
+            &[
+                EngineType::Claude,
+                EngineType::Codex,
+                EngineType::OpenCode,
+                EngineType::Grok,
+                EngineType::Pi,
+                EngineType::Qoder,
+                EngineType::Dsh,
+            ],
+            7,
+            Some(on_status),
+        )
+        .await;
+
+        assert!(
+            statuses
+                .iter()
+                .any(|status| status.engine_type == EngineType::Kimi && status.installed),
+            "fake kimi must be detected"
+        );
+        let events = events.lock().expect("events lock");
+        assert_eq!(
+            events.len(),
+            1,
+            "exactly one per-engine event must be emitted"
+        );
+        assert_eq!(events[0], (7, EngineType::Kimi));
+        let _ = fs::remove_file(&script_path);
+        let _ = fs::remove_file(&marker);
+        let _ = fs::remove_dir_all(script_path.parent().unwrap_or(std::path::Path::new("")));
     }
 
     /// refactor-engine-detection-pipeline B2：同一轮 Claude 检测内 `claude --version`

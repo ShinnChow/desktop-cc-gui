@@ -1017,7 +1017,13 @@ impl DaemonState {
         let settings = self.app_settings.lock().await.clone();
         let disabled_engines = engine::detection_disabled_engines(&settings);
         self.engine_manager
-            .detect_engines_cached(force, engines, settings.gemini_enabled, &disabled_engines)
+            .detect_engines_cached(
+                force,
+                engines,
+                settings.gemini_enabled,
+                &disabled_engines,
+                None,
+            )
             .await
     }
 
@@ -1040,7 +1046,7 @@ impl DaemonState {
             .engine_manager
             // 显式 switch 的安装校验不走检测黑名单：开关只控制可见性/检测范围，
             // 不阻断对已配置引擎的显式切换。
-            .detect_engines_with_gates(settings.gemini_enabled, &[])
+            .detect_engines_with_gates(settings.gemini_enabled, &[], None)
             .await;
         let installed = statuses
             .iter()
@@ -1079,6 +1085,7 @@ impl DaemonState {
                 Some(&[engine_type]),
                 settings.gemini_enabled,
                 &disabled_engines,
+                None,
             )
             .await;
         statuses

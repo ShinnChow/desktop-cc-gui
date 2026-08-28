@@ -15,6 +15,10 @@ import {
   runCodexDoctor,
   switchEngine,
 } from "../../../services/tauri";
+import {
+  subscribeEngineStatusEvents,
+  type EngineStatusUpdatedEvent,
+} from "../../../services/tauri/appServer";
 import { startupOrchestrator } from "../../startup-orchestration/utils/startupOrchestrator";
 import {
   buildAvailableEngines,
@@ -569,6 +573,64 @@ export function useEngineController({
     initRef.current = true;
     refreshEngines();
   }, [refreshEngines]);
+
+  // B4 逐引擎事件订阅：探测完成即逐项 reveal。runId 单调守卫丢弃旧 run 的
+  // 迟到事件；同一轮连续事件在 microtask 内合批为单次 setState（Render Perf
+  // Baseline：低频事件驱动，不进根链高频 setState）。
+  const lastAppliedDetectRunIdRef = useRef(0);
+  const pendingStatusEventsRef = useRef<Map<EngineType, EngineStatusUpdatedEvent>>(new Map());
+  const flushScheduledRef = useRef(false);
+  useEffect(() => {
+    return subscribeEngineStatusEvents((event) => {
+      if (
+        !Number.isFinite(event.detectRunId) ||
+        event.detectRunId < lastAppliedDetectRunIdRef.current ||
+        !event.status ||
+        typeof event.status.engineType !== "string"
+      ) {
+        return;
+      }
+      pendingStatusEventsRef.current.set(event.status.engineType, event);
+      if (flushScheduledRef.current) {
+        return;
+      }
+      flushScheduledRef.current = true;
+      queueMicrotask(() => {
+        flushScheduledRef.current = false;
+        const pending = new Map(pendingStatusEventsRef.current);
+        pendingStatusEventsRef.current.clear();
+        if (pending.size === 0) {
+          return;
+        }
+        let maxRunId = 0;
+        pending.forEach((item) => {
+          maxRunId = Math.max(maxRunId, item.detectRunId);
+        });
+        lastAppliedDetectRunIdRef.current = Math.max(
+          lastAppliedDetectRunIdRef.current,
+          maxRunId,
+        );
+        setEngineStatuses((currentStatuses) => {
+          let changed = false;
+          const next = currentStatuses.map((status) => {
+            const item = pending.get(status.engineType);
+            if (!item) {
+              return status;
+            }
+            changed = true;
+            return item.status;
+          });
+          pending.forEach((item) => {
+            if (!next.some((status) => status.engineType === item.status.engineType)) {
+              changed = true;
+              next.push(item.status);
+            }
+          });
+          return changed ? next : currentStatuses;
+        });
+      });
+    });
+  }, []);
 
   // Reset models when workspace changes
   useEffect(() => {

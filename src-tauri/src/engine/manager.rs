@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex, RwLock};
@@ -25,6 +25,7 @@ use super::status::{
     detect_kimi_status, detect_opencode_status_with_options, detect_pi_status_with_options,
     detect_qoder_status_with_options,
 };
+use super::status::EngineStatusEventSink;
 use super::{disabled_engine_status, EngineConfig, EngineStatus, EngineType};
 
 /// Unified engine manager
@@ -44,6 +45,8 @@ pub struct EngineManager {
     detect_bookkeeping: StdMutex<DetectBookkeeping>,
     /// SWR 后台 revalidate 单飞标记。
     detect_revalidate_inflight: Arc<AtomicBool>,
+    /// 逐引擎事件 detectRunId 单调计数（B4）。
+    detect_run_counter: Arc<AtomicU64>,
 
     /// Claude session manager. Wrapped in `Arc` so the in-process AskUserQuestion
     /// MCP server can hold a shared handle for session lookup (see `askuser_mcp`).
@@ -258,6 +261,7 @@ impl EngineManager {
             engine_statuses: RwLock::new(HashMap::new()),
             detect_bookkeeping: StdMutex::new(DetectBookkeeping::default()),
             detect_revalidate_inflight: Arc::new(AtomicBool::new(false)),
+            detect_run_counter: Arc::new(AtomicU64::new(1)),
             claude_manager: Arc::new(ClaudeSessionManager::new()),
             opencode_sessions: Mutex::new(HashMap::new()),
             gemini_sessions: Mutex::new(GeminiSessionRegistry::default()),
@@ -381,8 +385,10 @@ impl EngineManager {
         &self,
         gemini_enabled: bool,
         disabled_engines: &[EngineType],
+        on_status: Option<EngineStatusEventSink>,
     ) -> Vec<EngineStatus> {
         let gemini_enabled = gemini_enabled && crate::engine_policy::GEMINI_RUNTIME_ENABLED;
+        let detect_run_id = self.detect_run_counter.fetch_add(1, Ordering::SeqCst);
         let (
             claude_bin,
             codex_bin,
@@ -438,6 +444,8 @@ impl EngineManager {
             &dsh_settings,
             gemini_enabled,
             disabled_engines,
+            detect_run_id,
+            on_status,
         )
         .await;
 
@@ -575,7 +583,12 @@ impl EngineManager {
 
     /// SWR 后台 revalidate（单飞）：立即返回 stale 快照后异步全量重探，
     /// 结果经 merge 写回缓存与落盘（B4 起逐引擎 emit 事件）。
-    fn spawn_revalidate_if_idle(self: &Arc<Self>, gemini_enabled: bool, disabled: &[EngineType]) {
+    fn spawn_revalidate_if_idle(
+        self: &Arc<Self>,
+        gemini_enabled: bool,
+        disabled: &[EngineType],
+        on_status: Option<EngineStatusEventSink>,
+    ) {
         if self
             .detect_revalidate_inflight
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -588,7 +601,7 @@ impl EngineManager {
         tokio::spawn(async move {
             let _reset = DetectInflightReset(Arc::clone(&manager.detect_revalidate_inflight));
             manager
-                .detect_engines_with_gates(gemini_enabled, &disabled)
+                .detect_engines_with_gates(gemini_enabled, &disabled, on_status)
                 .await;
         });
     }
@@ -613,6 +626,7 @@ impl EngineManager {
         engines: Option<&[EngineType]>,
         gemini_enabled: bool,
         disabled: &[EngineType],
+        on_status: Option<EngineStatusEventSink>,
     ) -> Vec<EngineStatus> {
         if !force && engines.is_none() {
             // 快照 MUST 按当前黑名单过滤：检测上下文变化（新禁用引擎）后，
@@ -629,14 +643,15 @@ impl EngineManager {
             self.ensure_last_good_loaded().await;
             let snapshot = self.get_all_statuses().await;
             if !snapshot.is_empty() {
-                self.spawn_revalidate_if_idle(gemini_enabled, disabled);
+                self.spawn_revalidate_if_idle(gemini_enabled, disabled, on_status);
                 return filter_disabled(snapshot);
             }
             return self
-                .detect_engines_with_gates(gemini_enabled, disabled)
+                .detect_engines_with_gates(gemini_enabled, disabled, on_status)
                 .await;
         }
         if let Some(list) = engines {
+            let detect_run_id = self.detect_run_counter.fetch_add(1, Ordering::SeqCst);
             for engine_type in list {
                 if disabled.contains(engine_type) {
                     continue;
@@ -653,11 +668,14 @@ impl EngineManager {
                     let mut bk = self.detect_bookkeeping.lock().expect("detect bookkeeping");
                     bk.per_engine_detected_at.insert(merged.engine_type, now);
                 }
+                if let Some(on_status) = on_status.as_ref() {
+                    on_status(detect_run_id, merged.clone());
+                }
                 self.cache_engine_status(merged).await;
             }
             return self.get_all_statuses().await;
         }
-        self.detect_engines_with_gates(gemini_enabled, disabled)
+        self.detect_engines_with_gates(gemini_enabled, disabled, on_status)
             .await
     }
 
@@ -1779,7 +1797,7 @@ mod tests {
             )
             .await;
 
-        let statuses = manager.detect_engines_with_gates(true, &[]).await;
+        let statuses = manager.detect_engines_with_gates(true, &[], None).await;
         let status = statuses
             .iter()
             .find(|status| status.engine_type == EngineType::Gemini)
@@ -1991,7 +2009,9 @@ mod tests {
         manager.cache_engine_status(seeded.clone()).await;
         manager.test_mark_detect_cache_fresh(false, &[]);
 
-        let statuses = manager.detect_engines_cached(false, None, false, &[]).await;
+        let statuses = manager
+            .detect_engines_cached(false, None, false, &[], None)
+            .await;
         let kimi = statuses
             .iter()
             .find(|status| status.engine_type == EngineType::Kimi)
@@ -2010,7 +2030,7 @@ mod tests {
         // 黑名单变化（禁用 kimi）→ 缓存上下文失配 → 不得命中 TTL 缓存分支；
         // 走 SWR/重探路径后 kimi 不应出现在结果中。
         let statuses = manager
-            .detect_engines_cached(false, None, false, &[EngineType::Kimi])
+            .detect_engines_cached(false, None, false, &[EngineType::Kimi], None)
             .await;
         assert!(
             statuses
@@ -2051,7 +2071,9 @@ mod tests {
             .replace(file_path.clone());
 
         let manager = Arc::new(EngineManager::new());
-        let statuses = manager.detect_engines_cached(false, None, false, &[]).await;
+        let statuses = manager
+            .detect_engines_cached(false, None, false, &[], None)
+            .await;
         let kimi = statuses
             .iter()
             .find(|status| status.engine_type == EngineType::Kimi)
