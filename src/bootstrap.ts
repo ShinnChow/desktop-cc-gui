@@ -3,6 +3,7 @@ import "./styles/base.css";
 import "./styles/buttons.css";
 import "./styles/sidebar-shell.css";
 import "./styles/sidebar.css";
+import "./styles/sidebar.system-proxy-drawer.css";
 import "./styles/sidebar.footer.css";
 import "./styles/home.css";
 import "./styles/home-chat.css";

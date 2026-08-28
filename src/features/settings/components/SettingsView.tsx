@@ -187,7 +187,6 @@ import {
 import {
   TEMPORARILY_DISABLED_SIDEBAR_SECTIONS as BASE_DISABLED_SIDEBAR_SECTIONS,
 } from "./settings-view/settingsViewConstants";
-import { useSystemProxySettings } from "./settings-view/hooks/useSystemProxySettings";
 import type { SettingsHighlightTarget } from "../../app/hooks/useSettingsModalState";
 
 export type SettingsViewProps = {
@@ -555,21 +554,6 @@ export function SettingsView({
   const [shortcutDrafts, setShortcutDrafts] = useState<ShortcutDrafts>(() =>
     buildShortcutDrafts(appSettings),
   );
-  const {
-    handleSaveSystemProxy,
-    handleSystemProxyUrlChange,
-    handleToggleSystemProxy,
-    systemProxyDirty,
-    systemProxyEnabledDraft,
-    systemProxyError,
-    systemProxyNotice,
-    systemProxySaving,
-    systemProxyUrlDraft,
-  } = useSystemProxySettings({
-    appSettings,
-    onUpdateAppSettings,
-    t,
-  });
   const normalizedUserMsgColor = useMemo(
     () => normalizeHexColor(appSettings.userMsgColor),
     [appSettings.userMsgColor],
@@ -2170,15 +2154,6 @@ export function SettingsView({
                 terminalShellPathDirty={terminalShellPathDirty}
                 handleSaveTerminalShellPath={handleSaveTerminalShellPath}
                 handleClearTerminalShellPath={handleClearTerminalShellPath}
-                systemProxyEnabledDraft={systemProxyEnabledDraft}
-                systemProxyUrlDraft={systemProxyUrlDraft}
-                handleToggleSystemProxy={handleToggleSystemProxy}
-                handleSystemProxyUrlChange={handleSystemProxyUrlChange}
-                handleSaveSystemProxy={handleSaveSystemProxy}
-                systemProxySaving={systemProxySaving}
-                systemProxyDirty={systemProxyDirty}
-                systemProxyNotice={systemProxyNotice}
-                systemProxyError={systemProxyError}
                 selectedNotificationSound={selectedNotificationSound}
                 soundOptions={soundOptions}
                 handleNotificationSoundOptionChange={

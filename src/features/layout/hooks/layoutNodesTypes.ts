@@ -90,6 +90,7 @@ export type ThreadActivityStatus = {
   hasUnread: boolean;
   isReviewing: boolean;
   isContextCompacting?: boolean;
+  backgroundTaskRunningCount?: number;
   processingStartedAt?: number | null;
   lastDurationMs?: number | null;
   heartbeatPulse?: number;
@@ -159,6 +160,10 @@ export type LayoutNodesFlatOptions = {
   activeTurnId?: string | null;
   systemProxyEnabled?: boolean;
   systemProxyUrl?: string | null;
+  onUpdateSystemProxy?: (patch: {
+    systemProxyEnabled: boolean;
+    systemProxyUrl: string | null;
+  }) => Promise<unknown>;
   activeItems: ConversationItem[];
   activeQueuedHandoffBubble: QueuedHandoffBubble | null;
   threadItemsByThread: Record<string, ConversationItem[]>;
@@ -816,6 +821,7 @@ export type WorkspaceLayoutNodesOptions = Pick<
   | "isTablet"
   | "systemProxyEnabled"
   | "systemProxyUrl"
+  | "onUpdateSystemProxy"
 >;
 
 export type RuntimeLayoutNodesOptions = Pick<

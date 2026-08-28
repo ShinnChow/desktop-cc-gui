@@ -585,6 +585,8 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
         engine: conversationEngine,
         activeTurnId: options.activeTurnId ?? null,
         isThinking: activeThreadStatus?.isProcessing ?? false,
+        backgroundTaskRunningCount:
+          activeThreadStatus?.backgroundTaskRunningCount ?? 0,
         heartbeatPulse: heartbeatPulseRef.current,
         historyRestoredAtMs: activeHistoryRestoredAtMs,
       },
@@ -598,6 +600,7 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
       options.activeTurnId,
       conversationEngine,
       activeThreadStatus?.isProcessing,
+      activeThreadStatus?.backgroundTaskRunningCount,
       activeHistoryRestoredAtMs,
     ],
   );
@@ -797,6 +800,7 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
           activeThreadId={options.activeThreadId}
           systemProxyEnabled={options.systemProxyEnabled}
           systemProxyUrl={options.systemProxyUrl}
+          onUpdateSystemProxy={options.onUpdateSystemProxy}
           accountRateLimits={options.activeRateLimits}
           usageShowRemaining={options.usageShowRemaining}
           showProviderLabels={options.showSidebarProviderLabels}

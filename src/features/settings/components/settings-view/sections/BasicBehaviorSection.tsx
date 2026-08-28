@@ -2,7 +2,6 @@ import type { TFunction } from "i18next";
 import FolderOpen from "lucide-react/dist/esm/icons/folder-open";
 import Download from "lucide-react/dist/esm/icons/download";
 import Save from "lucide-react/dist/esm/icons/save";
-import { ProxyStatusBadge } from "@/components/ProxyStatusBadge";
 import { Switch } from "@/components/ui/switch";
 import type { AppSettings } from "@/types";
 import {
@@ -17,13 +16,6 @@ type DiagnosticsBundleExportState = {
   status: "idle" | "exporting" | "exported" | "failed";
   message: string | null;
 };
-
-type InlineNoticeState =
-  | {
-      kind: "success" | "error";
-      message: string;
-    }
-  | null;
 
 type NotificationSoundOption = {
   value: string;
@@ -45,15 +37,6 @@ type BasicBehaviorSectionProps = {
   terminalShellPathDirty: boolean;
   handleSaveTerminalShellPath: () => Promise<void>;
   handleClearTerminalShellPath: () => Promise<void>;
-  systemProxyEnabledDraft: boolean;
-  systemProxyUrlDraft: string;
-  handleToggleSystemProxy: (checked: boolean) => void;
-  handleSystemProxyUrlChange: (value: string) => void;
-  handleSaveSystemProxy: () => Promise<void>;
-  systemProxySaving: boolean;
-  systemProxyDirty: boolean;
-  systemProxyNotice: InlineNoticeState;
-  systemProxyError: string | null;
   selectedNotificationSound: string;
   soundOptions: ReadonlyArray<NotificationSoundOption>;
   handleNotificationSoundOptionChange: (nextSound: string | null) => void;
@@ -78,15 +61,6 @@ export function BasicBehaviorSection({
   terminalShellPathDirty,
   handleSaveTerminalShellPath,
   handleClearTerminalShellPath,
-  systemProxyEnabledDraft,
-  systemProxyUrlDraft,
-  handleToggleSystemProxy,
-  handleSystemProxyUrlChange,
-  handleSaveSystemProxy,
-  systemProxySaving,
-  systemProxyDirty,
-  systemProxyNotice,
-  systemProxyError,
   selectedNotificationSound,
   soundOptions,
   handleNotificationSoundOptionChange,
@@ -162,7 +136,9 @@ export function BasicBehaviorSection({
               role="radio"
               aria-checked={appSettings.composerSendShortcut === "cmdEnter"}
               className={`settings-pref-segment ${
-                appSettings.composerSendShortcut === "cmdEnter" ? "is-active" : ""
+                appSettings.composerSendShortcut === "cmdEnter"
+                  ? "is-active"
+                  : ""
               }`}
               onClick={() => handleComposerSendShortcutChange("cmdEnter")}
             >
@@ -215,7 +191,9 @@ export function BasicBehaviorSection({
                   type="button"
                   role="radio"
                   aria-checked={gitCommitComposerPlacement === placement}
-                  aria-label={t(`settings.gitCommitComposerPlacement.${placement}`)}
+                  aria-label={t(
+                    `settings.gitCommitComposerPlacement.${placement}`,
+                  )}
                   className={`settings-pref-segment ${
                     gitCommitComposerPlacement === placement ? "is-active" : ""
                   }`}
@@ -322,7 +300,9 @@ export function BasicBehaviorSection({
       <div className="settings-basic-group-card settings-basic-group-card--list settings-pref-card">
         <div
           className={`settings-pref-row settings-pref-row--stack${
-            appSettings.performanceCompatibilityModeEnabled ? " is-expanded" : ""
+            appSettings.performanceCompatibilityModeEnabled
+              ? " is-expanded"
+              : ""
           }`}
         >
           <div className="settings-pref-row-main">
@@ -424,7 +404,9 @@ export function BasicBehaviorSection({
               id="terminal-shell-path"
               className="settings-pref-text-input"
               value={terminalShellPathDraft}
-              onChange={(event) => setTerminalShellPathDraft(event.target.value)}
+              onChange={(event) =>
+                setTerminalShellPathDraft(event.target.value)
+              }
               placeholder={t("settings.terminalShellPathPlaceholder")}
               spellCheck={false}
               autoCapitalize="off"
@@ -458,87 +440,6 @@ export function BasicBehaviorSection({
               {t("settings.terminalShellPathHint")}
             </span>
           </div>
-        </div>
-      </div>
-
-      {/* 代理 */}
-      <div
-        className={`settings-basic-group-card settings-basic-group-card--list settings-pref-card settings-basic-proxy-card${
-          systemProxyEnabledDraft ? " is-enabled" : ""
-        }`}
-      >
-        <div className="settings-pref-row">
-          <div className="settings-pref-meta">
-            <div className="settings-pref-title settings-pref-title--inline">
-              <span>{t("settings.behaviorProxyTitle")}</span>
-              {systemProxyEnabledDraft ? (
-                <ProxyStatusBadge
-                  proxyUrl={systemProxyUrlDraft}
-                  label={t("messages.proxyBadge")}
-                  variant="compact"
-                  className="settings-proxy-header-badge"
-                />
-              ) : null}
-            </div>
-            <div className="settings-pref-desc">
-              {t("settings.behaviorProxyDesc")}
-            </div>
-          </div>
-          <div className="settings-pref-control">
-            <Switch
-              checked={systemProxyEnabledDraft}
-              onCheckedChange={handleToggleSystemProxy}
-              aria-label={t("settings.behaviorProxyEnabled")}
-            />
-          </div>
-        </div>
-        <div className="settings-pref-row settings-pref-row--stack">
-          <div className="settings-pref-field-row">
-            <input
-              id="system-proxy-url"
-              className="settings-pref-text-input"
-              value={systemProxyUrlDraft}
-              onChange={(event) => {
-                handleSystemProxyUrlChange(event.target.value);
-              }}
-              placeholder={t("settings.behaviorProxyAddressPlaceholder")}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
-              aria-label={t("settings.behaviorProxyAddress")}
-            />
-            <button
-              type="button"
-              className="ghost settings-button-compact settings-pref-action-btn"
-              onClick={() => void handleSaveSystemProxy()}
-              disabled={systemProxySaving || !systemProxyDirty}
-            >
-              <Save size={14} aria-hidden />
-              {t("settings.behaviorProxySave")}
-            </button>
-          </div>
-          <div className="settings-pref-hint">
-            <span className="settings-pref-hint-copy">
-              {t("settings.behaviorProxyHint")}
-            </span>
-          </div>
-          {systemProxyNotice ? (
-            <div
-              className={
-                systemProxyNotice.kind === "error"
-                  ? "settings-inline-error"
-                  : "settings-inline-success"
-              }
-              role={systemProxyNotice.kind === "error" ? "alert" : "status"}
-            >
-              {systemProxyNotice.message}
-            </div>
-          ) : null}
-          {systemProxyError ? (
-            <div className="settings-pref-desc" role="alert">
-              {systemProxyError}
-            </div>
-          ) : null}
         </div>
       </div>
 

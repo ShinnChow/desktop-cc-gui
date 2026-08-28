@@ -39,7 +39,7 @@ describe("useSidebarSettingsPinnedActions", () => {
     expect(readSidebarSettingsPinnedActionIds()).toEqual(["lock", "spec-hub"]);
   });
 
-  it("pins until the max of two, then ignores further pins", () => {
+  it("pins until the max of four, then ignores further pins", () => {
     const store: string[] = [];
     vi.mocked(getClientStoreSync).mockImplementation(() => [...store]);
     vi.mocked(writeClientStoreValue).mockImplementation((_ns, _key, value) => {
@@ -51,19 +51,38 @@ describe("useSidebarSettingsPinnedActions", () => {
       "lock",
       "spec-hub",
     ]);
-    // 已满 2 个，再 pin 保持不变
     expect(toggleSidebarSettingsPinnedActionId("git-history")).toEqual([
       "lock",
       "spec-hub",
+      "git-history",
     ]);
-    expect(writeClientStoreValue).toHaveBeenCalledTimes(2);
-    expect(SIDEBAR_SETTINGS_PINNED_MAX).toBe(2);
-
-    // 取消一个后再 pin 成功
-    expect(toggleSidebarSettingsPinnedActionId("lock")).toEqual(["spec-hub"]);
-    expect(toggleSidebarSettingsPinnedActionId("git-history")).toEqual([
+    expect(toggleSidebarSettingsPinnedActionId("system-proxy")).toEqual([
+      "lock",
       "spec-hub",
       "git-history",
+      "system-proxy",
+    ]);
+    // 已满 4 个，再 pin 保持不变。
+    expect(toggleSidebarSettingsPinnedActionId("project-memory")).toEqual([
+      "lock",
+      "spec-hub",
+      "git-history",
+      "system-proxy",
+    ]);
+    expect(writeClientStoreValue).toHaveBeenCalledTimes(4);
+    expect(SIDEBAR_SETTINGS_PINNED_MAX).toBe(4);
+
+    // 取消一个后再 pin 成功。
+    expect(toggleSidebarSettingsPinnedActionId("lock")).toEqual([
+      "spec-hub",
+      "git-history",
+      "system-proxy",
+    ]);
+    expect(toggleSidebarSettingsPinnedActionId("project-memory")).toEqual([
+      "spec-hub",
+      "git-history",
+      "system-proxy",
+      "project-memory",
     ]);
   });
 
@@ -93,7 +112,7 @@ describe("useSidebarSettingsPinnedActions", () => {
 
     const { result } = renderHook(() => useSidebarSettingsPinnedActions());
     expect(result.current.pinnedIds).toEqual([]);
-    expect(result.current.maxPinned).toBe(2);
+    expect(result.current.maxPinned).toBe(4);
 
     act(() => {
       result.current.togglePinned("lock");

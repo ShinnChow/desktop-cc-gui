@@ -1884,6 +1884,17 @@ export function useAppShellLayoutNodesSection(
       });
     },
   );
+  const handleUpdateSystemProxy = useEventCallback(
+    async (patch: {
+      systemProxyEnabled: boolean;
+      systemProxyUrl: string | null;
+    }) => {
+      await queueSaveSettings({
+        ...appSettings,
+        ...patch,
+      });
+    },
+  );
   const handlePrefillHandled = useEventCallback((id: string) => {
     if (prefillDraft?.id === id) {
       setPrefillDraft(null);
@@ -2024,6 +2035,7 @@ export function useAppShellLayoutNodesSection(
       isTablet,
       systemProxyEnabled: appSettings.systemProxyEnabled,
       systemProxyUrl: appSettings.systemProxyUrl,
+      onUpdateSystemProxy: handleUpdateSystemProxy,
     },
     runtime: {
       activeItems,

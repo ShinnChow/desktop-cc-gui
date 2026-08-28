@@ -6,6 +6,7 @@ import LayoutDashboard from "lucide-react/dist/esm/icons/layout-dashboard";
 import Lock from "lucide-react/dist/esm/icons/lock";
 import PanelLeftClose from "lucide-react/dist/esm/icons/panel-left-close";
 import Settings from "lucide-react/dist/esm/icons/settings";
+import WavesLadder from "lucide-react/dist/esm/icons/waves-ladder";
 import type { ReactNode, RefObject } from "react";
 import {
   Tooltip,
@@ -31,6 +32,7 @@ type SidebarSettingsMenuProps = {
   onOpenSpecHub: () => void;
   onOpenProjectMemory: () => void;
   onOpenSettings: () => void;
+  onOpenSystemProxy: () => void;
   onAppModeChange: (mode: AppMode) => void;
   /** 打开侧栏运行时提示面板（入口已收入设置二级菜单，不再外显） */
   onOpenRuntimeNotice?: () => void;
@@ -69,6 +71,7 @@ export function SidebarSettingsMenu({
   onOpenSpecHub,
   onOpenProjectMemory,
   onOpenSettings,
+  onOpenSystemProxy,
   onAppModeChange,
   onOpenRuntimeNotice,
   showRuntimeNotice = false,
@@ -134,6 +137,16 @@ export function SidebarSettingsMenu({
         onAppModeChange(appMode === "gitHistory" ? "chat" : "gitHistory");
       },
       active: appMode === "gitHistory",
+      visible: true,
+    },
+    {
+      id: "system-proxy",
+      label: t("settings.behaviorProxyTitle"),
+      icon: <WavesLadder size={14} aria-hidden />,
+      onSelect: () => {
+        onClose();
+        onOpenSystemProxy();
+      },
       visible: true,
     },
     {

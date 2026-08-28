@@ -31,6 +31,7 @@ import { WorkspaceSettingsDialog } from "./WorkspaceSettingsDialog";
 import { SidebarFolderMovePicker } from "./SidebarFolderMovePicker";
 import { SidebarSearchBox } from "./SidebarSearchBox";
 import { SidebarSettingsMenu } from "./SidebarSettingsMenu";
+import { SystemProxyDrawer } from "./SystemProxyDrawer";
 import { SidebarTopbarSlot } from "./SidebarTopbarSlot";
 import { SidebarVersionTag } from "./SidebarVersionTag";
 import { SidebarWorkspaceDropOverlay } from "./SidebarWorkspaceDropOverlay";
@@ -171,6 +172,10 @@ type SidebarProps = {
   activeThreadId: string | null;
   systemProxyEnabled?: boolean;
   systemProxyUrl?: string | null;
+  onUpdateSystemProxy?: (patch: {
+    systemProxyEnabled: boolean;
+    systemProxyUrl: string | null;
+  }) => Promise<unknown>;
   accountRateLimits: RateLimitSnapshot | null;
   usageShowRemaining: boolean;
   showProviderLabels?: boolean;
@@ -330,6 +335,7 @@ function SidebarImpl({
   activeThreadId,
   systemProxyEnabled = false,
   systemProxyUrl = null,
+  onUpdateSystemProxy = async () => undefined,
   showProviderLabels = false,
   defaultVisibleThreadRootCount,
   onChangeDefaultVisibleThreadRootCount,
@@ -609,6 +615,7 @@ function SidebarImpl({
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isSearchOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [isSystemProxyDrawerOpen, setIsSystemProxyDrawerOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const { collapsedGroups, toggleGroupCollapse, replaceCollapsedGroups } =
@@ -1832,6 +1839,19 @@ function SidebarImpl({
   }, [isSettingsMenuOpen]);
 
   useEffect(() => {
+    if (!isSystemProxyDrawerOpen) {
+      return;
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsSystemProxyDrawerOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isSystemProxyDrawerOpen]);
+
+  useEffect(() => {
     if (!isSearchOpen && searchQuery) {
       setSearchQuery("");
     }
@@ -2750,6 +2770,7 @@ function SidebarImpl({
               onOpenSpecHub={onOpenSpecHub}
               onOpenProjectMemory={onOpenProjectMemory}
               onOpenSettings={onOpenSettings}
+              onOpenSystemProxy={() => setIsSystemProxyDrawerOpen(true)}
               onAppModeChange={onAppModeChange}
               onOpenRuntimeNotice={onOpenRuntimeNotice}
               showRuntimeNotice={showRuntimeNoticeMenuItem}
@@ -2764,6 +2785,15 @@ function SidebarImpl({
           </div>
         </div>
       </div>
+      {isSystemProxyDrawerOpen ? (
+        <SystemProxyDrawer
+          systemProxyEnabled={systemProxyEnabled}
+          systemProxyUrl={systemProxyUrl}
+          onUpdateSystemProxy={onUpdateSystemProxy}
+          onClose={() => setIsSystemProxyDrawerOpen(false)}
+          t={t}
+        />
+      ) : null}
       {folderMovePicker ? (
         <SidebarFolderMovePicker
           picker={folderMovePicker}

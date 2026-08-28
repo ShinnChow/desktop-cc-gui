@@ -10,14 +10,15 @@ export const SIDEBAR_SETTINGS_PINNED_ACTIONS_KEY = "sidebarSettingsPinnedActions
 export const SIDEBAR_SETTINGS_PINNED_ACTIONS_CHANGED_EVENT =
   "sidebarSettingsPinnedActionsChanged";
 
-/** 底部空间有限，最多外显 2 个快捷入口。 */
-export const SIDEBAR_SETTINGS_PINNED_MAX = 2;
+/** 底部空间有限，最多外显 4 个快捷入口。 */
+export const SIDEBAR_SETTINGS_PINNED_MAX = 4;
 
 export const PINNABLE_SETTINGS_ACTION_IDS = [
   "lock",
   "spec-hub",
   "project-memory",
   "git-history",
+  "system-proxy",
   "runtime-notice",
 ] as const;
 
