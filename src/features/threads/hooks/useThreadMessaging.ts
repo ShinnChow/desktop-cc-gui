@@ -406,7 +406,8 @@ type UseThreadMessagingOptions = {
   model?: string | null;
   effort?: string | null;
   collaborationMode?: Record<string, unknown> | null;
-  resolveComposerSelection?: () => {
+  resolveComposerSelection?: (threadId?: string | null) => {
+    threadId?: string | null;
     id?: string | null;
     model: string | null;
     source?: string | null;
@@ -1774,19 +1775,35 @@ export function useThreadMessaging({
           },
         });
       }
-      const resolvedComposerSelection = resolveComposerSelection?.() ?? null;
+      const rawComposerSelection = resolveComposerSelection?.(threadId) ?? null;
+      // A stale render may still expose the previous native thread snapshot.
+      // Do not let it cross the send boundary even if an injected resolver
+      // ignores the requested thread argument.
+      const resolvedComposerSelection =
+        rawComposerSelection?.threadId &&
+        rawComposerSelection.threadId !== threadId
+          ? null
+          : rawComposerSelection;
       const modelFromOptions =
         options?.model !== undefined ? options.model : undefined;
       // resolver 在场时是 Native send 唯一模型权威：禁止回落到全局 / 其他会话 hook model。
-      const modelFromHook = resolveComposerSelection
-        ? (resolvedComposerSelection?.model?.trim() ||
+      // A frozen native target is the Composer/send boundary contract. Without
+      // one, an existing resolver remains authoritative; a mismatched resolver
+      // must fail closed rather than falling back to another thread's global model.
+      const modelFromHook =
+        options?.nativeExecutionTarget?.model?.trim() ||
+        options?.nativeExecutionTarget?.modelCatalogEntryId?.trim() ||
+        (resolveComposerSelection
+          ? (resolvedComposerSelection?.model?.trim() ||
             resolvedComposerSelection?.id?.trim() ||
             null)
-        : model;
+          : model);
       const selectedModelId =
         threadKind === "shared"
           ? (supportedStoredSharedTarget?.modelCatalogEntryId ?? null)
-          : (resolvedComposerSelection?.id ?? null);
+          : (options?.nativeExecutionTarget?.modelCatalogEntryId?.trim() ||
+            resolvedComposerSelection?.id?.trim() ||
+            null);
       const selectedModelSource =
         threadKind === "shared"
           ? (supportedStoredSharedTarget?.providerProfileSource ?? "unknown")
@@ -1800,9 +1817,10 @@ export function useThreadMessaging({
       const rawResolvedEffort =
         threadKind === "shared" && supportedStoredSharedTarget
           ? (supportedStoredSharedTarget.reasoning?.effort ?? null)
-          : options?.effort !== undefined
-            ? options.effort
-            : (resolvedComposerSelection?.effort ?? effort);
+          : options?.nativeExecutionTarget?.reasoning?.effort ??
+            (options?.effort !== undefined
+              ? options.effort
+              : (resolvedComposerSelection?.effort ?? effort));
       const resolvedEffort = normalizeEngineScopedEffort(
         resolvedEngine,
         rawResolvedEffort,

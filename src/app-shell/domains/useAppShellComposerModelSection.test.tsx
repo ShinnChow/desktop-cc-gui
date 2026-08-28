@@ -77,6 +77,48 @@ function renderSection(overrides: Record<string, unknown> = {}) {
 }
 
 describe("useAppShellComposerModelSection handleSelectModel", () => {
+  it("projects the active PI thread ledger instead of a deferred stale Kimi engine default", () => {
+    const { result } = renderSection({
+      activeEngine: "kimi",
+      activeThreadId: "pi:session-b",
+      selectedComposerSelection: {
+        modelId: "openai-codex/gpt-5.6-terra",
+        effort: "high",
+      },
+      engineModelCatalogsAsOptions: {
+        kimi: [makeModel("kimi-coding/k3", { isDefault: true })],
+        pi: [makeModel("openai-codex/gpt-5.6-terra", { isDefault: true })],
+      },
+    });
+
+    expect(result.current.effectiveSelectedModelId).toBe(
+      "openai-codex/gpt-5.6-terra",
+    );
+    expect(result.current.resolvedModel).toBe("openai-codex/gpt-5.6-terra");
+  });
+
+  it("keeps the PI ledger target when its catalog is unavailable instead of using stale Kimi rows", () => {
+    const { result } = renderSection({
+      activeEngine: "kimi",
+      activeThreadId: "pi:session-b",
+      selectedComposerSelection: {
+        modelId: "openai-codex/gpt-5.6-terra",
+        effort: "high",
+      },
+      engineModelsAsOptions: [
+        makeModel("kimi-coding/k3", { isDefault: true }),
+      ],
+      engineModelCatalogsAsOptions: {
+        kimi: [makeModel("kimi-coding/k3", { isDefault: true })],
+      },
+    });
+
+    expect(result.current.effectiveSelectedModelId).toBe(
+      "openai-codex/gpt-5.6-terra",
+    );
+    expect(result.current.resolvedModel).toBe("openai-codex/gpt-5.6-terra");
+  });
+
   it("uses the bound Codex provider catalog instead of the global model list", () => {
     const providerModels = [
       makeModel("provider-a-model", { providerProfileId: "provider-a" }),

@@ -27,7 +27,7 @@ import { resolveThreadEngine } from "./selectedComposerSession";
 
 export function useAppShellComposerModelSection({
   accessMode,
-  activeEngine,
+  activeEngine: globalActiveEngine,
   activeThreadId,
   activeProviderProfileId,
   activeWorkspaceId,
@@ -38,7 +38,7 @@ export function useAppShellComposerModelSection({
   composerInputRef,
   composerSelectionResolverRef,
   engineModelCatalogsAsOptions,
-  engineModelsAsOptions,
+  engineModelsAsOptions: globalEngineModelsAsOptions,
   globalSelectionReady,
   handleSelectComposerSelection,
   handleSetAccessMode,
@@ -57,6 +57,17 @@ export function useAppShellComposerModelSection({
   setSelectedEffort,
   setSelectedModelId,
 }: any) {
+  // Thread identity commits before deferred chrome. Native Composer state must
+  // therefore derive its engine/catalog from the active thread, not the stale
+  // global chrome engine that can remain from the previously selected session.
+  const activeThreadEngine = resolveThreadEngine(activeThreadId ?? "");
+  const activeEngine = activeThreadEngine ?? globalActiveEngine;
+  const engineModelsAsOptions =
+    activeThreadEngine !== null
+      ? ((engineModelCatalogsAsOptions?.[activeEngine] as
+          | ModelOption[]
+          | undefined) ?? [])
+      : globalEngineModelsAsOptions;
   const userCommittedComposerSelectionRef = useRef<{
     id: string;
     model: string;
@@ -128,7 +139,6 @@ export function useAppShellComposerModelSection({
   }, [activeEngine, engineModelsAsOptions, activeEngineSelectedModelId]);
 
   const hasActiveComposerThread = activeThreadId !== null;
-  const activeThreadEngine = resolveThreadEngine(activeThreadId ?? "");
   const effectiveSelectedModelId = useMemo(() => {
     return getEffectiveSelectedModelId({
       activeEngine,
@@ -435,6 +445,8 @@ export function useAppShellComposerModelSection({
             : (previousResolver?.providerProfileId ?? null),
         effort: nextSelectedEffort,
         collaborationMode: previousResolver?.collaborationMode ?? null,
+        threadId: activeThreadId,
+        revision: (previousResolver?.revision ?? 0) + 1,
       };
       handleSelectComposerSelection({
         modelId: nextSelectedModel.id,
@@ -507,6 +519,7 @@ export function useAppShellComposerModelSection({
     userCommitted != null &&
     userCommitted.engine === activeEngine &&
     userCommitted.threadId === activeThreadId;
+  const previousResolver = composerSelectionResolverRef.current;
   composerSelectionResolverRef.current = {
     id: honorUserCommit ? userCommitted.id : resolvedComposerModelId,
     model: honorUserCommit ? userCommitted.model : resolvedModel,
@@ -514,6 +527,8 @@ export function useAppShellComposerModelSection({
     providerProfileId: resolvedProviderProfileId,
     effort: resolvedEffort,
     collaborationMode: collaborationModePayload,
+    threadId: activeThreadId,
+    revision: (previousResolver?.revision ?? 0) + 1,
   };
   // 注意：禁止在 effect 里对 Claude residual 自动 handleSelectModel。
   // allowUnknown 下 effectiveSelectedModelId 可长期停在 k3，而 resolver 的 entryId

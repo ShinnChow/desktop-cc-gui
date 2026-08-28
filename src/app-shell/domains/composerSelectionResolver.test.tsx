@@ -13,6 +13,8 @@ describe("useComposerSelectionResolver", () => {
       providerProfileId: null,
       effort: null,
       collaborationMode: null,
+      threadId: null,
+      revision: 0,
     });
   });
 
@@ -20,22 +22,26 @@ describe("useComposerSelectionResolver", () => {
     const { result } = renderHook(() => useComposerSelectionResolver());
 
     result.current.composerSelectionResolverRef.current = {
-      id: "model-entry-1",
+      id: "gpt-5",
       model: "gpt-5",
-      source: "catalog",
-      providerProfileId: "profile-1",
-      effort: "high",
+      source: "managed",
+      providerProfileId: null,
+      effort: null,
       collaborationMode: { mode: "plan" },
+      threadId: "pi:session-a",
+      revision: 1,
     };
-
     expect(result.current.resolveComposerSelection()).toEqual({
-      id: "model-entry-1",
+      id: "gpt-5",
       model: "gpt-5",
-      source: "catalog",
-      providerProfileId: "profile-1",
-      effort: "high",
+      source: "managed",
+      providerProfileId: null,
+      effort: null,
       collaborationMode: { mode: "plan" },
+      threadId: "pi:session-a",
+      revision: 1,
     });
+    expect(result.current.resolveComposerSelection("pi:session-b")).toBeNull();
   });
 
   it("keeps ref and resolver identity stable across rerenders", () => {

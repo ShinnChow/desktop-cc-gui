@@ -2021,6 +2021,54 @@ describe("useThreadMessaging", () => {
     );
   });
 
+  it("does not send a stale native resolver target after switching PI sessions", async () => {
+    const threadId = "pi:session-b";
+    const { result } = makeThreadMessagingHook("pi", {
+      activeThreadId: threadId,
+      ensuredThreadId: threadId,
+      threadEngineById: { [threadId]: "pi" },
+      providerProfileByThread: { [threadId]: "provider-b" },
+      model: "kimi-coding/k3",
+      resolveComposerSelection: () => ({
+        id: "openai-codex/gpt-5.6-terra",
+        model: "openai-codex/gpt-5.6-terra",
+        source: "managed",
+        providerProfileId: "provider-a",
+        effort: "high",
+        collaborationMode: null,
+        threadId: "pi:session-a",
+      }),
+    });
+
+    await act(async () => {
+      await result.current.sendUserMessageToThread(
+        workspace,
+        threadId,
+        "use the current PI session target",
+        [],
+        {
+          nativeExecutionTarget: {
+            engine: "pi",
+            providerProfileId: "provider-b",
+            modelCatalogEntryId: "kimi-coding/k3",
+            model: "kimi-coding/k3",
+            reasoning: { effort: "low" },
+          },
+        },
+      );
+    });
+
+    expect(engineSendMessage).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        engine: "pi",
+        model: "kimi-coding/k3",
+        effort: "low",
+        providerProfileId: "provider-b",
+      }),
+    );
+  });
+
   it("continues finalized pi session with native thread id", async () => {
     const { result } = makeThreadMessagingHook("pi", {
       activeThreadId: "pi:019ffb7b-dedc-7b36-8d2f-f85f35501036",
