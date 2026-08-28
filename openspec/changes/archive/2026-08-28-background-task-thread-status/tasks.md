@@ -30,5 +30,5 @@
 - [x] 4.8 绕过守卫同时关 markProcessing（D12 回归修正）：`onBackgroundTaskUpdated` 改传 `shouldMarkProcessing=false`，否则 post-settle 会话永久「响应中」；回归断言 `markProcessing not called`
 - [x] 4.9 rename 链路随迁（D13 review 修复）：`renameThreadStateIdentity` status 合并补 `backgroundTaskRunningCount`（max）；backgroundTaskStore 新增 `renameBackgroundTasksForThread`（幂等/补缺合并/emitChange）；`renameThreadId` 与 ensureThread pending-rename 分支接线迁移；回归测试锁定合并保留计数 + store 随迁
 - [x] 4.10 卡片权威快照直读（D14 并行双 resident 事故防御）：`useBackgroundTaskLiveSnapshot`（store 版本号订阅）+ `canonicalBackgroundTaskFromRecord`；`ToolBlockRenderer` backgroundTask 分支 store live 优先、output 兜底；全真实管线 killed round-trip 集成测试锁定
-- [ ] 4.4 真机手工验收：pi 会话 bg_run → 切走 → 紫灯 + ⚙N 徽标；全部终态 → 灯灭 + 非活跃会话未读点；模型生成中蓝灯 + 徽标并存；reduced-motion 降级静态；**任务结束后幕布卡片 ≤3s 内原地折叠（无需切会话/重开）**；并行双 pi 会话各自独立亮灯/独立折叠（已取证：无互杀，app 重启会按扩展设计终止全部在跑任务，卡片显示「已终止」）
-- [ ] 4.5 收口：`openspec` validate / archive 流程，同步 capability spec
+- [x] 4.4 真机手工验收（2026-08-28 用户验收通过：紫灯/徽标/卡片折叠/终态收口均符合预期；并行互杀疑虑经取证排除）：pi 会话 bg_run → 切走 → 紫灯 + ⚙N 徽标；全部终态 → 灯灭 + 非活跃会话未读点；模型生成中蓝灯 + 徽标并存；reduced-motion 降级静态；**任务结束后幕布卡片 ≤3s 内原地折叠（无需切会话/重开）**；并行双 pi 会话各自独立亮灯/独立折叠（已取证：无互杀，app 重启会按扩展设计终止全部在跑任务，卡片显示「已终止」）
+- [x] 4.5 收口（2026-08-28 archive，5 条 ADDED Requirements 已合并进 pi-background-task-experience spec；纯前端派生态不触发基石校准 Gate，见 design D7）：`openspec` validate / archive 流程，同步 capability spec
