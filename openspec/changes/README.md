@@ -2,15 +2,16 @@
 
 本页是 `mossx` OpenSpec proposal 的当前入口。它只维护 active change 的执行状态，并把 archived change 路由到完整历史索引；详细治理快照仍以 [`../project.md`](../project.md) 为准。
 
-- Updated At: `2026-08-27`
-- Active proposals: `70`（以磁盘 `openspec/changes/*` 为准）
-- Archived proposals: `928`（以磁盘 `openspec/changes/archive/<date>-*` 目录为准；本页逐条索引链接 872，历史存量缺口另计）
+- Updated At: `2026-08-28`
+- Active proposals: `71`（以磁盘 `openspec/changes/*` 为准）
+- Archived proposals: `928`（以磁盘 `openspec/changes/archive/<date>-*` 为准；本页逐条索引链接 872，历史存量缺口另计）
 - Main capability specs: `544`
 
 ## Active Proposals
 
 | Change | Progress | Current gate | Artifacts |
 | ------ | -------: | ------------ | --------- |
+| [`fix-pi-catalog-default-from-settings`](fix-pi-catalog-default-from-settings/proposal.md) | implemented / await 2.3 真机验收 | PI catalog default 恒为枚举首条目（provider 字母序 → `anthropic/claude-fable-5`），无账本 pi 会话切入即绑 claude（2026-08-28 用户实测「你家」会话）：`get_pi_models` 汇合点读 `<agent>/settings.json` `defaultProvider`/`defaultModel` promote 置顶（对齐 kimi/grok 共同特性），settings 缺失/未命中回退首条目零行为漂移；status 47/47 绿、rustfmt clean、validate strict 过、全量 15 失败为存量（stash 基线复核）；前端零改动 | [proposal](fix-pi-catalog-default-from-settings/proposal.md) · [design](fix-pi-catalog-default-from-settings/design.md) · [tasks](fix-pi-catalog-default-from-settings/tasks.md) · [specs](fix-pi-catalog-default-from-settings/specs/) |
 | [`fix-claude-slash-command-title-truncation-omission`](fix-claude-slash-command-title-truncation-omission/proposal.md) | implementing / TDD | slash-command 会话被索引误剔（0.9.3 用户 desktop-cc-gui：claude 列表恒 0）：`/brainstorming` 信封前缀 >80 字符，`peek_claude_first_user_preview` 截断后 title 无完整 `<command-args>` 标签对 → `should_omit_claude_index_row` 误判裸命令整条剔除；修复 = truncate 前先用 `extract_command_prompt_text` 还原 prompt（与 history 路径同语义）；TDD 红→绿（writers 15/15）、rustfmt clean；与 fix-sidebar-reload-force-index-sync 互补 | [proposal](fix-claude-slash-command-title-truncation-omission/proposal.md) · [tasks](fix-claude-slash-command-title-truncation-omission/tasks.md) · [specs](fix-claude-slash-command-title-truncation-omission/specs/) |
 | [`fix-composer-cross-engine-draft-selection-leak`](fix-composer-cross-engine-draft-selection-leak/proposal.md) | implementing / TDD | 跨引擎模型串台（Claude 会话的 grok4.6/opus5 成为新 Codex 会话默认并进请求，2026-08-27 用户反馈）：draft carry 应用无引擎门禁；apply 点按 `resolveThreadEngine` 双侧一致才放行，未知引擎维持放行；只动 `selectedComposerSession.ts` / `useSelectedComposerSession.ts` + 测试；**不碰 fix-model-picker-send-authority 在途域** | [proposal](fix-composer-cross-engine-draft-selection-leak/proposal.md) · [design](fix-composer-cross-engine-draft-selection-leak/design.md) · [tasks](fix-composer-cross-engine-draft-selection-leak/tasks.md) · [specs](fix-composer-cross-engine-draft-selection-leak/specs/) |
 | [`fix-context-compacted-marker-turn-finality`](fix-context-compacted-marker-turn-finality/proposal.md) | implementing / TDD | 压缩留痕劫持 turn 终态：pi auto-compaction 先于 settle 入库 assistant 消息 → `markLatestAssistantMessageFinal` 误标 → 极简模式锚点错、真实回答被折进 chip（2026-08-27 用户反馈）；新增 `context-event` kind + `compaction_end` reason/token 透传 + i18n 分隔行渲染；**TDD 先红后绿** | [proposal](fix-context-compacted-marker-turn-finality/proposal.md) · [design](fix-context-compacted-marker-turn-finality/design.md) · [tasks](fix-context-compacted-marker-turn-finality/tasks.md) · [specs](fix-context-compacted-marker-turn-finality/specs/) |

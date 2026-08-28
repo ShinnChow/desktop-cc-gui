@@ -1417,6 +1417,18 @@ async fn run_pi_list_models(
 }
 
 async fn get_pi_models(bin: &str, path_env: Option<&String>) -> (Vec<ModelInfo>, Option<String>) {
+    let (mut models, config_diagnostic) = probe_pi_models_chain(bin, path_env).await;
+    promote_pi_default_from_settings(&mut models);
+    (models, config_diagnostic)
+}
+
+/// PI catalog 三条取数路径（RPC `get_available_models` → `--list-models` 两跳 →
+/// generated fallback）。default 标记保持 parse 层兜底语义（首条目），由
+/// `promote_pi_default_from_settings` 在汇合点按 settings 修正。
+async fn probe_pi_models_chain(
+    bin: &str,
+    path_env: Option<&String>,
+) -> (Vec<ModelInfo>, Option<String>) {
     match fetch_pi_models_via_rpc(bin, None).await {
         Ok(models) => return (models, None),
         Err(error) => {
@@ -1434,6 +1446,63 @@ async fn get_pi_models(bin: &str, path_env: Option<&String>) -> (Vec<ModelInfo>,
     match run_pi_list_models(bin, path_env, &[]).await {
         Ok(models) => (models, None),
         Err(error) => (get_generated_fallback_models(EngineType::Pi), Some(error)),
+    }
+}
+
+/// Read `(defaultProvider, defaultModel)` from `<agent>/settings.json`.
+/// Provider is optional (custom models.json entries may be provider-less);
+/// any failure (missing file / malformed JSON / non-string / blank) → None.
+/// 探测链禁止为 settings 缺失注入诊断噪音，故全部静默容错。
+fn read_pi_default_model_selection(home_dir: Option<&Path>) -> Option<(Option<String>, String)> {
+    let path = home_dir?.join("settings.json");
+    let content = std::fs::read_to_string(&path).ok()?;
+    let root: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let read_field = |key: &str| -> Option<String> {
+        root.get(key)
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    };
+    Some((read_field("defaultProvider"), read_field("defaultModel")?))
+}
+
+/// 通用「CLI 默认模型置顶」约定（同 kimi / grok 既有内联实现语义）：
+/// 清除全部 default 标记 → 命中 `default_id` 的条目标 default 并移到 index 0。
+/// 未命中返回 `false` 且列表零变化——调用方维持 parse 层首条目兜底语义。
+fn promote_default_model(models: &mut Vec<ModelInfo>, default_id: &str) -> bool {
+    let Some(index) = models.iter().position(|model| model.id == default_id) else {
+        return false;
+    };
+    for model in models.iter_mut() {
+        model.default = false;
+    }
+    let mut matched = models.remove(index);
+    matched.default = true;
+    models.insert(0, matched);
+    true
+}
+
+/// PI default 解析：settings 候选 id 依次 `{defaultProvider}/{defaultModel}` →
+/// 裸 `{defaultModel}`；全部未命中或 settings 不可用时不动列表。
+fn promote_pi_default_from_settings(models: &mut Vec<ModelInfo>) {
+    let Some((provider, model)) = read_pi_default_model_selection(get_pi_home_dir().as_deref())
+    else {
+        return;
+    };
+    for candidate in pi_default_candidate_ids(provider.as_deref(), &model) {
+        if promote_default_model(models, &candidate) {
+            return;
+        }
+    }
+}
+
+/// 候选 id 顺序：`{defaultProvider}/{defaultModel}` 优先，裸 `{defaultModel}`
+/// 兜底（覆盖自定义 models.json 无 provider 前缀条目）。
+fn pi_default_candidate_ids(provider: Option<&str>, model: &str) -> Vec<String> {
+    match provider.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(provider) => vec![pi_model_catalog_id(&provider, model), model.to_string()],
+        None => vec![model.to_string()],
     }
 }
 
@@ -2541,6 +2610,120 @@ anthropic claude-opus    200k   32k    no       yes
             supported_thinking_levels_for_pi_model(true, Some(&map)),
             vec!["high", "max"]
         );
+    }
+
+    fn write_pi_settings_for_test(home: &Path, content: &str) {
+        fs::create_dir_all(home).expect("create pi home dir");
+        fs::write(home.join("settings.json"), content).expect("write settings.json");
+    }
+
+    fn pi_test_home(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("ccgui-pi-default-{label}-{}", uuid::Uuid::new_v4()))
+    }
+
+    #[test]
+    fn read_pi_default_model_selection_parses_settings_fields() {
+        let home = pi_test_home("full");
+        write_pi_settings_for_test(
+            &home,
+            r#"{"theme":"dark","defaultProvider":"kimi-coding","defaultModel":"k3"}"#,
+        );
+        assert_eq!(
+            read_pi_default_model_selection(Some(&home)),
+            Some((Some("kimi-coding".to_string()), "k3".to_string()))
+        );
+    }
+
+    #[test]
+    fn read_pi_default_model_selection_allows_missing_provider() {
+        let home = pi_test_home("providerless");
+        write_pi_settings_for_test(&home, r#"{"defaultModel":" my-relay/grok-4.6 "}"#);
+        assert_eq!(
+            read_pi_default_model_selection(Some(&home)),
+            Some((None, "my-relay/grok-4.6".to_string()))
+        );
+    }
+
+    #[test]
+    fn read_pi_default_model_selection_tolerates_missing_or_broken_settings() {
+        assert_eq!(read_pi_default_model_selection(None), None);
+
+        let missing = pi_test_home("missing");
+        assert_eq!(read_pi_default_model_selection(Some(&missing)), None);
+
+        let broken = pi_test_home("broken");
+        write_pi_settings_for_test(&broken, "{ not json");
+        assert_eq!(read_pi_default_model_selection(Some(&broken)), None);
+
+        let blank = pi_test_home("blank");
+        write_pi_settings_for_test(&blank, r#"{"defaultProvider":"","defaultModel":"  "}"#);
+        assert_eq!(read_pi_default_model_selection(Some(&blank)), None);
+
+        let non_string = pi_test_home("non-string");
+        write_pi_settings_for_test(&non_string, r#"{"defaultModel":3}"#);
+        assert_eq!(read_pi_default_model_selection(Some(&non_string)), None);
+    }
+
+    #[test]
+    fn promote_default_model_moves_match_to_front_and_clears_old_flag() {
+        let mut models = vec![
+            ModelInfo::new("anthropic/claude-fable-5", "anthropic/claude-fable-5").as_default(),
+            ModelInfo::new("kimi-coding/k3", "kimi-coding/k3"),
+            ModelInfo::new("deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-pro"),
+        ];
+        assert!(promote_default_model(&mut models, "kimi-coding/k3"));
+        assert_eq!(models[0].id, "kimi-coding/k3");
+        assert!(models[0].default);
+        assert!(!models[1].default);
+        assert!(!models[2].default);
+    }
+
+    #[test]
+    fn promote_default_model_leaves_list_untouched_on_miss() {
+        let mut models = vec![
+            ModelInfo::new("anthropic/claude-fable-5", "anthropic/claude-fable-5").as_default(),
+            ModelInfo::new("kimi-coding/k3", "kimi-coding/k3"),
+        ];
+        assert!(!promote_default_model(&mut models, "openai/gpt-5"));
+        assert!(models[0].default);
+        assert!(!models[1].default);
+        assert_eq!(models[0].id, "anthropic/claude-fable-5");
+    }
+
+    #[test]
+    fn pi_default_candidate_ids_prefer_provider_prefixed_then_bare() {
+        assert_eq!(
+            pi_default_candidate_ids(Some("kimi-coding"), "k3"),
+            vec!["kimi-coding/k3".to_string(), "k3".to_string()]
+        );
+        assert_eq!(
+            pi_default_candidate_ids(None, "my-relay/grok-4.6"),
+            vec!["my-relay/grok-4.6".to_string()]
+        );
+        assert_eq!(
+            pi_default_candidate_ids(Some("  "), "k3"),
+            vec!["k3".to_string()]
+        );
+    }
+
+    #[test]
+    fn pi_default_promotion_end_to_end_over_parsed_catalog() {
+        // 复刻「settings default 指向 catalog 存在条目」的完整汇合语义：
+        // parse 层 first-entry default 被清除，settings default 置顶。
+        let mut models = parse_pi_models_output(
+            "provider model          ctx  max     thinking images
+anthropic claude-fable-5  1M   128K    yes      yes
+kimi-coding k3             1.0M 131.1K  yes      yes
+",
+        );
+        for candidate in pi_default_candidate_ids(Some("kimi-coding"), "k3") {
+            if promote_default_model(&mut models, &candidate) {
+                break;
+            }
+        }
+        assert_eq!(models[0].id, "kimi-coding/k3");
+        assert!(models[0].default);
+        assert!(!models[1].default);
     }
 
     /// 探测 spawn 参数必须同时跳过会话恢复与 extension boot：任一缺失都会
