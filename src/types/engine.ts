@@ -61,6 +61,8 @@ export type EngineStatus = {
   features: EngineFeatures;
   models: EngineModelInfo[];
   error: string | null;
+  /** 登录态（B6 二段式：phase 1 多为 unknown，phase 2 事件补推）。 */
+  authState?: "unknown" | "authenticated" | "requires_login";
 };
 
 /**

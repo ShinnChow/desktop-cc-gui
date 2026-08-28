@@ -155,6 +155,7 @@ pub async fn detect_dsh_status(settings: &DshRuntimeSettings) -> EngineStatus {
 
     EngineStatus {
         engine_type: EngineType::Dsh,
+        auth_state: crate::engine::AuthState::default(),
         installed: true,
         version,
         bin_path: Some(bin),
@@ -796,6 +797,7 @@ fn build_async_command(bin: &str) -> Command {
 fn not_installed(error: Option<String>) -> EngineStatus {
     EngineStatus {
         engine_type: EngineType::Dsh,
+        auth_state: crate::engine::AuthState::default(),
         installed: false,
         version: None,
         bin_path: None,

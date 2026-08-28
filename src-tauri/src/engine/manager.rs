@@ -26,7 +26,7 @@ use super::status::{
     detect_qoder_status_with_options,
 };
 use super::status::EngineStatusEventSink;
-use super::{disabled_engine_status, EngineConfig, EngineStatus, EngineType};
+use super::{disabled_engine_status, AuthState, EngineConfig, EngineStatus, EngineType};
 
 /// Unified engine manager
 pub struct EngineManager {
@@ -606,6 +606,39 @@ impl EngineManager {
         });
     }
 
+    /// B6/D6 登录态二段式 phase 2：detect 返回后异步 spawn 登录探测（仅 Qoder），
+    /// 完成后覆写缓存并以新 runId emit 事件；探测失败保持 Unknown 不覆盖。
+    fn spawn_qoder_login_phase_two(self: &Arc<Self>, on_status: Option<EngineStatusEventSink>) {
+        let manager = Arc::clone(self);
+        tokio::spawn(async move {
+            let Some(cached) = manager.get_engine_status(EngineType::Qoder).await else {
+                return;
+            };
+            if !cached.installed || cached.auth_state != AuthState::Unknown {
+                return;
+            }
+            let Some(logged_in) = crate::engine::status::detect_qoder_login_state_phase_two().await
+            else {
+                return;
+            };
+            let auth_state = if logged_in {
+                AuthState::Authenticated
+            } else {
+                AuthState::RequiresLogin
+            };
+            let mut updated = cached;
+            updated.auth_state = auth_state;
+            if auth_state == AuthState::RequiresLogin && updated.error.is_none() {
+                updated.error = Some("Qoder CLI 未登录：请先运行 qodercli login".to_string());
+            }
+            let run_id = manager.detect_run_counter.fetch_add(1, Ordering::SeqCst);
+            manager.cache_engine_status(updated.clone()).await;
+            if let Some(on_status) = on_status.as_ref() {
+                on_status(run_id, updated);
+            }
+        });
+    }
+
     #[cfg(test)]
     fn test_mark_detect_cache_fresh(&self, gemini_enabled: bool, disabled: &[EngineType]) {
         let mut bk = self.detect_bookkeeping.lock().expect("detect bookkeeping");
@@ -643,7 +676,8 @@ impl EngineManager {
             self.ensure_last_good_loaded().await;
             let snapshot = self.get_all_statuses().await;
             if !snapshot.is_empty() {
-                self.spawn_revalidate_if_idle(gemini_enabled, disabled, on_status);
+                self.spawn_revalidate_if_idle(gemini_enabled, disabled, on_status.clone());
+                self.spawn_qoder_login_phase_two(on_status);
                 return filter_disabled(snapshot);
             }
             return self
@@ -672,11 +706,17 @@ impl EngineManager {
                     on_status(detect_run_id, merged.clone());
                 }
                 self.cache_engine_status(merged).await;
+                if *engine_type == EngineType::Qoder {
+                    self.spawn_qoder_login_phase_two(on_status.clone());
+                }
             }
             return self.get_all_statuses().await;
         }
-        self.detect_engines_with_gates(gemini_enabled, disabled, on_status)
-            .await
+        let statuses = self
+            .detect_engines_with_gates(gemini_enabled, disabled, on_status.clone())
+            .await;
+        self.spawn_qoder_login_phase_two(on_status);
+        statuses
     }
 
     /// Get cached engine status

@@ -667,6 +667,7 @@ async fn probe_opencode_cli_help(bin: &str, path_env: Option<&String>) -> bool {
 fn not_installed_status(engine_type: EngineType, error: Option<String>) -> EngineStatus {
     EngineStatus {
         engine_type,
+        auth_state: crate::engine::AuthState::default(),
         installed: false,
         version: None,
         bin_path: None,
@@ -713,6 +714,7 @@ pub async fn detect_claude_status(custom_bin: Option<&str>) -> EngineStatus {
 
     EngineStatus {
         engine_type: EngineType::Claude,
+        auth_state: crate::engine::AuthState::default(),
         installed: true,
         version,
         bin_path: Some(bin.to_string()),
@@ -740,6 +742,7 @@ pub async fn detect_codex_status(custom_bin: Option<&str>) -> EngineStatus {
 
     EngineStatus {
         engine_type: EngineType::Codex,
+        auth_state: crate::engine::AuthState::default(),
         installed: true,
         version: None,
         bin_path: Some(bin.to_string()),
@@ -811,6 +814,7 @@ pub async fn detect_opencode_status_with_options(
 
     EngineStatus {
         engine_type: EngineType::OpenCode,
+        auth_state: crate::engine::AuthState::default(),
         installed: true,
         version,
         bin_path: Some(bin.to_string()),
@@ -865,6 +869,7 @@ pub async fn detect_gemini_status(custom_bin: Option<&str>) -> EngineStatus {
 
     EngineStatus {
         engine_type: EngineType::Gemini,
+        auth_state: crate::engine::AuthState::default(),
         installed: true,
         version,
         bin_path: Some(bin.to_string()),
@@ -897,6 +902,7 @@ pub async fn detect_kimi_status(custom_bin: Option<&str>) -> EngineStatus {
 
     EngineStatus {
         engine_type: EngineType::Kimi,
+        auth_state: crate::engine::AuthState::default(),
         installed: true,
         version,
         bin_path: Some(bin.to_string()),
@@ -931,6 +937,7 @@ pub async fn detect_pi_status_with_options(
         }
         return EngineStatus {
             engine_type: EngineType::Pi,
+            auth_state: crate::engine::AuthState::default(),
             installed: true,
             version,
             bin_path: Some(bin.to_string()),
@@ -955,6 +962,7 @@ pub async fn detect_pi_status_with_options(
     let default_model = models.iter().find(|m| m.default).map(|m| m.id.clone());
     EngineStatus {
         engine_type: EngineType::Pi,
+        auth_state: crate::engine::AuthState::default(),
         installed: true,
         version,
         bin_path: Some(bin.to_string()),
@@ -1078,6 +1086,28 @@ pub async fn detect_qoder_status(custom_bin: Option<&str>) -> EngineStatus {
     detect_qoder_status_with_home(custom_bin, None).await
 }
 
+/// phase 2 登录探测（spawn \`status -o json\`，10s 预算）：detect 返回后异步执行，
+/// 结果经缓存覆写 + 事件补推（B6/D6）。返回 None 表示探测失败（保持 Unknown）。
+pub async fn detect_qoder_login_state_phase_two() -> Option<bool> {
+    let bin_path = resolve_bin_path("qodercli", None);
+    let bin = bin_path
+        .as_ref()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| "qodercli".to_string());
+    let path_env = build_codex_path_env(None);
+    let home_dir = crate::engine::qoder_provider_profile::resolve_qoder_distribution_home_dir(
+        crate::engine::qoder_provider_profile::QoderDistribution::Global,
+        None,
+    );
+    probe_qoder_logged_in(
+        crate::engine::qoder_provider_profile::QoderDistribution::Global,
+        &bin,
+        path_env.as_ref(),
+        home_dir.as_deref(),
+    )
+    .await
+}
+
 /// 启动检测轻量入口：跳过 ACP models 探测（refactor-engine-detection-pipeline D1）。
 pub async fn detect_qoder_status_with_options(
     custom_bin: Option<&str>,
@@ -1142,13 +1172,25 @@ pub async fn detect_qoder_distribution_status_with_options(
         distribution,
         configured_home_dir.map(Path::new),
     );
-    let logged_in =
-        probe_qoder_logged_in(distribution, &bin, path_env.as_ref(), home_dir.as_deref()).await;
+    // B6/D6 二段式：phase 1（启动检测，include_models=false）不做 spawn 型登录
+    // 探测，auth_state 留 Unknown 由 phase 2 异步补推；完整路径（catalog 语义）
+    // 保持既有登录检查。
     let has_pat =
         crate::engine::qoder_auth::qoder_has_pat_credential_for_distribution(distribution);
+    let logged_in = if include_models {
+        probe_qoder_logged_in(distribution, &bin, path_env.as_ref(), home_dir.as_deref()).await
+    } else {
+        None
+    };
+    let qoder_auth_state = match logged_in {
+        Some(true) => crate::engine::AuthState::Authenticated,
+        Some(false) if !has_pat => crate::engine::AuthState::RequiresLogin,
+        _ => crate::engine::AuthState::Unknown,
+    };
     if logged_in == Some(false) && !has_pat {
         return EngineStatus {
             engine_type: EngineType::Qoder,
+            auth_state: crate::engine::AuthState::RequiresLogin,
             installed: true,
             version,
             bin_path: Some(bin),
@@ -1173,6 +1215,7 @@ pub async fn detect_qoder_distribution_status_with_options(
     let default_model = models.iter().find(|m| m.default).map(|m| m.id.clone());
     EngineStatus {
         engine_type: EngineType::Qoder,
+        auth_state: qoder_auth_state,
         installed: true,
         version,
         bin_path: Some(bin),
@@ -1597,6 +1640,7 @@ pub async fn detect_grok_status(custom_bin: Option<&str>) -> EngineStatus {
 
     EngineStatus {
         engine_type: EngineType::Grok,
+        auth_state: crate::engine::AuthState::default(),
         installed: true,
         version,
         bin_path: Some(bin.to_string()),
@@ -4218,6 +4262,52 @@ opencode/gpt-5-nano
             "panic must be contained as a per-engine error, got {:?}",
             panicking.error
         );
+    }
+
+    /// refactor-engine-detection-pipeline B6：Qoder 检测 phase 1 MUST NOT
+    /// spawn 登录探测命令（`qodercli status`）——spawn 型探测延后到 phase 2。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn detect_all_engines_qoder_phase1_never_spawns_login_probe() {
+        let marker = unique_test_marker("qoder-login-phase1");
+        let script_path = write_unix_test_cli_named(
+            &format!(
+                "#!/bin/sh\ncase \"$*\" in\n  *status*) printf x >> '{}'\n  ;;\nesac\necho '1.2.3'\n",
+                marker.display()
+            ),
+            "qodercli",
+        );
+        let qoder_bin = script_path.to_string_lossy().to_string();
+
+        let statuses = detect_all_engines_scoped(
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&qoder_bin),
+            &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
+            false,
+            &[],
+            0,
+            None,
+        )
+        .await;
+
+        let qoder = statuses
+            .iter()
+            .find(|status| status.engine_type == EngineType::Qoder)
+            .expect("qoder status present");
+        assert!(qoder.installed, "fake qodercli reports a version");
+        assert!(
+            !marker.exists(),
+            "phase 1 detection must not spawn `qodercli status` login probe"
+        );
+        let _ = fs::remove_file(&script_path);
+        let _ = fs::remove_file(&marker);
+        let _ = fs::remove_dir_all(script_path.parent().unwrap_or(std::path::Path::new("")));
     }
 
     /// refactor-engine-detection-pipeline B4：逐引擎事件——每引擎探测完成

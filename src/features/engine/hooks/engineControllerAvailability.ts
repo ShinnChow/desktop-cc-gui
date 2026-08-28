@@ -48,6 +48,10 @@ export function buildAvailableEngines(
       // 重试成功后由 controller 清除 detectFailed 恢复 ready。
       availabilityState = "failed";
       availabilityLabelKey = "workspace.engineStatusFailed";
+    } else if (status?.installed && status.authState === "requires_login") {
+      // B6：登录态二段式——已安装但 phase 2 探测确认未登录。
+      availabilityState = "requires-login";
+      availabilityLabelKey = "workspace.engineStatusRequiresLogin";
     } else if (status?.installed) {
       availabilityState = "ready";
       availabilityLabelKey = null;

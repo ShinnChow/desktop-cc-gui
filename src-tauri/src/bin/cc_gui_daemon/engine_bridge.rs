@@ -639,10 +639,22 @@ pub(crate) fn ensure_engine_enabled(
         .to_string())
 }
 
+/// 登录态三态（与 src/engine/mod.rs 的 AuthState 对齐，B6/D6）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthState {
+    #[default]
+    Unknown,
+    Authenticated,
+    RequiresLogin,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineStatus {
     pub engine_type: EngineType,
+    #[serde(default)]
+    pub auth_state: AuthState,
     pub installed: bool,
     pub version: Option<String>,
     pub bin_path: Option<String>,
@@ -920,6 +932,7 @@ pub(crate) fn disabled_engine_status(engine_type: EngineType) -> EngineStatus {
     };
     EngineStatus {
         engine_type,
+        auth_state: AuthState::default(),
         installed: false,
         version: None,
         bin_path: None,

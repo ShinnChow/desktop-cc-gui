@@ -208,6 +208,7 @@ pub(crate) fn disabled_engine_status(engine_type: EngineType) -> EngineStatus {
     };
     EngineStatus {
         engine_type,
+        auth_state: crate::engine::AuthState::default(),
         installed: false,
         version: None,
         bin_path: None,
@@ -225,12 +226,26 @@ impl std::fmt::Display for EngineType {
     }
 }
 
+/// 登录态三态（refactor-engine-detection-pipeline B6/D6）：detect phase 1 只做
+/// 同步凭据检查（多为 Unknown），spawn 型登录探测在 phase 2 异步补推。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthState {
+    #[default]
+    Unknown,
+    Authenticated,
+    RequiresLogin,
+}
+
 /// Engine installation and capability status
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineStatus {
     /// Engine type identifier
     pub engine_type: EngineType,
+    /// 登录态（serde default 向后兼容 remote/daemon 与历史 last-good）。
+    #[serde(default)]
+    pub auth_state: AuthState,
     /// Whether the CLI is installed and accessible
     pub installed: bool,
     /// CLI version string if available
