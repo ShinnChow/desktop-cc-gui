@@ -1,4 +1,5 @@
 use super::credentials::{query_kimi_cli_status, resolve_quota_route};
+use super::pi_usage::query_pi_openai_codex_usage;
 use super::relay::query_by_base_url_and_key;
 use super::snapshot::*;
 use super::types::*;
@@ -19,6 +20,17 @@ pub(crate) async fn get_coding_plan_quota_for_session(
     // Claude Code / Codex 绑 Kimi HTTP 不会命中这里（engine 是 claude/codex）。
     if engine_lc == "kimi" {
         return query_kimi_cli_status().await;
+    }
+
+    // PI 的 `openai-codex` OAuth 直接复用 Codex CLI 的 ChatGPT usage endpoint。
+    // 不能走 PI 的 base_url + api_key 路径：OAuth entry 没有 API key。
+    if engine_lc == "pi"
+        && matches!(
+            provider_profile_id,
+            None | Some("openai") | Some("openai-codex")
+        )
+    {
+        return query_pi_openai_codex_usage().await;
     }
 
     if engine_lc == "qoder" {
