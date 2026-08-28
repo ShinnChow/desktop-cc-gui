@@ -509,10 +509,12 @@ pub async fn pi_auth_set_api_key(
     )
     .await?;
     // 凭证写入改变 pi 的可用模型目录（pi 每次实时按 auth.json 过滤），
-    // 必须丢掉内存态目录缓存，否则模型选择器继续展示已变更 provider 的模型。
+    // 必须清掉内存态目录缓存，否则模型选择器继续展示已变更 provider 的模型。
+    // 只清 models 保留状态条目：detect TTL 命中路径透出全量 statuses，
+    // 缺条目会让引擎菜单在窗口期漏掉 PI。
     state
         .engine_manager
-        .invalidate_engine_status(EngineType::Pi)
+        .invalidate_engine_models(EngineType::Pi)
         .await;
     Ok(())
 }
@@ -543,7 +545,7 @@ pub async fn pi_auth_delete_credential(
     // 同 set：删除后目录按实时探测收敛，防 picker 继续展示已删 provider 的模型。
     state
         .engine_manager
-        .invalidate_engine_status(EngineType::Pi)
+        .invalidate_engine_models(EngineType::Pi)
         .await;
     Ok(())
 }

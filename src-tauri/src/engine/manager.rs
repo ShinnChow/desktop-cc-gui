@@ -733,11 +733,19 @@ impl EngineManager {
         statuses.insert(status.engine_type, status);
     }
 
-    /// Drop the cached status for an engine. Credential-mutating paths
-    /// (PI auth.json 写入/删除)用：目录随凭证实时变化，而 models 消费路径的
-    /// 内存缓存无 TTL，不失效则 picker 会继续展示已变更 provider 的模型。
-    pub async fn invalidate_engine_status(&self, engine_type: EngineType) {
-        self.engine_statuses.write().await.remove(&engine_type);
+    /// Drop the cached model catalog for an engine, keeping the status entry
+    /// itself（installed / version / auth_state 原样保留）。凭证写入路径
+    /// （PI auth.json 写入/删除）用：目录随凭证实时变化，而 models 消费路径的
+    /// 内存缓存无 TTL，不清则 picker 继续展示已变更 provider 的模型。
+    /// MUST NOT 整条删除状态：detect TTL 命中路径直接透出 get_all_statuses()，
+    /// 缺条目会让引擎菜单在窗口期漏掉该引擎；「条目在 + models 空」等价
+    /// 轻量检测常态，全部消费方均已按需回填设计。
+    pub async fn invalidate_engine_models(&self, engine_type: EngineType) {
+        let mut statuses = self.engine_statuses.write().await;
+        if let Some(status) = statuses.get_mut(&engine_type) {
+            status.models = Vec::new();
+            status.default_model = None;
+        }
     }
 
     /// Get all cached engine statuses
@@ -2050,16 +2058,31 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalidate_engine_status_drops_cached_catalog() {
+    async fn invalidate_engine_models_clears_catalog_keeps_entry() {
         let manager = Arc::new(EngineManager::new());
-        manager
-            .cache_engine_status(b3_status(EngineType::Pi, true, Some("1.0.0")))
-            .await;
-        assert!(manager.get_engine_status(EngineType::Pi).await.is_some());
+        let mut seeded = b3_status(EngineType::Pi, true, Some("1.0.0"));
+        seeded.models = vec![
+            crate::engine::ModelInfo::new("pi-model-a", "PI Model A"),
+            crate::engine::ModelInfo::new("pi-model-b", "PI Model B"),
+        ];
+        seeded.default_model = Some("pi-model-a".to_string());
+        manager.cache_engine_status(seeded).await;
+        assert!(!manager
+            .get_engine_status(EngineType::Pi)
+            .await
+            .unwrap()
+            .models
+            .is_empty());
 
-        // 凭证写入路径依赖本失效：失效后目录消费不得再命中内存缓存。
-        manager.invalidate_engine_status(EngineType::Pi).await;
-        assert!(manager.get_engine_status(EngineType::Pi).await.is_none());
+        // 凭证写入路径依赖本失效：models 必须清空（下次目录请求强制重探），
+        // 但状态条目必须保留——detect TTL 命中路径透出全量 statuses，
+        // 缺条目会让引擎菜单在窗口期漏掉该引擎。
+        manager.invalidate_engine_models(EngineType::Pi).await;
+        let status = manager.get_engine_status(EngineType::Pi).await.unwrap();
+        assert!(status.models.is_empty());
+        assert!(status.default_model.is_none());
+        assert_eq!(status.version.as_deref(), Some("1.0.0"));
+        assert!(status.installed);
     }
 
     #[tokio::test]
