@@ -10,7 +10,9 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use tokio::fs;
 use tokio::io::{AsyncBufReadExt, BufReader as AsyncBufReader};
@@ -790,6 +792,103 @@ async fn list_all_session_files(root: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
+/// F1（fix-session-load-bridge-freeze）：raw-string 返回通道。
+/// 对象图过 WKWebView 桥按对象数逐个同步转换（2140 条 / ~3MB 实测冻结主线程
+/// 6683ms）；字符串成本 O(len)。序列化在 tokio 线程，不占 UI。前端一次 parse。
+pub async fn load_pi_session_payload_json(
+    workspace_path: &Path,
+    session_id: &str,
+    home_dir: Option<&str>,
+) -> Result<String, String> {
+    let result = load_pi_session(workspace_path, session_id, home_dir).await?;
+    serde_json::to_string(&result).map_err(|error| error.to_string())
+}
+
+/// F5（fix-session-load-bridge-freeze）：session_id → 候选文件索引（按 root 分桶）。
+/// 实测 resolve 全量扫描 117 目录/227MB 与目标会话体量无关（3 条 items 也 1563ms）。
+/// 命中后仅做 exists() 校验；miss（新会话/文件被删）触发一次重建，等价旧行为。
+#[derive(Clone, Debug)]
+struct PiIndexedSessionFile {
+    path: PathBuf,
+    cwd: Option<String>,
+}
+
+#[derive(Default)]
+struct PiSessionFileIndexRoot {
+    by_session_id: HashMap<String, Vec<PiIndexedSessionFile>>,
+}
+
+static PI_SESSION_FILE_INDEX: OnceLock<Mutex<HashMap<PathBuf, PiSessionFileIndexRoot>>> =
+    OnceLock::new();
+
+fn pi_session_file_index_map() -> &'static Mutex<HashMap<PathBuf, PiSessionFileIndexRoot>> {
+    PI_SESSION_FILE_INDEX.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+async fn read_pi_session_header(file: &Path) -> Option<SessionHeader> {
+    let file_handle = fs::File::open(file).await.ok()?;
+    let mut lines = AsyncBufReader::new(file_handle).lines();
+    let first_line = lines.next_line().await.ok().flatten()?;
+    let header = serde_json::from_str::<Value>(first_line.trim())
+        .ok()
+        .and_then(|value| {
+            if value.get("type").and_then(Value::as_str) == Some("session") {
+                parse_header(&value, file)
+            } else {
+                None
+            }
+        });
+    header.or_else(|| header_from_file_name(file))
+}
+
+async fn rebuild_pi_session_file_index(root: &Path) -> Result<(), String> {
+    let files = list_all_session_files(root).await?;
+    let mut by_session_id: HashMap<String, Vec<PiIndexedSessionFile>> = HashMap::new();
+    for file in files {
+        let Some(header) = read_pi_session_header(&file).await else {
+            continue;
+        };
+        if header.session_id.is_empty() {
+            continue;
+        }
+        by_session_id
+            .entry(header.session_id)
+            .or_default()
+            .push(PiIndexedSessionFile {
+                path: file,
+                cwd: header.cwd,
+            });
+    }
+    let mut map = pi_session_file_index_map()
+        .lock()
+        .map_err(|_| "PI session file index poisoned".to_string())?;
+    map.insert(root.to_path_buf(), PiSessionFileIndexRoot { by_session_id });
+    Ok(())
+}
+
+fn pick_indexed_session_file(
+    index_map: &HashMap<PathBuf, PiSessionFileIndexRoot>,
+    root: &Path,
+    session_id: &str,
+    workspace_variants: &[String],
+    allow_cwd_mismatch_fallback: bool,
+) -> Option<PathBuf> {
+    let root_index = index_map.get(root)?;
+    let candidates = root_index.by_session_id.get(session_id)?;
+    let mut fallback: Option<&PiIndexedSessionFile> = None;
+    for candidate in candidates {
+        if let Some(cwd) = candidate.cwd.as_deref() {
+            if paths_match(cwd, workspace_variants) {
+                return Some(candidate.path.clone());
+            }
+        }
+        if allow_cwd_mismatch_fallback && fallback.is_none() {
+            fallback = Some(candidate);
+        }
+    }
+    fallback.map(|candidate| candidate.path.clone())
+}
+
 async fn resolve_session_file(
     root: &Path,
     session_id: &str,
@@ -797,42 +896,37 @@ async fn resolve_session_file(
     allow_cwd_mismatch_fallback: bool,
 ) -> Result<Option<PathBuf>, String> {
     let workspace_variants = build_workspace_path_variants(workspace_path);
-    let files = list_all_session_files(root).await?;
-    let mut fallback: Option<PathBuf> = None;
-    for file in files {
-        let file_handle = match fs::File::open(&file).await {
-            Ok(handle) => handle,
-            Err(_) => continue,
-        };
-        let mut lines = AsyncBufReader::new(file_handle).lines();
-        let first_line = lines.next_line().await.ok().flatten();
-        let header = first_line
-            .as_deref()
-            .and_then(|line| serde_json::from_str::<Value>(line.trim()).ok())
-            .and_then(|value| {
-                if value.get("type").and_then(Value::as_str) == Some("session") {
-                    parse_header(&value, &file)
-                } else {
-                    None
-                }
-            })
-            .or_else(|| header_from_file_name(&file));
-        let Some(header) = header else {
-            continue;
-        };
-        if header.session_id != session_id {
-            continue;
-        }
-        if let Some(cwd) = header.cwd.as_deref() {
-            if paths_match(cwd, &workspace_variants) {
-                return Ok(Some(file));
+    {
+        let index_map = pi_session_file_index_map()
+            .lock()
+            .map_err(|_| "PI session file index poisoned".to_string())?;
+        if let Some(path) = pick_indexed_session_file(
+            &index_map,
+            root,
+            session_id,
+            &workspace_variants,
+            allow_cwd_mismatch_fallback,
+        ) {
+            if path.exists() {
+                return Ok(Some(path));
             }
         }
-        if allow_cwd_mismatch_fallback && fallback.is_none() {
-            fallback = Some(file);
-        }
     }
-    Ok(fallback)
+    rebuild_pi_session_file_index(root).await?;
+    let index_map = pi_session_file_index_map()
+        .lock()
+        .map_err(|_| "PI session file index poisoned".to_string())?;
+    let resolved = pick_indexed_session_file(
+        &index_map,
+        root,
+        session_id,
+        &workspace_variants,
+        allow_cwd_mismatch_fallback,
+    );
+    match resolved {
+        Some(path) if path.exists() => Ok(Some(path)),
+        _ => Ok(None),
+    }
 }
 
 /// Resolve a session id to its JSONL file path (for RPC `switch_session`).
@@ -1923,6 +2017,144 @@ mod title_attachment_tests {
         .await;
         let summary = read_session_summary(&file).await.expect("summary");
         assert_eq!(summary.first_message, "[图片]");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+/// F5（fix-session-load-bridge-freeze）：resolve_session_file 内存索引。
+/// 实测 3 条 items 的 pi 会话切换也需 1563ms——每次 resolve 全量扫描 117 个
+/// 会话目录逐文件 open+read first line，与目标会话体量无关。索引按 root 分桶
+/// 缓存 session_id → 候选文件（保留扫描顺序与 cwd 匹配/fallback 语义），
+/// miss 触发一次重建（等价于旧行为），命中后不再逐文件打开。
+#[cfg(test)]
+mod session_file_index_tests {
+    use super::*;
+    use std::io::Write;
+
+    async fn write_session_file(
+        root: &std::path::Path,
+        cwd_name: &str,
+        session_id: &str,
+        cwd: &std::path::Path,
+    ) -> PathBuf {
+        let cwd_dir = root.join(cwd_name);
+        std::fs::create_dir_all(&cwd_dir).expect("mkdir");
+        let file = cwd_dir.join(format!("2026-08-28T01-00-00-000Z_{session_id}.jsonl"));
+        let mut handle = std::fs::File::create(&file).expect("create");
+        writeln!(
+            handle,
+            r#"{{"type":"session","version":3,"id":"{session_id}","timestamp":"2026-08-28T01:00:00.000Z","cwd":"{}"}}"#,
+            cwd.display()
+        )
+        .unwrap();
+        writeln!(
+            handle,
+            r#"{{"type":"message","id":"m1","timestamp":"2026-08-28T01:00:01.000Z","message":{{"role":"user","content":[{{"type":"text","text":"hi"}}]}}}}"#
+        )
+        .unwrap();
+        file
+    }
+
+    fn unique_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "pi-index-{name}-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        dir
+    }
+
+    #[tokio::test]
+    async fn resolves_repeat_lookups_via_index_and_finds_new_files() {
+        let dir = unique_dir("repeat");
+        let root = dir.join("sessions");
+        let project = dir.join("project");
+        std::fs::create_dir_all(&project).expect("mkdir project");
+        let file_a = write_session_file(&root, "--proj--", "019fe705-index-0001", &project).await;
+
+        // 首查：建索引并命中
+        let resolved = resolve_session_file(&root, "019fe705-index-0001", &project, true)
+            .await
+            .expect("resolve")
+            .expect("hit");
+        assert_eq!(resolved, file_a);
+
+        // 索引建立后新增会话文件 → miss 触发一次重建仍能找到
+        let file_b = write_session_file(&root, "--proj--", "019fe705-index-0002", &project).await;
+        let resolved_b = resolve_session_file(&root, "019fe705-index-0002", &project, true)
+            .await
+            .expect("resolve")
+            .expect("hit-new");
+        assert_eq!(resolved_b, file_b);
+
+        // 旧会话再查（索引复用路径）
+        let resolved_again = resolve_session_file(&root, "019fe705-index-0001", &project, true)
+            .await
+            .expect("resolve")
+            .expect("hit-again");
+        assert_eq!(resolved_again, file_a);
+
+        // 不存在的 id → None
+        let missing = resolve_session_file(&root, "019fe705-index-ffff", &project, true)
+            .await
+            .expect("resolve");
+        assert!(missing.is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn payload_json_channel_round_trips() {
+        let dir = unique_dir("payload-json");
+        let root = dir.join("sessions");
+        let project = dir.join("project");
+        std::fs::create_dir_all(&project).expect("mkdir project");
+        write_session_file(&root, "--proj--", "019fe705-index-json", &project).await;
+
+        let payload_json = load_pi_session_payload_json(
+            &project,
+            "019fe705-index-json",
+            Some(dir.to_string_lossy().as_ref()),
+        )
+        .await
+        .expect("payload");
+        let parsed: Value = serde_json::from_str(&payload_json).expect("parse");
+        let messages = parsed
+            .get("messages")
+            .and_then(Value::as_array)
+            .expect("messages array");
+        assert_eq!(messages.len(), 1); // 单条 user message 投影
+                                       // fixture 无 usage 条目：skip_serializing_if 下该字段缺省
+        let usage = parsed.get("usage");
+        assert!(usage.is_none() || usage.unwrap().is_object());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn fallback_semantics_preserved_with_index() {
+        let dir = unique_dir("fallback");
+        let root = dir.join("sessions");
+        let other_project = dir.join("other-project");
+        std::fs::create_dir_all(&other_project).expect("mkdir");
+        let file =
+            write_session_file(&root, "--drifted--", "019fe705-index-drift", &other_project).await;
+        let workspace = dir.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("mkdir ws");
+
+        // allow=true：cwd 漂移时返回 fallback 文件
+        let with_fallback = resolve_session_file(&root, "019fe705-index-drift", &workspace, true)
+            .await
+            .expect("resolve")
+            .expect("fallback");
+        assert_eq!(with_fallback, file);
+
+        // allow=false：cwd 不匹配即 None
+        let strict = resolve_session_file(&root, "019fe705-index-drift", &workspace, false)
+            .await
+            .expect("resolve");
+        assert!(strict.is_none());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

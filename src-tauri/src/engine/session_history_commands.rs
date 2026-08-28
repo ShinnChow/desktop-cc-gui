@@ -467,26 +467,32 @@ pub async fn load_pi_session(
     session_id: String,
     state: State<'_, AppState>,
     app: AppHandle,
-) -> Result<Value, String> {
+) -> Result<String, String> {
+    // F1（fix-session-load-bridge-freeze）：raw-string 通道，载荷以单一 JSON
+    // 字符串过桥，避免嵌套对象图被 WKWebView 桥逐对象同步转换（实测冻结主线程）。
     if remote_backend::is_remote_mode(&*state).await {
         let workspace_path = remote_backend::normalize_path_for_remote(workspace_path);
-        return remote_backend::call_remote(
+        let value = remote_backend::call_remote(
             &*state,
             app,
             "load_pi_session",
             json!({ "workspacePath": workspace_path, "sessionId": session_id }),
         )
-        .await;
+        .await?;
+        // remote 可能返回旧形态对象图：统一归一为 JSON 字符串
+        return match value {
+            Value::String(text) => Ok(text),
+            other => serde_json::to_string(&other).map_err(|error| error.to_string()),
+        };
     }
     let path = std::path::PathBuf::from(&workspace_path);
     let config = state.engine_manager.get_engine_config(EngineType::Pi).await;
-    let result = super::pi_history::load_pi_session(
+    super::pi_history::load_pi_session_payload_json(
         &path,
         &session_id,
         config.as_ref().and_then(|item| item.home_dir.as_deref()),
     )
-    .await?;
-    serde_json::to_value(result).map_err(|error| error.to_string())
+    .await
 }
 
 #[tauri::command]

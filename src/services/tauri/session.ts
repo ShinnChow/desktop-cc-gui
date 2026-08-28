@@ -423,10 +423,20 @@ export async function loadPiSession(
   workspacePath: string,
   sessionId: string,
 ): Promise<Record<string, unknown> | null> {
-  return invoke<Record<string, unknown> | null>("load_pi_session", {
-    workspacePath,
-    sessionId,
-  });
+  // F1（fix-session-load-bridge-freeze）：载荷以单一 JSON string 过桥
+  // （对象图逐个同步转换实测冻结主线程 6683ms）；remote/legacy 的对象图
+  // 形态直接透传兼容。非法 JSON 抛错走既有恢复路径。
+  const payload = await invoke<string | Record<string, unknown> | null>(
+    "load_pi_session",
+    {
+      workspacePath,
+      sessionId,
+    },
+  );
+  if (payload == null || typeof payload !== "string") {
+    return payload;
+  }
+  return JSON.parse(payload) as Record<string, unknown>;
 }
 
 export async function deletePiSession(
