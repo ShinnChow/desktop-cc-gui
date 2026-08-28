@@ -295,10 +295,79 @@ export function classifyFastMarkdownWorkerRuntimeError(
 
 function handleWorkerError(event: ErrorEvent) {
   const message = event.message || "Fast Markdown worker failed";
-  disposeBrokenWorker(new Error(message));
+  const errorName =
+    event.error instanceof Error && event.error.name
+      ? event.error.name
+      : "Error";
+  // F3（fix-session-switch-jank-red-lines）：error 事件≠worker 已死（引擎语义上未捕获
+  // 异常不终止 DedicatedWorker）。空闲期（无在途请求）错误先探活，存活则保留 worker，
+  // 避免「同一句错误 → 处决 → 重建 → 同一句错误」的重建循环（实测同指纹一天 4 次）。
+  // 在途期间错误无法归因来源，维持既有处决语义。
+  if (pendingRequests.size === 0 && sharedWorker && !healthProbeInFlight) {
+    void probeWorkerHealthAfterIdleError(errorName, message);
+    return;
+  }
+  disposeBrokenWorker(new Error(message), errorName);
 }
 
-function disposeBrokenWorker(error: Error) {
+const WORKER_HEALTH_PROBE_TIMEOUT_MS = 2_000;
+const WORKER_HEALTH_PROBE_ARGS = {
+  documentKey: "doc-health-probe",
+  rawMarkdown: "# probe",
+  rendererProfile: "fast-html" as const,
+  featureFlags: {
+    fastHtmlRendererEnabled: true,
+    boundedFastHtmlRendererEnabled: false,
+  },
+};
+let healthProbeInFlight = false;
+
+async function probeWorkerHealthAfterIdleError(
+  errorName: string,
+  message: string,
+): Promise<void> {
+  const workerAtProbeStart = sharedWorker;
+  if (!workerAtProbeStart) {
+    return;
+  }
+  healthProbeInFlight = true;
+  try {
+    await precomputeFastMarkdownInWorker(WORKER_HEALTH_PROBE_ARGS, {
+      timeoutMs: WORKER_HEALTH_PROBE_TIMEOUT_MS,
+    });
+  } catch {
+    // 探活失败/超时：worker 真不可用，走既有 dispose + 退避。
+    healthProbeInFlight = false;
+    if (sharedWorker === workerAtProbeStart) {
+      disposeBrokenWorker(
+        new Error(message || "Fast Markdown worker health probe failed"),
+        errorName,
+      );
+    }
+    return;
+  }
+  healthProbeInFlight = false;
+  if (sharedWorker !== workerAtProbeStart) {
+    return;
+  }
+  // 探活成功：worker 存活，保留服务；成功响应已顺带清零崩溃计数。
+  workerDiagnostics.recordFallback("worker-error-kept-alive");
+  persistWorkerFailureDiagnostic(
+    "worker-error-kept-alive",
+    classifyFastMarkdownWorkerRuntimeError(message),
+    buildWorkerErrorFingerprint(errorName, message),
+  );
+}
+
+function buildWorkerErrorFingerprint(errorName: string, message: string) {
+  return {
+    errorName,
+    messageHash: hashStableString(message).slice(0, 16),
+    messageLength: message.length,
+  };
+}
+
+function disposeBrokenWorker(error: Error, errorName?: string) {
   if (sharedWorker) {
     sharedWorker.terminate();
   }
@@ -321,10 +390,7 @@ function disposeBrokenWorker(error: Error) {
   persistWorkerFailureDiagnostic(
     "worker-runtime-error",
     classifyFastMarkdownWorkerRuntimeError(message),
-    {
-      messageHash: hashStableString(message).slice(0, 16),
-      messageLength: message.length,
-    },
+    buildWorkerErrorFingerprint(errorName ?? "Error", message),
   );
 }
 

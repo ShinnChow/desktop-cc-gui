@@ -15,6 +15,7 @@ vi.mock("../../../../services/rendererDiagnostics", () => ({
 type WorkerListener = (event: {
   type: string;
   message?: string;
+  error?: unknown;
   data?: unknown;
 }) => void;
 
@@ -46,7 +47,7 @@ class FakeWorker {
 
   dispatch(
     type: "error" | "message",
-    event: { message?: string; data?: unknown },
+    event: { message?: string; error?: unknown; data?: unknown },
   ) {
     for (const listener of this.listeners.get(type) ?? []) {
       listener({ type, ...event });
@@ -64,8 +65,10 @@ const compileArgs = {
   },
 };
 
-function buildValidArtifact(): FastMarkdownUnsafeArtifact {
-  const identity = createFastMarkdownCompileIdentity(compileArgs);
+function buildValidArtifactFor(
+  args: typeof compileArgs,
+): FastMarkdownUnsafeArtifact {
+  const identity = createFastMarkdownCompileIdentity(args);
   return {
     cacheKey: identity.cacheKey,
     contentHash: identity.contentHash,
@@ -167,7 +170,7 @@ describe("fast markdown worker crash backoff", () => {
       data: {
         type: "fast-markdown-result",
         requestId: latestWorker().lastRequest?.requestId,
-        result: buildValidArtifact(),
+        result: buildValidArtifactFor(compileArgs),
       },
     });
     await expect(success).resolves.toBeDefined();
@@ -242,4 +245,99 @@ describe("fast markdown worker crash backoff", () => {
       }),
     );
   });
+
+  it("crash diagnostics carry the errorName class", async () => {
+    const first = precomputeFastMarkdownInWorker(compileArgs);
+    latestWorker().dispatch("error", {
+      message: "boom",
+      error: new TypeError("boom"),
+    });
+    await expect(first).rejects.toThrow();
+
+    expect(appendRendererDiagnostic).toHaveBeenCalledWith(
+      "fast-markdown-worker/failed",
+      expect.objectContaining({
+        reasonCode: "worker-runtime-error",
+        errorName: "TypeError",
+      }),
+    );
+  });
+
+  it("keeps the worker alive when an idle error passes the health probe", async () => {
+    // 先建立 worker 并成功响应，进入空闲健康态
+    const initial = precomputeFastMarkdownInWorker(compileArgs);
+    respondToLatestRequest(compileArgs);
+    await expect(initial).resolves.toBeDefined();
+
+    // 空闲期 error（无在途请求）：应探活而非处决
+    latestWorker().dispatch("error", {
+      message: "Uncaught TypeError: x is undefined",
+      error: new TypeError("x is undefined"),
+    });
+
+    // 探活请求已发出（documentKey 为探活专用 key）
+    const probeRequest = latestWorker().lastRequest;
+    expect(probeRequest?.requestId).toContain("doc-health-probe");
+    respondToLatestRequest(probeArgs);
+    // 探活成功路径在微任务里收尾
+    await vi.waitFor(() => {
+      expect(appendRendererDiagnostic).toHaveBeenCalledWith(
+        "fast-markdown-worker/failed",
+        expect.objectContaining({
+          reasonCode: "worker-error-kept-alive",
+          errorName: "TypeError",
+        }),
+      );
+    });
+
+    expect(latestWorker().terminated).toBe(false);
+
+    // 后续请求仍由同一 worker 服务
+    const next = precomputeFastMarkdownInWorker(compileArgs);
+    expect(next).not.toBeNull();
+    expect(FakeWorker.instances).toHaveLength(1);
+    next?.catch(() => {
+      // afterEach dispose 会 reject 未 settle 的请求，吞掉避免 unhandled rejection。
+    });
+  });
+
+  it("disposes the worker when the idle-error health probe times out", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const initial = precomputeFastMarkdownInWorker(compileArgs);
+    respondToLatestRequest(compileArgs);
+    await expect(initial).resolves.toBeDefined();
+
+    latestWorker().dispatch("error", { message: "worker truly gone" });
+
+    // 探活请求无人应答 → 2s 超时 → 按既有语义 dispose（首崩无退避）
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(latestWorker().terminated).toBe(true);
+    const next = precomputeFastMarkdownInWorker(compileArgs);
+    expect(next).not.toBeNull();
+    expect(FakeWorker.instances).toHaveLength(2);
+    next?.catch(() => {
+      // afterEach dispose 会 reject 未 settle 的请求，吞掉避免 unhandled rejection。
+    });
+  });
 });
+
+const probeArgs = {
+  documentKey: "doc-health-probe",
+  rawMarkdown: "# probe",
+  rendererProfile: "fast-html" as const,
+  featureFlags: {
+    fastHtmlRendererEnabled: true,
+    boundedFastHtmlRendererEnabled: false,
+  },
+};
+
+function respondToLatestRequest(args: typeof compileArgs) {
+  latestWorker().dispatch("message", {
+    data: {
+      type: "fast-markdown-result",
+      requestId: latestWorker().lastRequest?.requestId,
+      result: buildValidArtifactFor(args),
+    },
+  });
+}
