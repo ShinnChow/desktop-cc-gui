@@ -57,7 +57,9 @@ let lastWorstPersistAt = Number.NEGATIVE_INFINITY;
 function noteWorstFrameDrop(deltaMs: number, at: number): void {
   const entry: WorstFrameDropEntry = {
     deltaMs: Math.round(deltaMs),
-    at: Math.round(at),
+    // fix-diagnostics-forensics-hardening：epoch 毫秒（此前误用 performance.now
+    // 相对值，落盘后无法对钟点）。
+    at: Date.now(),
     hotspots: getRecentHotspotSummary(Math.min(3_000, deltaMs + 600)),
   };
   const insertAt = worstFrameDrops.findIndex(
@@ -77,10 +79,15 @@ function noteWorstFrameDrop(deltaMs: number, at: number): void {
   if (at - lastWorstPersistAt >= WORST_FRAME_DROPS_PERSIST_INTERVAL_MS) {
     lastWorstPersistAt = at;
     appendRendererDiagnostic("perf.frame-drop-worst", {
+      // hotspots 扁平化为字符串数组（depth 3）：嵌套对象在第 4 层会被
+      // MAX_DIAGNOSTIC_PAYLOAD_DEPTH 截成 "[truncated]"，磁盘版归因全丢。
       entries: worstFrameDrops.map((worst) => ({
         deltaMs: worst.deltaMs,
         at: worst.at,
-        hotspots: worst.hotspots,
+        hotspots: worst.hotspots.map(
+          (row) =>
+            `${row.category}=${row.totalMs}ms(max ${row.maxMs}${row.maxDetail ? ` ${row.maxDetail}` : ""})x${row.count}`,
+        ),
       })),
     });
   }

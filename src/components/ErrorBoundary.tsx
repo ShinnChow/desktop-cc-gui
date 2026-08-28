@@ -9,6 +9,7 @@ import {
   appendRendererDiagnostic,
   buildDiagnosticComponentFrames,
   buildDiagnosticErrorAttribution,
+  countDiagnosticStackLines,
 } from "../services/rendererDiagnostics";
 import { recoverFromReactScanUpdateDepthError } from "../services/reactScanController";
 import {
@@ -115,12 +116,16 @@ export class ErrorBoundary extends Component<
     const componentFrames = buildDiagnosticComponentFrames(
       errorInfo.componentStack,
     );
+    const componentStackLineCount = countDiagnosticStackLines(
+      errorInfo.componentStack,
+    );
     if (reactScanRecoveryStatus === "recovered") {
       appendRendererDiagnostic("react/error-boundary-react-scan-recovery", {
         errorClass: "maximum-update-depth",
         componentStack: errorInfo.componentStack || null,
         ...attribution,
         componentFrames,
+        componentStackLineCount,
       });
       return;
     }
@@ -130,6 +135,7 @@ export class ErrorBoundary extends Component<
         componentStack: errorInfo.componentStack || null,
         ...attribution,
         componentFrames,
+        componentStackLineCount,
       });
     }
     this.setState({ errorInfo, copyStatus: "idle" });
@@ -139,6 +145,7 @@ export class ErrorBoundary extends Component<
       componentStack: errorInfo.componentStack || null,
       ...attribution,
       componentFrames,
+      componentStackLineCount,
     });
     console.error("[ErrorBoundary] Uncaught rendering error:", error, errorInfo);
   }

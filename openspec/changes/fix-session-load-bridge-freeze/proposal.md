@@ -19,7 +19,7 @@
 2. **全量加载与渲染窗口脱节**：渲染只需尾部 300 条（tail-first 首屏 + 500/页按需 prepend），但 load 无窗口参数，全量 2140 条（3MB）全部过桥、全部前端组装（`hydrateHistory` → `prepareThreadItems` 全量遍历）。claude 引擎已有 `limit/before` 窗口参数（`load_claude_session` options），pi/gemini 无。
 3. **次要成本**：前端 `piHistoryParser`（224 行）+ reducer 全量 merge——在桥冻结消除后占比会浮出，但先例证明字符串 `JSON.parse`（V8，3MB 约 10~30ms）+ 结构体数组组装远小于对象图转换。
 
-旁证：同轮测试 281/261 条会话切换也需 1276~1581ms（中会话仍有数百 KB~1MB 级对象图过桥 + 固定底座）；上午生产日志大会话切换时 366/395ms 掉帧与之相符。
+旁证：同轮测试 281/261 条会话切换也需 1276~1581ms（中会话仍有数百 KB~1MB 级对象图过桥 + 固定底座）；上午生产日志大会话切换时 366/395ms 掉帧与之相符。追加实测（15:19–18:01 轮）：**3 条 items 的 pi 会话切换也需 1563ms**——存在与体量无关的固定链路成本（嫌疑 `resolve_session_file` 全目录扫描），F1 只救大头，固定成本另立调查（tasks 3.5）。
 
 ## What Changes
 

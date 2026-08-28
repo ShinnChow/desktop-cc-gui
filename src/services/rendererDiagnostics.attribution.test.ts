@@ -91,6 +91,65 @@ describe("崩溃取证结构化字段", () => {
     expect(frames[0]).toBe("Component0");
   });
 
+  it("F1: 匿名组件帧解析为 anonymous 而非丢弃（dev/生产两种格式）", () => {
+    // 真机 2026-08-28：7/7 次 error-boundary frames=[] —— 无 displayName 组件树
+    // 输出 `at <anonymous>`，尖括号 token 被旧正则丢弃，整条归因失效。
+    expect(
+      buildDiagnosticComponentFrames(
+        "\n    at <anonymous> (http://localhost:5173/src/app.tsx:64:23)\n    at <anonymous> (<anonymous>)\n    at AppShell",
+      ),
+    ).toEqual(["anonymous", "anonymous", "AppShell"]);
+    expect(
+      buildDiagnosticComponentFrames("\n    at <anonymous>\n    at <wrapper>"),
+    ).toEqual(["anonymous", "anonymous"]);
+  });
+
+  it("F1: componentStackLineCount 计数过 sanitize 存活", () => {
+    appendRendererDiagnostic("react/error-boundary", {
+      error: "Error: boom",
+      errorClass: "Error",
+      componentStack: "\n    at <anonymous>\n    at <anonymous>",
+      errorName: "Error",
+      messageHash: "abc",
+      messageLength: 10,
+      componentFrames: ["anonymous", "anonymous"],
+      componentStackLineCount: 2,
+    });
+
+    const payload = persistedEntries().find(
+      (entry) => entry.label === "react/error-boundary",
+    )?.payload;
+    expect(payload?.componentStackLineCount).toBe(2);
+  });
+
+  it("F3: window/error 的 sourceModule/Line/Col 过 sanitize 存活，filename 仍脱敏", () => {
+    appendRendererDiagnostic("window/error", {
+      message: "Uncaught Error: mystery",
+      filename: "http://localhost:5173/src/features/markdown/dep.ts",
+      lineno: 64,
+      colno: 23,
+      errorName: "Error",
+      messageHash: "1wt84ny",
+      messageLength: 45,
+      sourceModule: "dep.ts",
+      sourceLine: 64,
+      sourceCol: 23,
+    });
+
+    const payload = persistedEntries().find(
+      (entry) => entry.label === "window/error",
+    )?.payload;
+    expect(payload).toMatchObject({
+      sourceModule: "dep.ts",
+      sourceLine: 64,
+      sourceCol: 23,
+      lineno: 64,
+      colno: 23,
+    });
+    expect(payload?.filename).toBe("[redacted]");
+    expect(payload?.message).toBe("[redacted]");
+  });
+
   it("error-boundary 结构化字段过持久化 sanitize 后存活，本体仍脱敏", () => {
     appendRendererDiagnostic("react/error-boundary", {
       error: "TypeError: boom at user context",
@@ -102,9 +161,9 @@ describe("崩溃取证结构化字段", () => {
       componentFrames: ["TimelineRowRenderer", "Messages"],
     });
 
-    const payload = persistedEntries().find(
-      (entry) => entry.label === "react/error-boundary",
-    )?.payload;
+    const payload = [...persistedEntries()]
+      .reverse()
+      .find((entry) => entry.label === "react/error-boundary")?.payload;
     expect(payload).toBeDefined();
     expect(payload).toMatchObject({
       errorName: "TypeError",
@@ -128,9 +187,9 @@ describe("崩溃取证结构化字段", () => {
       messageLength: 24,
     });
 
-    const payload = persistedEntries().find(
-      (entry) => entry.label === "window/error",
-    )?.payload;
+    const payload = [...persistedEntries()]
+      .reverse()
+      .find((entry) => entry.label === "window/error")?.payload;
     expect(payload).toMatchObject({
       errorName: "TypeError",
       messageHash: "abc123",

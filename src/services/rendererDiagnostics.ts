@@ -429,6 +429,38 @@ export function buildDiagnosticErrorAttribution(
 
 const MAX_DIAGNOSTIC_COMPONENT_FRAMES = 12;
 
+/** fix-diagnostics-forensics-hardening：stack 行数计数（区分 stack 为空与格式不匹配）。 */
+/** 抛错位置证据：模块 basename + 行列（filename 本体仍脱敏，不落完整 URL）。 */
+export function buildDiagnosticSourceLocation(
+  filename: string | null | undefined,
+  line: number | null | undefined,
+  column: number | null | undefined,
+): { sourceModule: string | null; sourceLine: number | null; sourceCol: number | null } {
+  let sourceModule: string | null = null;
+  if (typeof filename === "string" && filename.trim().length > 0) {
+    const withoutQuery = filename.split("?")[0] ?? "";
+    const segments = withoutQuery.split("/").filter(Boolean);
+    sourceModule = clipDiagnosticString(segments[segments.length - 1] ?? "", 64) || null;
+  }
+  return {
+    sourceModule,
+    sourceLine: typeof line === "number" && Number.isFinite(line) ? line : null,
+    sourceCol:
+      typeof column === "number" && Number.isFinite(column) ? column : null,
+  };
+}
+
+export function countDiagnosticStackLines(
+  componentStack: string | null | undefined,
+): number {
+  if (!componentStack || typeof componentStack !== "string") {
+    return 0;
+  }
+  return componentStack
+    .split("\n")
+    .filter((line) => line.trim().length > 0).length;
+}
+
 /**
  * componentStack → 组件名数组（≤12 帧、每帧 clip 32）。组件名是代码标识符、
  * 不含用户内容，字段名 `componentFrames` 避开内容 token，sanitize 后存活。
@@ -440,10 +472,14 @@ export function buildDiagnosticComponentFrames(
     return [];
   }
   const frames: string[] = [];
-  const framePattern = /\bat\s+([A-Za-z0-9_$]+)/g;
+  // fix-diagnostics-forensics-hardening：无 displayName 组件输出 `at <anonymous>`
+  // （尖括号 token），旧正则整帧丢弃——真机 7/7 次 error-boundary frames=[] 即此。
+  // 命名帧与匿名帧都收，匿名统一记 "anonymous"。
+  const framePattern = /\bat\s+(?:<([A-Za-z0-9_$-]+)>|([A-Za-z0-9_$]+))/g;
   let match: RegExpExecArray | null;
   while ((match = framePattern.exec(componentStack)) !== null) {
-    frames.push(clipDiagnosticString(match[1] ?? "", 32));
+    const frameName = match[1] !== undefined ? "anonymous" : match[2];
+    frames.push(clipDiagnosticString(frameName ?? "", 32));
     if (frames.length >= MAX_DIAGNOSTIC_COMPONENT_FRAMES) {
       break;
     }
@@ -1804,6 +1840,8 @@ export function installRendererLifecycleDiagnostics() {
         error: formatUnknown(event.error),
         // F2（enhance-perf-diagnostics-evidence）：结构化归因（文本本体仍脱敏）
         ...buildDiagnosticErrorAttribution(event.error ?? event.message),
+        // fix-diagnostics-forensics-hardening：抛错模块定位（basename 无用户内容）
+        ...buildDiagnosticSourceLocation(event.filename, event.lineno, event.colno),
       }),
     );
   });  window.addEventListener("unhandledrejection", (event) => {

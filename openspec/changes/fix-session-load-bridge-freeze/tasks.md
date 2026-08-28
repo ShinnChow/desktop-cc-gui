@@ -21,6 +21,11 @@
 - [ ] 3.1 gemini/dsh 载荷形态实测（找最大会话文件体积）→ 同款改法排期。
 - [ ] 3.2 claude（已有 limit）/codex 按实测决定是否跟进。
 
+## 3.5 F5 pi 固定链路成本调查（2026-08-28 真机新证据补入）
+
+- [ ] 5.1 实测：3 条 items 的 pi 会话切换也需 1563ms（perf.thread-switch 17:32:15）——与体量无关的固定成本；嫌疑 `resolve_session_file`（全 sessions 目录扫描）与 pi loader 固定往返。TDD：为 resolve 路径加计时/缓存断言。
+- [ ] 5.2 若证实目录扫描：会话文件 resolve 加内存索引（session_id → path 直查），对齐 2026-08-27 complete-native-sidebar-session-index 方向。
+
 ## 收口
 
 - [ ] 4.1 `openspec validate --strict`；索引更新；A4 真机数据回填 tasks。

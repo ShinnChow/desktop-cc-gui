@@ -120,6 +120,32 @@ describe("worst-K 掉帧持久环（perf.frame-drop-worst）", () => {
     expect(entries.length).toBeLessThanOrEqual(10);
   });
 
+  it("F2: worst-K 持久条目热点为扁平字符串且 at 为 epoch", () => {
+    recordHotspotSample("react-commit", 214, "70 update");
+    tickTo(0);
+    tickTo(300);
+
+    const worstCall = rendererDiagnosticsMocks.appendRendererDiagnostic.mock.calls
+      .find(([label]) => label === "perf.frame-drop-worst");
+    expect(worstCall).toBeTruthy();
+    const payload = worstCall?.[1] as {
+      entries: Array<{
+        at: number;
+        hotspots: unknown[];
+      }>;
+    };
+    const entry = payload.entries[payload.entries.length - 1];
+    expect(entry.at).toBeGreaterThan(1e12); // epoch 毫秒，可直接对钟点
+    expect(entry.hotspots).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("react-commit=214ms"),
+      ]),
+    );
+    for (const hotspot of entry.hotspots) {
+      expect(typeof hotspot).toBe("string");
+    }
+  });
+
   it("top-10 外的小掉帧不触发持久", () => {
     tickTo(0);
     // 用 10 次 300ms 掉帧填满环（每次 tick 间隔 300ms → delta 恒为 300；

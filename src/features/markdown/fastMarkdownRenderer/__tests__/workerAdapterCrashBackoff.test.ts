@@ -8,7 +8,10 @@ import {
 } from "../workerAdapter";
 import type { FastMarkdownUnsafeArtifact } from "../types";
 
-vi.mock("../../../../services/rendererDiagnostics", () => ({
+vi.mock("../../../../services/rendererDiagnostics", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../../services/rendererDiagnostics")
+  >()),
   appendRendererDiagnostic: vi.fn(),
 }));
 
@@ -16,6 +19,9 @@ type WorkerListener = (event: {
   type: string;
   message?: string;
   error?: unknown;
+  filename?: string;
+  lineno?: number;
+  colno?: number;
   data?: unknown;
 }) => void;
 
@@ -47,7 +53,14 @@ class FakeWorker {
 
   dispatch(
     type: "error" | "message",
-    event: { message?: string; error?: unknown; data?: unknown },
+    event: {
+      message?: string;
+      error?: unknown;
+      filename?: string;
+      lineno?: number;
+      colno?: number;
+      data?: unknown;
+    },
   ) {
     for (const listener of this.listeners.get(type) ?? []) {
       listener({ type, ...event });
@@ -242,6 +255,27 @@ describe("fast markdown worker crash backoff", () => {
         reasonCode: "worker-runtime-error",
         messageHash: expect.stringMatching(/^[a-z0-9]{1,16}$/i),
         messageLength: "Uncaught ReferenceError: boom is not defined".length,
+      }),
+    );
+  });
+
+  it("F3: crash diagnostics carry the throwing module location", async () => {
+    const first = precomputeFastMarkdownInWorker(compileArgs);
+    latestWorker().dispatch("error", {
+      message: "boom",
+      filename: "http://localhost:5173/src/features/markdown/dep.ts?t=1",
+      lineno: 64,
+      colno: 23,
+      error: new Error("boom"),
+    });
+    await expect(first).rejects.toThrow();
+
+    expect(appendRendererDiagnostic).toHaveBeenCalledWith(
+      "fast-markdown-worker/failed",
+      expect.objectContaining({
+        sourceModule: "dep.ts",
+        sourceLine: 64,
+        sourceCol: 23,
       }),
     );
   });
