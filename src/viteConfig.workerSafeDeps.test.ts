@@ -29,6 +29,52 @@ describe("worker 不安全依赖强制离线构建", () => {
     expect(offlineSource).not.toContain("createElement");
   });
 
+  it("F6 后续: hast-util-from-html-isomorphic 同样强制离线入口（DOMParser 在 worker 不存在）", async () => {
+    // 真机 2026-08-28 20:54:58：decode 修复后下层暴露第二处——
+    // rehype-katex 预打包产物内联的 lib/browser.js 顶层 new DOMParser()
+    // → ReferenceError（rehype-katex.js:119），worker 崩溃回退主线程。
+    const configSource = readFileSync(
+      path.resolve(__dirname, "../vite.config.ts"),
+      "utf8",
+    );
+    expect(configSource).toMatch(
+      /"hast-util-from-html-isomorphic":\s*path\.resolve\(\s*__dirname,\s*"node_modules\/hast-util-from-html-isomorphic\/index\.js"/,
+    );
+    // 预打包（optimizeDeps esbuild）同样强制：dev worker 实际加载预打包产物
+    expect(configSource).toMatch(
+      /esbuildOptions[\s\S]*?"hast-util-from-html-isomorphic"/,
+    );
+    expect(configSource).toMatch(
+      /esbuildOptions[\s\S]*?"decode-named-character-reference"/,
+    );
+
+    const workerEntry = path.join(
+      packageRoot.replace("decode-named-character-reference", "hast-util-from-html-isomorphic"),
+      "index.js",
+    );
+    const workerSafeSource = readFileSync(workerEntry, "utf8");
+    expect(workerSafeSource).not.toContain("new DOMParser");
+  });
+
+  it("离线构建在无 DOMParser/document 的 worker 环境求值并可用", async () => {
+    vi.stubGlobal("document", undefined);
+    vi.stubGlobal("window", undefined);
+    vi.stubGlobal("DOMParser", undefined);
+    vi.resetModules();
+    try {
+      const module = await import(offlineEntry + "?worker-safe-probe");
+      const decoded = (
+        module as {
+          decodeNamedCharacterReference: (value: string) => string | null;
+        }
+      ).decodeNamedCharacterReference("amp");
+      expect(decoded).toBe("&");
+    } finally {
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    }
+  });
+
   it("离线构建在无 document 的 worker 环境求值并可用", async () => {
     // 模拟 worker：无 document/window；若模块顶层触碰 DOM 将在此抛错
     vi.stubGlobal("document", undefined);

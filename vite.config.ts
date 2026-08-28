@@ -61,6 +61,13 @@ export default defineConfig(({ command }) => ({
         __dirname,
         "node_modules/decode-named-character-reference/index.js",
       ),
+      // F6 后续：同款问题第二处——lib/browser.js 顶层 new DOMParser()
+      // （真机 rehype-katex.js:119 ReferenceError）。worker 条件入口 index.js
+      // 走 parse5 路径（纯 JS），主线程/worker/dev/build 全栈一致。
+      "hast-util-from-html-isomorphic": path.resolve(
+        __dirname,
+        "node_modules/hast-util-from-html-isomorphic/index.js",
+      ),
     },
     dedupe: [
       "@codemirror/state",
@@ -73,6 +80,17 @@ export default defineConfig(({ command }) => ({
     ],
   },
   optimizeDeps: {
+    esbuildOptions: {
+      alias: {
+        // fix-session-load-bridge-freeze（Phase C）：worker 不安全条件包在
+        // 预打包层强制离线/worker 入口（browser 条件的 dom.js/browser.js
+        // 顶层访问 document/DOMParser，worker 求值即崩）。
+        "decode-named-character-reference":
+          "./node_modules/decode-named-character-reference/index.js",
+        "hast-util-from-html-isomorphic":
+          "./node_modules/hast-util-from-html-isomorphic/index.js",
+      },
+    },
     include: [
       // vendored TokenTracker 页面（usage / skills）全部经 React.lazy 异步
       // 加载，vite 的 entry 扫描发现不了这些只出现在 lazy chunk 里的依赖；
