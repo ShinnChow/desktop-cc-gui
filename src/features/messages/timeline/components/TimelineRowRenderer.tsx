@@ -30,8 +30,6 @@ import {
 } from "../projection/messagesTimelineProjection";
 import type { TimelineRowHydrationState } from "../virtualization/messagesTimelineHydration";
 import { useTimelineMessageNodeRefs } from "../hooks/useTimelineMessageNodeRefs";
-import { usePiForkFlow } from "../../../pi-session/components/PiForkDialog";
-import { setComposerDraft } from "../../../composer/hooks/composerDraftStore";
 import { resolveTimelineLiveRenderItem } from "../presentation/messagesTimelineLiveRender";
 import { resolveTimelineLightweightRowSummary } from "../presentation/messagesTimelineLightweightRow";
 import {
@@ -161,22 +159,6 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
   } = presentation;
   const { approvalNode, userInputNode } = slots;
   const { t } = useTranslation();
-  // PI RPC fork：气泡 ⑂ 入口（beginForkWithQuote 引用稳定，可入行缓存；
-  // dialog 渲染在缓存外的行 Fragment 里，portal 挂载）。
-  const { beginForkWithQuote, forkDialog: piForkDialog } = usePiForkFlow({
-    workspaceId: workspaceId ?? "",
-    threadId: threadId ?? "",
-    onForked: (forkedText, forkedSessionId) => {
-      // fork-then-switch-back：源 thread 不动，草稿写入新会话的输入框；
-      // 拿不到 forkedSessionId 时退化到当前 thread（不丢文本）。
-      const targetThreadId = forkedSessionId
-        ? `pi:${forkedSessionId}`
-        : threadId;
-      if (targetThreadId) {
-        setComposerDraft(targetThreadId, forkedText);
-      }
-    },
-  });
   const messageNodeRefs = useTimelineMessageNodeRefs({
     agentTaskNodeByTaskIdRef,
     agentTaskNodeByToolUseIdRef,
@@ -382,16 +364,6 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
             className="message-action-bar message-user-bubble-actions"
             aria-label={t("messages.messageActions")}
           >
-            {activeEngine === "pi" && !threadId?.startsWith("shared:") ? ( // capability-router-allow-engine-branch: pi-only 气泡分叉按钮（shared 会话不泄露）, 见 enhance-pi-native-rpc-session
-              <TooltipIconButton
-                className="ghost message-action-button pi-fork-action"
-                onClick={() => beginForkWithQuote(userCopyText)}
-                label={t("piSession.fork.title")}
-                tooltipSide="top"
-              >
-                <GitBranch className="message-action-icon" size={12} />
-              </TooltipIconButton>
-            ) : null}
             <TooltipIconButton
               className={`ghost message-action-button message-copy-button${isCopied ? " is-copied" : ""}`}
               onClick={() => handleCopyMessage(renderItem, userCopyText)}
@@ -498,7 +470,6 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
               ) : null}
             </div>
           )}
-          {piForkDialog}
         </Fragment>
       );
     }
