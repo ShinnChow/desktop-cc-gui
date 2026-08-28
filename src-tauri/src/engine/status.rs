@@ -13,7 +13,10 @@ use tokio::time::timeout;
 use super::pi_rpc::PiRpcClient;
 use super::{disabled_engine_status, EngineFeatures, EngineStatus, EngineType, ModelInfo};
 use crate::app_paths;
-use crate::backend::app_server::{build_codex_path_env, find_claude_code_binary, find_cli_binary};
+use crate::backend::app_server::{
+    build_codex_path_env, claude_cached_version_text, find_claude_code_binary, find_cli_binary,
+    invalidate_environment_resolution_caches,
+};
 use crate::backend::app_server_cli::resolve_safe_opencode_binary;
 
 /// Timeout for CLI commands
@@ -684,8 +687,13 @@ pub async fn detect_claude_status(custom_bin: Option<&str>) -> EngineStatus {
         .unwrap_or_else(|| "claude".to_string());
     let path_env = build_codex_path_env(custom_bin);
 
-    let (mut installed, mut version, mut error) =
-        probe_cli_version(&bin, "claude", path_env.as_ref()).await;
+    // B2 版本去重：find_claude_code_binary 的候选验证已 spawn 过 `claude
+    // --version`（结果在进程级 memo），同轮检测直接复用，不再二次探测。
+    let memoized_version = bin_path.as_deref().and_then(claude_cached_version_text);
+    let (mut installed, mut version, mut error) = match memoized_version {
+        Some(text) => (true, Some(text), None),
+        None => probe_cli_version(&bin, "claude", path_env.as_ref()).await,
+    };
 
     if !installed && probe_cli_help(&bin, path_env.as_ref()).await {
         installed = true;
@@ -2598,7 +2606,7 @@ pub async fn detect_all_engines_scoped(
         dsh_status,
     );
 
-    vec![
+    let statuses = vec![
         claude_status,
         codex_status,
         gemini_status,
@@ -2608,10 +2616,17 @@ pub async fn detect_all_engines_scoped(
         pi_status,
         qoder_status,
         dsh_status,
-    ]
-    .into_iter()
-    .filter(|status| is_enabled(status.engine_type))
-    .collect()
+    ];
+    // D4 失效条件：开启引擎全部 not_installed 时清环境解析缓存（npm prefix /
+    // 登录 shell / claude version memo），覆盖「用户刚装好 CLI」的场景；
+    // 下一轮检测重新解析。不视为引擎间错误传播（D10）。
+    if !statuses.is_empty() && statuses.iter().all(|status| !status.installed) {
+        invalidate_environment_resolution_caches();
+    }
+    statuses
+        .into_iter()
+        .filter(|status| is_enabled(status.engine_type))
+        .collect()
 }
 
 /// Detect available engines and return the preferred default engine.
@@ -4132,6 +4147,37 @@ opencode/gpt-5-nano
             "panic must be contained as a per-engine error, got {:?}",
             panicking.error
         );
+    }
+
+    /// refactor-engine-detection-pipeline B2：同一轮 Claude 检测内 `claude --version`
+    /// MUST 只 spawn 一次（find_claude_code_binary 的候选验证结果 MUST 被复用，
+    /// 不得在 probe_cli_version 里重复探测）。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn detect_claude_status_probes_version_once_per_round() {
+        let marker = unique_test_marker("claude-version");
+        let script_path = write_unix_test_cli_named(
+            &format!(
+                "#!/bin/sh\nprintf x >> '{}'\necho '1.2.3 (Claude Code)'\n",
+                marker.display()
+            ),
+            "claude",
+        );
+        let claude_bin = script_path.to_string_lossy().to_string();
+
+        let status = detect_claude_status(Some(&claude_bin)).await;
+
+        assert!(status.installed, "fake claude reports a version");
+        let marker_text = fs::read_to_string(&marker).unwrap_or_default();
+        assert_eq!(
+            marker_text.chars().count(),
+            1,
+            "claude --version must be probed exactly once per detection round, got {} invocations",
+            marker_text.chars().count()
+        );
+        let _ = fs::remove_file(&script_path);
+        let _ = fs::remove_file(&marker);
+        let _ = fs::remove_dir_all(script_path.parent().unwrap_or(std::path::Path::new("")));
     }
 
     #[cfg(unix)]
