@@ -266,6 +266,43 @@ export function projectActiveEngineModels(
   return projectEngineModels(activeEngine, engineModels);
 }
 
+/**
+ * models 已从 detect 解耦的引擎（后端慢目录链：PI RPC 链 / Qoder ACP /
+ * OpenCode models spawn，refactor-engine-detection-pipeline B1）。
+ * 这些引擎的目录加载 MUST 用 on-demand 预算（22s，覆盖后端最坏探测链，
+ * 对齐 provider-model-catalog-refresh spec「on-demand timeout MUST 覆盖
+ * 后端探测链」），不能用 idle-prewarm 8s——否则冷启动必超时拿空目录，
+ * Composer 思考档联动（providerModelCatalogs[engine]）随之缺数据。
+ */
+export const DETACHED_CATALOG_ENGINES: ReadonlySet<EngineType> = new Set([
+  "pi",
+  "qoder",
+  "opencode",
+]);
+
+export type EngineCatalogLoadPhase = "idle-prewarm" | "on-demand";
+
+/**
+ * 目录加载 phase 决策（共通方法，detect 后加载 / workspace 切换 / 翻转重算
+ * 统一走这里）：显式 phase 优先；force 一律 on-demand；解耦引擎默认
+ * on-demand，其余 idle-prewarm。
+ */
+export function resolveEngineCatalogLoadPhase(
+  engineType: EngineType,
+  options: {
+    forceRefresh?: boolean;
+    phase?: EngineCatalogLoadPhase;
+  } = {},
+): EngineCatalogLoadPhase {
+  if (options.phase) {
+    return options.phase;
+  }
+  if (options.forceRefresh || DETACHED_CATALOG_ENGINES.has(engineType)) {
+    return "on-demand";
+  }
+  return "idle-prewarm";
+}
+
 export function projectEngineModelCatalogs(
   engineStatuses: readonly EngineStatus[],
   activeEngine: EngineType,

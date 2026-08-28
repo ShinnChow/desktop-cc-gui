@@ -120,6 +120,20 @@ fn public_models_for_engine(engine_type: EngineType) -> Vec<ModelInfo> {
     }
 }
 
+/// B-fix 共通方法：models 已从 detect 解耦的引擎（慢目录链）在启动轻量分支
+/// 回填静态 generated catalog 快照。全部条目带 source="fallback"：
+/// ① PI 专属防中毒判定（is_fallback_only_catalog）可识别 → 不会钉死缓存，
+///   每次 get_engine_models 都会重探真实链并权威覆盖；
+/// ② 前端 providerModelCatalogs 立即非空，思考档/模型列表不再有空白窗口
+///   （真实探测由 on-demand 22s 预算保证到达）。Qoder 为 ACP runtime-only
+///   无静态 roster，回填为空。
+fn detached_catalog_snapshot(engine_type: EngineType) -> Vec<ModelInfo> {
+    match engine_type {
+        EngineType::Pi | EngineType::OpenCode => public_models_for_engine(engine_type),
+        _ => Vec::new(),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UnlistedRuntimeModelPolicy {
     Allow,
@@ -808,7 +822,7 @@ pub async fn detect_opencode_status_with_options(
             }
         }
     } else {
-        (Vec::new(), None)
+        (detached_catalog_snapshot(EngineType::OpenCode), None)
     };
     let default_model = models.iter().find(|m| m.default).map(|m| m.id.clone());
 
@@ -935,6 +949,8 @@ pub async fn detect_pi_status_with_options(
         if !installed {
             return not_installed_status(EngineType::Pi, error);
         }
+        let snapshot = detached_catalog_snapshot(EngineType::Pi);
+        let default_model = snapshot.iter().find(|m| m.default).map(|m| m.id.clone());
         return EngineStatus {
             engine_type: EngineType::Pi,
             auth_state: crate::engine::AuthState::default(),
@@ -942,8 +958,8 @@ pub async fn detect_pi_status_with_options(
             version,
             bin_path: Some(bin.to_string()),
             home_dir: get_pi_home_dir().map(|p| p.to_string_lossy().to_string()),
-            models: Vec::new(),
-            default_model: None,
+            models: snapshot,
+            default_model,
             features: EngineFeatures::pi(),
             error: None,
         };
@@ -1209,7 +1225,7 @@ pub async fn detect_qoder_distribution_status_with_options(
         )
         .await
     } else {
-        (Vec::new(), None)
+        (detached_catalog_snapshot(EngineType::Qoder), None)
     };
     let models = scope_qoder_models_to_distribution(distribution, models);
     let default_model = models.iter().find(|m| m.default).map(|m| m.id.clone());
@@ -4064,8 +4080,11 @@ opencode/gpt-5-nano
             "detect_all_engines must not spawn `opencode models` probe"
         );
         assert!(
-            opencode.models.is_empty(),
-            "lightweight detection must not carry a model catalog"
+            opencode
+                .models
+                .iter()
+                .all(|model| model.source == "fallback"),
+            "lightweight detection carries a fallback snapshot only"
         );
         let _ = fs::remove_file(&script_path);
         let _ = fs::remove_file(&marker);
@@ -4110,8 +4129,8 @@ opencode/gpt-5-nano
             "detect_all_engines must not spawn the pi models probe chain"
         );
         assert!(
-            pi.models.is_empty(),
-            "lightweight detection must not carry a model catalog"
+            pi.models.iter().all(|model| model.source == "fallback"),
+            "lightweight detection carries a fallback snapshot only"
         );
         let _ = fs::remove_file(&script_path);
         let _ = fs::remove_file(&marker);
@@ -4161,7 +4180,7 @@ opencode/gpt-5-nano
         );
         assert!(
             qoder.models.is_empty(),
-            "lightweight detection must not carry a model catalog"
+            "qoder is ACP runtime-only: fallback snapshot stays empty"
         );
         let _ = fs::remove_file(&script_path);
         let _ = fs::remove_file(&marker);
@@ -4304,6 +4323,37 @@ opencode/gpt-5-nano
         assert!(
             !marker.exists(),
             "phase 1 detection must not spawn `qodercli status` login probe"
+        );
+        let _ = fs::remove_file(&script_path);
+        let _ = fs::remove_file(&marker);
+        let _ = fs::remove_dir_all(script_path.parent().unwrap_or(std::path::Path::new("")));
+    }
+
+    /// B-fix：解耦引擎的启动轻量分支 MUST 回填 source=fallback 静态快照
+    /// （providerModelCatalogs 立即非空；防中毒判定可识别不钉死缓存）。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn detect_pi_light_backfills_fallback_catalog_snapshot() {
+        let marker = unique_test_marker("pi-light-backfill");
+        let script_path = write_unix_test_cli_named(
+            &format!(
+                "#!/bin/sh\nprintf x >> '{}'\necho '1.2.3'\n",
+                marker.display()
+            ),
+            "pi",
+        );
+        let pi_bin = script_path.to_string_lossy().to_string();
+
+        let status = detect_pi_status_with_options(Some(&pi_bin), false).await;
+
+        assert!(status.installed);
+        assert!(
+            !status.models.is_empty(),
+            "detached engine light detection must carry a fallback snapshot"
+        );
+        assert!(
+            status.models.iter().all(|model| model.source == "fallback"),
+            "every snapshot entry must be marked source=fallback (poison-guard recognizable)"
         );
         let _ = fs::remove_file(&script_path);
         let _ = fs::remove_file(&marker);

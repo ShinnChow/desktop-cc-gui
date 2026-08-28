@@ -42,6 +42,7 @@ import {
   WEB_RUNTIME_DEFAULT_ENGINE,
   WEB_RUNTIME_INITIAL_STATUSES,
 } from "./engineControllerWebRuntime";
+import { resolveEngineCatalogLoadPhase } from "./engineControllerCatalog";
 import { useEngineRuntimeNotices } from "./useEngineRuntimeNotices";
 import { useEngineCatalogRevision } from "./useEngineCatalogRevision";
 
@@ -124,7 +125,7 @@ export function useEngineController({
         setEngineModels(scopedFallbackModels.map((model) => normalizeEngineModelEntry(model)));
       }
       try {
-        const phase = options.phase ?? (options.forceRefresh ? "on-demand" : "idle-prewarm");
+        const phase = resolveEngineCatalogLoadPhase(engineType, options);
         const models = await startupOrchestrator.run({
           id: `engine-models:${engineType}:${catalogScope}`,
           phase,
@@ -344,10 +345,14 @@ export function useEngineController({
           setEngineModels([]);
         }
 
-        // For OpenCode, always refresh from CLI model list to ensure "all models"
-        // are shown independent of provider login status.
-        if (currentStatus?.installed && nextActiveEngine !== "opencode") {
-          await loadModelsForEngine(nextActiveEngine, currentStatus.models);
+        // B-fix：激活引擎目录在 detect 后立即加载。解耦引擎（pi/qoder/
+        // opencode）走 on-demand 22s 预算覆盖后端最坏探测链——此前 idle-prewarm
+        // 8s 对 PI 冷启动必超时，providerModelCatalogs[pi] 为空导致思考档
+        // 联动滞后/缺失。opencode 不再跳过（其 models 同样已解耦）。
+        if (currentStatus?.installed) {
+          await loadModelsForEngine(nextActiveEngine, currentStatus.models, {
+            phase: resolveEngineCatalogLoadPhase(nextActiveEngine),
+          });
         }
 
         return {

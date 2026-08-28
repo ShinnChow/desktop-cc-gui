@@ -1905,12 +1905,15 @@ describe("useEngineController", () => {
       );
       await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
+      // B-fix：pi 是解耦目录引擎，detect 后的默认加载升级为 on-demand 22s
+      // （覆盖后端 RPC+list-models 最坏链；旧 idle-prewarm 8s 冷启动必超时，
+      // providerModelCatalogs[pi] 为空导致思考档联动滞后/缺失）。
       const prewarmCall = runSpy.mock.calls
         .map(([descriptor]) => descriptor)
         .find((descriptor) =>
           String(descriptor.id).startsWith("engine-models:pi:"),
         );
-      expect(prewarmCall?.timeoutMs).toBe(8_000);
+      expect(prewarmCall?.timeoutMs).toBe(22_000);
 
       runSpy.mockClear();
       await act(async () => {
