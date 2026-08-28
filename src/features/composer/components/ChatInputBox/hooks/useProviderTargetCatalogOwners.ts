@@ -1,3 +1,6 @@
+import {
+  useEngineAvailabilityProjection,
+} from "./useEngineAvailabilityProjection";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -746,6 +749,8 @@ function useProviderTargetCatalogOwner({
     [runCatalogAction],
   );
 
+  // B7：与新建会话菜单同源的引擎可用性投影（host bus 字段级订阅）。
+  const availability = useEngineAvailabilityProjection();
   const groups = useMemo<ProviderTargetGroup[]>(() => {
     if (!enabled) {
       return [];
@@ -754,11 +759,28 @@ function useProviderTargetCatalogOwner({
       (engine) =>
         engine === currentProvider || !disabledCliEngineIds.has(engine),
     );
+    const resolveAvailabilityGate = (
+      engine: ProviderId,
+    ): { enabled: boolean; disabledReason?: string } => {
+      // B7：检测态分组门禁（与新建会话菜单同源）。当前引擎保持可用
+      // （激活会话的展示/选择语义不被检测态打断）；requires-login 可选但标注。
+      if (engine === currentProvider) {
+        return { enabled: true };
+      }
+      const state = availability.stateByEngine[engine];
+      if (!state || state === "ready") {
+        return { enabled: true };
+      }
+      const reason = availability.reasonByEngine[engine];
+      if (state === "requires-login") {
+        return { enabled: true, disabledReason: reason };
+      }
+      return { enabled: false, disabledReason: reason };
+    };
     const groups: ProviderTargetGroup[] = engines.map((engine) => ({
       providerId: engine,
       providerLabel: resolveProviderLabel(engine),
-      enabled: true,
-      disabledReason: undefined,
+      ...resolveAvailabilityGate(engine),
       profiles: (profiles[engine] ?? []).map((profile) => {
         const key = modelCatalogKey(engine, profile.id);
         const pluginModelsForEngine =
@@ -808,8 +830,7 @@ function useProviderTargetCatalogOwner({
       groups.push({
         providerId: "dsh",
         providerLabel: resolveProviderLabel("dsh"),
-        enabled: true,
-        disabledReason: undefined,
+        ...resolveAvailabilityGate("dsh"),
         profiles: [
           {
             id: DSH_LOCAL_PROVIDER_PROFILE_ID,
@@ -832,6 +853,7 @@ function useProviderTargetCatalogOwner({
     // 但 Global/CN 是固定 distribution binding，不是用户可编辑的 provider CRUD 项。
     return groups;
   }, [
+    availability,
     currentProvider,
     catalogActions,
     disabledCliEngineIds,

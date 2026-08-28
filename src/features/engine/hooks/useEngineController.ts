@@ -19,6 +19,7 @@ import {
   type EngineStatusUpdatedEvent,
 } from "../../../services/tauri/appServer";
 import { requestEngineDetection } from "./engineDetectionCoordinator";
+import { PROVIDER_TARGET_CATALOG_INVALIDATED_EVENT } from "../../composer/components/ChatInputBox/hooks/useProviderTargetCatalogOwners";
 import { startupOrchestrator } from "../../startup-orchestration/utils/startupOrchestrator";
 import {
   buildAvailableEngines,
@@ -590,6 +591,30 @@ export function useEngineController({
   // 迟到事件；同一轮连续事件在 microtask 内合批为单次 setState（Render Perf
   // Baseline：低频事件驱动，不进根链高频 setState）。
   const lastAppliedDetectRunIdRef = useRef(0);
+  const refreshEngineModelsRef = useRef<typeof refreshEngineModels | null>(null);
+  useEffect(() => {
+    refreshEngineModelsRef.current = refreshEngineModels;
+  }, [refreshEngineModels]);
+  // B7：供应商 CRUD 失效事件同时清除 controller 侧 per-scope last-good，
+  // legacy \`engineModelCatalogsAsOptions\` 不再吃旧目录。
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const handler = () => {
+      lastGoodModelsByScopeRef.current.clear();
+    };
+    window.addEventListener(
+      PROVIDER_TARGET_CATALOG_INVALIDATED_EVENT,
+      handler,
+    );
+    return () => {
+      window.removeEventListener(
+        PROVIDER_TARGET_CATALOG_INVALIDATED_EVENT,
+        handler,
+      );
+    };
+  }, []);
   const pendingStatusEventsRef = useRef<Map<EngineType, EngineStatusUpdatedEvent>>(new Map());
   const flushScheduledRef = useRef(false);
   useEffect(() => {
@@ -630,6 +655,22 @@ export function useEngineController({
               return status;
             }
             changed = true;
+            // B7：installed/auth 翻转 → 统一失效菜单与模型下拉两侧
+            // （INVALIDATED 事件清 atomic 缓存 + idle-prewarm 重算 legacy 投影）。
+            if (
+              status.installed !== item.status.installed ||
+              (status.authState ?? "unknown") !==
+                (item.status.authState ?? "unknown")
+            ) {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                  new CustomEvent(PROVIDER_TARGET_CATALOG_INVALIDATED_EVENT),
+                );
+              }
+              void refreshEngineModelsRef.current?.(status.engineType, {
+                phase: "idle-prewarm",
+              }).catch(() => {});
+            }
             return item.status;
           });
           pending.forEach((item) => {
