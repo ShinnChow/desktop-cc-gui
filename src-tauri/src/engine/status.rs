@@ -901,12 +901,38 @@ pub async fn detect_kimi_status(custom_bin: Option<&str>) -> EngineStatus {
 }
 
 pub async fn detect_pi_status(custom_bin: Option<&str>) -> EngineStatus {
+    detect_pi_status_with_options(custom_bin, true).await
+}
+
+/// `include_models = false` 为启动检测轻量分支：只回答「装没装 / 版本」，
+/// models 目录留给 `get_engine_models` 按需路径（refactor-engine-detection-pipeline D1）。
+pub async fn detect_pi_status_with_options(
+    custom_bin: Option<&str>,
+    include_models: bool,
+) -> EngineStatus {
     let bin_path = resolve_bin_path("pi", custom_bin);
     let bin = bin_path
         .as_ref()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|| "pi".to_string());
     let path_env = build_codex_path_env(custom_bin);
+    if !include_models {
+        let (installed, version, error) = probe_cli_version(&bin, "pi", path_env.as_ref()).await;
+        if !installed {
+            return not_installed_status(EngineType::Pi, error);
+        }
+        return EngineStatus {
+            engine_type: EngineType::Pi,
+            installed: true,
+            version,
+            bin_path: Some(bin.to_string()),
+            home_dir: get_pi_home_dir().map(|p| p.to_string_lossy().to_string()),
+            models: Vec::new(),
+            default_model: None,
+            features: EngineFeatures::pi(),
+            error: None,
+        };
+    }
     // version 与 models 探测无数据依赖：并行发起，最坏路径 30s → 20s
     // （max(version 10s, RPC 10s + list-models 10s 回退)），与 FE on-demand
     // timeout 对齐。未安装时 models 探测 spawn 立即失败，结果被丢弃。
@@ -1044,6 +1070,20 @@ pub async fn detect_qoder_status(custom_bin: Option<&str>) -> EngineStatus {
     detect_qoder_status_with_home(custom_bin, None).await
 }
 
+/// 启动检测轻量入口：跳过 ACP models 探测（refactor-engine-detection-pipeline D1）。
+pub async fn detect_qoder_status_with_options(
+    custom_bin: Option<&str>,
+    include_models: bool,
+) -> EngineStatus {
+    detect_qoder_distribution_status_with_options(
+        crate::engine::qoder_provider_profile::QoderDistribution::Global,
+        custom_bin,
+        None,
+        include_models,
+    )
+    .await
+}
+
 pub async fn detect_qoder_status_with_home(
     custom_bin: Option<&str>,
     configured_home_dir: Option<&str>,
@@ -1060,6 +1100,24 @@ pub async fn detect_qoder_distribution_status(
     distribution: crate::engine::qoder_provider_profile::QoderDistribution,
     custom_bin: Option<&str>,
     configured_home_dir: Option<&str>,
+) -> EngineStatus {
+    detect_qoder_distribution_status_with_options(
+        distribution,
+        custom_bin,
+        configured_home_dir,
+        true,
+    )
+    .await
+}
+
+/// `include_models = false` 为启动检测轻量分支：version + 登录检查即返回，
+/// ACP 握手 / `session/new` models 探测留给 `get_engine_models` 按需路径
+/// （refactor-engine-detection-pipeline D1）。
+pub async fn detect_qoder_distribution_status_with_options(
+    distribution: crate::engine::qoder_provider_profile::QoderDistribution,
+    custom_bin: Option<&str>,
+    configured_home_dir: Option<&str>,
+    include_models: bool,
 ) -> EngineStatus {
     let cli_name = distribution.cli_name();
     let bin_path = resolve_bin_path(cli_name, custom_bin);
@@ -1093,12 +1151,16 @@ pub async fn detect_qoder_distribution_status(
             error: Some(format!("Qoder CLI 未登录：请先运行 {} login", cli_name)),
         };
     }
-    let (models, config_diagnostic) = get_qoder_models(
-        distribution,
-        Some(&bin),
-        home_dir.as_deref().and_then(|p| p.to_str()),
-    )
-    .await;
+    let (models, config_diagnostic) = if include_models {
+        get_qoder_models(
+            distribution,
+            Some(&bin),
+            home_dir.as_deref().and_then(|p| p.to_str()),
+        )
+        .await
+    } else {
+        (Vec::new(), None)
+    };
     let models = scope_qoder_models_to_distribution(distribution, models);
     let default_model = models.iter().find(|m| m.default).map(|m| m.id.clone());
     EngineStatus {
@@ -2341,6 +2403,25 @@ fn format_opencode_model_name(provider: &str, model_id: &str) -> String {
     format!("{}/{}", provider_name, model_name)
 }
 
+/// Wrap a single engine probe in its own task：任一引擎探测 panic / abort
+/// 只落该引擎 error，MUST NOT 影响其他引擎的探测与结果（隔离铁律，
+/// refactor-engine-detection-pipeline D10）。
+async fn run_engine_detection_isolated<F, Fut>(engine_type: EngineType, probe: F) -> EngineStatus
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = EngineStatus> + Send + 'static,
+{
+    match tokio::spawn(probe()).await {
+        Ok(status) => status,
+        Err(join_error) => {
+            let mut status = disabled_engine_status(engine_type);
+            status.installed = false;
+            status.error = Some(format!("engine detection task failed: {join_error}"));
+            status
+        }
+    }
+}
+
 /// Detect all supported engines
 pub async fn detect_all_engines(
     claude_bin: Option<&str>,
@@ -2354,7 +2435,147 @@ pub async fn detect_all_engines(
     dsh_settings: &crate::engine::dsh::supervisor::DshRuntimeSettings,
     gemini_enabled: bool,
 ) -> Vec<EngineStatus> {
-    // Run detections in parallel
+    detect_all_engines_scoped(
+        claude_bin,
+        codex_bin,
+        gemini_bin,
+        opencode_bin,
+        kimi_bin,
+        grok_bin,
+        pi_bin,
+        qoder_bin,
+        dsh_settings,
+        gemini_enabled,
+        &[],
+    )
+    .await
+}
+
+/// 同 `detect_all_engines`，但 `disabled_engines` 内的引擎不进入检测
+/// （0 spawn、结果不出现；refactor-engine-detection-pipeline D9 启用范围铁律）。
+/// 各引擎 MUST 走启动轻量分支（models 目录探测只在 `get_engine_models` 按需路径）。
+pub async fn detect_all_engines_scoped(
+    claude_bin: Option<&str>,
+    codex_bin: Option<&str>,
+    gemini_bin: Option<&str>,
+    opencode_bin: Option<&str>,
+    kimi_bin: Option<&str>,
+    grok_bin: Option<&str>,
+    pi_bin: Option<&str>,
+    qoder_bin: Option<&str>,
+    dsh_settings: &crate::engine::dsh::supervisor::DshRuntimeSettings,
+    gemini_enabled: bool,
+    disabled_engines: &[EngineType],
+) -> Vec<EngineStatus> {
+    // 参数 owned 化：per-engine 独立 task 要求 'static（隔离铁律）。
+    let claude_bin = claude_bin.map(str::to_string);
+    let codex_bin = codex_bin.map(str::to_string);
+    let gemini_bin = gemini_bin.map(str::to_string);
+    let opencode_bin = opencode_bin.map(str::to_string);
+    let kimi_bin = kimi_bin.map(str::to_string);
+    let grok_bin = grok_bin.map(str::to_string);
+    let pi_bin = pi_bin.map(str::to_string);
+    let qoder_bin = qoder_bin.map(str::to_string);
+    let dsh_settings = dsh_settings.clone();
+
+    let is_enabled = |engine_type: EngineType| !disabled_engines.contains(&engine_type);
+
+    let claude_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Claude) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Claude,
+                move || async move { detect_claude_status(claude_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::Claude,
+            )))
+        };
+    let codex_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Codex) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Codex,
+                move || async move { detect_codex_status(codex_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::Codex,
+            )))
+        };
+    let gemini_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if gemini_enabled && crate::engine_policy::GEMINI_RUNTIME_ENABLED {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Gemini,
+                move || async move { detect_gemini_status(gemini_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::Gemini,
+            )))
+        };
+    let opencode_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::OpenCode) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::OpenCode,
+                move || async move {
+                    detect_opencode_status_with_options(opencode_bin.as_deref(), false).await
+                },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::OpenCode,
+            )))
+        };
+    let kimi_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Kimi) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Kimi,
+                move || async move { detect_kimi_status(kimi_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Kimi)))
+        };
+    let grok_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Grok) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Grok,
+                move || async move { detect_grok_status(grok_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Grok)))
+        };
+    let pi_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Pi) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Pi,
+                move || async move { detect_pi_status_with_options(pi_bin.as_deref(), false).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Pi)))
+        };
+    let qoder_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Qoder) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Qoder,
+                move || async move {
+                    detect_qoder_status_with_options(qoder_bin.as_deref(), false).await
+                },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::Qoder,
+            )))
+        };
+    let dsh_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Dsh) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Dsh,
+                move || async move { crate::engine::dsh::detect_dsh_status(&dsh_settings).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Dsh)))
+        };
+
     let (
         claude_status,
         codex_status,
@@ -2366,21 +2587,15 @@ pub async fn detect_all_engines(
         qoder_status,
         dsh_status,
     ) = tokio::join!(
-        detect_claude_status(claude_bin),
-        detect_codex_status(codex_bin),
-        async {
-            if gemini_enabled && crate::engine_policy::GEMINI_RUNTIME_ENABLED {
-                detect_gemini_status(gemini_bin).await
-            } else {
-                disabled_engine_status(EngineType::Gemini)
-            }
-        },
-        detect_opencode_status(opencode_bin),
-        detect_kimi_status(kimi_bin),
-        detect_grok_status(grok_bin),
-        detect_pi_status(pi_bin),
-        detect_qoder_status(qoder_bin),
-        crate::engine::dsh::detect_dsh_status(dsh_settings),
+        claude_status,
+        codex_status,
+        gemini_status,
+        opencode_status,
+        kimi_status,
+        grok_status,
+        pi_status,
+        qoder_status,
+        dsh_status,
     );
 
     vec![
@@ -2394,6 +2609,9 @@ pub async fn detect_all_engines(
         qoder_status,
         dsh_status,
     ]
+    .into_iter()
+    .filter(|status| is_enabled(status.engine_type))
+    .collect()
 }
 
 /// Detect available engines and return the preferred default engine.
@@ -2409,8 +2627,145 @@ pub async fn detect_preferred_engine(
     qoder_bin: Option<&str>,
     dsh_settings: Option<&crate::engine::dsh::supervisor::DshRuntimeSettings>,
 ) -> EngineType {
+    detect_preferred_engine_scoped(
+        claude_bin,
+        codex_bin,
+        gemini_bin,
+        opencode_bin,
+        kimi_bin,
+        grok_bin,
+        pi_bin,
+        qoder_bin,
+        dsh_settings,
+        &[],
+    )
+    .await
+}
+
+/// 同 `detect_preferred_engine`，但 `disabled_engines` 内的引擎不参与探测与
+/// 默认引擎选择（refactor-engine-detection-pipeline D9）。
+pub async fn detect_preferred_engine_scoped(
+    claude_bin: Option<&str>,
+    codex_bin: Option<&str>,
+    gemini_bin: Option<&str>,
+    opencode_bin: Option<&str>,
+    kimi_bin: Option<&str>,
+    grok_bin: Option<&str>,
+    pi_bin: Option<&str>,
+    qoder_bin: Option<&str>,
+    dsh_settings: Option<&crate::engine::dsh::supervisor::DshRuntimeSettings>,
+    disabled_engines: &[EngineType],
+) -> EngineType {
     let default_dsh = crate::engine::dsh::supervisor::DshRuntimeSettings::default();
     let dsh_settings = dsh_settings.unwrap_or(&default_dsh);
+    // 参数 owned 化：per-engine 独立 task 要求 'static（隔离铁律）。
+    let claude_bin = claude_bin.map(str::to_string);
+    let codex_bin = codex_bin.map(str::to_string);
+    let gemini_bin = gemini_bin.map(str::to_string);
+    let opencode_bin = opencode_bin.map(str::to_string);
+    let kimi_bin = kimi_bin.map(str::to_string);
+    let grok_bin = grok_bin.map(str::to_string);
+    let pi_bin = pi_bin.map(str::to_string);
+    let qoder_bin = qoder_bin.map(str::to_string);
+    let dsh_settings = dsh_settings.clone();
+    let is_enabled = |engine_type: EngineType| !disabled_engines.contains(&engine_type);
+
+    let claude_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Claude) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Claude,
+                move || async move { detect_claude_status(claude_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::Claude,
+            )))
+        };
+    let codex_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Codex) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Codex,
+                move || async move { detect_codex_status(codex_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::Codex,
+            )))
+        };
+    let gemini_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if crate::engine_policy::GEMINI_RUNTIME_ENABLED {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Gemini,
+                move || async move { detect_gemini_status(gemini_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::Gemini,
+            )))
+        };
+    let opencode_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::OpenCode) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::OpenCode,
+                move || async move {
+                    detect_opencode_status_with_options(opencode_bin.as_deref(), false).await
+                },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::OpenCode,
+            )))
+        };
+    let kimi_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Kimi) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Kimi,
+                move || async move { detect_kimi_status(kimi_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Kimi)))
+        };
+    let grok_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Grok) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Grok,
+                move || async move { detect_grok_status(grok_bin.as_deref()).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Grok)))
+        };
+    let pi_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Pi) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Pi,
+                move || async move { detect_pi_status_with_options(pi_bin.as_deref(), false).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Pi)))
+        };
+    let qoder_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Qoder) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Qoder,
+                move || async move {
+                    detect_qoder_status_with_options(qoder_bin.as_deref(), false).await
+                },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(
+                EngineType::Qoder,
+            )))
+        };
+    let dsh_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Dsh) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Dsh,
+                move || async move { crate::engine::dsh::detect_dsh_status(&dsh_settings).await },
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Dsh)))
+        };
+
     let (
         claude_status,
         codex_status,
@@ -2422,21 +2777,15 @@ pub async fn detect_preferred_engine(
         qoder_status,
         dsh_status,
     ) = tokio::join!(
-        detect_claude_status(claude_bin),
-        detect_codex_status(codex_bin),
-        async {
-            if crate::engine_policy::GEMINI_RUNTIME_ENABLED {
-                detect_gemini_status(gemini_bin).await
-            } else {
-                disabled_engine_status(EngineType::Gemini)
-            }
-        },
-        detect_opencode_status(opencode_bin),
-        detect_kimi_status(kimi_bin),
-        detect_grok_status(grok_bin),
-        detect_pi_status(pi_bin),
-        detect_qoder_status(qoder_bin),
-        crate::engine::dsh::detect_dsh_status(dsh_settings),
+        claude_status,
+        codex_status,
+        gemini_status,
+        opencode_status,
+        kimi_status,
+        grok_status,
+        pi_status,
+        qoder_status,
+        dsh_status,
     );
 
     // Priority: Claude first (more users have it installed)
@@ -2488,6 +2837,7 @@ pub async fn resolve_engine_type(
     grok_bin: Option<&str>,
     pi_bin: Option<&str>,
     qoder_bin: Option<&str>,
+    disabled_engines: &[EngineType],
 ) -> EngineType {
     // 1. Check workspace-specific setting
     if let Some(engine) = workspace_engine.filter(|s| !s.is_empty()) {
@@ -2525,7 +2875,7 @@ pub async fn resolve_engine_type(
 
     // 3. Auto-detect based on installed CLIs
     // Box 到堆：tokio::join! 并发持有多路 CLI 探测，内联会放大调用方栈帧。
-    Box::pin(detect_preferred_engine(
+    Box::pin(detect_preferred_engine_scoped(
         claude_bin,
         codex_bin,
         gemini_bin,
@@ -2535,6 +2885,7 @@ pub async fn resolve_engine_type(
         pi_bin,
         qoder_bin,
         None,
+        disabled_engines,
     ))
     .await
 }
@@ -3316,6 +3667,7 @@ xai      grok-4.5        256k   64k    yes      yes
             None,
             None,
             None,
+            &[],
         )
         .await;
         assert_eq!(resolved, EngineType::OpenCode);
@@ -3334,6 +3686,7 @@ xai      grok-4.5        256k   64k    yes      yes
             None,
             None,
             None,
+            &[],
         )
         .await;
         assert_eq!(resolved, EngineType::Claude);
@@ -3405,6 +3758,7 @@ xai      grok-4.5        256k   64k    yes      yes
             None,
             None,
             None,
+            &[],
         )
         .await;
 
@@ -3431,6 +3785,7 @@ xai      grok-4.5        256k   64k    yes      yes
             None,
             None,
             None,
+            &[],
         )
         .await;
         assert_eq!(resolved, EngineType::Kimi);
@@ -3449,6 +3804,7 @@ xai      grok-4.5        256k   64k    yes      yes
             None,
             None,
             None,
+            &[],
         )
         .await;
         assert_eq!(resolved, EngineType::Grok);
@@ -3514,6 +3870,11 @@ opencode/gpt-5-nano
 
     #[cfg(unix)]
     fn write_unix_test_cli(script_body: &str) -> PathBuf {
+        write_unix_test_cli_named(script_body, "codex-status-cli")
+    }
+
+    #[cfg(unix)]
+    fn write_unix_test_cli_named(script_body: &str, file_name: &str) -> PathBuf {
         let unique = format!(
             "ccgui-engine-status-{}-{}",
             std::process::id(),
@@ -3524,7 +3885,7 @@ opencode/gpt-5-nano
         );
         let dir = std::env::temp_dir().join(unique);
         fs::create_dir_all(&dir).expect("create temp cli dir");
-        let script_path = dir.join("codex-status-cli");
+        let script_path = dir.join(file_name);
         fs::write(&script_path, script_body).expect("write temp cli script");
         let mut permissions = fs::metadata(&script_path)
             .expect("stat temp cli script")
@@ -3532,6 +3893,245 @@ opencode/gpt-5-nano
         permissions.set_mode(0o755);
         fs::set_permissions(&script_path, permissions).expect("chmod temp cli script");
         script_path
+    }
+
+    #[cfg(unix)]
+    fn unique_test_marker(tag: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "ccgui-detect-marker-{tag}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ))
+    }
+
+    /// refactor-engine-detection-pipeline B1.2：detect_all_engines（启动检测路径）
+    /// MUST NOT 运行 `opencode models` 目录探测——模型目录只允许走
+    /// `get_engine_models` 按需路径。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn detect_all_engines_skips_opencode_model_listing() {
+        let marker = unique_test_marker("opencode-models");
+        let script_path = write_unix_test_cli_named(
+            &format!(
+                "#!/bin/sh\ncase \"$1\" in\n  models) printf x >> '{}'\n  ;;\nesac\necho '1.2.3'\n",
+                marker.display()
+            ),
+            "opencode",
+        );
+        let opencode_bin = script_path.to_string_lossy().to_string();
+
+        let statuses = detect_all_engines(
+            None,
+            None,
+            None,
+            Some(&opencode_bin),
+            None,
+            None,
+            None,
+            None,
+            &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
+            false,
+        )
+        .await;
+
+        let opencode = statuses
+            .iter()
+            .find(|status| status.engine_type == EngineType::OpenCode)
+            .expect("opencode status present");
+        assert!(
+            !marker.exists(),
+            "detect_all_engines must not spawn `opencode models` probe"
+        );
+        assert!(
+            opencode.models.is_empty(),
+            "lightweight detection must not carry a model catalog"
+        );
+        let _ = fs::remove_file(&script_path);
+        let _ = fs::remove_file(&marker);
+        let _ = fs::remove_dir_all(script_path.parent().unwrap_or(std::path::Path::new("")));
+    }
+
+    /// refactor-engine-detection-pipeline B1.2：detect_all_engines MUST NOT 运行
+    /// PI 的 RPC / `--list-models` models 探测链。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn detect_all_engines_skips_pi_model_probe_chain() {
+        let marker = unique_test_marker("pi-models");
+        let script_path = write_unix_test_cli_named(
+            &format!(
+                "#!/bin/sh\ncase \"$*\" in\n  *list-models*|*rpc*) printf x >> '{}'\n  ;;\nesac\necho '1.2.3'\n",
+                marker.display()
+            ),
+            "pi",
+        );
+        let pi_bin = script_path.to_string_lossy().to_string();
+
+        let statuses = detect_all_engines(
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&pi_bin),
+            None,
+            &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
+            false,
+        )
+        .await;
+
+        let pi = statuses
+            .iter()
+            .find(|status| status.engine_type == EngineType::Pi)
+            .expect("pi status present");
+        assert!(
+            !marker.exists(),
+            "detect_all_engines must not spawn the pi models probe chain"
+        );
+        assert!(
+            pi.models.is_empty(),
+            "lightweight detection must not carry a model catalog"
+        );
+        let _ = fs::remove_file(&script_path);
+        let _ = fs::remove_file(&marker);
+        let _ = fs::remove_dir_all(script_path.parent().unwrap_or(std::path::Path::new("")));
+    }
+
+    /// refactor-engine-detection-pipeline B1.1：detect_all_engines MUST NOT 运行
+    /// Qoder 的 `--acp` ACP 握手 / `session/new` models 探测。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn detect_all_engines_skips_qoder_acp_model_probe() {
+        let marker = unique_test_marker("qoder-acp");
+        let script_path = write_unix_test_cli_named(
+            &format!(
+                "#!/bin/sh\ncase \"$1\" in\n  --acp) printf x >> '{}'\n  ;;\n  status) printf '{{\"authenticated\": true}}'\n  ;;\nesac\necho '1.2.3'\n",
+                marker.display()
+            ),
+            "qodercli",
+        );
+        let qoder_bin = script_path.to_string_lossy().to_string();
+
+        let statuses = detect_all_engines(
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&qoder_bin),
+            &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
+            false,
+        )
+        .await;
+
+        let qoder = statuses
+            .iter()
+            .find(|status| status.engine_type == EngineType::Qoder)
+            .expect("qoder status present");
+        assert!(
+            qoder.installed,
+            "fake qodercli reports a version, detection must treat it as installed"
+        );
+        assert!(
+            !marker.exists(),
+            "detect_all_engines must not run the qoder ACP model probe"
+        );
+        assert!(
+            qoder.models.is_empty(),
+            "lightweight detection must not carry a model catalog"
+        );
+        let _ = fs::remove_file(&script_path);
+        let _ = fs::remove_file(&marker);
+        let _ = fs::remove_dir_all(script_path.parent().unwrap_or(std::path::Path::new("")));
+    }
+
+    /// refactor-engine-detection-pipeline B1.3（启用范围铁律）：黑名单引擎
+    /// MUST 0 spawn 且不出现在结果中，其余引擎照常。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn detect_all_engines_scoped_skips_disabled_engines_without_spawning() {
+        let marker = unique_test_marker("kimi-disabled");
+        let script_path = write_unix_test_cli_named(
+            &format!(
+                "#!/bin/sh\nprintf x >> '{}'\necho '1.2.3'\n",
+                marker.display()
+            ),
+            "kimi",
+        );
+        let kimi_bin = script_path.to_string_lossy().to_string();
+
+        let statuses = detect_all_engines_scoped(
+            None,
+            None,
+            None,
+            None,
+            Some(&kimi_bin),
+            None,
+            None,
+            None,
+            &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
+            false,
+            &[EngineType::Kimi],
+        )
+        .await;
+
+        assert!(
+            statuses
+                .iter()
+                .all(|status| status.engine_type != EngineType::Kimi),
+            "disabled engine must not appear in detection results"
+        );
+        assert!(
+            !marker.exists(),
+            "disabled engine must not be probed at all"
+        );
+        assert!(
+            statuses
+                .iter()
+                .any(|status| status.engine_type == EngineType::Grok),
+            "other engines keep being detected"
+        );
+        let _ = fs::remove_file(&script_path);
+        let _ = fs::remove_file(&marker);
+        let _ = fs::remove_dir_all(script_path.parent().unwrap_or(std::path::Path::new("")));
+    }
+
+    /// refactor-engine-detection-pipeline B1.4（隔离铁律）：单引擎探测 panic
+    /// MUST 只落该引擎 error，其他引擎结果不受影响。
+    #[tokio::test]
+    async fn engine_detection_isolation_contains_panicking_probe() {
+        let healthy = run_engine_detection_isolated(EngineType::Kimi, || async {
+            let mut status = disabled_engine_status(EngineType::Kimi);
+            status.installed = true;
+            status.version = Some("1.0.0".to_string());
+            status
+        });
+        let panicking = run_engine_detection_isolated(EngineType::Grok, || async {
+            panic!("probe exploded");
+            #[allow(unreachable_code)]
+            disabled_engine_status(EngineType::Grok)
+        });
+        let (healthy, panicking) = tokio::join!(healthy, panicking);
+
+        assert!(
+            healthy.installed,
+            "healthy engine detection must be unaffected by the panicking probe"
+        );
+        assert!(!panicking.installed);
+        assert!(
+            panicking
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("engine detection task failed"),
+            "panic must be contained as a per-engine error, got {:?}",
+            panicking.error
+        );
     }
 
     #[cfg(unix)]

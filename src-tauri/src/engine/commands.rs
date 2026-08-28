@@ -1168,8 +1168,9 @@ pub async fn detect_engines(
     }
     let manager = &state.engine_manager;
     let settings = read_app_settings_snapshot(&state).await;
+    let disabled_engines = crate::engine::detection_disabled_engines(&settings);
     Ok(manager
-        .detect_engines_with_gates(settings.gemini_enabled)
+        .detect_engines_with_gates(settings.gemini_enabled, &disabled_engines)
         .await)
 }
 

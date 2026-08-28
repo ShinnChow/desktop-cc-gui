@@ -19,7 +19,7 @@ use super::pi::PiSession;
 use super::qoder::QoderSession;
 use super::qoder_provider_profile::{QoderDistributionSettings, QoderProviderLaunchProfile};
 use super::status::{
-    detect_all_engines, detect_claude_status, detect_codex_status, detect_grok_status,
+    detect_all_engines_scoped, detect_claude_status, detect_codex_status, detect_grok_status,
     detect_kimi_status, detect_opencode_status,
 };
 use super::{disabled_engine_status, EngineConfig, EngineStatus, EngineType};
@@ -278,7 +278,11 @@ impl EngineManager {
             .await
     }
 
-    pub async fn detect_engines_with_gates(&self, gemini_enabled: bool) -> Vec<EngineStatus> {
+    pub async fn detect_engines_with_gates(
+        &self,
+        gemini_enabled: bool,
+        disabled_engines: &[EngineType],
+    ) -> Vec<EngineStatus> {
         let gemini_enabled = gemini_enabled && crate::engine_policy::GEMINI_RUNTIME_ENABLED;
         let (
             claude_bin,
@@ -323,7 +327,7 @@ impl EngineManager {
             )
         };
 
-        let statuses = detect_all_engines(
+        let statuses = detect_all_engines_scoped(
             claude_bin.as_deref(),
             codex_bin.as_deref(),
             gemini_bin.as_deref(),
@@ -334,6 +338,7 @@ impl EngineManager {
             qoder_bin.as_deref(),
             &dsh_settings,
             gemini_enabled,
+            disabled_engines,
         )
         .await;
 
@@ -1472,7 +1477,7 @@ mod tests {
             )
             .await;
 
-        let statuses = manager.detect_engines_with_gates(true).await;
+        let statuses = manager.detect_engines_with_gates(true, &[]).await;
         let status = statuses
             .iter()
             .find(|status| status.engine_type == EngineType::Gemini)

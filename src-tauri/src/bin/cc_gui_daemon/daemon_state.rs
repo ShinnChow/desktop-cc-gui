@@ -1007,8 +1007,9 @@ impl DaemonState {
     pub(super) async fn detect_engines(&self) -> Vec<engine::EngineStatus> {
         self.sync_engine_configs().await;
         let settings = self.app_settings.lock().await.clone();
+        let disabled_engines = engine::detection_disabled_engines(&settings);
         self.engine_manager
-            .detect_engines_with_gates(settings.gemini_enabled)
+            .detect_engines_with_gates(settings.gemini_enabled, &disabled_engines)
             .await
     }
 
@@ -1029,7 +1030,9 @@ impl DaemonState {
         }
         let statuses = self
             .engine_manager
-            .detect_engines_with_gates(settings.gemini_enabled)
+            // 显式 switch 的安装校验不走检测黑名单：开关只控制可见性/检测范围，
+            // 不阻断对已配置引擎的显式切换。
+            .detect_engines_with_gates(settings.gemini_enabled, &[])
             .await;
         let installed = statuses
             .iter()
@@ -1053,9 +1056,10 @@ impl DaemonState {
     ) -> Option<engine::EngineStatus> {
         self.sync_engine_configs().await;
         let settings = self.app_settings.lock().await.clone();
+        let disabled_engines = engine::detection_disabled_engines(&settings);
         let statuses = self
             .engine_manager
-            .detect_engines_with_gates(settings.gemini_enabled)
+            .detect_engines_with_gates(settings.gemini_enabled, &disabled_engines)
             .await;
         statuses
             .into_iter()

@@ -155,6 +155,31 @@ pub(crate) fn engine_enabled_in_settings(
     }
 }
 
+/// 检测范围黑名单（refactor-engine-detection-pipeline D9 启用范围铁律）：
+/// 供应商页面关闭的引擎不进入检测环节（0 spawn）。只作用于 detect 路径，
+/// 不改变 switch/send 的既有「开关只控制可见性」语义。
+pub(crate) fn detection_disabled_engines(settings: &crate::types::AppSettings) -> Vec<EngineType> {
+    [
+        EngineType::Claude,
+        EngineType::Codex,
+        EngineType::Gemini,
+        EngineType::Grok,
+        EngineType::OpenCode,
+        EngineType::Kimi,
+        EngineType::Pi,
+        EngineType::Dsh,
+        EngineType::Qoder,
+    ]
+    .into_iter()
+    .filter(|engine_type| {
+        settings
+            .disabled_cli_engines
+            .iter()
+            .any(|id| id == engine_type.icon())
+    })
+    .collect()
+}
+
 pub(crate) fn engine_disabled_diagnostic(engine_type: EngineType) -> Option<&'static str> {
     match engine_type {
         EngineType::Gemini => Some(crate::engine_policy::GEMINI_DISABLED_DIAGNOSTIC),
