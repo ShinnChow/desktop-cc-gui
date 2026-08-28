@@ -60,6 +60,46 @@
 - [x] 7.6 实现：`useEngineAvailabilityProjection` + groups 投影接入 + 双向失效通道（design D7）；`useProviderTargetCatalogOwners.ts` 只动 groups 投影 hunk。
 - [x] 7.7 验证：vitest 相关面全绿（含 ModelSelect 提交/authority 既有测试零回归）；typecheck；`npm run check:app-shell:governance`；commit `feat(engine): 模型下拉与新会话菜单可用性同源，状态翻转统一失效两侧`。
 
+## P0 回归修复（实施期真实环境暴露，TDD 先红后绿，全部已提交）
+
+> 上线即 P0：PI 选中后模型/思考档必现错乱缺失、多引擎切换后发送失败
+> （No API key found for openrouter）。三个根因均为解耦引入的隐含契约断裂，
+> 逐一修复并留回归锁定测试：
+
+- [x] P0-1 引擎切换后目标引擎目录无人加载：`setActiveEngine` 成功后显式
+  `loadModelsForEngine`（解耦引擎 on-demand 22s）——隐含契约「detect 顺带
+  带回目录」断裂的主根因（commit `bd9fc10a3`）。
+- [x] P0-2 authState 到达误触发 INVALIDATED 风暴：翻转失效收敛为 installed
+  翻转独占 + 副本检测移出 updater（StrictMode 安全）（commit `7947a8776`）。
+- [x] P0-3 静态快照回填污染选择链路：撤销轻量分支回填（EngineStatus.models
+  被乐观选中/新会话默认解析当可选模型消费，快照 auto 绑进会话 → 跳过对账 →
+  openrouter 报错），留 MUST-NOT 回归锁定测试（commit `bd35e06ae`）。
+- [x] P0-4 PI 思考档滞后（原始反馈）：解耦引擎目录加载 phase 升级 on-demand
+  22s + （试行的静态快照回填因 P0-3 撤销）（commit `e4dfee947`）。
+- [x] P0-5 非激活态目录消费漏点（全引擎审计后补）：响应式 per-engine 目录表
+  + projectEngineModelCatalogs 回退 + pi/opencode 启动后台预热；qoder 明确
+  排除（ACP 重探测 runtime-only）（commit `0075cd288`）。
+- [x] P0-6 首页创建框思考档引擎白名单分叉（DSH 首页缺失）：atomic 投影
+  通用化为 catalog 驱动（目录带 supportedReasoningEfforts 即联动，不发明），
+  PI 特例折叠进通用分支（commit `c2bfb3c44`）。
+
+### 全引擎思考档传递审计（实测结论，沉淀备查）
+
+| 引擎 | 派发传递 | 判定 |
+| ---- | ---- | ---- |
+| codex | app-server turn `payload["effort"]` | 真实传递 |
+| claude | `--effort` + `disable_thinking` | 真实传递 |
+| grok | `--reasoning-effort` | 真实传递 |
+| pi | RPC `set_thinking_level` / `--thinking` 回退 | 真实传递（目录 47 模型实测全带档位） |
+| dsh | `payload["reasoningEffort"]` | 真实传递 |
+| qoder | `session/set_config_option reasoning_effort` | 后端两端已接；选择器不出现为账号/版本目录数据侧，待真机抓 `session/new` 响应定论 |
+| kimi | build_command 不传 | CLI 无思考/effort 参数（--help 全量确认），能力边界非漏点；`wire-kimi-qoder-thinking-levels` 空占位待 CLI 支持 |
+| opencode | capability 不支持 | 不适用 |
+
+外部条件（用户侧）：pi settings `defaultModel: "k3"` 解析不到（实际条目
+`k3-256k`），是 openrouter 报错的必要条件之一，建议修正；已污染绑定的
+旧 PI 会话需重选一次模型。
+
 ## 收口
 
 - [ ] 8.1 真机量化验收（A9）：全新环境（清 last-good）与有 last-good 两种场景打开「新建会话」菜单，核对逐项 reveal、codex 等 ≤1s 亮起、全部 ≤15s、「检测中」单调递减；菜单单引擎刷新只起 1 引擎子进程；结果记录到本 tasks。
