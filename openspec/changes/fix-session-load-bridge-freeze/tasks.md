@@ -38,7 +38,8 @@
 
 - [x] 4.C.1 红测试：worker 作用域 error/unhandledrejection 回传结构化 detail（message/stack/filename/位置）；主线程指纹落盘（worker-scope-error）且不 dispose worker。
 - [x] 4.C.2 实现：`fastMarkdown.worker.ts` 作用域监听 + `workerAdapter.ts` 处理分支（sourceModule/Line/Col + stackHash）。
-- [ ] 4.C.3 下一轮真机：`fast-markdown-worker/failed` 的 worker-scope-error 条目携带完整 stackHash/sourceModule → 定位 chunk-GNJJE6OE.js:64:23 的 1wt84ny 真凶。
+- [x] 4.C.3 真机回填（2026-08-28 20:54）：F6 生效——新指纹 1f00s72 定位 `rehype-katex.js:119` = 预打包产物内联 `hast-util-from-html-isomorphic/lib/browser.js` 顶层 `new DOMParser()`；同构第二处已修（resolve.alias + optimizeDeps.esbuildOptions.alias 强制 worker 条件入口）；1wt84ny（document）经 decode alias 修复已消失。
+- [ ] 4.C.4 下一轮真机：确认 fast-markdown-worker/failed 归零、markdown.precompute mode=worker。
 
 ## 收口
 
