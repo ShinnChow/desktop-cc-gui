@@ -1597,13 +1597,17 @@ export function useThreadItemEvents({
       item: Record<string, unknown>,
       shouldMarkProcessing: boolean,
       shouldIncrementAgentSegment: boolean,
+      options?: {
+        /** backgroundTask 终态合成 item：合法的 post-settle 迟到更新，绕过 turn 终态守卫。 */
+        skipTurnTerminalGuard?: boolean;
+      },
     ) => {
       if (isInterruptedThread(interruptedThreadsRef, workspaceId, threadId)) {
         return;
       }
       flushRealtimeDeltaOps();
       const turnId = extractTurnIdFromRawItem(item);
-      if (isRealtimeTurnTerminal(threadId, turnId)) {
+      if (!options?.skipTurnTerminalGuard && isRealtimeTurnTerminal(threadId, turnId)) {
         return;
       }
       // \u00a76.3: \u5165\u53e3 ensureThread \u8d70 dispatchWithSchedule\u3002
@@ -2311,7 +2315,13 @@ export function useThreadItemEvents({
       if (!result) {
         return;
       }
-      handleItemUpdate(workspaceId, threadId, result.item, true, false);
+      // skipTurnTerminalGuard：post-settle 后台任务终态是合法迟到事件——
+      // 合成 item 无 turnId，会命中「无 id 分支」的 settled 线程守卫被丢弃
+      // （时间线卡片永停运行中）。backgroundTask item 不带 markProcessing
+      // 语义，不会复燃「生成中」。
+      handleItemUpdate(workspaceId, threadId, result.item, true, false, {
+        skipTurnTerminalGuard: true,
+      });
     },
     [handleItemUpdate],
   );

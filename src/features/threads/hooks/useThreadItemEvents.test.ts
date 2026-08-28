@@ -18,6 +18,9 @@ import {
 import {
   workspaceScopedSet,
 } from "./workspaceScopedMap";
+import {
+  resetBackgroundTaskStoreForTests,
+} from "../../messages/utils/backgroundTaskStore";
 
 vi.mock("../../../utils/threadItems", () => ({
   buildConversationItem: vi.fn(),
@@ -1710,5 +1713,61 @@ describe("useThreadItemEvents", () => {
     expect(safeMessageActivity).toHaveBeenCalledTimes(1);
 
     vi.useRealTimers();
+  });
+});
+
+describe("onBackgroundTaskUpdated post-settle terminal update", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetBackgroundTaskStoreForTests();
+  });
+
+  it("upserts the timeline item even after the turn has settled (post-settle 终态不被迟到守卫丢弃)", () => {
+    const { result, dispatch } = makeOptions({
+      activeThreadId: "pi:s1",
+      resolveCanonicalThreadId: (id) => id,
+    });
+    const converted = {
+      id: "tool-bg-1",
+      kind: "tool",
+      toolType: "backgroundTask",
+      title: "bg_run",
+      detail: "",
+      status: "completed",
+      output: JSON.stringify({ id: "t-1", status: "completed" }),
+    } as const;
+    vi.mocked(buildConversationItem).mockReturnValue(
+      converted as unknown as ReturnType<typeof buildConversationItem>,
+    );
+
+    act(() => {
+      result.current.noteRealtimeTurnStarted("pi:s1", "turn-1");
+      result.current.markRealtimeTurnTerminal("pi:s1", "turn-1");
+    });
+
+    // 普通无 turnId 快照在 settled 线程上仍应被丢弃（守卫本意：防复燃生成中）。
+    act(() => {
+      result.current.onItemUpdated("ws-1", "pi:s1", {
+        id: "some-late-item",
+        type: "commandExecution",
+      });
+    });
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "upsertItem" }),
+    );
+
+    // backgroundTask 终态合成 item 必须绕过守卫：post-settle 合法迟到更新。
+    act(() => {
+      result.current.onBackgroundTaskUpdated("ws-1", "pi:s1", {
+        toolId: "tool-bg-1",
+        task: { id: "t-1", status: "completed", exitCode: 0 },
+        source: "registry",
+      });
+    });
+
+    const upsert = dispatch.mock.calls
+      .map((call) => call[0] as { type: string })
+      .find((action) => action.type === "upsertItem");
+    expect(upsert).toBeTruthy();
   });
 });
