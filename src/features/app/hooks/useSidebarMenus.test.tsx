@@ -116,6 +116,12 @@ vi.mock("../../../services/tauri", () => ({
   switchGrokProvider: vi.fn().mockResolvedValue(undefined),
   switchOpenCodeProvider: vi.fn().mockResolvedValue(undefined),
 }));
+const requestEngineDetectionMock = vi.fn();
+vi.mock("../../engine/hooks/engineDetectionCoordinator", () => ({
+  requestEngineDetection: (
+    options: { source: string; force?: boolean; engines?: string[] },
+  ) => requestEngineDetectionMock(options),
+}));
 vi.mock("../../../services/events", () => ({
   subscribeNativeProviderContinuationProgress: vi.fn(
     (
@@ -170,6 +176,18 @@ function createDeferred<T>() {
     resolvePromise = resolve;
   });
   return { promise, resolve: resolvePromise };
+}
+
+function buildInstalledEngineStatus(engineType: EngineType): import("../../../types").EngineStatus {
+  return {
+    engineType,
+    installed: true,
+    version: "1.0.0",
+    binPath: null,
+    features: {} as import("../../../types").EngineFeatures,
+    models: [],
+    error: null,
+  };
 }
 
 function createHandlers() {
@@ -278,6 +296,8 @@ function createHandlers() {
 
 describe("useSidebarMenus", () => {
   beforeEach(() => {
+    requestEngineDetectionMock.mockReset();
+    requestEngineDetectionMock.mockResolvedValue(undefined);
     clientStoreMock.data = {};
     clientStoreMock.getClientStoreSync.mockClear();
     clientStoreMock.writeClientStoreValue.mockClear();
@@ -387,18 +407,11 @@ describe("useSidebarMenus", () => {
   it("refreshes a single engine action without closing the menu", async () => {
     const handlers = createHandlers();
     handlers.engineOptions = [];
-    let rerenderHook:
-      | ((nextHandlers: ReturnType<typeof createHandlers>) => void)
-      | null = null;
-    handlers.onRefreshEngineOptions = vi.fn(async () => {
-      rerenderHook?.(createHandlers());
-    });
+    requestEngineDetectionMock.mockResolvedValue([
+      buildInstalledEngineStatus("claude"),
+    ]);
 
-    const { result, rerender } = renderHook(
-      (nextHandlers: ReturnType<typeof createHandlers>) => useSidebarMenus(nextHandlers),
-      { initialProps: handlers },
-    );
-    rerenderHook = rerender;
+    const { result } = renderHook(() => useSidebarMenus(handlers));
 
     act(() => {
       const event = {
@@ -430,7 +443,13 @@ describe("useSidebarMenus", () => {
       expect(refreshedClaudeAction?.statusLabel).toBeNull();
     });
 
-    expect(handlers.onRefreshEngineOptions).toHaveBeenCalledTimes(1);
+    expect(requestEngineDetectionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "menu-single-engine",
+        force: true,
+        engines: ["claude"],
+      }),
+    );
     expect(pushGlobalRuntimeNoticeMock).toHaveBeenCalledWith(
       expect.objectContaining({
         messageKey: "runtimeNotice.engine.checking",
@@ -446,24 +465,12 @@ describe("useSidebarMenus", () => {
     ["kimi", "Kimi", "new-session-kimi"],
   ] as const)(
     "keeps %s refresh result visible before parent engine props rerender",
-    async (engineType, expectedLabel, actionId) => {
+    async (engineType, _expectedLabel, actionId) => {
       const handlers = createHandlers();
       handlers.engineOptions = [];
-      handlers.onRefreshEngineOptions = vi.fn(async () => ({
-        activeEngine: "claude",
-        availableEngines: [
-          {
-            type: engineType as EngineType,
-            displayName: expectedLabel,
-            shortName: expectedLabel,
-            installed: true,
-            version: "1.0.0",
-            error: null,
-            availabilityState: "ready" as const,
-            availabilityLabelKey: null,
-          },
-        ],
-      }));
+      requestEngineDetectionMock.mockResolvedValue([
+        buildInstalledEngineStatus(engineType),
+      ]);
 
       const { result } = renderHook(() => useSidebarMenus(handlers));
 
@@ -493,7 +500,15 @@ describe("useSidebarMenus", () => {
 
       expect(refreshedAction?.unavailable).toBe(false);
       expect(refreshedAction?.statusLabel).toBeNull();
-      expect(handlers.onRefreshEngineOptions).toHaveBeenCalledTimes(1);
+      // 菜单打开的 fire-and-forget 检测 + 单引擎刷新各一次
+      expect(requestEngineDetectionMock).toHaveBeenCalledTimes(2);
+      expect(requestEngineDetectionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "menu-single-engine",
+          force: true,
+          engines: [engineType],
+        }),
+      );
     },
   );
 

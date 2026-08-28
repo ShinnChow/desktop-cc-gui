@@ -68,6 +68,8 @@ const workspace = {
     "engineOpenCode": "OpenCode",
     "engineDsh": "DeepSeek Harness",
     "engineStatusLoading": "Проверка...",
+
+    "engineStatusFailed": "Не удалось определить, нажмите для повтора",
     "engineStatusRequiresLogin": "Требуется вход",
     "engineComingSoon": "Скоро",
     "startConversation": "Начать беседу",

@@ -90,12 +90,49 @@ export async function installWebAssetsFromFile(
 /**
  * Detect all installed engines and their status
  */
-export async function detectEngines(): Promise<EngineStatus[]> {
+/**
+ * B5：detect 前端守卫超时。25s 覆盖裁剪后最坏探测链（OpenCode version+help
+ * 20s）+ 余量；超时抛 DetectionTimeoutError，不中止后端（后端跑完经事件收货）。
+ */
+export const ENGINE_DETECT_FRONTEND_TIMEOUT_MS = 25_000;
+
+export class EngineDetectionTimeoutError extends Error {
+  constructor() {
+    super("engine detection frontend guard timed out");
+    this.name = "EngineDetectionTimeoutError";
+  }
+}
+
+export async function detectEngines(
+  options: { force?: boolean; engines?: EngineType[] } = {},
+): Promise<EngineStatus[]> {
+  const payload =
+    options.force || options.engines
+      ? { force: options.force ?? false, engines: options.engines ?? null }
+      : {};
+  const invokePromise = invoke<EngineStatus[]>("detect_engines", payload);
+  const guard = new Promise<never>((_, reject) => {
+    setTimeout(
+      () => reject(new EngineDetectionTimeoutError()),
+      ENGINE_DETECT_FRONTEND_TIMEOUT_MS,
+    );
+  });
   try {
-    const statuses = await invoke<EngineStatus[]>("detect_engines");
+    const statuses = await Promise.race([invokePromise, guard]);
     markDaemonEngineRpcSupported(true);
     return statuses;
   } catch (error) {
+    if (error instanceof EngineDetectionTimeoutError) {
+      // 超时不代表 daemon 不可用：在途 invoke 继续跑完（静默收货，事件会补齐）。
+      void invokePromise
+        .then(() => markDaemonEngineRpcSupported(true))
+        .catch(() => {
+          if (isUnknownMethodError(error, "detect_engines")) {
+            markDaemonEngineRpcSupported(false);
+          }
+        });
+      throw error;
+    }
     if (isUnknownMethodError(error, "detect_engines")) {
       if (!shouldUseWebServiceFallback()) {
         throw error;

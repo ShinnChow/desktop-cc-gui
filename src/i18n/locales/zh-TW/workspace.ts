@@ -68,6 +68,8 @@ const workspace = {
     "engineOpenCode": "OpenCode",
     "engineDsh": "DeepSeek Harness",
     "engineStatusLoading": "檢查中…",
+
+    "engineStatusFailed": "偵測失敗，點擊重試",
     "engineStatusRequiresLogin": "需要登入",
     "engineComingSoon": "即將推出",
     "startConversation": "開始對話",

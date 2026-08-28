@@ -153,7 +153,7 @@ type AdapterEngineInfo = {
   type: EngineType;
   installed: boolean;
   version: string | null;
-  availabilityState?: 'loading' | 'ready' | 'requires-login' | 'unavailable';
+  availabilityState?: 'loading' | 'ready' | 'requires-login' | 'unavailable' | 'failed';
   availabilityLabelKey?: string | null;
 };
 

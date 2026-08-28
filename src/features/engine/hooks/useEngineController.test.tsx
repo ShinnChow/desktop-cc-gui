@@ -47,6 +47,11 @@ const engineStatusEventListeners = new Set<
     status: EngineStatus;
   }) => void
 >();
+const requestEngineDetectionMock = vi.fn();
+vi.mock("./engineDetectionCoordinator", () => ({
+  requestEngineDetection: (options: unknown) =>
+    requestEngineDetectionMock(options),
+}));
 vi.mock("../../../services/tauri/appServer", () => ({
   subscribeEngineStatusEvents: vi.fn(
     (
@@ -101,7 +106,12 @@ function createEngineStatus(
 describe("useEngineController", () => {
   beforeEach(() => {
   engineStatusEventListeners.clear();
-    vi.clearAllMocks();
+  requestEngineDetectionMock.mockImplementation(
+    (options: { force?: boolean } | undefined) => {
+      void options;
+      return detectEnginesMock();
+    },
+  );    vi.clearAllMocks();
     window.localStorage.clear();
     isWebServiceRuntimeMock.mockReturnValue(false);
     switchEngineMock.mockResolvedValue(undefined);
@@ -1915,8 +1925,7 @@ describe("useEngineController", () => {
     } finally {
       runSpy.mockRestore();
     }
-  });
-});
+  });});
 
 // ==================== B4 逐引擎事件 ====================
 
@@ -2008,5 +2017,56 @@ describe("useEngineController per-engine status events", () => {
       result.current.engineStatuses.find((status) => status.engineType === "kimi")
         ?.installed,
     ).toBe(true);
+  });
+});
+
+describe("useEngineController detect failure state", () => {
+  it("marks failed on detect rejection and never stays loading forever", async () => {
+    detectEnginesMock.mockRejectedValue(new Error("ipc down"));
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+    expect(result.current.detectFailed).toBe(true);
+    expect(
+      result.current.availableEngines.every(
+        (engine) => engine.availabilityState === "failed",
+      ),
+    ).toBe(true);
+  });
+
+  it("routes detection through the coordinator (shared single-flight)", async () => {
+    detectEnginesMock.mockResolvedValue([
+      createEngineStatus("kimi", true, []),
+    ]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+
+    await waitFor(() => {
+      expect(requestEngineDetectionMock).toHaveBeenCalled();
+    });
+    expect(requestEngineDetectionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "controller" }),
+    );
   });
 });

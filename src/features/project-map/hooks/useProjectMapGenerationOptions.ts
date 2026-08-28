@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CODEX_MODEL_CATALOG } from "../../models/codexModelCatalog";
-import { detectEngines, getConfigModel, getEngineModels, getModelList } from "../../../services/tauri";
+import { getConfigModel, getEngineModels, getModelList } from "../../../services/tauri";
+import { requestEngineDetection } from "../../engine/hooks/engineDetectionCoordinator";
 import type { EngineModelInfo, EngineStatus, EngineType, WorkspaceInfo } from "../../../types";
 import { normalizeEngineForExecution } from "../../../utils/engineExecutionPolicy";
 
@@ -224,7 +225,7 @@ export function useProjectMapGenerationOptions({
     let cancelled = false;
     setEnginesLoading(true);
     setEnginesError(null);
-    void detectEngines()
+    void requestEngineDetection({ source: "project-map" })
       .then((statuses) => {
         if (cancelled) {
           return;

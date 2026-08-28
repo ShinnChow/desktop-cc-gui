@@ -12,7 +12,12 @@ export type EngineDisplayInfo = {
   installed: boolean;
   version: string | null;
   error: string | null;
-  availabilityState?: "loading" | "ready" | "requires-login" | "unavailable";
+  availabilityState?:
+    | "loading"
+    | "ready"
+    | "requires-login"
+    | "unavailable"
+    | "failed";
   availabilityLabelKey?: string | null;
 };
 
@@ -25,6 +30,7 @@ export const ENABLED_ENGINE_TYPES: readonly EngineType[] = Object.freeze(
 export function buildAvailableEngines(
   engineStatuses: readonly EngineStatus[],
   isInitialized: boolean,
+  detectFailed = false,
 ): EngineDisplayInfo[] {
   return ENABLED_ENGINE_TYPES.map((engineType) => {
     const status =
@@ -37,6 +43,11 @@ export function buildAvailableEngines(
     if (!isInitialized) {
       availabilityState = "loading";
       availabilityLabelKey = "workspace.engineStatusLoading";
+    } else if (detectFailed) {
+      // B5：检测失败/超时 MUST 落 failed 态（「检测中」不得永久停留），
+      // 重试成功后由 controller 清除 detectFailed 恢复 ready。
+      availabilityState = "failed";
+      availabilityLabelKey = "workspace.engineStatusFailed";
     } else if (status?.installed) {
       availabilityState = "ready";
       availabilityLabelKey = null;

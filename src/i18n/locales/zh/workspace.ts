@@ -73,6 +73,8 @@ const workspace = {
     engineOpenCode: "OpenCode",
     engineDsh: "DeepSeek Harness",
     engineStatusLoading: "检测中...",
+
+    engineStatusFailed: "检测失败，点击重试",
     engineStatusRequiresLogin: "需先登录",
     engineComingSoon: "即将支持",
     startConversation: "新建会话",

@@ -3,11 +3,16 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EngineStatus, WorkspaceInfo } from "../../../types";
-import { detectEngines, getConfigModel, getEngineModels, getModelList } from "../../../services/tauri";
+import { getConfigModel, getEngineModels, getModelList } from "../../../services/tauri";
 import { useProjectMapGenerationOptions } from "./useProjectMapGenerationOptions";
 
+const detectEnginesMock = vi.fn();
+vi.mock("../../engine/hooks/engineDetectionCoordinator", () => ({
+  requestEngineDetection: (
+    options: { source: string; force?: boolean; engines?: string[] },
+  ) => detectEnginesMock(options),
+}));
 vi.mock("../../../services/tauri", () => ({
-  detectEngines: vi.fn(),
   getConfigModel: vi.fn(),
   getEngineModels: vi.fn(),
   getModelList: vi.fn(),
@@ -86,7 +91,7 @@ const engineStatuses: EngineStatus[] = [
 
 describe("useProjectMapGenerationOptions", () => {
   beforeEach(() => {
-    vi.mocked(detectEngines).mockResolvedValue(engineStatuses);
+    detectEnginesMock.mockResolvedValue(engineStatuses);
     vi.mocked(getEngineModels).mockReset();
     vi.mocked(getModelList).mockReset();
     vi.mocked(getConfigModel).mockReset();

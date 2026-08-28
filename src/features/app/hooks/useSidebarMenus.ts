@@ -1,3 +1,4 @@
+import { requestEngineDetection } from "../../engine/hooks/engineDetectionCoordinator";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -1256,11 +1257,41 @@ export function useSidebarMenus({
 
       let resolvedOverride: EngineDisplayInfo | null = null;
       try {
-        const refreshResult = await onRefreshEngineOptions?.();
-        resolvedOverride =
-          refreshResult?.availableEngines.find((entry) => entry.type === engineType) ??
-          latestEngineOptionsRef.current.find((entry) => entry.type === engineType) ??
-          null;
+        // B5：单引擎刷新走 per-engine force（coordinator 单飞 + 后端 per-engine
+        // cached 检测），不再触发 9 引擎全量 spawn 风暴；结果经逐引擎事件 merge。
+        const refreshedStatuses = await requestEngineDetection({
+          source: "menu-single-engine",
+          force: true,
+          engines: [engineType],
+        }).catch(() => null);
+        // 单引擎刷新不走全量返回；用 per-engine 检测结果构造 override，
+        // 保持「刷新结果立即可见」既有契约，事件 merge 后 engineOptions
+        // 更新会清掉 override（既有对账 effect）。
+        const refreshed = refreshedStatuses?.find(
+          (status) => status.engineType === engineType,
+        );
+        const fallbackInfo = latestEngineOptionsRef.current.find(
+          (entry) => entry.type === engineType,
+        );
+        resolvedOverride = refreshed
+          ? {
+              ...(fallbackInfo ?? {
+                type: engineType,
+                displayName: engineType,
+                shortName: engineType,
+                installed: refreshed.installed,
+                version: refreshed.version,
+                error: refreshed.error,
+              }),
+              installed: refreshed.installed,
+              version: refreshed.version,
+              error: refreshed.error,
+              availabilityState: refreshed.installed ? "ready" : "unavailable",
+              availabilityLabelKey: refreshed.installed
+                ? null
+                : "sidebar.cliNotInstalled",
+            }
+          : null;
         if (engineType === "opencode" && workspace.connected) {
           await primeWorkspaceOpenCodeLoginState(workspace, {
             force: true,
@@ -1321,6 +1352,14 @@ export function useSidebarMenus({
         return {
           unavailable: true,
           statusLabel: t("workspace.engineStatusLoading"),
+          ...commonMeta,
+        };
+      }
+
+      if (engineInfo.availabilityState === "failed") {
+        return {
+          unavailable: true,
+          statusLabel: t("workspace.engineStatusFailed"),
           ...commonMeta,
         };
       }
@@ -2464,6 +2503,9 @@ export function useSidebarMenus({
     (event: MouseEvent, workspace: WorkspaceInfo) => {
       event.preventDefault();
       event.stopPropagation();
+      // B5：菜单打开即 fire-and-forget 检测（后端缓存裁决 fresh/stale，
+      // 事件驱动逐项翻转，不阻塞菜单渲染、不触发切会话路径 IPC）。
+      void requestEngineDetection({ source: "menu-open" }).catch(() => {});
       const workspaceId = workspace.id;
       const { x, y } = resolveWorkspaceMenuPosition(event);
 

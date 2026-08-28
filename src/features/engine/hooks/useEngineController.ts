@@ -8,7 +8,6 @@ import type {
   WorkspaceInfo,
 } from "../../../types";
 import {
-  detectEngines,
   getActiveEngine,
   getEngineModels,
   isWebServiceRuntime,
@@ -19,6 +18,7 @@ import {
   subscribeEngineStatusEvents,
   type EngineStatusUpdatedEvent,
 } from "../../../services/tauri/appServer";
+import { requestEngineDetection } from "./engineDetectionCoordinator";
 import { startupOrchestrator } from "../../startup-orchestration/utils/startupOrchestrator";
 import {
   buildAvailableEngines,
@@ -82,6 +82,8 @@ export function useEngineController({
   const [engineModels, setEngineModels] = useState<EngineModelInfo[]>([]);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  // B5：detect 失败/前端 25s 超时守卫触发后的失败态（「检测中」不得永久停留）。
+  const [detectFailed, setDetectFailed] = useState(false);
   const customModelsVersion = useEngineCatalogRevision();
 
   // Track initialization
@@ -234,6 +236,7 @@ export function useEngineController({
 
     const detectPromise = (async () => {
       setIsDetecting(true);
+      setDetectFailed(false);
 
       onDebug?.({
         id: `${Date.now()}-engine-detect`,
@@ -245,7 +248,7 @@ export function useEngineController({
 
       try {
         const [rawStatuses, detectedEngine] = await Promise.all([
-          detectEngines(),
+          requestEngineDetection({ source: "controller" }),
           getActiveEngine(),
         ]);
         const statuses = rawStatuses.filter((status) =>
@@ -324,7 +327,7 @@ export function useEngineController({
           payload: { statuses, currentEngine: nextActiveEngine },
         });
 
-        const nextAvailableEngines = buildAvailableEngines(statuses, true);
+        const nextAvailableEngines = buildAvailableEngines(statuses, true, false);
 
         setEngineStatuses(statuses);
         setActiveEngineState(nextActiveEngine);
@@ -358,6 +361,10 @@ export function useEngineController({
           label: "engine/detect error",
           payload: error instanceof Error ? error.message : String(error),
         });
+        // B5：失败/超时必置位 isInitialized + failed 态，根除永久「检测中」；
+        // 晚到的真实结果（事件或迟返 invoke）恢复 ready。
+        setIsInitialized(true);
+        setDetectFailed(true);
       } finally {
         detectPromiseRef.current = null;
         setIsDetecting(false);
@@ -396,7 +403,12 @@ export function useEngineController({
         null;
       if (!targetStatus?.installed) {
         try {
-          const refreshedStatuses = (await detectEngines()).filter((status) =>
+          const refreshedStatuses = (
+            await requestEngineDetection({
+              source: "controller-switch",
+              force: true,
+            })
+          ).filter((status) =>
             enabledEngineTypes.includes(status.engineType),
           );
           setEngineStatuses(refreshedStatuses);
@@ -510,7 +522,7 @@ export function useEngineController({
    * Get display information for all engines
    */
   const availableEngines = useMemo(
-    () => buildAvailableEngines(engineStatuses, isInitialized),
+    () => buildAvailableEngines(engineStatuses, isInitialized, detectFailed),
     [engineStatuses, isInitialized],
   );
 
@@ -652,9 +664,53 @@ export function useEngineController({
 
   useEngineRuntimeNotices(availableEngines, isInitialized);
 
+  // B5：打开新建会话菜单的 fire-and-forget 检测——后端缓存裁决 fresh/stale
+  //（fresh 即时返回 0 spawn，stale 走 SWR），不阻塞菜单渲染；结果经事件 merge。
+  const requestMenuOpenDetection = useCallback(() => {
+    void requestEngineDetection({ source: "menu-open" }).catch(() => {
+      // fire-and-forget：失败不打扰菜单；failed 态由显式刷新/重试路径管理
+    });
+  }, []);
+
+  // B5：failed 态重试——清失败态后重跑全量检测（force 语义由后端 SWR 决定）。
+  const retryDetection = useCallback(async () => {
+    setDetectFailed(false);
+    setIsDetecting(true);
+    try {
+      await requestEngineDetection({ source: "controller-retry", force: true });
+    } catch {
+      setDetectFailed(true);
+    } finally {
+      setIsDetecting(false);
+    }
+  }, []);
+
+  // B5：菜单单引擎刷新——per-engine force，不再全量。
+  const refreshSingleEngine = useCallback(
+    async (engineType: EngineType) => {
+      setIsDetecting(true);
+      try {
+        await requestEngineDetection({
+          source: "menu-single-engine",
+          force: true,
+          engines: [engineType],
+        });
+      } catch {
+        // 单引擎失败不置全局 failed；该引擎条目以自身 error 呈现
+      } finally {
+        setIsDetecting(false);
+      }
+    },
+    [],
+  );
+
   return useMemo(
     () => ({
       activeEngine,
+      detectFailed,
+      requestMenuOpenDetection,
+      retryDetection,
+      refreshSingleEngine,
       engineStatuses,
       engineModels,
       engineModelsAsOptions,
