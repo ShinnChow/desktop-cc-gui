@@ -20,6 +20,7 @@ import {
 } from "../../../services/tauri/appServer";
 import { requestEngineDetection } from "./engineDetectionCoordinator";
 import { PROVIDER_TARGET_CATALOG_INVALIDATED_EVENT } from "../../composer/components/ChatInputBox/hooks/useProviderTargetCatalogOwners";
+import { PI_AUTH_CATALOG_CHANGED_EVENT } from "../../vendors/piAuthCatalogEvent";
 import { startupOrchestrator } from "../../startup-orchestration/utils/startupOrchestrator";
 import {
   buildAvailableEngines,
@@ -165,7 +166,9 @@ export function useEngineController({
             : fallbackModels;
         const nextModels = sourceModels.map((model) => normalizeEngineModelEntry(model));
         lastGoodModelsByScopeRef.current.set(catalogRequestKey, nextModels);
-        if (nextModels.length > 0) {
+        // forceRefresh = 权威重探：空目录也必须落表（凭证删除后目录可能真变空），
+        // 否则 engineCatalogsByEngine 残留旧目录，非激活消费方读 stale。
+        if (nextModels.length > 0 || options.forceRefresh) {
           setEngineCatalogsByEngine((current) => {
             const previous = current[engineType];
             if (
@@ -680,6 +683,33 @@ export function useEngineController({
         PROVIDER_TARGET_CATALOG_INVALIDATED_EVENT,
         handler,
       );
+    };
+  }, []);
+  // PI 凭证（auth.json）/ models.json 写入：后端命令已 invalidate_engine_models，
+  // FE 侧同步两步收敛（否则要等切换/翻转/重启才一致）：
+  // ① 清状态副本中的 PI models——与 Rust 失效语义一一对应（清目录留条目），
+  //    非激活投影立即失去 stale status.models；
+  // ② forceRefresh 重载——空目录也被采信并落 engineCatalogsByEngine /
+  //    engineModels，凭证删除后 picker 即时收敛。
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const handler = () => {
+      setEngineStatuses((current) =>
+        current.map((status) =>
+          status.engineType === "pi" && status.models.length > 0
+            ? { ...status, models: [] }
+            : status,
+        ),
+      );
+      void refreshEngineModelsRef.current?.("pi", {
+        forceRefresh: true,
+      }).catch(() => {});
+    };
+    window.addEventListener(PI_AUTH_CATALOG_CHANGED_EVENT, handler);
+    return () => {
+      window.removeEventListener(PI_AUTH_CATALOG_CHANGED_EVENT, handler);
     };
   }, []);
   const pendingStatusEventsRef = useRef<Map<EngineType, EngineStatusUpdatedEvent>>(new Map());

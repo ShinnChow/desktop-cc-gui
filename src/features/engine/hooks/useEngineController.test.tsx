@@ -2171,4 +2171,56 @@ describe("useEngineController detect failure state", () => {
       expect.objectContaining({ source: "controller" }),
     );
   });
+
+  it("clears stale pi models and force-reloads catalog on pi auth change", async () => {
+    // 初载：PI 目录带「已删 provider」的旧模型（凭证删除前探测的残留）
+    const stalePiModels: EngineStatus["models"] = [
+      { id: "deepseek-v4-pro", displayName: "DeepSeek V4 Pro", description: "", isDefault: true },
+    ];
+    detectEnginesMock.mockResolvedValue([
+      createEngineStatus("kimi", true, []),
+      createEngineStatus("pi", true, stalePiModels),
+    ]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+    await waitFor(() =>
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "pi")
+          ?.models.length,
+      ).toBeGreaterThan(0),
+    );
+    const callsBeforeDispatch = getEngineModelsMock.mock.calls.length;
+
+    // 删除/保存凭证成功后组件广播本事件：FE 必须清 stale models 并 force 重载
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("ccgui:pi-auth-catalog-changed"));
+    });
+
+    await waitFor(() => {
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "pi")
+          ?.models,
+      ).toHaveLength(0);
+    });
+    // 状态条目本身保留（installed/version 不动，等价轻量检测态）
+    expect(
+      result.current.engineStatuses.find((status) => status.engineType === "pi")
+        ?.installed,
+    ).toBe(true);
+    // force 重载发生（get_engine_models 带 forceRefresh，空目录也被采信）
+    const piForceCall = getEngineModelsMock.mock.calls
+      .slice(callsBeforeDispatch)
+      .find(([engine, options]) => engine === "pi" && options?.forceRefresh);
+    expect(piForceCall).toBeDefined();
+  });
 });

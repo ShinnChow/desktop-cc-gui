@@ -178,27 +178,36 @@ describe("PiProviderAuthSection", () => {
   });
 
   it("opens inline editor, cancels on empty save, persists on value save", async () => {
-    await renderSection();
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener("ccgui:pi-auth-catalog-changed", listener);
+    try {
+      await renderSection();
 
-    const setButtons = screen.getAllByText("设置 Key");
-    fireEvent.click(setButtons[0]); // openai
-    const editor = await screen.findByTestId("pi-auth-editor-openai");
-    expect(editor).toBeTruthy();
+      const setButtons = screen.getAllByText("设置 Key");
+      fireEvent.click(setButtons[0]); // openai
+      const editor = await screen.findByTestId("pi-auth-editor-openai");
+      expect(editor).toBeTruthy();
 
-    // 留空保存 = 取消，不调用后端
-    fireEvent.click(screen.getByText("保存"));
-    expect(mockSet).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("pi-auth-editor-openai")).toBeNull();
+      // 留空保存 = 取消，不调用后端、不广播目录失效
+      fireEvent.click(screen.getByText("保存"));
+      expect(mockSet).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("pi-auth-editor-openai")).toBeNull();
+      expect(events).toHaveLength(0);
 
-    // 重新展开并输入保存
-    fireEvent.click(screen.getAllByText("设置 Key")[0]);
-    const input = await screen.findByPlaceholderText(/粘贴 OPENAI_API_KEY/);
-    fireEvent.change(input, { target: { value: "  sk-proj-abc  " } });
-    fireEvent.click(screen.getByText("保存"));
-    await waitFor(() =>
-      expect(mockSet).toHaveBeenCalledWith("openai", "sk-proj-abc"),
-    );
-    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+      // 重新展开并输入保存：写凭证后必须广播 FE 目录重载事件
+      fireEvent.click(screen.getAllByText("设置 Key")[0]);
+      const input = await screen.findByPlaceholderText(/粘贴 OPENAI_API_KEY/);
+      fireEvent.change(input, { target: { value: "  sk-proj-abc  " } });
+      fireEvent.click(screen.getByText("保存"));
+      await waitFor(() =>
+        expect(mockSet).toHaveBeenCalledWith("openai", "sk-proj-abc"),
+      );
+      await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+      expect(events).toHaveLength(1);
+    } finally {
+      window.removeEventListener("ccgui:pi-auth-catalog-changed", listener);
+    }
   });
 
   it("keeps only one editor expanded at a time", async () => {
@@ -214,21 +223,30 @@ describe("PiProviderAuthSection", () => {
   });
 
   it("requires confirmation before deleting a credential", async () => {
-    await renderSection();
-    const anthropicRow = screen
-      .getByText("ANTHROPIC_API_KEY")
-      .closest(".pi-auth-row") as HTMLElement;
-    fireEvent.click(within(anthropicRow).getByText("删除"));
-    // 确认前不调用后端
-    expect(mockDelete).not.toHaveBeenCalled();
-    const confirm = await screen.findByText(
-      "settings.vendor.deleteConfirm.confirm",
-    );
-    fireEvent.click(confirm);
-    await waitFor(() =>
-      expect(mockDelete).toHaveBeenCalledWith("anthropic"),
-    );
-    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener("ccgui:pi-auth-catalog-changed", listener);
+    try {
+      await renderSection();
+      const anthropicRow = screen
+        .getByText("ANTHROPIC_API_KEY")
+        .closest(".pi-auth-row") as HTMLElement;
+      fireEvent.click(within(anthropicRow).getByText("删除"));
+      // 确认前不调用后端、不广播目录失效
+      expect(mockDelete).not.toHaveBeenCalled();
+      expect(events).toHaveLength(0);
+      const confirm = await screen.findByText(
+        "settings.vendor.deleteConfirm.confirm",
+      );
+      fireEvent.click(confirm);
+      await waitFor(() =>
+        expect(mockDelete).toHaveBeenCalledWith("anthropic"),
+      );
+      await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(events).toHaveLength(1));
+    } finally {
+      window.removeEventListener("ccgui:pi-auth-catalog-changed", listener);
+    }
   });
 
   it("filters providers by search and toggles the full catalog", async () => {

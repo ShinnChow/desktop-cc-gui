@@ -34,6 +34,7 @@ import {
 } from "../piAuthProviderCatalog";
 import { loadSettingsStyles } from "../../../styles/featureStyleLoaders";
 import { useFeatureStylesReady } from "../../../styles/useFeatureStylesReady";
+import { notifyPiAuthCatalogChanged } from "../piAuthCatalogEvent";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { ProviderBrandIconImg } from "./ProviderBrandIconImg";
 
@@ -156,6 +157,8 @@ export function PiProviderAuthSection({ piBin }: { piBin?: string | null }) {
       setActionError(null);
       try {
         await piAuthSetApiKey(provider.id, key);
+        // 后端已失效 Rust 目录缓存；再广播 FE 侧重载，picker/思考档立即收敛。
+        notifyPiAuthCatalogChanged();
         closeEditor();
         await refresh();
       } catch (error) {
@@ -173,6 +176,8 @@ export function PiProviderAuthSection({ piBin }: { piBin?: string | null }) {
     }
     try {
       await piAuthDeleteCredential(deleteTarget.id);
+      // 同 handleSave：删除后广播 FE 目录重载（目录可能收缩甚至变空）。
+      notifyPiAuthCatalogChanged();
       setDeleteTarget(null);
       await refresh();
     } catch (error) {
@@ -200,6 +205,8 @@ export function PiProviderAuthSection({ piBin }: { piBin?: string | null }) {
     setModelsError(null);
     try {
       await piModelsConfigWrite(modelsDraft);
+      // models.json 自定义供应商同样进入 PI 目录，保存后同步 FE 重载。
+      notifyPiAuthCatalogChanged();
       setModelsEditorOpen(false);
       setModelsDraft("");
       await refresh();
