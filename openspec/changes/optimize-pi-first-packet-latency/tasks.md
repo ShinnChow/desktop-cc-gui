@@ -12,6 +12,7 @@
 - [x] 1.4 i18n 核验：`messages.waitingForFirstText` / `messages.nonStreamingHint` 在 10 locale 全覆盖，无需新增
 - [x] 1.5 单测：`resolvePresentationProfile("pi").heartbeatWaitingHint === true`；既有引擎（opencode/codex/默认）profile 零回归；`waitingForFirstTextLabel` 对 pi 的选取分支（含 `waitingForFirstChunk` false 时回落正常 label）
 - [x] 1.6 自检 + review + 提交：相关 vitest 14/14 + tsc 零错误；`Messages.live-behavior` 10 个滚动用例失败经 stash 对照确认为存量问题（与本批无关）；diff 仅含本批 hunk（+92/-4），我的新增行 prettier-clean，存量格式违规未裹挟；macOS 目视待验收，Win/Linux 后续补
+- [x] 1.7 验收修复（2026-08-28 真机反馈）：pi 流是 reasoning/tool 先行，原清除条件只认 assistant message 导致「思考/工具已渲染、标签仍称等待首段文本」粘连——`waitingForFirstChunk` 对 pi 扩为 reasoning/tool item 也算 chunk 到达（codex/qoder/dsh 语义不变），spec delta 场景措辞同步修正；单测 11/11（新增 reasoning 清除 / tool 清除 / codex 不回归三例）
 
 ## Phase 2 — D1 resident 预热
 

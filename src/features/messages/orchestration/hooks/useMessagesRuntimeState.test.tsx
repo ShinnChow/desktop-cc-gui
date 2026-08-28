@@ -82,6 +82,74 @@ describe("useMessagesRuntimeState", () => {
     expect(result.current.primaryWorkingLabel).toBe(null);
   });
 
+  it("stops showing the waiting label for pi as soon as reasoning streams", () => {
+    const reasoningItem: ConversationItem = {
+      id: "pi-reasoning-1",
+      kind: "reasoning",
+      summary: "thinking",
+      content: "thinking out loud",
+    };
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "pi",
+          deferredRenderSourceItems: [userItem, reasoningItem],
+          renderSourceItems: [userItem, reasoningItem],
+          items: [userItem, reasoningItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(false);
+    expect(result.current.primaryWorkingLabel).toBe(null);
+  });
+
+  it("stops showing the waiting label for pi once a tool row renders", () => {
+    const toolItem: ConversationItem = {
+      id: "pi-tool-1",
+      kind: "tool",
+      toolType: "ctxTree",
+      title: "Ctx Tree",
+      detail: ".",
+      status: "running",
+    };
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "pi",
+          deferredRenderSourceItems: [userItem, toolItem],
+          renderSourceItems: [userItem, toolItem],
+          items: [userItem, toolItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(false);
+    expect(result.current.primaryWorkingLabel).toBe(null);
+  });
+
+  it("keeps the assistant-message-only chunk semantics for codex reasoning", () => {
+    const reasoningItem: ConversationItem = {
+      id: "codex-reasoning-1",
+      kind: "reasoning",
+      summary: "thinking",
+      content: "codex thinking",
+    };
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "codex",
+          deferredRenderSourceItems: [userItem, reasoningItem],
+          renderSourceItems: [userItem, reasoningItem],
+          items: [userItem, reasoningItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(true);
+    expect(result.current.primaryWorkingLabel).toBe("waiting");
+  });
+
   it("keeps the non-pi default working label for claude silence", () => {
     const { result } = renderHook(() =>
       useMessagesRuntimeState(

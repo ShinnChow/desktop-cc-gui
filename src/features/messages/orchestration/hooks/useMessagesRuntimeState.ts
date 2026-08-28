@@ -9,7 +9,11 @@ import {
   VISIBLE_TEXT_REPORT_MIN_INTERVAL_MS,
 } from "../../constants/messagesConstants";
 import type { LastVisibleTextReport } from "../../types/messagesTypes";
-import { isAssistantMessageConversationItem, isUserMessageConversationItem } from "../../utils/messageItemPredicates";
+import {
+  isAssistantMessageConversationItem,
+  isReasoningConversationItem,
+  isUserMessageConversationItem,
+} from "../../utils/messageItemPredicates";
 import {
   findLastUserMessageIndex,
   findLatestAssistantMessageIdAfterIndex,
@@ -354,13 +358,29 @@ export function useMessagesRuntimeState({
     if (latestUserIndex < 0) {
       return false;
     }
-    for (let index = latestUserIndex + 1; index < deferredRenderSourceItems.length; index += 1) {
-      if (isAssistantMessageConversationItem(deferredRenderSourceItems[index])) {
+    // pi 的流是 reasoning/tool 先行（首个 message_update 即 thinking_start）：
+    // 思考或工具行一旦渲染就不再是「等待首段」静默窗，标签必须立即让位，
+    // 否则流已到而文案仍称等待（2026-08-28 真机反馈）。其余引擎维持只有
+    // assistant message 才算 chunk 到达的既有语义。
+    const reasoningOrToolCountsAsChunk = activeEngine === "pi";
+    for (
+      let index = latestUserIndex + 1;
+      index < deferredRenderSourceItems.length;
+      index += 1
+    ) {
+      const item = deferredRenderSourceItems[index];
+      if (isAssistantMessageConversationItem(item)) {
+        return false;
+      }
+      if (
+        reasoningOrToolCountsAsChunk &&
+        (isReasoningConversationItem(item) || item?.kind === "tool")
+      ) {
         return false;
       }
     }
     return true;
-  }, [deferredRenderSourceItems, isThinking]);
+  }, [activeEngine, deferredRenderSourceItems, isThinking]);
   const approvalResumeWorkingLabel = useMemo(() => {
     if (!isThinking || lastUserMessageIndex < 0) {
       return null;

@@ -23,7 +23,7 @@ pi turn 的静默窗口（agent_start 之后、首个 `message_update` 之前）
 #### Scenario: 首个 delta 到达后无缝切换
 
 - **GIVEN** 静默期反馈已建立（等待文案 + 秒表 [+ 安抚提示]）
-- **WHEN** 首个 `message_update`（`thinking_start`）落地产生 assistant item（`waitingForFirstChunk` 变 false）
+- **WHEN** 首个 `message_update`（`thinking_start`）落地渲染出 reasoning / tool 等可见流式 item（pi 的 `waitingForFirstChunk` 随之变 false；codex/qoder/dsh 维持 assistant-message 语义不变）
 - **THEN** 等待文案 MUST 立即回落为正常 label，不闪烁、不重复、不多渲染一帧以上
 - **AND** thinking 内容 MUST 经既有 reasoning 行通路接管渲染
 
