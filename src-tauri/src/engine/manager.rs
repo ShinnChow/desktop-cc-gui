@@ -733,6 +733,13 @@ impl EngineManager {
         statuses.insert(status.engine_type, status);
     }
 
+    /// Drop the cached status for an engine. Credential-mutating paths
+    /// (PI auth.json 写入/删除)用：目录随凭证实时变化，而 models 消费路径的
+    /// 内存缓存无 TTL，不失效则 picker 会继续展示已变更 provider 的模型。
+    pub async fn invalidate_engine_status(&self, engine_type: EngineType) {
+        self.engine_statuses.write().await.remove(&engine_type);
+    }
+
     /// Get all cached engine statuses
     pub async fn get_all_statuses(&self) -> Vec<EngineStatus> {
         let statuses = self.engine_statuses.read().await;
@@ -2040,6 +2047,19 @@ mod tests {
             serde_json::from_str(&json).expect("deserialize entry");
         assert_eq!(parsed.status.version.as_deref(), Some("3.1.4"));
         assert!(parsed.status.installed);
+    }
+
+    #[tokio::test]
+    async fn invalidate_engine_status_drops_cached_catalog() {
+        let manager = Arc::new(EngineManager::new());
+        manager
+            .cache_engine_status(b3_status(EngineType::Pi, true, Some("1.0.0")))
+            .await;
+        assert!(manager.get_engine_status(EngineType::Pi).await.is_some());
+
+        // 凭证写入路径依赖本失效：失效后目录消费不得再命中内存缓存。
+        manager.invalidate_engine_status(EngineType::Pi).await;
+        assert!(manager.get_engine_status(EngineType::Pi).await.is_none());
     }
 
     #[tokio::test]

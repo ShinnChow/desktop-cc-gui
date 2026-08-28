@@ -507,7 +507,14 @@ pub async fn pi_auth_set_api_key(
         &key,
         config.as_ref().and_then(|item| item.home_dir.as_deref()),
     )
-    .await
+    .await?;
+    // 凭证写入改变 pi 的可用模型目录（pi 每次实时按 auth.json 过滤），
+    // 必须丢掉内存态目录缓存，否则模型选择器继续展示已变更 provider 的模型。
+    state
+        .engine_manager
+        .invalidate_engine_status(EngineType::Pi)
+        .await;
+    Ok(())
 }
 
 /// Delete an api_key credential from auth.json (OAuth entries are refused).
@@ -532,7 +539,13 @@ pub async fn pi_auth_delete_credential(
         &provider_id,
         config.as_ref().and_then(|item| item.home_dir.as_deref()),
     )
-    .await
+    .await?;
+    // 同 set：删除后目录按实时探测收敛，防 picker 继续展示已删 provider 的模型。
+    state
+        .engine_manager
+        .invalidate_engine_status(EngineType::Pi)
+        .await;
+    Ok(())
 }
 
 #[cfg(test)]
