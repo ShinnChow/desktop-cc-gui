@@ -385,6 +385,72 @@ function clipDiagnosticString(value: string, maxLength: number): string {
   return `${withoutControls.slice(0, maxLength)}…`;
 }
 
+// 与 features/files/utils/fileMarkdownDocument 的 hashStableString 同算法
+// （31 乘子 + base36），保证 fast-markdown-worker 崩溃指纹与这里同指纹空间。
+// 本地实现避免 services → features 的反向依赖。
+function hashDiagnosticText(text: string): string {
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+export type DiagnosticErrorAttribution = {
+  errorName: string;
+  messageHash: string;
+  messageLength: number;
+};
+
+/**
+ * F1/F2（enhance-perf-diagnostics-evidence）：错误的结构化归因字段。
+ * 字段名刻意避开 isSensitiveDiagnosticField 的内容 token（message/error/reason…），
+ * 使「错误构造名 + 文本指纹」能过持久化 sanitize 存活；错误文本本体仍脱敏、
+ * 完整文本只进 console。
+ */
+export function buildDiagnosticErrorAttribution(
+  error: unknown,
+): DiagnosticErrorAttribution {
+  if (error instanceof Error) {
+    const message = error.message || error.name || "Error";
+    return {
+      errorName: error.name || "Error",
+      messageHash: hashDiagnosticText(message),
+      messageLength: message.length,
+    };
+  }
+  const text = error == null ? "unknown" : String(error);
+  return {
+    errorName: "Error",
+    messageHash: hashDiagnosticText(text),
+    messageLength: text.length,
+  };
+}
+
+const MAX_DIAGNOSTIC_COMPONENT_FRAMES = 12;
+
+/**
+ * componentStack → 组件名数组（≤12 帧、每帧 clip 32）。组件名是代码标识符、
+ * 不含用户内容，字段名 `componentFrames` 避开内容 token，sanitize 后存活。
+ */
+export function buildDiagnosticComponentFrames(
+  componentStack: string | null | undefined,
+): string[] {
+  if (!componentStack || typeof componentStack !== "string") {
+    return [];
+  }
+  const frames: string[] = [];
+  const framePattern = /\bat\s+([A-Za-z0-9_$]+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = framePattern.exec(componentStack)) !== null) {
+    frames.push(clipDiagnosticString(match[1] ?? "", 32));
+    if (frames.length >= MAX_DIAGNOSTIC_COMPONENT_FRAMES) {
+      break;
+    }
+  }
+  return frames;
+}
+
 function sanitizeDiagnosticValue(
   value: unknown,
   fieldName: string,
@@ -1736,15 +1802,20 @@ export function installRendererLifecycleDiagnostics() {
         lineno: event.lineno,
         colno: event.colno,
         error: formatUnknown(event.error),
+        // F2（enhance-perf-diagnostics-evidence）：结构化归因（文本本体仍脱敏）
+        ...buildDiagnosticErrorAttribution(event.error ?? event.message),
       }),
     );
-  });
-
-  window.addEventListener("unhandledrejection", (event) => {
+  });  window.addEventListener("unhandledrejection", (event) => {
+    const attribution = buildDiagnosticErrorAttribution(event.reason);
     appendRendererDiagnostic(
       "window/unhandledrejection",
       collectWindowSnapshot({
         reason: formatUnknown(event.reason),
+        // F2：结构化归因（reason 文本本体仍脱敏）
+        reasonName: attribution.errorName,
+        reasonHash: attribution.messageHash,
+        reasonLength: attribution.messageLength,
       }),
     );
   });

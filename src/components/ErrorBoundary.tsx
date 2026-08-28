@@ -5,7 +5,11 @@ import {
   type ReactNode,
 } from "react";
 import i18n from "../i18n";
-import { appendRendererDiagnostic } from "../services/rendererDiagnostics";
+import {
+  appendRendererDiagnostic,
+  buildDiagnosticComponentFrames,
+  buildDiagnosticErrorAttribution,
+} from "../services/rendererDiagnostics";
 import { recoverFromReactScanUpdateDepthError } from "../services/reactScanController";
 import {
   ERROR_BOUNDARY_FEEDBACK_URL,
@@ -105,10 +109,18 @@ export class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     const reactScanRecoveryStatus = recoverFromReactScanUpdateDepthError(error);
+    // F1（enhance-perf-diagnostics-evidence）：结构化归因（errorName/文本指纹/组件帧）。
+    // 字段名避开内容 token，过 sanitize 存活；error/componentStack 本体仍脱敏。
+    const attribution = buildDiagnosticErrorAttribution(error);
+    const componentFrames = buildDiagnosticComponentFrames(
+      errorInfo.componentStack,
+    );
     if (reactScanRecoveryStatus === "recovered") {
       appendRendererDiagnostic("react/error-boundary-react-scan-recovery", {
         errorClass: "maximum-update-depth",
         componentStack: errorInfo.componentStack || null,
+        ...attribution,
+        componentFrames,
       });
       return;
     }
@@ -116,6 +128,8 @@ export class ErrorBoundary extends Component<
       appendRendererDiagnostic("react/error-boundary-react-scan-recovery-failed", {
         errorClass: "maximum-update-depth",
         componentStack: errorInfo.componentStack || null,
+        ...attribution,
+        componentFrames,
       });
     }
     this.setState({ errorInfo, copyStatus: "idle" });
@@ -123,6 +137,8 @@ export class ErrorBoundary extends Component<
       error: `${error.name}: ${error.message}`,
       errorClass: classifyErrorBoundaryError(error),
       componentStack: errorInfo.componentStack || null,
+      ...attribution,
+      componentFrames,
     });
     console.error("[ErrorBoundary] Uncaught rendering error:", error, errorInfo);
   }
