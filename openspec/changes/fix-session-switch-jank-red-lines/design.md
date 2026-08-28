@@ -72,39 +72,35 @@ Batch 4  红线收窄 threadDataContext（F5）     —— app-shell 跨域重�
 
 ## Batch 3：resume hydrate 元数据合批
 
-现状（`useThreadActionsResumeThread.ts:654-762`）：hydrate 完成段连续 dispatch `ensureThread → setThreadItems(首个 chunk) → setThreadPlan → setThreadHistoryRestoredAt → setThreadHistoryWindow → setThreadTokenUsage`，因 await 边界各自成 commit。
+实施中核实（修正立项时假设）：React 18 automatic batching 下，`applyHydratedItems` 的 items dispatch 与其后微任务里的 metadata dispatch 本就同宏任务 → 已合为一次 commit。真正多付的是 **curtain paint yield 之前的 `ensureThread` 独立 dispatch**——它让侧栏/全树在还只显示 curtain 时就多付一次根级 commit。
 
-设计：
+实际落地：
 
-- reducer 新增组合 action `hydrateThreadHistorySnapshot`，payload：`{ workspaceId, threadId, items, plan, historyRestoredAtMs, historyWindow, tokenUsage }`（全部可选，除 identity 外）；单次状态转移内依序复用**既有**子逻辑（ensureThread 的行合并、setThreadItems 的 prepare/merge、plan/restoredAt/window/tokenUsage 的字段写入），保证与逐个 dispatch 的最终状态 bit 级一致——实现方式是把现有各 case 的纯函数体提取为 reducer 内共享函数，新旧 action 共用，杜绝双实现漂移。
-- `hydrateHistorySnapshot` 调用点改为：单个 `dispatch({type:"hydrateThreadHistorySnapshot", ...})` 替代 5 次 dispatch；首个 items chunk（tail-first ≤300）与元数据同 action 落地。progressive 多 chunk 路径（>300）保持既有后续 chunk dispatch 不变（那是首屏窗口设计，非本 change 范围）。
-- commit 预算：hydrate 段 = curtain 组（切前，已有）+ 数据+元数据组（1 commit）+ progressive 收尾（仅 >300 条会话）。单会话切入 hydrate 阶段根级 commit ≤3。
-- 兼容：`ensureThread / setThreadPlan / ...` 既有 action 与调用方保留（resume 之外的路径仍在用）；仅 resume 链切换到组合 action。
-- 风险：claude token 回填等条件分支（`:500-506`）必须跟随进 payload 的可选字段；错误恢复路径（`setThreadHistoryRecoveryFailed`）不合并（低频且语义独立）。
+- reducer 新增组合 action `hydrateThreadHistorySnapshot`（payload：ensureThread 字段 + plan + historyRestoredAtMs + historyWindow + tokenUsage 可选），case 内**递归调用 `threadReducer` 依序应用既有子 case**——构造上保证与逐个 dispatch 终态 bit 级一致，零逻辑复制。
+- `hydrateHistorySnapshot` 调用点：移除 yield 前的 `ensureThread` dispatch；`applyHydratedItems`（items）之后以组合 action 一次落 ensure + plan + restoredAt + window + tokenUsage——与 items dispatch 同宏任务 → 同一次根级 commit。
+- hydrate 段 commit 预算：curtain 组（recovery/progress，挂独立 historyLoading state）+ 数据+元数据组 = **2 次**（≤3 达标）；claude/gemini 恢复路径本就同宏任务合批，不动。
+- 测试锚点：`useThreadsReducer.hydrateComposite.test.ts`（4 测：字段覆盖 / 与细粒度路径 deep-equal / 可选字段 / null plan 语义）+ `useThreadActions.test.tsx` 两用例更新为新契约（ensure 经组合 action 落库）。
 
 ## Batch 4：红线收窄 threadDataContext
 
-红线：`threadsByWorkspace / threadStatusById / threadItemsByThread / threadListLoadingByWorkspace`（含 history* 投影）禁止被 `sections / render / layoutNodesChrome` 无差别订阅。
+红线：`threadsByWorkspace / threadStatusById / threadItemsByThread / threadListLoadingByWorkspace` 禁止被 left/right 无差别订阅。
 
-现状：四 key 在 `settingsContext`（`appShellDomainContexts.ts:628-631`），而 `APP_SHELL_CONSUMER_DOMAIN_SELECTION` 的 `layoutNodes / layoutNodesChrome / sections / render` 四个消费集都含 `settingsContext` → 任一线程 dispatch 四个 bag 全失效。
+现状核实（实施前消费面盘点，tasks 4.1）：四 key 原在 `settingsContext`（`appShellDomainContexts.ts`），四个消费集全选该域。真实消费点：`layoutNodes`（sidebar/topbar 节点构建）、`sections`（flows/searchRadar/quickSwitcher）、`render`（仅 Settings 的 workspace 数据管理读 `threadsByWorkspace/threadListLoadingByWorkspace`）、`layoutNodesChrome`（**零直接消费者**，仅因侧栏数据此前经 settingsContext 进 chromeBag）。
 
-设计：
+分两阶段落地（本 change 交付 4a）：
 
-- 新增 domain `threadDataContext`（`APP_SHELL_DOMAIN_CONTEXT_NAMES` 第 15 个），owner：`buildThreadDataDomainContextSlice`（`useAppShellDomainAssembly.ts` 新 builder）+ runtime thread host（写权唯一，符合「写权单一」矩阵原则）。
-- key 迁移：上述四 key（+ 若 §3.4 簇中 `history*` 投影同属全量 map 语义则一并）从 settingsContext 迁出；settingsContext 剩余 keys（settings UI / terminal / radar UI 态 / skills 启动器）语义保持。
-- 消费集收敛：
-  - `sections / render / layoutNodesChrome` 的选择集**不包含** `threadDataContext`；
-  - 实际消费方逐一改窄通道：
-    - sidebar 线程列表 / topbar tabs：`layoutNodes` 消费集**保留** threadDataContext（它们是真消费者），但 sidebar 行数据已经过 `useSidebarThreadStatusProjection` 布尔投影，`Sidebar` memo 面不扩散；
-    - quick switcher / radar / search 面板：经各自 section 的**字段级**选择读取（`selectAppShellDomainBag` 已支持 selected-field helper；若无则新增 `selectAppShellDomainFields`）；
-    - composer：仅读 activeThreadId（已在 sessionIdentityContext）与自身窄信号，迁移后不订阅 threadDataContext；
-  - 迁移中发现的「sections/render 实际读取了 thread map 字段」的隐性消费点：逐点处理——能改投影的改投影（布尔/计数），真需要全量的显式声明消费 threadDataContext（此时该点成为记录在案的窄消费者，而不是域泄漏）。
-- 可执行 gate（TDD 锚点）：`appShellDomainOwnershipGate.test.ts` 或新增 `threadDataSubscriptionRedLine.test.ts` 断言：
-  1. `APP_SHELL_CONSUMER_DOMAIN_SELECTION.sections / render / layoutNodesChrome` 不含 `"threadDataContext"`；
-  2. 这些消费集的 bag 构建结果（`selectAppShellDomainBag` 输出）不含上述四 key；
-  3. owner map 完整性测试对迁移后 key 集合仍全绿（`APP_SHELL_DOMAIN_CONTEXT_OWNED_KEYS` 同步更新）。
-- Governance：`npm run check:app-shell:governance` 必须全绿（owner map 完整 / 无重复 owner / freeze 表 key 数：settingsContext 36 → 减 4~6，threadDataContext 起步 ≈4~6，远低于 soft 80；navigation hard ≤79 不受影响）。
-- 预期收益量化：切会话 `setActiveThreadId` 与任何线程 dispatch 的 bag 失效面从 4 个消费集收敛到 1 个（layoutNodes）+ 显式窄消费者；`AppShellView` 三 section 中 sections/render 不再因线程态整体重跑。
+### 4a（已交付）：域迁移 + 冷域收窄 + 红线 gate
+
+- 新增 `threadDataContext`（第 15 域），owner builder `buildThreadDataDomainContextSlice`（写权唯一 runtime thread host），hard budget 4 咬死；settingsContext 36 → 32。
+- 消费集：`layoutNodes` / `layoutNodesCanvas`（侧栏节点数据随 canvas zone bag 供应）/ `sections` / `render` **显式**选择该域；**`layoutNodesChrome` 不选择** → 线程 dispatch 不再重建 chrome bag。
+- 收益：① threads map 脱离 settingsContext——settings UI / terminal / radar UI 态的 bag 不再与线程态同域放大；② chrome zone 与线程 dispatch 解耦；③ 红线可执行化。
+- 红线 gate（`threadDataSubscriptionRedLine.test.ts`）：四 key 归属断言 + chrome 排除断言 + sections/render 显式消费记录断言（防无差别回流）。
+
+### 4b（后续批次，本 change 不交付）：逐点投影化收窄
+
+- `render`：Settings 的 `workspaceThreadsById` 改由 settings surface 窄通道供给，移出 render 选择集；
+- `sections`：flows/searchRadar/quickSwitcher 按消费点改布尔/计数投影或字段级选择；
+- 每移出一个点更新红线 gate 的显式消费清单，最终目标是 sections/render 不再选择 `threadDataContext`。
 
 ## 测量与验收口径
 
