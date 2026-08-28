@@ -13,6 +13,7 @@ const git = {
     "commitStagedChanges": "Fazer commit das alterações preparadas",
     "commitAllChanges": "Fazer commit de todas as alterações não preparadas",
     "diffUnavailable": "Diff indisponível.",
+    "diffNoTextChanges": "Sem alterações de texto (apenas os fins de linha podem diferir).",
     "imageDiffUnavailable": "Prévia da imagem indisponível.",
     "untracked": "Não rastreado",
     "noChanges": "Nenhuma alteração",

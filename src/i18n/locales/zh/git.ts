@@ -10,6 +10,7 @@ const git = {
     commitStagedChanges: "提交已暂存的更改",
     commitAllChanges: "提交所有未暂存的更改",
     diffUnavailable: "差异不可用。",
+    diffNoTextChanges: "没有文本差异（可能仅为换行符差异）。",
     imageDiffUnavailable: "图片预览不可用。",
     untracked: "未跟踪",
     noChanges: "无更改",

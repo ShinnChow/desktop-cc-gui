@@ -13,6 +13,7 @@ const git = {
     "commitStagedChanges": "스테이징된 변경 사항 커밋",
     "commitAllChanges": "스테이징되지 않은 모든 변경 사항 커밋",
     "diffUnavailable": "Diff를 사용할 수 없습니다.",
+    "diffNoTextChanges": "텍스트 변경 사항이 없습니다(줄바꿈 문자만 다를 수 있음).",
     "imageDiffUnavailable": "이미지 미리 보기를 사용할 수 없습니다.",
     "untracked": "추적되지 않음",
     "noChanges": "변경 사항 없음",
