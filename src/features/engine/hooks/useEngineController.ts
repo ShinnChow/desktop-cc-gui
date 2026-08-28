@@ -86,6 +86,11 @@ export function useEngineController({
   const [isInitialized, setIsInitialized] = useState(false);
   // B5：detect 失败/前端 25s 超时守卫触发后的失败态（「检测中」不得永久停留）。
   const [detectFailed, setDetectFailed] = useState(false);
+  // P0 修复：解耦引擎的响应式 per-engine 目录表——任何一次真实加载落地即
+  // 写入，非激活消费方（思考档联动/分组模型列表）不再读到恒空 catalog。
+  const [engineCatalogsByEngine, setEngineCatalogsByEngine] = useState<
+    Partial<Record<EngineType, EngineModelInfo[]>>
+  >({});
   const customModelsVersion = useEngineCatalogRevision();
 
   // Track initialization
@@ -160,6 +165,18 @@ export function useEngineController({
             : fallbackModels;
         const nextModels = sourceModels.map((model) => normalizeEngineModelEntry(model));
         lastGoodModelsByScopeRef.current.set(catalogRequestKey, nextModels);
+        if (nextModels.length > 0) {
+          setEngineCatalogsByEngine((current) => {
+            const previous = current[engineType];
+            if (
+              (previous?.length ?? 0) === nextModels.length &&
+              previous?.[0]?.id === nextModels[0]?.id
+            ) {
+              return current;
+            }
+            return { ...current, [engineType]: nextModels };
+          });
+        }
         if (visibleCatalogRequestKeyRef.current === catalogRequestKey) {
           setEngineModels((currentModels) =>
             areEngineModelCatalogsEqual(currentModels, nextModels)
@@ -357,6 +374,23 @@ export function useEngineController({
             phase: resolveEngineCatalogLoadPhase(nextActiveEngine),
           });
         }
+        // 后台预热其余解耦引擎的目录（仅 pi/opencode：静态/低危害探测；
+        // qoder 为 ACP 重探测 + runtime-only，明确排除——其目录由切换/
+        // picker 显式路径按需加载）。非激活消费方（Shared 思考档联动/
+        // 分组模型列表）依赖响应式目录表非空。idle-prewarm 后台预算，
+        // 失败无副作用：后续切换/翻转路径会以 on-demand 重试。
+        statuses
+          .filter(
+            (status) =>
+              status.installed &&
+              status.engineType !== nextActiveEngine &&
+              (status.engineType === "pi" || status.engineType === "opencode"),
+          )
+          .forEach((status) => {
+            void loadModelsForEngine(status.engineType, [], {
+              phase: "idle-prewarm",
+            }).catch(() => {});
+          });
 
         return {
           availableEngines: nextAvailableEngines,
@@ -599,8 +633,15 @@ export function useEngineController({
         engineStatuses,
         activeEngine,
         mappedEngineModels,
+        engineCatalogsByEngine,
       ),
-    [activeEngine, customModelsVersion, engineStatuses, mappedEngineModels],
+    [
+      activeEngine,
+      customModelsVersion,
+      engineCatalogsByEngine,
+      engineStatuses,
+      mappedEngineModels,
+    ],
   );
 
   // Initialize on mount

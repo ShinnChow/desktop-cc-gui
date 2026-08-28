@@ -307,6 +307,10 @@ export function projectEngineModelCatalogs(
   engineStatuses: readonly EngineStatus[],
   activeEngine: EngineType,
   activeModels: readonly EngineModelInfo[],
+  /** B-fix：解耦引擎（pi/qoder/opencode）的响应式 per-engine 目录表——
+   *  非激活态 status.models 恒空，任何一次真实加载落地后写入此处，
+   *  供 Composer 思考档联动 / 分组模型列表等非激活消费方取数。 */
+  catalogsByEngine: Partial<Record<EngineType, readonly EngineModelInfo[]>> = {},
 ): Partial<Record<EngineType, ModelOption[]>> {
   const catalogs: Partial<Record<EngineType, ModelOption[]>> = {};
   for (const status of engineStatuses) {
@@ -314,7 +318,11 @@ export function projectEngineModelCatalogs(
       continue;
     }
     const baseModels =
-      status.engineType === activeEngine ? activeModels : status.models;
+      status.engineType === activeEngine
+        ? activeModels
+        : (status.models.length > 0
+            ? status.models
+            : (catalogsByEngine[status.engineType] ?? []));
     catalogs[status.engineType] = projectEngineModels(
       status.engineType,
       baseModels,
