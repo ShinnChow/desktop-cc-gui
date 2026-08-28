@@ -13,6 +13,7 @@ vi.mock("../../../services/clientStorage", () => ({
 
 import {
   MAX_TURN_FINAL_META_ENTRIES_PER_THREAD,
+  MAX_TURN_FINAL_META_THREADS,
   TURN_FINAL_META_STORE_KEY,
   deleteTurnFinalMetaForThread,
   mergeTurnFinalMetaIntoItems,
@@ -20,6 +21,7 @@ import {
   persistTurnFinalMetaFromAssistant,
   persistTurnFinalMetaFromItems,
   pruneTurnFinalMetaEntries,
+  pruneTurnFinalMetaMap,
   recordFromAssistantMessage,
   renameTurnFinalMetaThreadId,
   upsertTurnFinalMetaRecord,
@@ -288,6 +290,29 @@ describe("turnFinalMetaStorage", () => {
     const pruned = pruneTurnFinalMetaEntries(entries, 3);
     expect(pruned).toHaveLength(3);
     expect(pruned.map((entry) => entry.assistantItemId)).toEqual(["a2", "a3", "a4"]);
+  });
+
+  it("caps thread count at the tightened 200-thread budget, keeping newest", () => {
+    // F2c（fix-session-switch-jank-red-lines）：500 线程上限曾把存量堆到 633KB。
+    expect(MAX_TURN_FINAL_META_THREADS).toBe(200);
+
+    const map: TurnFinalMetaMap = {};
+    for (let index = 0; index < 201; index += 1) {
+      map[`thread-${index}`] = [
+        {
+          assistantItemId: `a-${index}`,
+          finalDurationMs: index,
+          updatedAt: index + 1,
+        },
+      ];
+    }
+    const pruned = pruneTurnFinalMetaMap(map);
+    expect(Object.keys(pruned)).toHaveLength(200);
+    // 最旧的 thread-0 被剪掉，最新的 thread-200 保留
+    expect(pruned["thread-0"]).toBeUndefined();
+    expect(pruned["thread-200"]).toEqual([
+      { assistantItemId: "a-200", finalDurationMs: 200, updatedAt: 201 },
+    ]);
   });
 
   it("normalizes corrupted store payloads", () => {

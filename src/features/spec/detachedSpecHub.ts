@@ -112,9 +112,23 @@ export function readDetachedSpecHubSessionSnapshot(): DetachedSpecHubSession | n
 }
 
 export function writeDetachedSpecHubSessionSnapshot(session: DetachedSpecHubSession): void {
-  writeClientStoreValue("app", DETACHED_SPEC_HUB_SESSION_STORAGE_KEY, session, {
-    immediate: true,
-  });
+  // F2b（fix-session-switch-jank-red-lines）：只持久化指针字段。files/directories 是
+  // 可由磁盘重扫的派生树（detached 窗口 focus 时本就走 getWorkspaceFiles 重扫），
+  // 实测存量全树持久化把该 key 堆到 1.28MB。保留 immediate：开窗后 detached 进程
+  // 同步读该快照做首帧，属用户显式动作回响。
+  writeClientStoreValue(
+    "app",
+    DETACHED_SPEC_HUB_SESSION_STORAGE_KEY,
+    {
+      workspaceId: session.workspaceId,
+      workspaceName: session.workspaceName,
+      changeId: session.changeId ?? null,
+      artifactType: session.artifactType ?? null,
+      specSourcePath: session.specSourcePath ?? null,
+      updatedAt: session.updatedAt,
+    },
+    { immediate: true },
+  );
 }
 
 export function buildDetachedSpecHubWindowTitle(

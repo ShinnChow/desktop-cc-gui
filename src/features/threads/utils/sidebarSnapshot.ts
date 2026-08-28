@@ -1,8 +1,62 @@
 import type { ThreadSummary, WorkspaceInfo, WorkspaceSettings } from "../../../types";
 import { getClientStoreSync, writeClientStoreValue } from "../../../services/clientStorage";
+import { hashStableString } from "../../files/utils/fileMarkdownDocument";
 
 const SIDEBAR_SNAPSHOT_KEY = "sidebarSnapshot";
 const SIDEBAR_SNAPSHOT_VERSION = 1;
+
+// F1a（fix-session-switch-jank-red-lines）：内容签名跳过。
+// useThreads 的 effect 对 threadsByWorkspace 任何引用变化都会调 saveSidebarSnapshotAllThreads，
+// 切会话时多由无关 dispatch 换引用触发；签名相同必须零成本早退（不 normalize、不写盘）。
+// 签名排除 updatedAt 时间戳噪声；磁盘现值参与首签初始化，跨重启不重写。
+let lastPersistedSnapshotContentSignature: string | null = null;
+let lastSeenAllThreadsInputSignature: string | null = null;
+
+function computeSnapshotContentSignature(content: {
+  workspaces?: unknown;
+  threadsByWorkspace?: unknown;
+}): string {
+  return hashStableString(
+    JSON.stringify({
+      workspaces: content.workspaces ?? [],
+      threadsByWorkspace: content.threadsByWorkspace ?? {},
+    }),
+  );
+}
+
+function readPersistedSnapshotContentSignature(): string {
+  const raw = getClientStoreSync<unknown>("threads", SIDEBAR_SNAPSHOT_KEY);
+  if (!isRecord(raw)) {
+    return "";
+  }
+  return computeSnapshotContentSignature(raw);
+}
+
+function rememberSnapshotContentSignatureAndSkipIfUnchanged(content: {
+  workspaces: WorkspaceInfo[];
+  threadsByWorkspace: Record<string, ThreadSummary[]>;
+}): boolean {
+  const signature = computeSnapshotContentSignature(content);
+  if (lastPersistedSnapshotContentSignature === null) {
+    lastPersistedSnapshotContentSignature = readPersistedSnapshotContentSignature();
+  }
+  if (signature === lastPersistedSnapshotContentSignature) {
+    return true;
+  }
+  lastPersistedSnapshotContentSignature = signature;
+  writeClientStoreValue("threads", SIDEBAR_SNAPSHOT_KEY, {
+    version: SIDEBAR_SNAPSHOT_VERSION,
+    updatedAt: Date.now(),
+    ...content,
+  });
+  return false;
+}
+
+/** 测试专用：清空签名缓存（磁盘现值会在下次持久化时重新初始化）。 */
+export function __resetSidebarSnapshotSignatureForTests(): void {
+  lastPersistedSnapshotContentSignature = null;
+  lastSeenAllThreadsInputSignature = null;
+}
 
 export type SidebarSnapshot = {
   version: 1;
@@ -287,12 +341,7 @@ export function saveSidebarSnapshotWorkspaces(workspaces: WorkspaceInfo[]): void
       workspaceIds.has(workspaceId),
     ),
   );
-  writeClientStoreValue("threads", SIDEBAR_SNAPSHOT_KEY, {
-    ...current,
-    updatedAt: Date.now(),
-    workspaces,
-    threadsByWorkspace,
-  });
+  rememberSnapshotContentSignatureAndSkipIfUnchanged({ workspaces, threadsByWorkspace });
 }
 
 export function saveSidebarSnapshotThreads(
@@ -303,9 +352,8 @@ export function saveSidebarSnapshotThreads(
     return;
   }
   const current = buildSnapshot(loadSidebarSnapshot());
-  writeClientStoreValue("threads", SIDEBAR_SNAPSHOT_KEY, {
-    ...current,
-    updatedAt: Date.now(),
+  rememberSnapshotContentSignatureAndSkipIfUnchanged({
+    workspaces: current.workspaces,
     threadsByWorkspace: {
       ...current.threadsByWorkspace,
       [workspaceId]: threads,
@@ -320,6 +368,12 @@ export function saveSidebarSnapshotThreads(
 export function saveSidebarSnapshotAllThreads(
   threadsByWorkspace: Record<string, ThreadSummary[]>,
 ): void {
+  // 输入级 fast-path：内容未变（仅引用变化）时在 normalize 前整体早退。
+  const inputSignature = hashStableString(JSON.stringify(threadsByWorkspace));
+  if (inputSignature === lastSeenAllThreadsInputSignature) {
+    return;
+  }
+  lastSeenAllThreadsInputSignature = inputSignature;
   const current = buildSnapshot(loadSidebarSnapshot());
   const nextThreadsByWorkspace = { ...current.threadsByWorkspace };
   let changed = false;
@@ -333,9 +387,8 @@ export function saveSidebarSnapshotAllThreads(
   if (!changed) {
     return;
   }
-  writeClientStoreValue("threads", SIDEBAR_SNAPSHOT_KEY, {
-    ...current,
-    updatedAt: Date.now(),
+  rememberSnapshotContentSignatureAndSkipIfUnchanged({
+    workspaces: current.workspaces,
     threadsByWorkspace: nextThreadsByWorkspace,
   });
 }
@@ -373,9 +426,8 @@ function flushQueuedRemovals(): void {
   if (!changed) {
     return;
   }
-  writeClientStoreValue("threads", SIDEBAR_SNAPSHOT_KEY, {
-    ...current,
-    updatedAt: Date.now(),
+  rememberSnapshotContentSignatureAndSkipIfUnchanged({
+    workspaces: current.workspaces,
     threadsByWorkspace: nextThreadsByWorkspace,
   });
 }

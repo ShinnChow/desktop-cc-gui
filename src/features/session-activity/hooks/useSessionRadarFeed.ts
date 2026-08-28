@@ -734,9 +734,7 @@ export function useSessionRadarFeed(input: UseSessionRadarFeedInput): SessionRad
     if (!isClientStoreReady(RADAR_STORE_NAME)) {
       return;
     }
-    writeClientStoreValue(RADAR_STORE_NAME, SESSION_RADAR_RECENT_STORAGE_KEY, persistedRecentRefs, {
-      immediate: true,
-    });
+    writeClientStoreValue(RADAR_STORE_NAME, SESSION_RADAR_RECENT_STORAGE_KEY, persistedRecentRefs);
 
     const existingReadState =
       getClientStoreSync<Record<string, number>>(RADAR_STORE_NAME, SESSION_RADAR_READ_STATE_KEY) ??
@@ -745,9 +743,7 @@ export function useSessionRadarFeed(input: UseSessionRadarFeedInput): SessionRad
     const prunedReadState = Object.fromEntries(
       Object.entries(existingReadState).filter(([entryId]) => activeIds.has(entryId)),
     );
-    writeClientStoreValue(RADAR_STORE_NAME, SESSION_RADAR_READ_STATE_KEY, prunedReadState, {
-      immediate: true,
-    });
+    writeClientStoreValue(RADAR_STORE_NAME, SESSION_RADAR_READ_STATE_KEY, prunedReadState);
 
     // 惰性修剪物理移除的条目，其 dismissed 记录一并清除；用户主动删除的条目不走
     // bounds 修剪（不在 prunedEntryIds 内），cutoff 保留以防止 reconcile 复活。
@@ -766,7 +762,6 @@ export function useSessionRadarFeed(input: UseSessionRadarFeedInput): SessionRad
           RADAR_STORE_NAME,
           SESSION_RADAR_DISMISSED_COMPLETED_AT_BY_ID_KEY,
           nextDismissed,
-          { immediate: true },
         );
       }
     }
