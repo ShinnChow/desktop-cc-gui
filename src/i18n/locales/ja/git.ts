@@ -13,6 +13,7 @@ const git = {
     "commitStagedChanges": "ステージ済みの変更をコミット",
     "commitAllChanges": "すべての未ステージの変更をコミット",
     "diffUnavailable": "差分を利用できません。",
+    "diffNoTextChanges": "テキスト差分はありません（改行コードのみの差異の可能性）。",
     "imageDiffUnavailable": "画像プレビューを利用できません。",
     "untracked": "未追跡",
     "noChanges": "変更なし",

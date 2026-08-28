@@ -10,6 +10,7 @@ const git = {
     commitStagedChanges: "Commit staged changes",
     commitAllChanges: "Commit all unstaged changes",
     diffUnavailable: "Diff unavailable.",
+    diffNoTextChanges: "No textual changes (line endings may only differ).",
     imageDiffUnavailable: "Image preview unavailable.",
     untracked: "Untracked",
     noChanges: "No changes",

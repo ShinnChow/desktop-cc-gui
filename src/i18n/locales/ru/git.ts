@@ -13,6 +13,7 @@ const git = {
     "commitStagedChanges": "Закоммитить проиндексированные изменения",
     "commitAllChanges": "Закоммитить все непроиндексированные изменения",
     "diffUnavailable": "Diff недоступен.",
+    "diffNoTextChanges": "Нет изменений текста (могут отличаться только концы строк).",
     "imageDiffUnavailable": "Просмотр изображения недоступен.",
     "untracked": "Не отслеживается",
     "noChanges": "Нет изменений",

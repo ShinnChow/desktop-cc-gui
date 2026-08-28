@@ -13,6 +13,7 @@ const git = {
     "commitStagedChanges": "स्टेज किए गए परिवर्तन कमिट करें",
     "commitAllChanges": "सभी अनस्टेज परिवर्तन कमिट करें",
     "diffUnavailable": "Diff उपलब्ध नहीं।",
+    "diffNoTextChanges": "कोई टेक्स्ट परिवर्तन नहीं (केवल लाइन एंडिंग भिन्न हो सकती हैं)।",
     "imageDiffUnavailable": "छवि पूर्वावलोकन उपलब्ध नहीं।",
     "untracked": "अनट्रैक्ड",
     "noChanges": "कोई परिवर्तन नहीं",
