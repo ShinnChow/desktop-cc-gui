@@ -35,6 +35,21 @@ function renderWorking(isThinking = true) {
 }
 
 describe("WorkingIndicator spinner platform split", () => {
+  it("renders an explicit conversation-tail curtain while background tasks await a main-channel continuation", () => {
+    const { getByText } = render(
+      <WorkingIndicator
+        isThinking
+        isBackgroundTaskAwaiting
+        backgroundTaskRunningCount={2}
+        hasItems
+        primaryLabel="正在等待 2 个后台任务完成"
+      />,
+    );
+
+    expect(getByText("正在等待 2 个后台任务完成")).toBeTruthy();
+    expect(getByText("任务完成后主对话将自动继续")).toBeTruthy();
+  });
+
   beforeEach(() => {
     mocks.isWindowsPlatform.mockReset();
     mocks.isWindowsPlatform.mockReturnValue(false);
@@ -107,15 +122,21 @@ describe("WorkingIndicator live tokens", () => {
     const { container } = renderWorking();
     expect(container.querySelector(".working-timer-tokens")).toBeNull();
     expect(container.querySelector(".working-timer-separator")).toBeNull();
-    expect(container.querySelector(".working-text")?.textContent).toContain("响应中");
+    expect(container.querySelector(".working-text")?.textContent).toContain(
+      "响应中",
+    );
   });
 
   it("renders compact live tokens beside the timer", () => {
     mocks.liveTokenSnapshot.tokenCount = 5600;
     mocks.liveTokenSnapshot.usageUpdatedAt = Date.now();
     const { container } = renderWorking();
-    expect(container.querySelector(".working-timer-separator")?.textContent).toBe("·");
-    expect(container.querySelector(".working-timer-tokens")?.textContent).toBe("5.6K tokens");
+    expect(
+      container.querySelector(".working-timer-separator")?.textContent,
+    ).toBe("·");
+    expect(container.querySelector(".working-timer-tokens")?.textContent).toBe(
+      "5.6K tokens",
+    );
   });
 
   it("hides leftover tokens from the previous turn", () => {

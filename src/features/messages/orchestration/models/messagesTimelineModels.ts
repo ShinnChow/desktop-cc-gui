@@ -1,8 +1,4 @@
-import type {
-  MutableRefObject,
-  ReactNode,
-  RefObject,
-} from "react";
+import type { MutableRefObject, ReactNode, RefObject } from "react";
 import type {
   AccessMode,
   ConversationItem,
@@ -67,6 +63,9 @@ export type TimelineLiveModel = {
   heartbeatPulse: number;
   hiddenClaudeReasoningOnly: boolean;
   isThinking: boolean;
+  isBackgroundTaskAwaiting: boolean;
+  backgroundTaskRunningCount: number;
+  backgroundTaskAwaitingStartedAt: number | null;
   isWorking: boolean;
   lastDurationMs: number | null;
   latestReasoningId: string | null;
@@ -130,12 +129,16 @@ export type TimelineInteractionModel = {
   onRecoverThreadRuntime?: (
     workspaceId: string,
     threadId: string,
-  ) => Promise<RuntimeReconnectRecoveryCallbackResult> | RuntimeReconnectRecoveryCallbackResult;
+  ) =>
+    | Promise<RuntimeReconnectRecoveryCallbackResult>
+    | RuntimeReconnectRecoveryCallbackResult;
   onRecoverThreadRuntimeAndResend?: (
     workspaceId: string,
     threadId: string,
     message: RetryMessage,
-  ) => Promise<RuntimeReconnectRecoveryCallbackResult> | RuntimeReconnectRecoveryCallbackResult;
+  ) =>
+    | Promise<RuntimeReconnectRecoveryCallbackResult>
+    | RuntimeReconnectRecoveryCallbackResult;
   onRetryHistory?: () => void;
   onRewindFromMessage?: (messageId: string) => void;
   onShowAllHistoryItems: () => void;

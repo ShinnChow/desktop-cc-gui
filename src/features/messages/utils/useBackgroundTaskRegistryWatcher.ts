@@ -34,7 +34,16 @@ export type BackgroundTaskRegistryWatcherOptions = {
 const DEFAULT_POLL_MS = 3000;
 const DEFAULT_STALE_MS = 30000;
 
-const TERMINAL = new Set(["completed", "failed", "killed"]);
+// 终态口径与 backgroundTaskStore.isTerminalBackgroundTaskStatus 一致
+// （含 cancelled/canceled）：registry metadata 写取消终态时必须立刻
+// 收口，否则 watcher 会把已取消任务当 running 永久探测。
+const TERMINAL = new Set([
+  "completed",
+  "failed",
+  "killed",
+  "cancelled",
+  "canceled",
+]);
 
 function isTerminalStatus(status: unknown): boolean {
   return TERMINAL.has(
@@ -211,6 +220,9 @@ async function probeThreadTasks({
     const taskId =
       typeof rawId === "string" ? rawId : ((record.toolId as string) ?? "");
     if (!taskId) continue;
+    // deadSince 按 workspace+thread+taskId 复合 key：不同会话的 taskId
+    // 可能撞号，裸 key 会互相重置「持续死亡」计时。
+    const deadKey = `${workspaceId}\u0000${threadId}\u0000${taskId}`;
 
     let terminal: Record<string, unknown> | null = null;
     if (outputPath) {
@@ -233,7 +245,7 @@ async function probeThreadTasks({
     }
 
     if (terminal) {
-      deadSince.delete(taskId);
+      deadSince.delete(deadKey);
       apply({ toolId: null, task: terminal, source: "registry" });
       continue;
     }
@@ -246,11 +258,11 @@ async function probeThreadTasks({
       continue;
     }
     if (alive === true) {
-      deadSince.delete(taskId);
+      deadSince.delete(deadKey);
       continue;
     }
-    const firstSeen = deadSince.get(taskId) ?? nowMs;
-    deadSince.set(taskId, firstSeen);
+    const firstSeen = deadSince.get(deadKey) ?? nowMs;
+    deadSince.set(deadKey, firstSeen);
     if (nowMs - firstSeen < staleAfterMs) {
       continue;
     }

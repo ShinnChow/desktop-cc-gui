@@ -82,6 +82,8 @@ export type ConversationMeta = {
   engine: ConversationEngine;
   activeTurnId: string | null;
   isThinking: boolean;
+  /** Detached PI task work; unlike isThinking it does not represent a foreground turn. */
+  backgroundTaskRunningCount?: number;
   heartbeatPulse: number | null;
   historyRestoredAtMs: number | null;
   historyHasMore?: boolean | null;

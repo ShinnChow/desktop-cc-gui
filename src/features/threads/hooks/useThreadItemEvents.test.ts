@@ -1774,4 +1774,38 @@ describe("onBackgroundTaskUpdated post-settle terminal update", () => {
     // settle 的会话永久「响应中」（2026-08-28 真机回归）。
     expect(markProcessing).not.toHaveBeenCalledWith("pi:s1", true);
   });
+
+  it("does not emit any extra timeline item beyond the task card on terminal update", () => {
+    // 完成留痕行已移除（2026-08-29 复盘）：终态更新只翻任务卡，
+    // 等待语义完全由 background-awaiting 幕布承载。
+    const { result, dispatch } = makeOptions({
+      activeThreadId: "pi:s1",
+      resolveCanonicalThreadId: (id) => id,
+    });
+    const taskCard = {
+      id: "tool-bg-1",
+      kind: "tool",
+      toolType: "backgroundTask",
+      title: "bg_run",
+      detail: "",
+      status: "completed",
+      output: JSON.stringify({ id: "t-1", status: "completed" }),
+    } as const;
+    vi.mocked(buildConversationItem).mockReturnValue(
+      taskCard as unknown as ReturnType<typeof buildConversationItem>,
+    );
+
+    act(() => {
+      result.current.onBackgroundTaskUpdated("ws-1", "pi:s1", {
+        toolId: "tool-bg-1",
+        task: { id: "t-1", status: "completed", exitCode: 0 },
+        source: "notification",
+      });
+    });
+
+    const upserts = dispatch.mock.calls
+      .map((call) => call[0] as { type: string; item: { id: string } })
+      .filter((action) => action.type === "upsertItem");
+    expect(upserts.map((action) => action.item.id)).toEqual(["tool-bg-1"]);
+  });
 });

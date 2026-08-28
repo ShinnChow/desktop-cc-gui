@@ -133,7 +133,11 @@ describe("parsePiHistoryMessages", () => {
     expect(task.status).toBe("completed"); // 通知终态覆盖 receipt running
     expect(task.exitCode).toBe(0);
     expect(task.outputPath).toBe(".pi/tasks/session-1-1/b2e2f48ad.output"); // receipt 字段保留
+    expect(items[2]).toEqual(
+      expect.objectContaining({ id: "m4", kind: "message", role: "assistant" }),
+    );
   });
+
 
   it("falls back to the notification position when call/result are outside the window", () => {
     const items = parsePiHistoryMessages([
@@ -145,7 +149,7 @@ describe("parsePiHistoryMessages", () => {
       },
     ]);
 
-    expect(items).toHaveLength(1);
+    expect(items).toHaveLength(1); // 兜底任务卡（通知不成行）
     const card = items[0] as { id: string; toolType: string; output: string };
     expect(card.id).toBe("backgroundTask-task-x");
     expect(card.toolType).toBe("backgroundTask");

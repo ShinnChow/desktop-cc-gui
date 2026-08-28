@@ -140,6 +140,9 @@ type WorkingIndicatorProps = {
   waitingForFirstChunk?: boolean;
   presentationProfile?: PresentationProfile | null;
   primaryLabel?: string | null;
+  /** Detached tasks are waiting for a future foreground stream, not a foreground turn. */
+  isBackgroundTaskAwaiting?: boolean;
+  backgroundTaskRunningCount?: number;
 };
 
 /**
@@ -164,6 +167,8 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   waitingForFirstChunk = false,
   presentationProfile = null,
   primaryLabel = null,
+  isBackgroundTaskAwaiting = false,
+  backgroundTaskRunningCount = 0,
 }: WorkingIndicatorProps) {
   const { t } = useTranslation();
   const liveTokenSnapshot = useActiveCanvasSelector(
@@ -274,12 +279,18 @@ export const WorkingIndicator = memo(function WorkingIndicator({
       setHeartbeatHintText("");
       return;
     }
-    if (heartbeatPulse <= 0 || heartbeatPulse === heartbeatStateRef.current.lastPulse) {
+    if (
+      heartbeatPulse <= 0 ||
+      heartbeatPulse === heartbeatStateRef.current.lastPulse
+    ) {
       return;
     }
     heartbeatStateRef.current.lastPulse = heartbeatPulse;
     let randomIndex = Math.floor(Math.random() * heartbeatHints.length);
-    if (heartbeatHints.length > 1 && randomIndex === heartbeatStateRef.current.lastIndex) {
+    if (
+      heartbeatHints.length > 1 &&
+      randomIndex === heartbeatStateRef.current.lastIndex
+    ) {
       randomIndex = (randomIndex + 1) % heartbeatHints.length;
     }
     heartbeatStateRef.current.lastIndex = randomIndex;
@@ -323,8 +334,23 @@ export const WorkingIndicator = memo(function WorkingIndicator({
               </>
             ) : null}
           </div>
-          <span className="working-text">{displayPrimaryLabel}</span>
-          {showActivityLabel && <span className="working-activity">{activityLabel}</span>}
+          <span
+            className="working-text"
+            data-background-task-awaiting={
+              isBackgroundTaskAwaiting ? "true" : undefined
+            }
+          >
+            {displayPrimaryLabel}
+          </span>
+          {isBackgroundTaskAwaiting && backgroundTaskRunningCount > 0 ? (
+            <span className="working-activity" data-background-task-awaiting>
+              {t("messages.backgroundTaskAwaitingContinuation", {
+                defaultValue: "任务完成后主对话将自动继续",
+              })}
+            </span>
+          ) : showActivityLabel ? (
+            <span className="working-activity">{activityLabel}</span>
+          ) : null}
           {showNonStreamingHint && (
             <span className="working-hint">
               {heartbeatHintText || resolvedNonStreamingHint}
@@ -336,7 +362,9 @@ export const WorkingIndicator = memo(function WorkingIndicator({
         <div className="turn-complete" aria-live="polite">
           <span className="turn-complete-line" aria-hidden />
           <span className="turn-complete-label">
-            {t("messages.doneIn", { duration: formatDurationMs(lastDurationMs) })}
+            {t("messages.doneIn", {
+              duration: formatDurationMs(lastDurationMs),
+            })}
           </span>
           <span className="turn-complete-line" aria-hidden />
         </div>

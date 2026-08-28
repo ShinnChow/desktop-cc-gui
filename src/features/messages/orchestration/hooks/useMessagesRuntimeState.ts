@@ -30,11 +30,14 @@ type RuntimeLabels = {
   codexSilentSuspected: string;
   waitingForFirstText: string;
   contextCompacting: string;
+  backgroundTasksRunning: string;
 };
 
 type UseMessagesRuntimeStateInput = {
   activeEngine: EngineType;
   activeTurnId: string | null;
+  backgroundTaskRunningCount: number;
+  backgroundTaskEarliestStartTime?: number | null;
   codexSilentSuspectedAt: number | null;
   deferredRenderSourceItems: ConversationItem[];
   isContextCompacting: boolean;
@@ -59,6 +62,8 @@ type UseMessagesRuntimeStateInput = {
 export function useMessagesRuntimeState({
   activeEngine,
   activeTurnId,
+  backgroundTaskRunningCount,
+  backgroundTaskEarliestStartTime,
   codexSilentSuspectedAt,
   deferredRenderSourceItems,
   isContextCompacting,
@@ -76,7 +81,26 @@ export function useMessagesRuntimeState({
   threadId,
   threadStreamLatencyCategory,
 }: UseMessagesRuntimeStateInput) {
-  const isWorking = isThinking || isContextCompacting;
+  const isBackgroundTaskAwaiting =
+    !isThinking && backgroundTaskRunningCount > 0;
+  // 等待起点在入期待锁定：运行中的任务先完成的会让「最早 startTime」往后跳，
+  // 跟随实时 earliest 会让幕布秒表倒退；同一次等待期内必须保持同一锚点
+  // （优先取入期时最早的任务 startTime，缺失才退化为入期时刻）。
+  const backgroundTaskAwaitingStartedAtRef = useRef<number | null>(null);
+  if (
+    isBackgroundTaskAwaiting &&
+    backgroundTaskAwaitingStartedAtRef.current === null
+  ) {
+    backgroundTaskAwaitingStartedAtRef.current =
+      backgroundTaskEarliestStartTime ?? Date.now();
+  } else if (!isBackgroundTaskAwaiting) {
+    backgroundTaskAwaitingStartedAtRef.current = null;
+  }
+  const backgroundTaskAwaitingStartedAt = isBackgroundTaskAwaiting
+    ? backgroundTaskAwaitingStartedAtRef.current
+    : null;
+  const isWorking =
+    isThinking || isContextCompacting || isBackgroundTaskAwaiting;
   const blankingRecoveryActive =
     activeEngine === "claude" &&
     isThinking &&
@@ -96,10 +120,11 @@ export function useMessagesRuntimeState({
   const readableWindowRecoveryActive =
     blankingRecoveryActive || visibleStallRecoveryActive;
 
-  const transientRuntimeReconnectSeenAtByItemIdRef = useRef<Map<string, number>>(new Map());
-  const [transientRuntimeReconnectClock, setTransientRuntimeReconnectClock] = useState(() =>
-    Date.now(),
-  );
+  const transientRuntimeReconnectSeenAtByItemIdRef = useRef<
+    Map<string, number>
+  >(new Map());
+  const [transientRuntimeReconnectClock, setTransientRuntimeReconnectClock] =
+    useState(() => Date.now());
   useEffect(() => {
     const currentMessageIds = new Set(
       items.filter((item) => item.kind === "message").map((item) => item.id),
@@ -135,17 +160,23 @@ export function useMessagesRuntimeState({
       if (!runtimeReconnectHint) {
         return null;
       }
-      if (runtimeReconnectHint.tone === "transient" && sawUserMessageAfterDiagnostic) {
+      if (
+        runtimeReconnectHint.tone === "transient" &&
+        sawUserMessageAfterDiagnostic
+      ) {
         continue;
       }
       if (runtimeReconnectHint.tone === "transient") {
-        const seenAtByItemId = transientRuntimeReconnectSeenAtByItemIdRef.current;
-        const seenAt = seenAtByItemId.get(item.id) ?? transientRuntimeReconnectClock;
+        const seenAtByItemId =
+          transientRuntimeReconnectSeenAtByItemIdRef.current;
+        const seenAt =
+          seenAtByItemId.get(item.id) ?? transientRuntimeReconnectClock;
         if (!seenAtByItemId.has(item.id)) {
           seenAtByItemId.set(item.id, seenAt);
         }
         const autoDismissMs =
-          runtimeReconnectHint.autoDismissMs ?? TRANSIENT_RUNTIME_RECONNECT_AUTO_DISMISS_MS;
+          runtimeReconnectHint.autoDismissMs ??
+          TRANSIENT_RUNTIME_RECONNECT_AUTO_DISMISS_MS;
         if (transientRuntimeReconnectClock - seenAt >= autoDismissMs) {
           continue;
         }
@@ -163,7 +194,9 @@ export function useMessagesRuntimeState({
     if (!latestRuntimeReconnectItemId) {
       return;
     }
-    const item = items.find((candidate) => candidate.id === latestRuntimeReconnectItemId);
+    const item = items.find(
+      (candidate) => candidate.id === latestRuntimeReconnectItemId,
+    );
     if (!item || item.kind !== "message" || item.role !== "assistant") {
       return;
     }
@@ -178,7 +211,8 @@ export function useMessagesRuntimeState({
       transientRuntimeReconnectSeenAtByItemIdRef.current.get(item.id) ??
       transientRuntimeReconnectClock;
     const autoDismissMs =
-      runtimeReconnectHint.autoDismissMs ?? TRANSIENT_RUNTIME_RECONNECT_AUTO_DISMISS_MS;
+      runtimeReconnectHint.autoDismissMs ??
+      TRANSIENT_RUNTIME_RECONNECT_AUTO_DISMISS_MS;
     const remainingMs = Math.max(0, seenAt + autoDismissMs - Date.now());
     const timeoutId = window.setTimeout(() => {
       setTransientRuntimeReconnectClock(Date.now());
@@ -191,7 +225,8 @@ export function useMessagesRuntimeState({
     transientRuntimeReconnectClock,
   ]);
   const latestRetryMessage = useMemo(
-    () => resolveRetryMessageForReconnectItem(items, latestRuntimeReconnectItemId),
+    () =>
+      resolveRetryMessageForReconnectItem(items, latestRuntimeReconnectItemId),
     [items, latestRuntimeReconnectItemId],
   );
 
@@ -205,7 +240,8 @@ export function useMessagesRuntimeState({
   const previousAssistantThinkingRef = useRef(isThinking);
   const previousAssistantScopeKeyRef = useRef(renderScopeKey);
   const runtimeScopeKeyRef = useRef(renderScopeKey);
-  const [finalizingAssistantMessageId, setFinalizingAssistantMessageId] = useState<string | null>(null);
+  const [finalizingAssistantMessageId, setFinalizingAssistantMessageId] =
+    useState<string | null>(null);
   const renderSourceItemsRef = useRef(renderSourceItems);
   renderSourceItemsRef.current = renderSourceItems;
   const lastUserMessageIndex = useMemo(
@@ -218,11 +254,19 @@ export function useMessagesRuntimeState({
   );
 
   const latestAssistantMessageId = useMemo(
-    () => findLatestAssistantMessageIdAfterIndex(deferredRenderSourceItems, lastUserMessageIndex),
+    () =>
+      findLatestAssistantMessageIdAfterIndex(
+        deferredRenderSourceItems,
+        lastUserMessageIndex,
+      ),
     [deferredRenderSourceItems, lastUserMessageIndex],
   );
   const latestLiveSourceAssistantMessageId = useMemo(
-    () => findLatestAssistantMessageIdAfterIndex(renderSourceItems, liveSourceLastUserMessageIndex),
+    () =>
+      findLatestAssistantMessageIdAfterIndex(
+        renderSourceItems,
+        liveSourceLastUserMessageIndex,
+      ),
     [liveSourceLastUserMessageIndex, renderSourceItems],
   );
   const assistantFinalizingCandidateId =
@@ -247,8 +291,8 @@ export function useMessagesRuntimeState({
     assistantFinalizingCandidateId !== null;
   const liveAssistantMessageId = isThinking
     ? assistantFinalizingCandidateId
-    : finalizingAssistantMessageId ??
-      (isAssistantCompletionFrame ? assistantFinalizingCandidateId : null);
+    : (finalizingAssistantMessageId ??
+      (isAssistantCompletionFrame ? assistantFinalizingCandidateId : null));
   const isAssistantFinalizing = !isThinking && liveAssistantMessageId !== null;
   const isWorkingRef = useRef(isWorking);
   isWorkingRef.current = isWorking;
@@ -348,7 +392,11 @@ export function useMessagesRuntimeState({
       return false;
     }
     let latestUserIndex = -1;
-    for (let index = deferredRenderSourceItems.length - 1; index >= 0; index -= 1) {
+    for (
+      let index = deferredRenderSourceItems.length - 1;
+      index >= 0;
+      index -= 1
+    ) {
       const item = deferredRenderSourceItems[index];
       if (isUserMessageConversationItem(item)) {
         latestUserIndex = index;
@@ -406,11 +454,18 @@ export function useMessagesRuntimeState({
       }
     }
     return null;
-  }, [deferredRenderSourceItems, isThinking, labels.approvalResumingAfterApproval, lastUserMessageIndex]);
+  }, [
+    deferredRenderSourceItems,
+    isThinking,
+    labels.approvalResumingAfterApproval,
+    lastUserMessageIndex,
+  ]);
   useEffect(() => {
     setPerfStreamingState({
       isStreaming: isThinking,
-      streamActivityPhase: streamActivityPhase ? String(streamActivityPhase) : null,
+      streamActivityPhase: streamActivityPhase
+        ? String(streamActivityPhase)
+        : null,
       visibleRowCount: renderSourceItems.length,
     });
   }, [isThinking, renderSourceItems.length, streamActivityPhase]);
@@ -435,16 +490,21 @@ export function useMessagesRuntimeState({
       : null;
   const primaryWorkingLabel = isContextCompacting
     ? labels.contextCompacting
-    : codexSilentSuspectedLabel ??
+    : (codexSilentSuspectedLabel ??
+      (isBackgroundTaskAwaiting ? labels.backgroundTasksRunning : null) ??
       waitingForFirstTextLabel ??
-      approvalResumeWorkingLabel;
+      approvalResumeWorkingLabel);
   const enableClaudeRenderSafeMode =
-    (isWindowsDesktop || isMacDesktop) && activeEngine === "claude" && isThinking;
+    (isWindowsDesktop || isMacDesktop) &&
+    activeEngine === "claude" &&
+    isThinking;
 
   const handleAssistantVisibleTextRender = useCallback(
     (payload: { itemId: string; visibleText: string }) => {
       if (
-        (activeEngine !== "claude" && activeEngine !== "codex" && activeEngine !== "gemini") ||
+        (activeEngine !== "claude" &&
+          activeEngine !== "codex" &&
+          activeEngine !== "gemini") ||
         (!isThinking && !isAssistantFinalizing) ||
         !threadId
       ) {
@@ -458,7 +518,9 @@ export function useMessagesRuntimeState({
         payload.itemId === finalizingAssistantMessageId
       ) {
         const targetItem = renderSourceItemsRef.current.find(
-          (item) => isAssistantMessageConversationItem(item) && item.id === payload.itemId,
+          (item) =>
+            isAssistantMessageConversationItem(item) &&
+            item.id === payload.itemId,
         );
         targetTextLength =
           targetItem && isAssistantMessageConversationItem(targetItem)
@@ -468,7 +530,8 @@ export function useMessagesRuntimeState({
       const previousReport = lastVisibleTextReportRef.current;
       const isNewAssistantItem = previousReport.itemId !== payload.itemId;
       const visibleTextGrew =
-        isNewAssistantItem || visibleTextLength > previousReport.visibleTextLength;
+        isNewAssistantItem ||
+        visibleTextLength > previousReport.visibleTextLength;
       if (visibleTextGrew) {
         const now = Date.now();
         const shouldReport =
@@ -476,7 +539,8 @@ export function useMessagesRuntimeState({
           visibleTextLength <= VISIBLE_TEXT_REPORT_EAGER_PREFIX_CHARS ||
           visibleTextLength - previousReport.visibleTextLength >=
             VISIBLE_TEXT_REPORT_MIN_GROWTH_CHARS ||
-          now - previousReport.reportedAt >= VISIBLE_TEXT_REPORT_MIN_INTERVAL_MS ||
+          now - previousReport.reportedAt >=
+            VISIBLE_TEXT_REPORT_MIN_INTERVAL_MS ||
           (targetTextLength > 0 && visibleTextLength >= targetTextLength);
         if (shouldReport) {
           reportVisibleTextRendered(threadId, {
@@ -535,6 +599,8 @@ export function useMessagesRuntimeState({
     handleAssistantVisibleTextRender,
     isAssistantFinalizing,
     isAssistantFinalizingRef,
+    isBackgroundTaskAwaiting,
+    backgroundTaskAwaitingStartedAt,
     isWorking,
     isWorkingRef,
     latestAssistantMessageId,

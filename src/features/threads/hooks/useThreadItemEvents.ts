@@ -1568,6 +1568,7 @@ export function useThreadItemEvents({
         typeof (globalThis as { requestIdleCallback?: unknown })
           .requestIdleCallback === "function"
       ) {
+        // SAFETY: the preceding typeof guard proves this browser global is callable.
         (
           globalThis as unknown as {
             requestIdleCallback: (cb: () => void) => void;
@@ -1607,7 +1608,10 @@ export function useThreadItemEvents({
       }
       flushRealtimeDeltaOps();
       const turnId = extractTurnIdFromRawItem(item);
-      if (!options?.skipTurnTerminalGuard && isRealtimeTurnTerminal(threadId, turnId)) {
+      if (
+        !options?.skipTurnTerminalGuard &&
+        isRealtimeTurnTerminal(threadId, turnId)
+      ) {
         return;
       }
       // \u00a76.3: \u5165\u53e3 ensureThread \u8d70 dispatchWithSchedule\u3002

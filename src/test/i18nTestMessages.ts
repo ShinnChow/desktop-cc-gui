@@ -1202,6 +1202,8 @@ export const mockTranslate = (key: string, params?: Record<string, unknown>) => 
         "messages.backgroundTaskCardFieldOutput": "output-file",
         "messages.backgroundTaskCardFieldError": "error",
         "messages.backgroundTaskCardFieldLog": "log",
+        "messages.backgroundTaskAwaitingRunning": "正在等待 {{count}} 个后台任务完成",
+        "messages.backgroundTaskAwaitingContinuation": "任务完成后主对话将自动继续",
         "messages.backgroundTaskFoldExpand": "Expand background task receipt",
         "messages.backgroundTaskFoldCollapse": "Collapse background task receipt",
         "composer.runStatus.backgroundTasks": "Background tasks",

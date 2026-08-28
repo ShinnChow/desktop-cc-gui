@@ -17,7 +17,10 @@ import {
 } from "../../../utils/threadItems";
 import { settlePlanInProgressSteps } from "../utils/threadNormalize";
 import { mergeTurnTargetBadgesIntoItems } from "../utils/turnTargetBadgeStorage";
-import { renameBackgroundTasksForThread } from "../../messages/utils/backgroundTaskStore";
+import {
+  clearBackgroundTasks,
+  renameBackgroundTasksForThread,
+} from "../../messages/utils/backgroundTaskStore";
 import { isMultiAgentHistFoldItemId } from "../../multi-agent/utils/canvasItems";
 import {
   isCollabWorkerNativeThreadId,
@@ -916,6 +919,13 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       };
     }
     case "removeThread": {
+      // 后台任务状态表随线程删除一并清理（幂等）：否则已删线程残留的
+      // running 记录会让 sidebar sync 持续向幽灵线程 dispatch、registry
+      // watcher 持续探测。queueMicrotask 避免 reducer 执行期同步触发
+      // 外部 store 订阅（StrictMode 双调用下重复 clear 也无副作用）。
+      queueMicrotask(() => {
+        clearBackgroundTasks(action.workspaceId, action.threadId);
+      });
       const list = state.threadsByWorkspace[action.workspaceId] ?? [];
       const filtered = list.filter((thread) => thread.id !== action.threadId);
       const nextActive =

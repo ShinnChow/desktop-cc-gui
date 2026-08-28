@@ -54,9 +54,7 @@ import {
 } from "../../components/MessagesRows";
 import { ConversationRowErrorBoundary } from "../../components/conversation/ConversationRowErrorBoundary";
 import { MultiAgentHistoryFoldTimelineRow } from "../../../multi-agent/components/HistoryFoldCard";
-import {
-  isHistoryFoldItemId,
-} from "../../../multi-agent/store/historyFoldRegistry";
+import { isHistoryFoldItemId } from "../../../multi-agent/store/historyFoldRegistry";
 import { isMultiAgentSettledSummaryItemId } from "../../../multi-agent/utils/canvasItems";
 import { HistoryLoadingSurface } from "./HistoryLoadingSurface";
 import { MiddleStepsCollapsedChip } from "./MiddleStepsCollapsedChip";
@@ -96,6 +94,9 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
   const {
     heartbeatPulse,
     isThinking,
+    isBackgroundTaskAwaiting,
+    backgroundTaskRunningCount,
+    backgroundTaskAwaitingStartedAt,
     isWorking,
     lastDurationMs,
     latestReasoningId,
@@ -165,7 +166,10 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
     messageNodeByIdRef,
   });
   const dockedReasoningById = useMemo(
-    () => new Map(claudeDockedReasoningItems.map((entry) => [entry.item.id, entry])),
+    () =>
+      new Map(
+        claudeDockedReasoningItems.map((entry) => [entry.item.id, entry]),
+      ),
     [claudeDockedReasoningItems],
   );
   // MessageRow 的 memo 比较器按引用比对 userActionNode；若每次时间线渲染都新建
@@ -207,7 +211,9 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
       const agentTaskNotification = parseAgentTaskNotification(renderItem.text);
       // SubAgent 型 task-notification：幕布行整段退役（事实迁 S10）；仅保留 0 高锚点供 scroll
       // Timeline prop 类型只有 taskId/toolUseId，退役判定用 contract 完整 parse（含 summary）
-      const fullAgentTaskNotification = parseFullAgentTaskNotification(renderItem.text);
+      const fullAgentTaskNotification = parseFullAgentTaskNotification(
+        renderItem.text,
+      );
       if (
         fullAgentTaskNotification &&
         isSubagentStyleAgentTaskNotification(fullAgentTaskNotification)
@@ -248,7 +254,7 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
       });
       const actionTargetUserMessageId =
         renderItem.role === "assistant"
-          ? messageActionTargetByAssistantId.get(renderItem.id) ?? null
+          ? (messageActionTargetByAssistantId.get(renderItem.id) ?? null)
           : null;
       const isLatestFinalAssistant =
         renderItem.id === latestFinalAssistantMessageId;
@@ -256,7 +262,7 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
         renderItem.role === "assistant" && renderItem.isFinal === true;
       const assistantCopyText =
         renderItem.role === "assistant"
-          ? messageCopyTextByAssistantId.get(renderItem.id) ?? renderItem.text
+          ? (messageCopyTextByAssistantId.get(renderItem.id) ?? renderItem.text)
           : renderItem.text;
       const userCopyText =
         renderItem.role === "user"
@@ -301,8 +307,14 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
               tooltipSide="top"
             >
               <span className="message-copy-icon" aria-hidden>
-                <Copy className="message-copy-icon-copy message-action-icon" {...actionIconProps} />
-                <Check className="message-copy-icon-check message-action-icon" {...actionIconProps} />
+                <Copy
+                  className="message-copy-icon-copy message-action-icon"
+                  {...actionIconProps}
+                />
+                <Check
+                  className="message-copy-icon-check message-action-icon"
+                  {...actionIconProps}
+                />
               </span>
             </TooltipIconButton>
             {shouldRenderForkAction && actionTargetUserMessageId ? (
@@ -338,7 +350,10 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
                 label={t("noteCards.captureMenu")}
                 tooltipSide="top"
               >
-                <NotebookPen className="message-action-icon" {...actionIconProps} />
+                <NotebookPen
+                  className="message-action-icon"
+                  {...actionIconProps}
+                />
               </TooltipIconButton>
             ) : null}
           </div>
@@ -400,7 +415,9 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
             ref={bindMessageNode}
             data-message-anchor-id={renderItem.id}
             data-agent-task-id={agentTaskNotification?.taskId ?? undefined}
-            data-agent-tool-use-id={agentTaskNotification?.toolUseId ?? undefined}
+            data-agent-tool-use-id={
+              agentTaskNotification?.toolUseId ?? undefined
+            }
           >
             <MessageRow
               item={renderItem}
@@ -425,7 +442,9 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
               enableCollaborationBadge={activeEngine === "codex"}
               presentationProfile={presentationProfile}
               nativeRuntimeRecoveryEnabled={nativeRuntimeRecoveryEnabled}
-              showRuntimeReconnectCard={renderItem.id === latestRuntimeReconnectItemId}
+              showRuntimeReconnectCard={
+                renderItem.id === latestRuntimeReconnectItemId
+              }
               onRecoverThreadRuntime={onRecoverThreadRuntime}
               onRecoverThreadRuntimeAndResend={onRecoverThreadRuntimeAndResend}
               onThreadRecoveryFork={onThreadRecoveryFork}
@@ -441,14 +460,19 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
               onOpenFileLinkMenu={showFileLinkMenu}
               streamMitigationProfile={streamMitigationProfile}
               onAssistantVisibleTextRender={onAssistantVisibleTextRender}
-              suppressMemorySummaryCard={suppressedUserMemoryContextMessageIds.has(renderItem.id)}
-              suppressNoteCardSummaryCard={suppressedUserNoteCardContextMessageIds.has(renderItem.id)}
+              suppressMemorySummaryCard={suppressedUserMemoryContextMessageIds.has(
+                renderItem.id,
+              )}
+              suppressNoteCardSummaryCard={suppressedUserNoteCardContextMessageIds.has(
+                renderItem.id,
+              )}
               showTurnTargetBadge={
                 !renderItem.executionTargetSnapshot ||
                 turnTargetBadgeVisibleItemIds.has(renderItem.id)
               }
               onOutlineReady={
-                renderItem.role === "assistant" && renderItem.id === liveAssistantMessageId
+                renderItem.role === "assistant" &&
+                renderItem.id === liveAssistantMessageId
                   ? liveAssistantOutlineReady
                   : undefined
               }
@@ -480,8 +504,7 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
       // 但 content/summary 已是拼接结果；若仍查源表 reasoningMetaById 会拿到合并前的短正文。
       // parseReasoning 按 item 引用 WeakMap 缓存，稳定行无额外成本。
       const parsed = parseReasoning(renderItem);
-      const isLiveReasoning =
-        isThinking && latestReasoningId === renderItem.id;
+      const isLiveReasoning = isThinking && latestReasoningId === renderItem.id;
       return (
         <ReasoningRow
           key={itemRenderKey}
@@ -513,7 +536,10 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
         />
       );
     }
-    if (renderKind === "generatedImage" && renderItem.kind === "generatedImage") {
+    if (
+      renderKind === "generatedImage" &&
+      renderItem.kind === "generatedImage"
+    ) {
       return (
         <GeneratedImageRow
           key={`generated-image:${renderItem.id}`}
@@ -528,7 +554,9 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
     if (renderKind === "tool" && renderItem.kind === "tool") {
       const isExpanded = expandedItems.has(renderItem.id);
       const selectedExitPlanExecutionMode =
-        selectedExitPlanExecutionByItemKey[`${threadId ?? "no-thread"}:${renderItem.id}`] ?? null;
+        selectedExitPlanExecutionByItemKey[
+          `${threadId ?? "no-thread"}:${renderItem.id}`
+        ] ?? null;
       return (
         <div key={`tool:${renderItem.id}`} className="message-tool-block-shell">
           <ToolBlockRenderer
@@ -551,7 +579,8 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
     }
     if (renderKind === "explore" && renderItem.kind === "explore") {
       const isExpanded =
-        liveAutoExpandedExploreId === renderItem.id || expandedItems.has(renderItem.id);
+        liveAutoExpandedExploreId === renderItem.id ||
+        expandedItems.has(renderItem.id);
       return (
         <ExploreRow
           key={`explore:${renderItem.id}`}
@@ -563,7 +592,12 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
     }
     if (renderKind === "context-event" && renderItem.kind === "context-event") {
       // 引擎侧上下文事件留痕（压缩完成）：独立系统行，不折叠、不进 chip。
-      return <ContextEventRow key={`context-event:${renderItem.id}`} item={renderItem} />;
+      return (
+        <ContextEventRow
+          key={`context-event:${renderItem.id}`}
+          item={renderItem}
+        />
+      );
     }
     return null;
   };
@@ -588,7 +622,10 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
     if (entry.kind === "readGroup") {
       const firstItem = entry.items[0];
       return renderWithAnchoredUserInput(
-        <ReadToolGroupBlock key={`rg-${firstItem?.id ?? "read-group"}`} items={entry.items} />,
+        <ReadToolGroupBlock
+          key={`rg-${firstItem?.id ?? "read-group"}`}
+          items={entry.items}
+        />,
       );
     }
     if (entry.kind === "editGroup") {
@@ -624,7 +661,10 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
     if (entry.kind === "searchGroup") {
       const firstItem = entry.items[0];
       return renderWithAnchoredUserInput(
-        <SearchToolGroupBlock key={`sg-${firstItem?.id ?? "search-group"}`} items={entry.items} />,
+        <SearchToolGroupBlock
+          key={`sg-${firstItem?.id ?? "search-group"}`}
+          items={entry.items}
+        />,
       );
     }
     return renderWithAnchoredUserInput(renderSingleItem(entry.item));
@@ -633,16 +673,14 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
     row: TimelineProjectionRow,
     hydrationState: TimelineRowHydrationState,
   ) => {
-    const { itemCount, rowKindLabel, singleMessage } = resolveTimelineLightweightRowSummary(
-      row,
-      {
+    const { itemCount, rowKindLabel, singleMessage } =
+      resolveTimelineLightweightRowSummary(row, {
         assistantMessage: t("messages.conversationLightweightAssistantMessage"),
         userMessage: t("messages.conversationLightweightUserMessage"),
-      },
-    );
+      });
     const actionTargetUserMessageId =
       singleMessage?.role === "assistant"
-        ? messageActionTargetByAssistantId.get(singleMessage.id) ?? null
+        ? (messageActionTargetByAssistantId.get(singleMessage.id) ?? null)
         : null;
     const shouldRenderForkAction =
       singleMessage?.id === latestFinalAssistantMessageId &&
@@ -726,13 +764,18 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
       }
       // Remount fade-in when a phase is expanded (hard-unmount model: no soft hide).
       if (row.processPhaseKey && !row.processPhaseCollapsed) {
-        const revealDelayMs = Math.min(140, (row.processPhaseRevealIndex ?? 0) * 32);
+        const revealDelayMs = Math.min(
+          140,
+          (row.processPhaseRevealIndex ?? 0) * 32,
+        );
         return (
           <div
             className="messages-process-phase-slot is-expanded"
             data-process-phase-key={row.processPhaseKey}
             data-process-phase-collapsed="false"
-            style={{ animationDelay: `${revealDelayMs}ms` } satisfies CSSProperties}
+            style={
+              { animationDelay: `${revealDelayMs}ms` } satisfies CSSProperties
+            }
           >
             <div className="messages-process-phase-slot-inner">{entryNode}</div>
           </div>
@@ -752,7 +795,11 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
           item={item}
           workspaceId={workspaceId}
           parsed={parsed}
-          isExpanded={isThinking && latestReasoningId === item.id ? true : expandedItems.has(item.id)}
+          isExpanded={
+            isThinking && latestReasoningId === item.id
+              ? true
+              : expandedItems.has(item.id)
+          }
           isLive={isThinking && latestReasoningId === item.id}
           onToggle={toggleExpanded}
           onOpenFileLink={openFileLink}
@@ -780,9 +827,15 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
       return (
         <WorkingIndicator
           isThinking={isWorking}
+          isBackgroundTaskAwaiting={isBackgroundTaskAwaiting}
+          backgroundTaskRunningCount={backgroundTaskRunningCount}
           proxyEnabled={proxyEnabled}
           proxyUrl={proxyUrl}
-          processingStartedAt={processingStartedAt}
+          processingStartedAt={
+            isBackgroundTaskAwaiting
+              ? backgroundTaskAwaitingStartedAt
+              : processingStartedAt
+          }
           lastDurationMs={lastDurationMs}
           heartbeatPulse={heartbeatPulse}
           hasItems={effectiveItemsCount > 0}
@@ -803,7 +856,11 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
           aria-label={t("messages.threadRecoveryTitle")}
         >
           <div className="message-runtime-recovery-header">
-            <Terminal className="message-runtime-recovery-icon" size={15} aria-hidden />
+            <Terminal
+              className="message-runtime-recovery-icon"
+              size={15}
+              aria-hidden
+            />
             <div className="message-runtime-recovery-copy">
               <div className="message-runtime-recovery-title">
                 {t("messages.threadRecoveryTitle")}
@@ -842,7 +899,9 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
           </div>
         );
       }
-      return <div className="empty messages-empty">{t("messages.emptyThread")}</div>;
+      return (
+        <div className="empty messages-empty">{t("messages.emptyThread")}</div>
+      );
     }
     if (row.kind === "approval") {
       return approvalNode;

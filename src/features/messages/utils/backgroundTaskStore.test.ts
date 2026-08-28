@@ -93,6 +93,32 @@ describe("listBackgroundTaskRunningCounts", () => {
     resetBackgroundTaskStoreForTests();
   });
 
+  it("stops counting cancelled tasks as running（终态口径统一）", () => {
+    // cancelled / canceled 同样是终态：running 计数必须立刻归零，
+    // 否则 sidebar 紫点 / unread 永不收口（2026-08-29 review 边界）。
+    applyBackgroundTaskUpdate(WS, THREAD, {
+      toolId: "tool-cancel",
+      task: { id: "t-cancel", status: "running" },
+      source: "receipt",
+    });
+    expect(
+      listBackgroundTaskRunningCounts().find(
+        (entry) => entry.threadId === THREAD,
+      )?.runningCount,
+    ).toBe(1);
+
+    applyBackgroundTaskUpdate(WS, THREAD, {
+      toolId: "tool-cancel",
+      task: { id: "t-cancel", status: "cancelled" },
+      source: "notification",
+    });
+    expect(
+      listBackgroundTaskRunningCounts().find(
+        (entry) => entry.threadId === THREAD,
+      )?.runningCount,
+    ).toBe(0);
+  });
+
   it("enumerates per-thread running counts across workspaces", () => {
     applyBackgroundTaskUpdate(WS, THREAD, {
       toolId: "tool-a",

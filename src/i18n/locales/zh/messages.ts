@@ -400,6 +400,8 @@ const messages = {
     builtInAgentUnavailableTitle: "内置智能体不可用",
     builtInAgentUnavailableMessage:
       "该智能体已被关闭或当前不可用，因此本次消息不会使用它的提示词。",
+    backgroundTaskAwaitingRunning: "正在等待 {{count}} 个后台任务完成",
+    backgroundTaskAwaitingContinuation: "任务完成后主对话将自动继续",
     backgroundTaskFoldCompleted: "后台任务完成",
     backgroundTaskFoldFailed: "后台任务失败",
     backgroundTaskFoldRunning: "后台任务进行中",

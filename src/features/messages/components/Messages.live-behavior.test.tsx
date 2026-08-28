@@ -1,6 +1,21 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import type { ConversationItem } from "../../../types";
 import type { ConversationState } from "../../threads/contracts/conversationCurtainContracts";
 import { MESSAGES_LIVE_CONTROLS_UPDATED_EVENT } from "../../../live-canvas/liveCanvasControls";
@@ -39,7 +54,9 @@ const notifyContentResized = () => {
 // 断言 scrollTop 前需要先推进一帧（fake timers 用例内请改用 advanceTimersByTime）。
 const flushFollowFrame = async () => {
   await act(async () => {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
   });
 };
 
@@ -109,15 +126,22 @@ describe("Messages live behavior", () => {
     });
     Object.defineProperty(scroller, "scrollHeight", {
       configurable: true,
-      get: () => (typeof scrollHeight === "function" ? scrollHeight() : scrollHeight),
+      get: () =>
+        typeof scrollHeight === "function" ? scrollHeight() : scrollHeight,
     });
     return {
       getScrollTopWriteCount: () => scrollTopWriteCount,
     };
   };
 
-  const setMessageOffsetTop = (container: HTMLElement, messageId: string, offsetTop: number) => {
-    const message = container.querySelector(`[data-message-anchor-id="${messageId}"]`);
+  const setMessageOffsetTop = (
+    container: HTMLElement,
+    messageId: string,
+    offsetTop: number,
+  ) => {
+    const message = container.querySelector(
+      `[data-message-anchor-id="${messageId}"]`,
+    );
     expect(message).toBeTruthy();
     Object.defineProperty(message, "offsetTop", {
       configurable: true,
@@ -187,10 +211,14 @@ describe("Messages live behavior", () => {
 
     const targetNode = container.querySelector('[data-message-anchor-id="u2"]');
     expect(targetNode).toBeTruthy();
-    Object.defineProperty(targetNode as HTMLDivElement, "getBoundingClientRect", {
-      configurable: true,
-      value: () => ({ top: 480 }),
-    });
+    Object.defineProperty(
+      targetNode as HTMLDivElement,
+      "getBoundingClientRect",
+      {
+        configurable: true,
+        value: () => ({ top: 480 }),
+      },
+    );
 
     act(() => {
       document.dispatchEvent(
@@ -249,12 +277,15 @@ describe("Messages live behavior", () => {
   });
 
   it("expands collapsed history before jumping to an older message", async () => {
-    const items: ConversationItem[] = Array.from({ length: 35 }, (_, index) => ({
-      id: `u${index + 1}`,
-      kind: "message" as const,
-      role: "user" as const,
-      text: `message ${index + 1}`,
-    }));
+    const items: ConversationItem[] = Array.from(
+      { length: 35 },
+      (_, index) => ({
+        id: `u${index + 1}`,
+        kind: "message" as const,
+        role: "user" as const,
+        text: `message ${index + 1}`,
+      }),
+    );
 
     const { container } = render(
       <Messages
@@ -269,7 +300,9 @@ describe("Messages live behavior", () => {
     );
 
     expect(container.querySelector('[data-message-anchor-id="u1"]')).toBeNull();
-    const showEarlierButton = container.querySelector(".messages-collapsed-indicator");
+    const showEarlierButton = container.querySelector(
+      ".messages-collapsed-indicator",
+    );
     expect(showEarlierButton).toBeTruthy();
     expect(showEarlierButton?.getAttribute("data-collapsed-count")).toBe("5");
 
@@ -298,7 +331,9 @@ describe("Messages live behavior", () => {
     });
 
     await waitFor(() => {
-      expect(container.querySelector('[data-message-anchor-id="u1"]')).toBeTruthy();
+      expect(
+        container.querySelector('[data-message-anchor-id="u1"]'),
+      ).toBeTruthy();
     });
 
     await waitFor(() => {
@@ -355,13 +390,15 @@ describe("Messages live behavior", () => {
 
     // Working bar: spinner + timer + fixed status + tool activity; no reasoning first-line echo.
     expect(container.querySelector(".working")).toBeTruthy();
-    expect(container.querySelector(".working-text")?.textContent ?? "").toContain("响应中");
-    expect(container.querySelector(".working-activity")?.textContent ?? "").toContain(
-      "Command: rg --files",
-    );
-    expect(container.querySelector(".working-activity")?.textContent ?? "").not.toContain(
-      "Indexing workspace",
-    );
+    expect(
+      container.querySelector(".working-text")?.textContent ?? "",
+    ).toContain("响应中");
+    expect(
+      container.querySelector(".working-activity")?.textContent ?? "",
+    ).toContain("Command: rg --files");
+    expect(
+      container.querySelector(".working-activity")?.textContent ?? "",
+    ).not.toContain("Indexing workspace");
     const reasoningRows = container.querySelectorAll(".thinking-block");
     expect(reasoningRows.length).toBe(1);
     expect(container.querySelector(".thinking-title")).toBeTruthy();
@@ -424,12 +461,12 @@ describe("Messages live behavior", () => {
     expect(reasoningRows.length).toBe(1);
     const reasoningTitle = container.querySelector(".thinking-title");
     expect(reasoningTitle?.textContent ?? "").toBeTruthy();
-    expect(container.querySelector(".working-text")?.textContent ?? "").not.toContain(
-      "这是一个包含多个子项目的目录。让我探索一下项目结构。",
-    );
-    expect(container.querySelector(".working-activity")?.textContent ?? "").toContain(
-      "批量读取4个文件",
-    );
+    expect(
+      container.querySelector(".working-text")?.textContent ?? "",
+    ).not.toContain("这是一个包含多个子项目的目录。让我探索一下项目结构。");
+    expect(
+      container.querySelector(".working-activity")?.textContent ?? "",
+    ).toContain("批量读取4个文件");
   });
 
   it("renders Claude reasoning and assistant message together when conversation state reuses the same item id", () => {
@@ -707,9 +744,9 @@ describe("Messages live behavior", () => {
       />,
     );
 
-    expect(container.querySelector(".working-text")?.textContent ?? "").toContain(
-      "messages.waitingForFirstText",
-    );
+    expect(
+      container.querySelector(".working-text")?.textContent ?? "",
+    ).toContain("messages.waitingForFirstText");
   });
 
   it("shows Qoder first-text waiting state before assistant text arrives", () => {
@@ -733,9 +770,9 @@ describe("Messages live behavior", () => {
       />,
     );
 
-    expect(container.querySelector(".working-text")?.textContent ?? "").toContain(
-      "messages.waitingForFirstText",
-    );
+    expect(
+      container.querySelector(".working-text")?.textContent ?? "",
+    ).toContain("messages.waitingForFirstText");
   });
 
   it("keeps Codex silent suspected state above the first-text waiting state", () => {
@@ -787,9 +824,10 @@ describe("Messages live behavior", () => {
             kind: "tool",
             toolType: "fileChange",
             title: "Applying approved file change",
-            detail: "{\"file_path\":\"aaa.txt\"}",
+            detail: '{"file_path":"aaa.txt"}',
             status: "running",
-            output: "Approved. Applying the change locally and resuming Claude...",
+            output:
+              "Approved. Applying the change locally and resuming Claude...",
           },
         ]}
         threadId="claude:thread-1"
@@ -802,12 +840,12 @@ describe("Messages live behavior", () => {
       />,
     );
 
-    expect(container.querySelector(".working-text")?.textContent ?? "").toContain(
-      "resuming Claude",
-    );
-    expect(container.querySelector(".working-activity")?.textContent ?? "").toContain(
-      "Applying approved file change",
-    );
+    expect(
+      container.querySelector(".working-text")?.textContent ?? "",
+    ).toContain("resuming Claude");
+    expect(
+      container.querySelector(".working-activity")?.textContent ?? "",
+    ).toContain("Applying approved file change");
   });
 
   it("does not render Codex session file-change summary cards in the timeline", async () => {
@@ -1031,7 +1069,12 @@ describe("Messages live behavior", () => {
     const renderWith = (includeQueuedUser: boolean) => (
       <Messages
         items={[
-          { id: "queued-send-user-1", kind: "message", role: "user", text: "first" },
+          {
+            id: "queued-send-user-1",
+            kind: "message",
+            role: "user",
+            text: "first",
+          },
           {
             id: "queued-send-assistant-1",
             kind: "message",
@@ -1072,7 +1115,12 @@ describe("Messages live behavior", () => {
     const renderWith = (includeOptimisticUser: boolean, thinking: boolean) => (
       <Messages
         items={[
-          { id: "delayed-working-user-1", kind: "message", role: "user", text: "first" },
+          {
+            id: "delayed-working-user-1",
+            kind: "message",
+            role: "user",
+            text: "first",
+          },
           {
             id: "delayed-working-assistant-1",
             kind: "message",
@@ -1173,14 +1221,31 @@ describe("Messages live behavior", () => {
   });
 
   it("keeps the latest anchor stable at the bottom and tracks the viewport after scroll-away", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     try {
       const { container } = render(
         <Messages
           items={[
-            { id: "anchor-user-old", kind: "message", role: "user", text: "older" },
-            { id: "anchor-assistant-old", kind: "message", role: "assistant", text: "reply" },
-            { id: "anchor-user-latest", kind: "message", role: "user", text: "latest" },
+            {
+              id: "anchor-user-old",
+              kind: "message",
+              role: "user",
+              text: "older",
+            },
+            {
+              id: "anchor-assistant-old",
+              kind: "message",
+              role: "assistant",
+              text: "reply",
+            },
+            {
+              id: "anchor-user-latest",
+              kind: "message",
+              role: "user",
+              text: "latest",
+            },
           ]}
           threadId="thread-bottom-anchor-stability"
           workspaceId="ws-1"
@@ -1210,7 +1275,9 @@ describe("Messages live behavior", () => {
       await waitFor(() => expect(getActiveAnchorDashIndex(container)).toBe(0));
 
       const updateDepthErrors = consoleErrorSpy.mock.calls.filter((call) =>
-        call.some((entry) => String(entry).includes("Maximum update depth exceeded")),
+        call.some((entry) =>
+          String(entry).includes("Maximum update depth exceeded"),
+        ),
       );
       expect(updateDepthErrors).toHaveLength(0);
     } finally {
@@ -1350,7 +1417,11 @@ describe("Messages live behavior", () => {
     );
     const scroller = getMessagesScroller(container);
     let scrollHeight = 2_000;
-    const metrics = setScrollerMetrics(scroller, 2_000 - 720, () => scrollHeight);
+    const metrics = setScrollerMetrics(
+      scroller,
+      2_000 - 720,
+      () => scrollHeight,
+    );
     fireEvent.scroll(scroller);
     notifyContentResized();
     const writesAfterArm = metrics.getScrollTopWriteCount();
@@ -1361,7 +1432,9 @@ describe("Messages live behavior", () => {
     }
     // 再冲一帧，让可能存在的 live-follow coalesce rAF 落地。
     await act(async () => {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
     });
 
     expect(scroller.scrollTop).toBe(scrollHeight - 720);
@@ -1452,7 +1525,9 @@ describe("Messages live behavior", () => {
               id: "fake-leave-assistant",
               kind: "message",
               role: "assistant",
-              text: thinking ? "streaming tail" : "final tall answer after full history restore",
+              text: thinking
+                ? "streaming tail"
+                : "final tall answer after full history restore",
             },
           ]}
           threadId="thread-settle-fake-leave"
@@ -1619,7 +1694,12 @@ describe("Messages live behavior", () => {
       <Messages
         items={[
           { id: "open-pin-1", kind: "message", role: "user", text: "hello" },
-          { id: "open-pin-2", kind: "message", role: "assistant", text: "long answer" },
+          {
+            id: "open-pin-2",
+            kind: "message",
+            role: "assistant",
+            text: "long answer",
+          },
         ]}
         threadId="thread-open-pin"
         workspaceId="ws-1"
@@ -1662,7 +1742,12 @@ describe("Messages live behavior", () => {
       />
     );
     const historyItems: ConversationItem[] = [
-      { id: "history-focus-off-1", kind: "message", role: "user", text: "hello" },
+      {
+        id: "history-focus-off-1",
+        kind: "message",
+        role: "user",
+        text: "hello",
+      },
       {
         id: "history-focus-off-2",
         kind: "message",
@@ -1738,9 +1823,17 @@ describe("Messages live behavior", () => {
     try {
       const historyItems: ConversationItem[] = [
         { id: "reopen-user", kind: "message", role: "user", text: "question" },
-        { id: "reopen-assistant", kind: "message", role: "assistant", text: "answer" },
+        {
+          id: "reopen-assistant",
+          kind: "message",
+          role: "assistant",
+          text: "answer",
+        },
       ];
-      const renderWith = (threadId: string | null, items: ConversationItem[]) => (
+      const renderWith = (
+        threadId: string | null,
+        items: ConversationItem[],
+      ) => (
         <Messages
           items={items}
           threadId={threadId}
@@ -1787,8 +1880,18 @@ describe("Messages live behavior", () => {
     const { container } = render(
       <Messages
         items={[
-          { id: "history-stable-1", kind: "message", role: "user", text: "hello" },
-          { id: "history-stable-2", kind: "message", role: "assistant", text: "done" },
+          {
+            id: "history-stable-1",
+            kind: "message",
+            role: "user",
+            text: "hello",
+          },
+          {
+            id: "history-stable-2",
+            kind: "message",
+            role: "assistant",
+            text: "done",
+          },
         ]}
         threadId="thread-history-stable-resize"
         workspaceId="ws-1"
@@ -1844,7 +1947,14 @@ describe("Messages live behavior", () => {
     // History lands: the initial pin fires and opens the follow window.
     rerender(
       renderWith(
-        [{ id: "landed-1", kind: "message", role: "assistant", text: "history" }],
+        [
+          {
+            id: "landed-1",
+            kind: "message",
+            role: "assistant",
+            text: "history",
+          },
+        ],
         false,
       ),
     );
@@ -1867,7 +1977,12 @@ describe("Messages live behavior", () => {
       .mockImplementation(() => {});
     const items: ConversationItem[] = [
       { id: "stream-follow-user", kind: "message", role: "user", text: "go" },
-      { id: "stream-follow-assistant", kind: "message", role: "assistant", text: "partial" },
+      {
+        id: "stream-follow-assistant",
+        kind: "message",
+        role: "assistant",
+        text: "partial",
+      },
     ];
     const { container } = render(
       <Messages
@@ -1908,8 +2023,18 @@ describe("Messages live behavior", () => {
     const { container } = render(
       <Messages
         items={[
-          { id: "wheel-release-user", kind: "message", role: "user", text: "go" },
-          { id: "wheel-release-assistant", kind: "message", role: "assistant", text: "partial" },
+          {
+            id: "wheel-release-user",
+            kind: "message",
+            role: "user",
+            text: "go",
+          },
+          {
+            id: "wheel-release-assistant",
+            kind: "message",
+            role: "assistant",
+            text: "partial",
+          },
         ]}
         threadId="thread-wheel-release"
         workspaceId="ws-1"
@@ -1951,8 +2076,18 @@ describe("Messages live behavior", () => {
     const { container } = render(
       <Messages
         items={[
-          { id: "stream-release-user", kind: "message", role: "user", text: "go" },
-          { id: "stream-release-assistant", kind: "message", role: "assistant", text: "partial" },
+          {
+            id: "stream-release-user",
+            kind: "message",
+            role: "user",
+            text: "go",
+          },
+          {
+            id: "stream-release-assistant",
+            kind: "message",
+            role: "assistant",
+            text: "partial",
+          },
         ]}
         threadId="thread-stream-release"
         workspaceId="ws-1"
@@ -1990,7 +2125,12 @@ describe("Messages live behavior", () => {
         <Messages
           items={[
             { id: "noop-user", kind: "message", role: "user", text: "go" },
-            { id: "noop-assistant", kind: "message", role: "assistant", text: "partial" },
+            {
+              id: "noop-assistant",
+              kind: "message",
+              role: "assistant",
+              text: "partial",
+            },
           ]}
           threadId="thread-noop-echo"
           workspaceId="ws-1"
@@ -2042,8 +2182,18 @@ describe("Messages live behavior", () => {
     const renderWith = (threadId: string) => (
       <Messages
         items={[
-          { id: `clear-${threadId}-user`, kind: "message", role: "user", text: "go" },
-          { id: `clear-${threadId}-assistant`, kind: "message", role: "assistant", text: "partial" },
+          {
+            id: `clear-${threadId}-user`,
+            kind: "message",
+            role: "user",
+            text: "go",
+          },
+          {
+            id: `clear-${threadId}-assistant`,
+            kind: "message",
+            role: "assistant",
+            text: "partial",
+          },
         ]}
         threadId={threadId}
         workspaceId="ws-1"
@@ -2081,7 +2231,11 @@ describe("Messages live behavior", () => {
   });
 
   it("does not synthesize a settle boundary when switching from a working thread", () => {
-    const renderWith = (threadId: string, thinking: boolean, messageId: string) => (
+    const renderWith = (
+      threadId: string,
+      thinking: boolean,
+      messageId: string,
+    ) => (
       <Messages
         items={[
           { id: messageId, kind: "message", role: "user", text: threadId },
@@ -2244,7 +2398,8 @@ describe("Messages live behavior", () => {
           id: `multi-turn-assistant-${index}`,
           kind: "message" as const,
           role: "assistant" as const,
-          text: index === turnCount && thinking ? "streaming" : `settled ${index}`,
+          text:
+            index === turnCount && thinking ? "streaming" : `settled ${index}`,
         }))}
         threadId="thread-multi-turn-settle"
         workspaceId="ws-1"
@@ -2425,12 +2580,15 @@ describe("Messages live behavior", () => {
   });
 
   it("reveals the full collapsed segment in one page when the remainder fits a page", async () => {
-    const items: ConversationItem[] = Array.from({ length: 32 }, (_, index) => ({
-      id: `history-reveal-${index + 1}`,
-      kind: "message",
-      role: index % 2 === 0 ? "user" : "assistant",
-      text: `history reveal message ${index + 1}`,
-    }));
+    const items: ConversationItem[] = Array.from(
+      { length: 32 },
+      (_, index) => ({
+        id: `history-reveal-${index + 1}`,
+        kind: "message",
+        role: index % 2 === 0 ? "user" : "assistant",
+        text: `history reveal message ${index + 1}`,
+      }),
+    );
 
     const { container } = render(
       <Messages
@@ -2444,10 +2602,8 @@ describe("Messages live behavior", () => {
     );
 
     const scroller = getMessagesScroller(container);
-    setScrollerMetrics(
-      scroller,
-      420,
-      () => (container.querySelector(".messages-collapsed-indicator") ? 2400 : 2560),
+    setScrollerMetrics(scroller, 420, () =>
+      container.querySelector(".messages-collapsed-indicator") ? 2400 : 2560,
     );
 
     const indicator = container.querySelector(".messages-collapsed-indicator");
@@ -2459,7 +2615,9 @@ describe("Messages live behavior", () => {
     fireEvent.click(indicator);
 
     await waitFor(() => {
-      expect(container.querySelector(".messages-collapsed-indicator")).toBeNull();
+      expect(
+        container.querySelector(".messages-collapsed-indicator"),
+      ).toBeNull();
       expect(screen.getByText("history reveal message 1")).toBeTruthy();
       // 分页展开不跳屏：scrollTop = 原值 + 插入高度（2560-2400），不再回顶。
       expect(scroller.scrollTop).toBe(420 + (2560 - 2400));
@@ -2467,12 +2625,15 @@ describe("Messages live behavior", () => {
   });
 
   it("pages collapsed history upward in bounded steps without moving the viewport", async () => {
-    const items: ConversationItem[] = Array.from({ length: 130 }, (_, index) => ({
-      id: `paged-history-${index + 1}`,
-      kind: "message",
-      role: index % 2 === 0 ? "user" : "assistant",
-      text: `paged history message ${index + 1}`,
-    }));
+    const items: ConversationItem[] = Array.from(
+      { length: 130 },
+      (_, index) => ({
+        id: `paged-history-${index + 1}`,
+        kind: "message",
+        role: index % 2 === 0 ? "user" : "assistant",
+        text: `paged history message ${index + 1}`,
+      }),
+    );
 
     const { container } = render(
       <Messages
@@ -2491,7 +2652,11 @@ describe("Messages live behavior", () => {
     };
     const scroller = getMessagesScroller(container);
     // 每条消息 8px：scrollHeight 随已展开条数增长。
-    setScrollerMetrics(scroller, 420, () => 2400 + (100 - collapsedCount()) * 8);
+    setScrollerMetrics(
+      scroller,
+      420,
+      () => 2400 + (100 - collapsedCount()) * 8,
+    );
 
     // 130 条、窗口 30：初始收起 100 条，可见头部是第 101 条。
     expect(collapsedCount()).toBe(100);
@@ -2504,7 +2669,9 @@ describe("Messages live behavior", () => {
     let expectedScrollTop = 420;
     let previousScrollHeight = 2400;
     for (const expectedCount of expectedCounts) {
-      const indicator = container.querySelector(".messages-collapsed-indicator");
+      const indicator = container.querySelector(
+        ".messages-collapsed-indicator",
+      );
       expect(indicator).toBeTruthy();
       if (!indicator) {
         return;
@@ -2529,12 +2696,15 @@ describe("Messages live behavior", () => {
   });
 
   it("reveals one history page per click during streaming", async () => {
-    const items: ConversationItem[] = Array.from({ length: 130 }, (_, index) => ({
-      id: `live-history-reveal-${index + 1}`,
-      kind: "message",
-      role: index % 2 === 0 ? "user" : "assistant",
-      text: `live history reveal message ${index + 1}`,
-    }));
+    const items: ConversationItem[] = Array.from(
+      { length: 130 },
+      (_, index) => ({
+        id: `live-history-reveal-${index + 1}`,
+        kind: "message",
+        role: index % 2 === 0 ? "user" : "assistant",
+        text: `live history reveal message ${index + 1}`,
+      }),
+    );
 
     const { container } = render(
       <Messages
@@ -2566,12 +2736,15 @@ describe("Messages live behavior", () => {
   });
 
   it("keeps paged history expansion stable even when scroller metrics are non-finite", async () => {
-    const items: ConversationItem[] = Array.from({ length: 32 }, (_, index) => ({
-      id: `history-reveal-invalid-${index + 1}`,
-      kind: "message",
-      role: index % 2 === 0 ? "user" : "assistant",
-      text: `history reveal invalid message ${index + 1}`,
-    }));
+    const items: ConversationItem[] = Array.from(
+      { length: 32 },
+      (_, index) => ({
+        id: `history-reveal-invalid-${index + 1}`,
+        kind: "message",
+        role: index % 2 === 0 ? "user" : "assistant",
+        text: `history reveal invalid message ${index + 1}`,
+      }),
+    );
 
     const { container } = render(
       <Messages
@@ -2596,7 +2769,9 @@ describe("Messages live behavior", () => {
     fireEvent.click(indicator);
 
     await waitFor(() => {
-      expect(container.querySelector(".messages-collapsed-indicator")).toBeNull();
+      expect(
+        container.querySelector(".messages-collapsed-indicator"),
+      ).toBeNull();
       expect(screen.getByText("history reveal invalid message 1")).toBeTruthy();
       // 非有限 metrics：跳过锚点恢复，scrollTop 保持原样，不写 NaN。
       expect(scroller.scrollTop).toBe(420);
@@ -2761,7 +2936,9 @@ describe("Messages live behavior", () => {
       />,
     );
 
-    expect(toolContainer.querySelector(".messages-process-phase-toggle")).toBeTruthy();
+    expect(
+      toolContainer.querySelector(".messages-process-phase-toggle"),
+    ).toBeTruthy();
     expect(toolContainer.textContent ?? "").toContain("工具调用 1 次");
     expect(toolContainer.textContent ?? "").not.toContain("已处理");
     expect(toolContainer.textContent ?? "").not.toContain("Read single.ts");
@@ -2799,7 +2976,9 @@ describe("Messages live behavior", () => {
       />,
     );
 
-    expect(reasonContainer.querySelector(".messages-process-phase-toggle")).toBeTruthy();
+    expect(
+      reasonContainer.querySelector(".messages-process-phase-toggle"),
+    ).toBeTruthy();
     expect(reasonContainer.querySelector(".thinking-block")).toBeNull();
     expect(reasonContainer.textContent ?? "").toContain("思考 1 次");
     expect(reasonContainer.textContent ?? "").not.toContain("已处理");
@@ -2859,7 +3038,9 @@ describe("Messages live behavior", () => {
       />,
     );
 
-    expect(container.querySelector(".messages-process-phase-toggle")).toBeTruthy();
+    expect(
+      container.querySelector(".messages-process-phase-toggle"),
+    ).toBeTruthy();
     expect(container.querySelector(".thinking-block")).toBeNull();
     expect(container.textContent ?? "").not.toContain("Read done.ts");
     expect(container.textContent ?? "").toContain("Read running.ts");
@@ -2913,7 +3094,9 @@ describe("Messages live behavior", () => {
       />,
     );
 
-    expect(container.querySelector(".messages-live-middle-collapsed-indicator")).toBeNull();
+    expect(
+      container.querySelector(".messages-live-middle-collapsed-indicator"),
+    ).toBeNull();
     expect(container.textContent ?? "").toContain("最终输出");
     expect(container.textContent ?? "").not.toContain("pwd");
     expect(container.textContent ?? "").not.toContain("ls -la");
@@ -3186,7 +3369,9 @@ describe("Messages live behavior", () => {
 
     expect(container.textContent ?? "").toContain("第一轮答案");
     expect(container.textContent ?? "").toContain("第二轮答案");
-    expect(container.querySelectorAll(".messages-process-phase-toggle")).toHaveLength(2);
+    expect(
+      container.querySelectorAll(".messages-process-phase-toggle"),
+    ).toHaveLength(2);
     expect(container.querySelector(".thinking-block")).toBeNull();
     expect(container.textContent ?? "").not.toContain("Read turn1.ts");
     expect(container.textContent ?? "").not.toContain("Read turn2.ts");
@@ -3271,7 +3456,8 @@ describe("Messages live behavior", () => {
           selectedOpenAppId=""
         />,
       );
-      const hintStable = container.querySelector(".working-hint")?.textContent ?? "";
+      const hintStable =
+        container.querySelector(".working-hint")?.textContent ?? "";
       expect(hintStable).toBe(hint1);
 
       rerender(
@@ -3327,7 +3513,9 @@ describe("Messages live behavior", () => {
     );
 
     const activity = container.querySelector(".working-activity");
-    expect(activity?.textContent ?? "").toContain("Command: rg -n TODO src @ /repo");
+    expect(activity?.textContent ?? "").toContain(
+      "Command: rg -n TODO src @ /repo",
+    );
   });
 
   it("hides duplicated working activity when it mirrors reasoning label", () => {
@@ -3361,11 +3549,13 @@ describe("Messages live behavior", () => {
     // Pure reasoning turn: spinner + timer + fixed status; no first-line echo in working bar.
     expect(container.querySelector(".working")).toBeTruthy();
     expect(container.querySelector(".working-timer-clock")).toBeTruthy();
-    expect(container.querySelector(".working-text")?.textContent ?? "").toContain("响应中");
+    expect(
+      container.querySelector(".working-text")?.textContent ?? "",
+    ).toContain("响应中");
     expect(container.querySelector(".working-activity")).toBeNull();
-    expect(container.querySelector(".thinking-content")?.textContent ?? "").toContain(
-      "用户回复了",
-    );
+    expect(
+      container.querySelector(".thinking-content")?.textContent ?? "",
+    ).toContain("用户回复了");
   });
 
   it("does not show stale backend activity from previous turns", () => {
