@@ -22,4 +22,4 @@
 ## 收口
 
 - [x] 5.1 全量验证（相关面 vitest + typecheck）+ 分批 commit；`openspec validate --strict`；索引更新。
-- [ ] 5.2 下一轮真机日志验证 sourceModule 直接定位 1wt84ny 抛错模块（回填本 tasks）。
+- [x] 5.2 真机验证（2026-08-28 20:54 轮）：sourceModule 生效——decode alias 修复后 1wt84ny 消失，下层暴露新指纹 1f00s72 @ rehype-katex.js:119（=hast-util-from-html-isomorphic browser 版顶层 DOMParser），已由 fix-session-load-bridge-freeze 第二处 alias 修复；worker-scope-error 回传与 stackHash 均落盘正常。
