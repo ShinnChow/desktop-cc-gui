@@ -336,14 +336,29 @@ export function isEquivalentUserObservation(
   );
 }
 
+// fix-session-load-bridge-freeze（组装段）：hydrateHistory 期间同一文本会被
+// 多处 compact（回声折叠/段落去重/前缀匹配），7 趟全文本正则 × 千条级消息
+// 实测秒级。纯函数 memo（有界，超出整体清空），输出 bit 级一致。
+const COMPACT_COMPARABLE_MEMO_LIMIT = 6000;
+const compactComparableMemo = new Map<string, string>();
+
 export function compactComparableConversationText(value: string) {
-  return value
+  const cached = compactComparableMemo.get(value);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const computed = value
     .replace(/\s+/g, "")
     .replace(/[！!]/g, "!")
     .replace(/[？?]/g, "?")
     .replace(/[，,]/g, ",")
     .replace(/[。．.]/g, ".")
     .trim();
+  if (compactComparableMemo.size >= COMPACT_COMPARABLE_MEMO_LIMIT) {
+    compactComparableMemo.clear();
+  }
+  compactComparableMemo.set(value, computed);
+  return computed;
 }
 
 export function normalizeComparableMessageTextByRole(

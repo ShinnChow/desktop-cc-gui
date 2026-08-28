@@ -99,12 +99,25 @@ export function extractClaudeApprovalResumeEntries(
   }
 }
 
+// fix-session-load-bridge-freeze（组装段）：纯函数 memo（有界），输出不变。
+const COMPACT_COMPARABLE_MESSAGE_MEMO_LIMIT = 6000;
+const compactComparableMessageMemo = new Map<string, string>();
+
 function compactComparableMessageText(value: string) {
-  return compactMessageText(value)
+  const cached = compactComparableMessageMemo.get(value);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const computed = compactMessageText(value)
     .replace(/[！!]/g, "!")
     .replace(/[？?]/g, "?")
     .replace(/[，,]/g, ",")
     .replace(/[。．.]/g, ".");
+  if (compactComparableMessageMemo.size >= COMPACT_COMPARABLE_MESSAGE_MEMO_LIMIT) {
+    compactComparableMessageMemo.clear();
+  }
+  compactComparableMessageMemo.set(value, computed);
+  return computed;
 }
 
 function rememberCacheEntry<T>(
