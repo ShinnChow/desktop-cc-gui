@@ -6,12 +6,12 @@
 
 ## Phase 1 — D2 静默期反馈补齐
 
-- [ ] 1.1 前置核验：`resolveConversationAssemblyMigrationGate("pi")` 状态确认（gate 未启用则 profile 早退分支会覆盖 `heartbeatWaitingHint`，需在 design 假设上落实现）
-- [ ] 1.2 `useMessagesRuntimeState.ts`：`waitingForFirstTextLabel` 引擎名单扩入 `"pi"`
-- [ ] 1.3 `presentationProfile.ts`：`pi` profile 分支返回 `heartbeatWaitingHint: true`（其余字段沿用默认值）
-- [ ] 1.4 i18n 核验：`messages.waitingForFirstText` / `messages.nonStreamingHint` 在 10 locale 的覆盖现状（zh 已确认存在；缺失 locale 走现有 fallback 行为，不新增 key 结构）
-- [ ] 1.5 单测：`resolvePresentationProfile("pi").heartbeatWaitingHint === true`；既有引擎（opencode/codex/默认）profile 零回归；`waitingForFirstTextLabel` 对 pi 的选取分支（含 `waitingForFirstChunk` false 时回落正常 label）
-- [ ] 1.6 自检 + review + 提交：相关 vitest 用例 + tsc；目视验收口径记录（macOS 必做，Win/Linux 后续补）
+- [x] 1.1 前置核验：`resolveConversationAssemblyMigrationGate("pi")` 状态确认（gate 未启用则 profile 早退分支会覆盖 `heartbeatWaitingHint`，需在 design 假设上落实现）——结论：gate 仅覆盖 claude/gemini，pi 走正常分支，假设成立
+- [x] 1.2 `useMessagesRuntimeState.ts`：`waitingForFirstTextLabel` 引擎名单扩入 `"pi"`
+- [x] 1.3 `presentationProfile.ts`：`pi` profile 分支返回 `heartbeatWaitingHint: true`（其余字段沿用默认值）
+- [x] 1.4 i18n 核验：`messages.waitingForFirstText` / `messages.nonStreamingHint` 在 10 locale 全覆盖，无需新增
+- [x] 1.5 单测：`resolvePresentationProfile("pi").heartbeatWaitingHint === true`；既有引擎（opencode/codex/默认）profile 零回归；`waitingForFirstTextLabel` 对 pi 的选取分支（含 `waitingForFirstChunk` false 时回落正常 label）
+- [x] 1.6 自检 + review + 提交：相关 vitest 14/14 + tsc 零错误；`Messages.live-behavior` 10 个滚动用例失败经 stash 对照确认为存量问题（与本批无关）；diff 仅含本批 hunk（+92/-4），我的新增行 prettier-clean，存量格式违规未裹挟；macOS 目视待验收，Win/Linux 后续补
 
 ## Phase 2 — D1 resident 预热
 

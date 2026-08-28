@@ -67,10 +67,24 @@ describe("presentationProfile", () => {
     }
   });
 
-  it("enables heartbeat waiting hint only for opencode profile", () => {
+  it("enables heartbeat waiting hint for opencode profile", () => {
     const profile = resolvePresentationProfile("opencode");
     expect(profile).toEqual({
       engine: "opencode",
+      preferCommandSummary: false,
+      codexCanvasMarkdown: false,
+      showReasoningLiveDot: false,
+      heartbeatWaitingHint: true,
+      assistantMarkdownStreamingThrottleMs: 80,
+      reasoningStreamingThrottleMs: 180,
+      useCodexStagedMarkdownThrottle: false,
+    });
+  });
+
+  it("enables heartbeat waiting hint for pi profile while keeping other fields at baseline", () => {
+    const profile = resolvePresentationProfile("pi");
+    expect(profile).toEqual({
+      engine: "pi",
       preferCommandSummary: false,
       codexCanvasMarkdown: false,
       showReasoningLiveDot: false,

@@ -400,12 +400,17 @@ export function useMessagesRuntimeState({
       ? labels.codexSilentSuspected
       : null;
   // First-text waiting is for engines whose onboarding identity used to collapse
-  // to Codex copy (Codex itself, plus Native-only DSH/Qoder). Do not steal the
-  // default "响应中" / tool-activity working label from Gemini, Claude, etc.
+  // to Codex copy (Codex itself, plus Native-only DSH/Qoder), plus pi whose RPC
+  // prefill window runs 20-50s with zero events (pi first-packet diagnosis
+  // 2026-08-28). Do not steal the default "响应中" / tool-activity working label
+  // from Gemini, Claude, etc.
   const waitingForFirstTextLabel =
     isThinking &&
     waitingForFirstChunk &&
-    (activeEngine === "codex" || activeEngine === "qoder" || activeEngine === "dsh")
+    (activeEngine === "codex" ||
+      activeEngine === "qoder" ||
+      activeEngine === "dsh" ||
+      activeEngine === "pi")
       ? labels.waitingForFirstText
       : null;
   const primaryWorkingLabel = isContextCompacting

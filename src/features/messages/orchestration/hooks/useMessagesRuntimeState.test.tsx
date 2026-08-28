@@ -11,6 +11,13 @@ const assistantItem: ConversationItem = {
   text: "shared assistant text",
 };
 
+const userItem: ConversationItem = {
+  id: "shared-user",
+  kind: "message",
+  role: "user",
+  text: "hi",
+};
+
 function buildRuntimeInput(
   overrides: Partial<Parameters<typeof useMessagesRuntimeState>[0]> = {},
 ): Parameters<typeof useMessagesRuntimeState>[0] {
@@ -43,6 +50,54 @@ function buildRuntimeInput(
 }
 
 describe("useMessagesRuntimeState", () => {
+  it("selects waiting-for-first-text label for pi while the first chunk is pending", () => {
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "pi",
+          deferredRenderSourceItems: [userItem],
+          renderSourceItems: [userItem],
+          items: [userItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(true);
+    expect(result.current.primaryWorkingLabel).toBe("waiting");
+  });
+
+  it("falls back to the default working label for pi once the first chunk lands", () => {
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "pi",
+          deferredRenderSourceItems: [userItem, assistantItem],
+          renderSourceItems: [userItem, assistantItem],
+          items: [userItem, assistantItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(false);
+    expect(result.current.primaryWorkingLabel).toBe(null);
+  });
+
+  it("keeps the non-pi default working label for claude silence", () => {
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "claude",
+          deferredRenderSourceItems: [userItem],
+          renderSourceItems: [userItem],
+          items: [userItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(true);
+    expect(result.current.primaryWorkingLabel).toBe(null);
+  });
+
   it("does not re-enter finalizing state when isThinking stays true under thrash", () => {
     let renderCount = 0;
     const { result, rerender } = renderHook(
