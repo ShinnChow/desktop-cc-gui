@@ -259,6 +259,38 @@ describe("fast markdown worker crash backoff", () => {
     );
   });
 
+  it("F6: persists scope-error details without disposing the worker", () => {
+    // 先创建 worker（scope-error 处理不依赖在途请求）
+    const pending = precomputeFastMarkdownInWorker(compileArgs);
+    pending?.catch(() => {});
+    const before = FakeWorker.instances.length;
+    latestWorker().dispatch("message", {
+      data: {
+        type: "fast-markdown-worker-scope-error",
+        detail: {
+          message: "Uncaught Error: scope boom",
+          errorName: "Error",
+          filename: "http://localhost:5173/src/chunk-GNJJE6OE.js",
+          lineno: 64,
+          colno: 23,
+          stack: "Error: scope boom\n    at init",
+        },
+      },
+    });
+
+    expect(FakeWorker.instances.length).toBe(before); // 不处决
+    expect(appendRendererDiagnostic).toHaveBeenCalledWith(
+      "fast-markdown-worker/failed",
+      expect.objectContaining({
+        reasonCode: "worker-scope-error",
+        errorName: "Error",
+        sourceModule: "chunk-GNJJE6OE.js",
+        sourceLine: 64,
+        sourceCol: 23,
+      }),
+    );
+  });
+
   it("F3: crash diagnostics carry the throwing module location", async () => {
     const first = precomputeFastMarkdownInWorker(compileArgs);
     latestWorker().dispatch("error", {

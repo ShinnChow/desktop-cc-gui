@@ -231,6 +231,15 @@ function attachWorkerListeners(worker: Worker) {
 
 function handleWorkerMessage(event: MessageEvent<unknown>) {
   const message = event.data;
+  if (
+    isRecord(message) &&
+    (message as { type?: unknown }).type === "fast-markdown-worker-scope-error"
+  ) {
+    handleWorkerScopeError(
+      message as { detail?: Record<string, unknown> },
+    );
+    return;
+  }
   if (!isWorkerResponse(message)) {
     workerDiagnostics.recordUnknownResponse();
     const requestId =
@@ -412,6 +421,37 @@ function disposeBrokenWorker(
     "worker-runtime-error",
     classifyFastMarkdownWorkerRuntimeError(message),
     buildWorkerErrorFingerprint(errorName ?? "Error", message, sourceLocation),
+  );
+}
+
+function handleWorkerScopeError(message: { detail?: Record<string, unknown> }) {
+  // F6：作用域错误详情指纹落盘；全文进 console。worker 存活，不 dispose。
+  const detail = message.detail ?? {};
+  const text = typeof detail.message === "string" ? detail.message : "";
+  const sourceLocation = buildDiagnosticSourceLocation(
+    typeof detail.filename === "string" ? detail.filename : null,
+    typeof detail.lineno === "number" ? detail.lineno : null,
+    typeof detail.colno === "number" ? detail.colno : null,
+  );
+  const stack = typeof detail.stack === "string" ? detail.stack : null;
+  if (typeof console !== "undefined") {
+    console.warn(
+      "[fast-markdown-worker] scope error captured (worker kept alive):",
+      detail,
+    );
+  }
+  persistWorkerFailureDiagnostic(
+    "worker-scope-error",
+    classifyFastMarkdownWorkerRuntimeError(text),
+    {
+      errorName:
+        typeof detail.errorName === "string" ? detail.errorName : "Error",
+      messageHash: hashStableString(text).slice(0, 16),
+      messageLength: text.length,
+      stackHash: stack ? hashStableString(stack).slice(0, 16) : null,
+      stackLength: stack ? stack.length : 0,
+      ...sourceLocation,
+    },
   );
 }
 
