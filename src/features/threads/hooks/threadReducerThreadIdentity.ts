@@ -132,6 +132,11 @@ export function renameThreadStateIdentity({
           isContextCompacting:
             (oldStatus.isContextCompacting ?? false)
             || (existingStatus.isContextCompacting ?? false),
+          // 后台任务计数取 max：两侧都可能有 live 任务在跑，合并后总数不缩水。
+          backgroundTaskRunningCount: Math.max(
+            oldStatus.backgroundTaskRunningCount ?? 0,
+            existingStatus.backgroundTaskRunningCount ?? 0,
+          ),
           processingStartedAt:
             oldStatus.processingStartedAt ?? existingStatus.processingStartedAt,
           lastDurationMs:

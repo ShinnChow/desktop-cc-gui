@@ -28,5 +28,6 @@
 - [x] 4.6 registry watcher 上收 app 级（D10 真机事故修复）：`useBackgroundTaskRegistryWatcherForRunningThreads` 枚举 running>0 会话探测，挂 `useThreadEventHandlers`；strip 旧挂载移除；probeThreadTasks 抽取复用；切走会话后终态经 sink 全路径回写时间线卡片
 - [x] 4.7 backgroundTask 终态绕过 turn 终态守卫（D11 真根因修复）：`handleItemUpdate` 加 `options.skipTurnTerminalGuard`，`onBackgroundTaskUpdated` 传入；回归测试锁定「settled 线程普通 item 仍被丢 + backgroundTask 终态 upsert 放行」
 - [x] 4.8 绕过守卫同时关 markProcessing（D12 回归修正）：`onBackgroundTaskUpdated` 改传 `shouldMarkProcessing=false`，否则 post-settle 会话永久「响应中」；回归断言 `markProcessing not called`
+- [x] 4.9 rename 链路随迁（D13 review 修复）：`renameThreadStateIdentity` status 合并补 `backgroundTaskRunningCount`（max）；backgroundTaskStore 新增 `renameBackgroundTasksForThread`（幂等/补缺合并/emitChange）；`renameThreadId` 与 ensureThread pending-rename 分支接线迁移；回归测试锁定合并保留计数 + store 随迁
 - [ ] 4.4 真机手工验收：pi 会话 bg_run → 切走 → 紫灯 + ⚙N 徽标；全部终态 → 灯灭 + 非活跃会话未读点；模型生成中蓝灯 + 徽标并存；reduced-motion 降级静态；重启后已终态任务不误亮；**任务结束后幕布卡片 ≤3s 内原地折叠（无需切会话/重开）**
 - [ ] 4.5 收口：`openspec` validate / archive 流程，同步 capability spec

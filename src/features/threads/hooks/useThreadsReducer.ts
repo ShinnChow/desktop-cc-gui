@@ -17,6 +17,7 @@ import {
 } from "../../../utils/threadItems";
 import { settlePlanInProgressSteps } from "../utils/threadNormalize";
 import { mergeTurnTargetBadgesIntoItems } from "../utils/turnTargetBadgeStorage";
+import { renameBackgroundTasksForThread } from "../../messages/utils/backgroundTaskStore";
 import { isMultiAgentHistFoldItemId } from "../../multi-agent/utils/canvasItems";
 import {
   isCollabWorkerNativeThreadId,
@@ -706,6 +707,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           const newThreadId = action.threadId;
           scheduleRenameTurnFinalMetaThreadId(oldThreadId, newThreadId);
           scheduleTombstoneLocalPendingDraftIndexRow(oldThreadId);
+          // 后台任务表随迁：pending→final rename 后 watcher/回写改挂新 id。
+          renameBackgroundTasksForThread(action.workspaceId, oldThreadId, newThreadId);
           writeRemappedClientSessionIndex({
             workspaceId: action.workspaceId,
             threadId: newThreadId,
@@ -2358,6 +2361,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       const { workspaceId, oldThreadId, newThreadId } = action;
       scheduleRenameTurnFinalMetaThreadId(oldThreadId, newThreadId);
       scheduleTombstoneLocalPendingDraftIndexRow(oldThreadId);
+      // 后台任务表随迁（同 pending-rename 分支）：store key 是 threadId。
+      renameBackgroundTasksForThread(workspaceId, oldThreadId, newThreadId);
       const renamedThread = (state.threadsByWorkspace[workspaceId] ?? []).find(
         (thread) => thread.id === oldThreadId,
       );
