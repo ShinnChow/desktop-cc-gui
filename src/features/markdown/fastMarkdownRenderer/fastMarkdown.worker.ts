@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+// 必须最先 import：注册作用域错误监听（先于所有重依赖求值）
+import "./workerScopeErrorBridge";
 import { compileFastMarkdownToUnsafeArtifact } from "./compileCore";
 import type {
   CompileFastMarkdownArgs,
@@ -30,45 +32,6 @@ type FastMarkdownWorkerCompileError = {
 };
 
 const workerScope = self as unknown as DedicatedWorkerGlobalScope;
-
-// F6（fix-session-load-bridge-freeze / Phase C）：作用域错误回传。
-// worker 内部未捕获异常同时触发主线程 Worker error 事件（探活/退避在那边处理），
-// 但完整 message + stack 只有作用域内拿得到。回传结构化 detail，主线程指纹落盘
-// （全文进 console），下一轮日志直接定位真凶模块与函数。
-workerScope.addEventListener(
-  "error",
-  (event) => {
-    const errorEvent = event as ErrorEvent;
-    const error = errorEvent.error;
-    workerScope.postMessage({
-      type: "fast-markdown-worker-scope-error",
-      detail: {
-        message: errorEvent.message || "worker scope error",
-        errorName: error instanceof Error && error.name ? error.name : "Error",
-        filename: errorEvent.filename || null,
-        lineno: errorEvent.lineno ?? null,
-        colno: errorEvent.colno ?? null,
-        stack: error instanceof Error ? (error.stack ?? null) : null,
-      },
-    });
-  },
-);
-
-workerScope.addEventListener("unhandledrejection", (event) => {
-  const reason = (event as PromiseRejectionEvent).reason;
-  const error = reason instanceof Error ? reason : null;
-  workerScope.postMessage({
-    type: "fast-markdown-worker-scope-error",
-    detail: {
-      message: error ? error.message : String(reason ?? "unhandled rejection"),
-      errorName: error ? error.name : "Error",
-      filename: null,
-      lineno: null,
-      colno: null,
-      stack: error ? (error.stack ?? null) : null,
-    },
-  });
-});
 
 workerScope.addEventListener("message", (event: MessageEvent<unknown>) => {
   const message = event.data;

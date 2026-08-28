@@ -614,7 +614,16 @@ function throwIfWorkerRequestIsStale(
 function persistWorkerFailureDiagnostic(
   reasonCode: string,
   errorClass?: string,
-  fingerprint?: { messageHash: string; messageLength: number },
+  fingerprint?: {
+    errorName?: string;
+    messageHash: string;
+    messageLength: number;
+    stackHash?: string | null;
+    stackLength?: number;
+    sourceModule?: string | null;
+    sourceLine?: number | null;
+    sourceCol?: number | null;
+  },
 ) {
   const now = Date.now();
   const previousAt = persistedWorkerFailureAtByReason.get(reasonCode);

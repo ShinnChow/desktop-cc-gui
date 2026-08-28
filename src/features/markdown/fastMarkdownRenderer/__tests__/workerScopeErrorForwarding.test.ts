@@ -13,6 +13,8 @@ import "../fastMarkdown.worker";
 
 describe("fastMarkdown.worker scope error forwarding", () => {
   beforeEach(() => {
+    // 每个用例重新 stub（afterEach 的 unstubAllGlobals 会移除）
+    vi.stubGlobal("postMessage", postMessageMock);
     postMessageMock.mockClear();
   });
 
@@ -20,10 +22,34 @@ describe("fastMarkdown.worker scope error forwarding", () => {
     vi.unstubAllGlobals();
   });
 
+  it("bridge 模块零依赖且被入口最先 import（保证 chunk 求值期错误也能捕获）", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const dir = path.dirname(new URL(import.meta.url).pathname);
+    const bridgeSrc = fs.readFileSync(
+      path.join(dir, "../workerScopeErrorBridge.ts"),
+      "utf8",
+    );
+    // 桥模块自身不得 import 任何模块（零依赖 → 求值即时完成）
+    expect(bridgeSrc.match(/^import /m)).toBeNull();
+
+    const workerSrc = fs.readFileSync(
+      path.join(dir, "../fastMarkdown.worker.ts"),
+      "utf8",
+    );
+    const bridgeImportIndex = workerSrc.indexOf(
+      'import "./workerScopeErrorBridge"',
+    );
+    const compileImportIndex = workerSrc.indexOf('from "./compileCore"');
+    expect(bridgeImportIndex).toBeGreaterThanOrEqual(0);
+    expect(bridgeImportIndex).toBeLessThan(compileImportIndex);
+  });
+
   it("forwards scope error details to the main thread", () => {
     const boom = new Error("Cannot read properties of chunk (reading 'init')");
     const event = new ErrorEvent("error", {
-      message: "Uncaught Error: Cannot read properties of chunk (reading 'init')",
+      message:
+        "Uncaught Error: Cannot read properties of chunk (reading 'init')",
       filename: "http://localhost:5173/src/chunk-GNJJE6OE.js",
       lineno: 64,
       colno: 23,
