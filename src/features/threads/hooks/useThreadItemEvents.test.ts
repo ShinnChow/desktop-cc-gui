@@ -1723,7 +1723,7 @@ describe("onBackgroundTaskUpdated post-settle terminal update", () => {
   });
 
   it("upserts the timeline item even after the turn has settled (post-settle 终态不被迟到守卫丢弃)", () => {
-    const { result, dispatch } = makeOptions({
+    const { result, dispatch, markProcessing } = makeOptions({
       activeThreadId: "pi:s1",
       resolveCanonicalThreadId: (id) => id,
     });
@@ -1769,5 +1769,9 @@ describe("onBackgroundTaskUpdated post-settle terminal update", () => {
       .map((call) => call[0] as { type: string })
       .find((action) => action.type === "upsertItem");
     expect(upsert).toBeTruthy();
+
+    // 关键：不得复燃「处理中」——绕过守卫后 markProcessing(true) 会让已
+    // settle 的会话永久「响应中」（2026-08-28 真机回归）。
+    expect(markProcessing).not.toHaveBeenCalledWith("pi:s1", true);
   });
 });

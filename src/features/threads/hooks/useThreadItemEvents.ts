@@ -2317,9 +2317,10 @@ export function useThreadItemEvents({
       }
       // skipTurnTerminalGuard：post-settle 后台任务终态是合法迟到事件——
       // 合成 item 无 turnId，会命中「无 id 分支」的 settled 线程守卫被丢弃
-      // （时间线卡片永停运行中）。backgroundTask item 不带 markProcessing
-      // 语义，不会复燃「生成中」。
-      handleItemUpdate(workspaceId, threadId, result.item, true, false, {
+      // （时间线卡片永停运行中）。shouldMarkProcessing 必须为 false：绕过
+      // 守卫后 markProcessing(true) 会把已 settle 的会话复燃成「响应中」
+      // 且无人再发 false（2026-08-28 真机回归）。
+      handleItemUpdate(workspaceId, threadId, result.item, false, false, {
         skipTurnTerminalGuard: true,
       });
     },
