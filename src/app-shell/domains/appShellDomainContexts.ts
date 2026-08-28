@@ -10,6 +10,7 @@ export const APP_SHELL_DOMAIN_CONTEXT_NAMES = [
   "layoutContext",
   "fileEditorContext",
   "settingsContext",
+  "threadDataContext",
   "runtimeContext",
   "modelSelectionContext",
   "collaborationModeContext",
@@ -32,6 +33,7 @@ export type AppShellDomainContexts = {
   layoutContext: AppShellDomainContextValue;
   fileEditorContext: AppShellDomainContextValue;
   settingsContext: AppShellDomainContextValue;
+  threadDataContext: AppShellDomainContextValue;
   runtimeContext: AppShellDomainContextValue;
   modelSelectionContext: AppShellDomainContextValue;
   collaborationModeContext: AppShellDomainContextValue;
@@ -625,10 +627,6 @@ export const APP_SHELL_DOMAIN_CONTEXT_OWNED_KEYS: Record<
     "terminalPanelHeight",
     "terminalState",
     "terminalTabs",
-    "threadItemsByThread",
-    "threadListLoadingByWorkspace",
-    "threadStatusById",
-    "threadsByWorkspace",
     "updaterState",
     "workspaceActivity",
     "workspaceDropTargetRef",
@@ -639,6 +637,15 @@ export const APP_SHELL_DOMAIN_CONTEXT_OWNED_KEYS: Record<
     // S4 PR-E：openSettings 归位 settings 域（从 layout）
     "openSettings",
     // S4 PR-E：删 17 个无 bag 读者 keys（根层直传不经 bag）
+  ],
+  // F5（fix-session-switch-jank-red-lines）：threads 全量 map 从 settingsContext
+  // 迁入独立 threadDataContext（ownership matrix 性能红线）。冷域 bag 不再因线程
+  // dispatch 失效；消费集见 APP_SHELL_CONSUMER_DOMAIN_SELECTION。
+  threadDataContext: [
+    "threadItemsByThread",
+    "threadListLoadingByWorkspace",
+    "threadStatusById",
+    "threadsByWorkspace",
   ],
   runtimeContext: [
     "runtimeRunState",
@@ -715,6 +722,8 @@ export const APP_SHELL_CONSUMER_DOMAIN_SELECTION = {
     "layoutContext",
     "fileEditorContext",
     "settingsContext",
+    // F5：threads 全量 map 显式消费（sidebar/topbar 投影真实读者）
+    "threadDataContext",
     "modelSelectionContext",
     "collaborationModeContext",
   ],
@@ -724,6 +733,9 @@ export const APP_SHELL_CONSUMER_DOMAIN_SELECTION = {
     "composerContext",
     "modelSelectionContext",
     "collaborationModeContext",
+    // F5：threads 全量 map 随侧栏节点构建走 canvas zone bag（与 runtimeThread 热域
+    // 同区）；chrome zone 不再因线程 dispatch 重建。
+    "threadDataContext",
   ],
   layoutNodesChrome: [
     "workspaceCatalogContext",
@@ -748,6 +760,9 @@ export const APP_SHELL_CONSUMER_DOMAIN_SELECTION = {
     "layoutContext",
     "fileEditorContext",
     "settingsContext",
+    // F5：threads 全量 map 显式消费（flows/radar/quickSwitcher 真实读者；
+    // 4b 深化时按消费点逐一投影化收窄并更新红线 gate）
+    "threadDataContext",
   ],
   // S4 PR-C：render 不再读 composerContext（原读取的 keys 已全部归位到
   // gitSurface / fileEditor / modeRouting / accountSurface / workspaceCatalog /
@@ -763,6 +778,10 @@ export const APP_SHELL_CONSUMER_DOMAIN_SELECTION = {
     "layoutContext",
     "fileEditorContext",
     "settingsContext",
+    // F5：threads 全量 map 显式消费（当前仅 Settings 的 workspace 数据管理
+    // 读 threadsByWorkspace/threadListLoadingByWorkspace；4b 应改由 settings
+    // surface 窄通道供给后移出本选择集并更新红线 gate）
+    "threadDataContext",
     "runtimeContext",
   ],
 } as const satisfies Record<string, readonly AppShellDomainContextName[]>;

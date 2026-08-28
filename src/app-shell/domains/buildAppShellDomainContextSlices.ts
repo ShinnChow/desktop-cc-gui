@@ -222,6 +222,24 @@ export function buildRuntimeDomainContextSlice(input: {
 }
 
 /**
+ * F5（fix-session-switch-jank-red-lines）：threads 全量 map 独立域。
+ * 写权唯一（runtime thread host）；冷域 bag 不再因线程 dispatch 失效。
+ */
+export function buildThreadDataDomainContextSlice(input: {
+  threadItemsByThread: unknown;
+  threadListLoadingByWorkspace: unknown;
+  threadStatusById: unknown;
+  threadsByWorkspace: unknown;
+}): AppShellDomainContextValue {
+  return {
+    threadItemsByThread: input.threadItemsByThread,
+    threadListLoadingByWorkspace: input.threadListLoadingByWorkspace,
+    threadStatusById: input.threadStatusById,
+    threadsByWorkspace: input.threadsByWorkspace,
+  };
+}
+
+/**
  * T1.2：会话 / workspace 身份标识（从 workspaceNavigation 垃圾桶拆出）。
  * 只含 id / ref / 当前实体投影；不含 git / catalog / mode 路由。
  */

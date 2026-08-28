@@ -50,8 +50,10 @@ export const APP_SHELL_DOMAIN_KEY_HARD_BUDGETS: Record<
   layoutContext: 35,
   /** S4 PR-F：实测 69 咬死 */
   fileEditorContext: 66,
-  /** S4 PR-E：124 → 36 达标；S4 PR-F：实测 36 咬死 */
-  settingsContext: 36,
+  /** S4 PR-E：124 → 36 达标；S4 PR-F：实测 36 咬死；F5（fix-session-switch-jank-red-lines）：threads 全量 map 4 keys 迁出 → 32 */
+  settingsContext: 32,
+  /** F5：threads 全量 map 独立域，实测 4 咬死（写权唯一 runtime thread host） */
+  threadDataContext: 4,
   /** S4 PR-F：实测 1 咬死 */
   runtimeContext: 1,
   /** S4 PR-F：实测 22 咬死 */

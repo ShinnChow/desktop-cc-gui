@@ -140,14 +140,15 @@ describe("assembleAppShellDomainContexts", () => {
       expect(contexts.runtimeThreadContext).not.toHaveProperty(key);
     }
 
-    // sections/render 仍可读：留在 settingsContext 的 conversation keys
+    // sections/render 仍可读：F5 后 threads 全量 map 迁入 threadDataContext
     for (const key of [
       "threadsByWorkspace",
       "threadStatusById",
       "threadItemsByThread",
       "threadListLoadingByWorkspace",
     ]) {
-      expect(contexts.settingsContext).toHaveProperty(key);
+      expect(contexts.threadDataContext).toHaveProperty(key);
+      expect(contexts.settingsContext).not.toHaveProperty(key);
     }
   });
 

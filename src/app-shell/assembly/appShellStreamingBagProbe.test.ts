@@ -23,6 +23,7 @@ function createContexts(
     layoutContext: { sidebarCollapsed: false },
     fileEditorContext: { activeEditorFilePath: null },
     settingsContext: { settingsOpen: false },
+    threadDataContext: { threadsByWorkspace: {} },
     runtimeContext: { runtimeRunState: { phase: "idle" } },
     modelSelectionContext: { selectedModelId: "m1" },
     collaborationModeContext: { selectedCollaborationModeId: null },
