@@ -7,7 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
  * 安全边界：完整 API key 永不回传前端，list 只携带 mask 后的展示串。
  */
 
-export type PiAuthProviderState = "configured" | "env" | "none";
+export type PiAuthProviderState = "configured" | "none";
 
 export type PiAuthKeySource = "literal" | "command" | "envRef";
 

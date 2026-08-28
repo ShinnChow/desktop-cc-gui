@@ -1860,7 +1860,6 @@ const settings = {
       searchPlaceholder: "Filter providers…",
       configured: "Configured",
       notConfigured: "Not configured",
-      envActive: "Env var active",
       customTitle: "Custom providers",
       customHint: "Written to ~/.pi/agent/models.json · relays / custom models",
       editConfig: "Edit config",

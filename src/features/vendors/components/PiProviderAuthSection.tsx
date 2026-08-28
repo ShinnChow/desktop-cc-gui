@@ -241,22 +241,6 @@ export function PiProviderAuthSection({ piBin }: { piBin?: string | null }) {
         </span>
       );
     }
-    if (state === "env") {
-      return (
-        <span
-          className="pi-auth-status pi-auth-status-env"
-          title={t("settings.vendor.piAuth.envActiveHint", {
-            defaultValue:
-              "环境变量生效中（mossx 启动 pi 时继承的环境）。如需覆盖，请设置 auth.json 凭证。",
-          })}
-        >
-          <span className="pi-auth-dot" aria-hidden />
-          {t("settings.vendor.piAuth.envActive", {
-            defaultValue: "环境变量生效中",
-          })}
-        </span>
-      );
-    }
     return (
       <span className="pi-auth-status pi-auth-status-idle">
         <span className="pi-auth-dot" aria-hidden />
@@ -491,13 +475,9 @@ export function PiProviderAuthSection({ piBin }: { piBin?: string | null }) {
                     >
                       {expanded
                         ? t("settings.vendor.piAuth.collapse", { defaultValue: "收起" })
-                        : state === "env"
-                          ? t("settings.vendor.piAuth.overrideSet", {
-                              defaultValue: "覆盖设置",
-                            })
-                          : t("settings.vendor.piAuth.setKey", {
-                              defaultValue: "设置 Key",
-                            })}
+                        : t("settings.vendor.piAuth.setKey", {
+                            defaultValue: "设置 Key",
+                          })}
                     </button>
                   )}
                 </div>

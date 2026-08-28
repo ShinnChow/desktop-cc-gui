@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -85,7 +86,11 @@ function snapshotFixture(): PiAuthListResult {
       envVar: "ANTHROPIC_API_KEY",
     }),
     snap("openai", "none", { envVar: "OPENAI_API_KEY" }),
-    snap("deepseek", "env", { envVar: "DEEPSEEK_API_KEY" }),
+    snap("deepseek", "configured", {
+      maskedKey: "sk-ds········wxyz",
+      keySource: "literal",
+      envVar: "DEEPSEEK_API_KEY",
+    }),
     snap("github-copilot", "none", { envVar: null }),
     snap("xai", "none", { envVar: "XAI_API_KEY" }),
     snap("openrouter", "none", { envVar: "OPENROUTER_API_KEY" }),
@@ -117,18 +122,18 @@ async function renderSection() {
 }
 
 describe("PiProviderAuthSection", () => {
-  it("renders configured / env / none states with distinct actions", async () => {
+  it("renders configured / none states with distinct actions", async () => {
     await renderSection();
 
-    // configured：mask chip + 编辑 + 删除
+    // configured：mask chip + 编辑 + 删除（env 态已摘除：进程 env ≠ pi 终端 env）
     expect(screen.getByText("sk-ant········3f2a")).toBeTruthy();
-    expect(screen.getByText("编辑")).toBeTruthy();
-    expect(screen.getByText("删除")).toBeTruthy();
-    // env：覆盖设置
-    expect(screen.getByText("环境变量生效中")).toBeTruthy();
-    expect(screen.getByText("覆盖设置")).toBeTruthy();
+    expect(screen.getByText("sk-ds········wxyz")).toBeTruthy();
+    expect(screen.getAllByText("编辑").length).toBe(2);
+    expect(screen.getAllByText("删除").length).toBe(2);
     // none：设置 Key（openai / xai / openrouter 等 featured）
     expect(screen.getAllByText("设置 Key").length).toBeGreaterThan(0);
+    expect(screen.queryByText("环境变量生效中")).toBeNull();
+    expect(screen.queryByText("覆盖设置")).toBeNull();
   });
 
   it("shows oauth subscription states and requests terminal login", async () => {
@@ -200,14 +205,20 @@ describe("PiProviderAuthSection", () => {
     await renderSection();
     fireEvent.click(screen.getAllByText("设置 Key")[0]); // openai
     await screen.findByTestId("pi-auth-editor-openai");
-    fireEvent.click(screen.getByText("覆盖设置")); // deepseek
+    const deepseekRow = screen
+      .getByText("DEEPSEEK_API_KEY")
+      .closest(".pi-auth-row") as HTMLElement;
+    fireEvent.click(within(deepseekRow).getByText("编辑")); // deepseek
     await screen.findByTestId("pi-auth-editor-deepseek");
     expect(screen.queryByTestId("pi-auth-editor-openai")).toBeNull();
   });
 
   it("requires confirmation before deleting a credential", async () => {
     await renderSection();
-    fireEvent.click(await screen.findByText("删除"));
+    const anthropicRow = screen
+      .getByText("ANTHROPIC_API_KEY")
+      .closest(".pi-auth-row") as HTMLElement;
+    fireEvent.click(within(anthropicRow).getByText("删除"));
     // 确认前不调用后端
     expect(mockDelete).not.toHaveBeenCalled();
     const confirm = await screen.findByText(
