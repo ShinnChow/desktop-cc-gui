@@ -25,7 +25,6 @@ pub(crate) enum WorkspaceSessionAttributionMode {
     WorkspaceOnly,
 }
 
-
 impl WorkspaceSessionAttributionMode {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
@@ -606,7 +605,6 @@ pub(crate) enum WorkspaceKind {
     Worktree,
 }
 
-
 impl WorkspaceKind {
     pub(crate) fn is_worktree(&self) -> bool {
         matches!(self, WorkspaceKind::Worktree)
@@ -737,7 +735,6 @@ pub(crate) enum EmailSenderProvider {
     Custom,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
@@ -747,7 +744,6 @@ pub(crate) enum EmailSenderSecurity {
     StartTls,
     None,
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -801,7 +797,6 @@ pub(crate) enum EmailInboundSecurity {
     StartTls,
     None,
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1424,7 +1419,6 @@ pub(crate) enum BackendMode {
     Local,
     Remote,
 }
-
 
 fn default_access_mode() -> String {
     "full-access".to_string()

@@ -125,9 +125,9 @@ fn resolve_workspace_arguments_source(
         && parent_entry
             .and_then(|parent| normalized_settings_value(parent.settings.codex_args.as_ref()))
             .is_some()
-        {
-            return "parent-workspace".to_string();
-        }
+    {
+        return "parent-workspace".to_string();
+    }
     if normalized_settings_value(settings.codex_args.as_ref()).is_some() {
         "global".to_string()
     } else {

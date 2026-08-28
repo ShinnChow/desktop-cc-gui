@@ -92,9 +92,9 @@ fn detect_claude_synthetic_approval_kind(
             && extract_absolute_path_from_tool_input(tool_input)
                 .or_else(|| extract_absolute_path_from_text(message))
                 .is_some()
-            {
-                return Some(ClaudeSyntheticApprovalKind::DirectoryGrant);
-            }
+        {
+            return Some(ClaudeSyntheticApprovalKind::DirectoryGrant);
+        }
         return Some(ClaudeSyntheticApprovalKind::CommandExecution);
     }
 

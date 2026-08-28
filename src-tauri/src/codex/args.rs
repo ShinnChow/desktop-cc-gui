@@ -83,11 +83,13 @@ fn rewrite_codex_args_with_unified_exec_override(
     let mut index = 0;
     while index < args.len() {
         let current = &args[index];
-        if (current == "-c" || current == "--config") && index + 1 < args.len()
-            && is_unified_exec_config_override(&args[index + 1]) {
-                index += 2;
-                continue;
-            }
+        if (current == "-c" || current == "--config")
+            && index + 1 < args.len()
+            && is_unified_exec_config_override(&args[index + 1])
+        {
+            index += 2;
+            continue;
+        }
         if let Some(inline) = current.strip_prefix("--config=") {
             if is_unified_exec_config_override(inline) {
                 index += 1;

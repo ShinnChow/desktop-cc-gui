@@ -1848,7 +1848,8 @@ fn read_number_before_keyword(line: &str, keyword: &str) -> Option<i64> {
     let keyword_index = lower.find(keyword)?;
     let prefix = &line[..keyword_index];
     prefix
-        .split(|ch: char| !ch.is_ascii_digit()).rfind(|segment| !segment.is_empty())
+        .split(|ch: char| !ch.is_ascii_digit())
+        .rfind(|segment| !segment.is_empty())
         .and_then(|segment| segment.parse::<i64>().ok())
 }
 
@@ -1996,9 +1997,7 @@ fn codex_subagent_display_title(metadata: &CodexSubagentSessionMetadata) -> Opti
 }
 
 fn portable_path_basename(path: &str) -> Option<String> {
-    let trimmed = path
-        .trim()
-        .trim_end_matches(['/', '\\']);
+    let trimmed = path.trim().trim_end_matches(['/', '\\']);
     if trimmed.is_empty() {
         return None;
     }

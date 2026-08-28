@@ -102,7 +102,10 @@ pub(super) fn extract_delta_text_from_event(event: &Value) -> Option<String> {
             .and_then(|value| value.as_str()),
         part.and_then(|value| value.get("content"))
             .and_then(|value| value.as_str()),
-    ].into_iter().flatten() {
+    ]
+    .into_iter()
+    .flatten()
+    {
         if !text.is_empty() {
             return Some(text.to_string());
         }
