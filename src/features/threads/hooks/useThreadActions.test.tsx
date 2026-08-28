@@ -222,30 +222,24 @@ describe("useThreadActions", () => {
 
     expect(resumeThread).toHaveBeenCalledWith("ws-1", "thread-unified");
     expect(loadCodexSession).toHaveBeenCalledWith("ws-1", "thread-unified");
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "ensureThread",
-      workspaceId: "ws-1",
-      threadId: "thread-unified",
-      engine: "codex",
-    });
+    // F4 合批契约：ensure/plan/restoredAt/window/tokenUsage 经
+    // hydrateThreadHistorySnapshot 单次 dispatch 落库（与 items 同 commit）。
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "hydrateThreadHistorySnapshot",
+        workspaceId: "ws-1",
+        threadId: "thread-unified",
+        engine: "codex",
+        plan: {
+          turnId: "turn-1",
+          explanation: "Plan first",
+          steps: [{ step: "Inspect", status: "pending" }],
+        },
+      }),
+    );
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "setThreadItems",
-        threadId: "thread-unified",
-      }),
-    );
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "setThreadPlan",
-      threadId: "thread-unified",
-      plan: {
-        turnId: "turn-1",
-        explanation: "Plan first",
-        steps: [{ step: "Inspect", status: "pending" }],
-      },
-    });
-    expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "setThreadHistoryRestoredAt",
         threadId: "thread-unified",
       }),
     );
@@ -444,12 +438,14 @@ describe("useThreadActions", () => {
       await result.current.resumeThreadForWorkspace("ws-1", "thread-empty");
     });
 
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "ensureThread",
-      workspaceId: "ws-1",
-      threadId: "thread-empty",
-      engine: "codex",
-    });
+    // F4 合批契约：空快照走 markHistoryRecoveryFailure，不再先 ensureThread，
+    // 也不应有 hydrateThreadHistorySnapshot / restoredAt 落库。
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "hydrateThreadHistorySnapshot",
+        threadId: "thread-empty",
+      }),
+    );
     expect(dispatch).not.toHaveBeenCalledWith(
       expect.objectContaining({
         type: "setThreadHistoryRestoredAt",

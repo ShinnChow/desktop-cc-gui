@@ -662,12 +662,10 @@ export function useThreadActionsResumeThreadForWorkspace(
             effectiveThreadId === threadId
               ? localItems
               : (itemsByThread[effectiveThreadId] ?? []);
-          dispatch({
-            type: "ensureThread",
-            workspaceId,
-            threadId: effectiveThreadId,
-            engine: assembledSnapshot.meta.engine,
-          });
+          // F4（fix-session-switch-jank-red-lines）：ensureThread 不再在 curtain
+          // yield 前单独 dispatch（那会让侧栏/全树为 curtain 多付一次根级 commit），
+          // 改为合入 applyHydratedItems 之后的 hydrateThreadHistorySnapshot 组合
+          // action，与 items/元数据同 commit 上屏。
           if (snapshot.fallbackWarnings.length > 0) {
             const partialHistoryDiagnostic = buildPartialHistoryDiagnostic(
               snapshot.fallbackWarnings
@@ -737,29 +735,19 @@ export function useThreadActionsResumeThreadForWorkspace(
           if (!applied) {
             return false;
           }
+          // F4：ensure + plan + restoredAt + window + tokenUsage 单次状态转移，
+          // 与上面的 items dispatch 同宏任务 → 同一次根级 commit。
           dispatch({
-            type: "setThreadPlan",
+            type: "hydrateThreadHistorySnapshot",
+            workspaceId,
             threadId: effectiveThreadId,
+            engine: assembledSnapshot.meta.engine,
             plan: assembledSnapshot.plan,
+            historyRestoredAtMs: assembledSnapshot.meta.historyRestoredAtMs,
+            historyHasMore: assembledSnapshot.meta.historyHasMore === true,
+            historyNextCursor: assembledSnapshot.meta.historyNextCursor ?? null,
+            tokenUsage: snapshot.tokenUsage ?? undefined,
           });
-          dispatch({
-            type: "setThreadHistoryRestoredAt",
-            threadId: effectiveThreadId,
-            timestamp: assembledSnapshot.meta.historyRestoredAtMs,
-          });
-          dispatch({
-            type: "setThreadHistoryWindow",
-            threadId: effectiveThreadId,
-            hasMore: assembledSnapshot.meta.historyHasMore === true,
-            nextCursor: assembledSnapshot.meta.historyNextCursor ?? null,
-          });
-          if (snapshot.tokenUsage) {
-            dispatch({
-              type: "setThreadTokenUsage",
-              threadId: effectiveThreadId,
-              tokenUsage: snapshot.tokenUsage,
-            });
-          }
           onDebug?.(
             createThreadHistoryReadableSurfaceDebugEntry({
               workspaceId,

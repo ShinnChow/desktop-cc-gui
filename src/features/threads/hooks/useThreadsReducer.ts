@@ -3284,6 +3284,41 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         },
       };
     }
+    case "hydrateThreadHistorySnapshot": {
+      // F4（fix-session-switch-jank-red-lines）：hydrate 元数据合批。递归复用既有
+      // case 实现（构造上保证终态与逐个 dispatch bit 级一致），单次状态转移把
+      // hydrate 段的 5 个根级 dispatch 收敛为 1 个 commit。
+      let next = threadReducer(state, {
+        type: "ensureThread",
+        workspaceId: action.workspaceId,
+        threadId: action.threadId,
+        ...(action.engine ? { engine: action.engine } : {}),
+      });
+      next = threadReducer(next, {
+        type: "setThreadPlan",
+        threadId: action.threadId,
+        plan: action.plan ?? null,
+      });
+      next = threadReducer(next, {
+        type: "setThreadHistoryRestoredAt",
+        threadId: action.threadId,
+        timestamp: action.historyRestoredAtMs,
+      });
+      next = threadReducer(next, {
+        type: "setThreadHistoryWindow",
+        threadId: action.threadId,
+        hasMore: action.historyHasMore,
+        nextCursor: action.historyNextCursor,
+      });
+      if (action.tokenUsage) {
+        next = threadReducer(next, {
+          type: "setThreadTokenUsage",
+          threadId: action.threadId,
+          tokenUsage: action.tokenUsage,
+        });
+      }
+      return next;
+    }
     case "setThreadTokenUsage": {
       const existingStatus = withThreadStatusDefaults(
         state.threadStatusById[action.threadId],

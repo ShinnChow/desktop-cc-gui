@@ -338,6 +338,29 @@ export type ThreadAction =
       threadId: string;
     }
   | { type: "setThreadTokenUsage"; threadId: string; tokenUsage: ThreadTokenUsage }
+  | {
+      /** F4（fix-session-switch-jank-red-lines）：hydrate 元数据合批。依序递归应用
+       *  ensureThread → setThreadPlan → setThreadHistoryRestoredAt → setThreadHistoryWindow
+       *  → setThreadTokenUsage（可选），单次状态转移 = 单次根级 commit。 */
+      type: "hydrateThreadHistorySnapshot";
+      workspaceId: string;
+      threadId: string;
+      engine?:
+        | "codex"
+        | "claude"
+        | "gemini"
+        | "grok"
+        | "kimi"
+        | "opencode"
+        | "pi"
+        | "dsh"
+        | "qoder";
+      plan?: TurnPlan | null;
+      historyRestoredAtMs: number | null;
+      historyHasMore: boolean;
+      historyNextCursor: string | null;
+      tokenUsage?: ThreadTokenUsage;
+    }
   | { type: "setThreadSessionStats"; threadId: string; sessionStats: ThreadTokenUsage["sessionStats"] }
   | { type: "setThreadDshTodos"; threadId: string; todos: ThreadTokenUsage["dshTodos"] }
   | {
