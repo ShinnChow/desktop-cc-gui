@@ -1157,20 +1157,31 @@ async fn fetch_opencode_provider_catalog_from_auth_picker(
 }
 
 /// Detect all installed engines and their capabilities
+///
+/// B3 缓存优先：默认（无 force / 无 engines）走 TTL 缓存 + last-good SWR；
+/// `force: true` 全量重探；`engines: ["kimi", ...]` 仅轻量重探指定引擎。
 #[tauri::command]
 pub async fn detect_engines(
+    force: Option<bool>,
+    engines: Option<Vec<EngineType>>,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<Vec<EngineStatus>, String> {
+    let force = force.unwrap_or(false);
     if remote_backend::is_remote_mode(&*state).await {
-        let (method, params) = remote_detect_engines_request();
+        let (method, params) = remote_detect_engines_request(force, engines.as_deref());
         return call_remote_typed(&*state, &app, method, params).await;
     }
     let manager = &state.engine_manager;
     let settings = read_app_settings_snapshot(&state).await;
     let disabled_engines = crate::engine::detection_disabled_engines(&settings);
     Ok(manager
-        .detect_engines_with_gates(settings.gemini_enabled, &disabled_engines)
+        .detect_engines_cached(
+            force,
+            engines.as_deref(),
+            settings.gemini_enabled,
+            &disabled_engines,
+        )
         .await)
 }
 

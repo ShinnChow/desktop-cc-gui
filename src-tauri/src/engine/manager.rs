@@ -4,8 +4,10 @@
 //! session management, and configuration.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex, RwLock};
 
 use super::adapter_registry::{EngineAdapterRegistry, EngineId};
@@ -20,7 +22,8 @@ use super::qoder::QoderSession;
 use super::qoder_provider_profile::{QoderDistributionSettings, QoderProviderLaunchProfile};
 use super::status::{
     detect_all_engines_scoped, detect_claude_status, detect_codex_status, detect_grok_status,
-    detect_kimi_status, detect_opencode_status,
+    detect_kimi_status, detect_opencode_status_with_options, detect_pi_status_with_options,
+    detect_qoder_status_with_options,
 };
 use super::{disabled_engine_status, EngineConfig, EngineStatus, EngineType};
 
@@ -34,6 +37,13 @@ pub struct EngineManager {
 
     /// Cached engine statuses
     engine_statuses: RwLock<HashMap<EngineType, EngineStatus>>,
+
+    /// 检测簿记（refactor-engine-detection-pipeline B3）：上次全量检测时间、
+    /// 检测上下文（gemini gate + 黑名单集合，变化即缓存失效）、per-engine
+    /// 检测时间与 last-good 落盘加载状态。
+    detect_bookkeeping: StdMutex<DetectBookkeeping>,
+    /// SWR 后台 revalidate 单飞标记。
+    detect_revalidate_inflight: Arc<AtomicBool>,
 
     /// Claude session manager. Wrapped in `Arc` so the in-process AskUserQuestion
     /// MCP server can hold a shared handle for session lookup (see `askuser_mcp`).
@@ -147,6 +157,97 @@ fn qoder_engine_config_with_launch_profile(
     config
 }
 
+/// 检测缓存簿记（B3）。`last_context` 变化（黑名单 / gemini gate 变化）即视为
+/// 缓存失效，下一轮检测按新上下文执行。
+#[derive(Default)]
+struct DetectBookkeeping {
+    last_full_detect_at: Option<Instant>,
+    last_context: Option<(bool, Vec<EngineType>)>,
+    per_engine_detected_at: HashMap<EngineType, Instant>,
+    last_good_loaded: bool,
+}
+
+/// last-good 落盘文件条目（`~/.ccgui/engine-status-last-good.json`）。
+#[derive(serde::Serialize, serde::Deserialize)]
+struct EngineStatusLastGoodEntry {
+    status: EngineStatus,
+    detected_at_ms: u64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct EngineStatusLastGoodFile {
+    entries: HashMap<String, EngineStatusLastGoodEntry>,
+}
+
+/// TTL 内返回缓存；60s 与前端菜单打开 fire-and-forget 频率解耦。
+const DETECT_CACHE_TTL: Duration = Duration::from_secs(60);
+/// last-good 落盘保留期：超龄条目按「无该引擎 last-good」处理。
+const LAST_GOOD_MAX_AGE_MS: u64 = 7 * 24 * 3600 * 1000;
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+static LAST_GOOD_PATH_OVERRIDE: OnceLock<StdMutex<Option<PathBuf>>> = OnceLock::new();
+
+fn last_good_file_path() -> Option<PathBuf> {
+    #[cfg(test)]
+    {
+        if let Some(lock) = LAST_GOOD_PATH_OVERRIDE.get() {
+            if let Ok(guard) = lock.lock() {
+                if let Some(path) = guard.as_ref() {
+                    return Some(path.clone());
+                }
+            }
+        }
+    }
+    crate::app_paths::app_home_dir()
+        .ok()
+        .map(|home| home.join("engine-status-last-good.json"))
+}
+
+/// SWR revalidate 单飞标记的 panic 安全复位。
+struct DetectInflightReset(Arc<AtomicBool>);
+
+impl Drop for DetectInflightReset {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
+/// per-engine 探测「失败」判定：仅限探测自身故障（panic 隔离标注 / 探测超时），
+/// 合法的 not-installed（如 ENOENT，用户外部卸载 CLI）不算失败，
+/// MUST 正常更新缓存让卸载状态传播（D9 外部变化识别）。
+fn is_probe_failure_error(error: Option<&str>) -> bool {
+    error
+        .map(|error| {
+            error.contains("engine detection task failed")
+                || error.contains("timed out")
+                || error.contains("Timed out")
+        })
+        .unwrap_or(false)
+}
+
+/// 防中毒合并（纯函数便于测试）：fresh 为探测失败且旧值为已安装时，
+/// 保留旧 last-good 并合入 error 标注；否则采用 fresh。
+fn merge_with_poison_guard(previous: Option<&EngineStatus>, fresh: EngineStatus) -> EngineStatus {
+    let degraded_probe = is_probe_failure_error(fresh.error.as_deref());
+    if degraded_probe {
+        if let Some(prev) = previous.filter(|prev| prev.installed) {
+            let mut merged = prev.clone();
+            if merged.error.is_none() {
+                merged.error = fresh.error.clone();
+            }
+            return merged;
+        }
+    }
+    fresh
+}
+
 impl EngineManager {
     /// Create a new engine manager
     pub fn new() -> Self {
@@ -155,6 +256,8 @@ impl EngineManager {
             adapter_registry: EngineAdapterRegistry::with_builtins(),
             active_engine: RwLock::new(EngineType::default()),
             engine_statuses: RwLock::new(HashMap::new()),
+            detect_bookkeeping: StdMutex::new(DetectBookkeeping::default()),
+            detect_revalidate_inflight: Arc::new(AtomicBool::new(false)),
             claude_manager: Arc::new(ClaudeSessionManager::new()),
             opencode_sessions: Mutex::new(HashMap::new()),
             gemini_sessions: Mutex::new(GeminiSessionRegistry::default()),
@@ -238,21 +341,17 @@ impl EngineManager {
         let config = configs.get(&engine_type);
         let bin = config.and_then(|c| c.bin_path.as_deref());
 
+        // B1/B3：单引擎重探走启动轻量分支（models 目录探测只在
+        // get_engine_models 按需路径）。
         let status = match engine_type {
             EngineType::Claude => detect_claude_status(bin).await,
             EngineType::Codex => detect_codex_status(bin).await,
             EngineType::Gemini => disabled_engine_status(engine_type),
-            EngineType::OpenCode => detect_opencode_status(bin).await,
+            EngineType::OpenCode => detect_opencode_status_with_options(bin, false).await,
             EngineType::Kimi => detect_kimi_status(bin).await,
             EngineType::Grok => detect_grok_status(bin).await,
-            EngineType::Pi => crate::engine::status::detect_pi_status(bin).await,
-            EngineType::Qoder => {
-                crate::engine::status::detect_qoder_status_with_home(
-                    bin,
-                    config.and_then(|item| item.home_dir.as_deref()),
-                )
-                .await
-            }
+            EngineType::Pi => detect_pi_status_with_options(bin, false).await,
+            EngineType::Qoder => detect_qoder_status_with_options(bin, false).await,
             EngineType::Dsh => {
                 crate::engine::dsh::detect_dsh_status(
                     &crate::engine::dsh::runtime_settings_from_engine_config(config),
@@ -350,13 +449,216 @@ impl EngineManager {
             })
             .collect::<Vec<_>>();
 
-        // Cache results
-        let mut cached = self.engine_statuses.write().await;
-        for status in &statuses {
-            cached.insert(status.engine_type, status.clone());
+        // Cache results with per-engine poison guard（B3）：探测自身失败
+        // （panic 隔离 / 超时）不得覆盖旧 last-good。
+        let now = Instant::now();
+        let mut persisted = Vec::with_capacity(statuses.len());
+        {
+            let mut cached = self.engine_statuses.write().await;
+            let mut bk = self.detect_bookkeeping.lock().expect("detect bookkeeping");
+            bk.last_full_detect_at = Some(now);
+            bk.last_context = Some((
+                gemini_enabled,
+                disabled_engines.iter().copied().collect::<Vec<_>>(),
+            ));
+            for status in &statuses {
+                let merged =
+                    merge_with_poison_guard(cached.get(&status.engine_type), status.clone());
+                bk.per_engine_detected_at.insert(merged.engine_type, now);
+                cached.insert(merged.engine_type, merged.clone());
+                persisted.push(merged);
+            }
         }
+        self.persist_last_good_snapshot(&persisted).await;
 
         statuses
+    }
+
+    /// 检测缓存是否新鲜（TTL 内且检测上下文一致：黑名单 / gemini gate 变化即失效）。
+    fn full_detect_cache_fresh(&self, gemini_enabled: bool, disabled: &[EngineType]) -> bool {
+        let bk = self.detect_bookkeeping.lock().expect("detect bookkeeping");
+        let fresh = bk
+            .last_full_detect_at
+            .map(|at| at.elapsed() < DETECT_CACHE_TTL)
+            .unwrap_or(false);
+        if !fresh {
+            return false;
+        }
+        match bk.last_context.as_ref() {
+            Some((last_gemini, last_disabled)) => {
+                *last_gemini == gemini_enabled
+                    && last_disabled.len() == disabled.len()
+                    && disabled
+                        .iter()
+                        .all(|engine_type| last_disabled.contains(engine_type))
+            }
+            None => false,
+        }
+    }
+
+    /// 冷启动一次性加载 last-good 落盘（容忍损坏；超龄条目按无 last-good 处理；
+    /// 不覆盖内存中已更新的条目）。
+    async fn ensure_last_good_loaded(&self) {
+        let already_loaded = {
+            let mut bk = self.detect_bookkeeping.lock().expect("detect bookkeeping");
+            if bk.last_good_loaded {
+                true
+            } else {
+                bk.last_good_loaded = true;
+                false
+            }
+        };
+        if already_loaded {
+            return;
+        }
+        let Some(path) = last_good_file_path() else {
+            return;
+        };
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            return;
+        };
+        let Ok(mut file) = serde_json::from_str::<EngineStatusLastGoodFile>(&text) else {
+            return;
+        };
+        let now = now_ms();
+        let mut statuses = self.engine_statuses.write().await;
+        let mut bk = self.detect_bookkeeping.lock().expect("detect bookkeeping");
+        for (engine_name, entry) in std::mem::take(&mut file.entries) {
+            let Ok(engine_type) =
+                serde_json::from_value::<EngineType>(serde_json::Value::String(engine_name))
+            else {
+                continue;
+            };
+            if now.saturating_sub(entry.detected_at_ms) > LAST_GOOD_MAX_AGE_MS {
+                continue;
+            }
+            statuses.entry(engine_type).or_insert(entry.status);
+            bk.per_engine_detected_at
+                .entry(engine_type)
+                .or_insert(Instant::now());
+        }
+    }
+
+    /// last-good 落盘（原子写：temp + rename；失败静默——纯缓存文件）。
+    async fn persist_last_good_snapshot(&self, statuses: &[EngineStatus]) {
+        let Some(path) = last_good_file_path() else {
+            return;
+        };
+        let bk = self.detect_bookkeeping.lock().expect("detect bookkeeping");
+        let mut entries = HashMap::new();
+        for status in statuses {
+            let detected_at_ms = bk
+                .per_engine_detected_at
+                .get(&status.engine_type)
+                .map(|at| now_ms().saturating_sub(at.elapsed().as_millis() as u64))
+                .unwrap_or_else(now_ms);
+            let Ok(name) = serde_json::to_string(&status.engine_type) else {
+                continue;
+            };
+            entries.insert(
+                name.trim_matches('"').to_string(),
+                EngineStatusLastGoodEntry {
+                    status: status.clone(),
+                    detected_at_ms,
+                },
+            );
+        }
+        drop(bk);
+        let Ok(json) = serde_json::to_string(&EngineStatusLastGoodFile { entries }) else {
+            return;
+        };
+        let tmp = path.with_extension("json.tmp");
+        if std::fs::write(&tmp, json).is_ok() {
+            let _ = std::fs::rename(&tmp, &path);
+        }
+    }
+
+    /// SWR 后台 revalidate（单飞）：立即返回 stale 快照后异步全量重探，
+    /// 结果经 merge 写回缓存与落盘（B4 起逐引擎 emit 事件）。
+    fn spawn_revalidate_if_idle(self: &Arc<Self>, gemini_enabled: bool, disabled: &[EngineType]) {
+        if self
+            .detect_revalidate_inflight
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return;
+        }
+        let manager = Arc::clone(self);
+        let disabled = disabled.to_vec();
+        tokio::spawn(async move {
+            let _reset = DetectInflightReset(Arc::clone(&manager.detect_revalidate_inflight));
+            manager
+                .detect_engines_with_gates(gemini_enabled, &disabled)
+                .await;
+        });
+    }
+
+    #[cfg(test)]
+    fn test_mark_detect_cache_fresh(&self, gemini_enabled: bool, disabled: &[EngineType]) {
+        let mut bk = self.detect_bookkeeping.lock().expect("detect bookkeeping");
+        bk.last_full_detect_at = Some(Instant::now());
+        bk.last_context = Some((gemini_enabled, disabled.to_vec()));
+        bk.last_good_loaded = true;
+    }
+
+    /// B3 缓存优先检测入口（app 命令与 daemon 共用）：
+    /// - `force=false && engines=None`：TTL 内直接返回缓存（0 spawn）；
+    ///   过期/上下文变化时返回 last-good（stale-while-revalidate）并后台单飞重探；
+    ///   冷启动无 last-good 才同步全量探测。
+    /// - `engines=Some(list)`：仅轻量重探列表内引擎并与缓存 merge（force 语义）。
+    /// - `force=true`：全量重探。
+    pub async fn detect_engines_cached(
+        self: &Arc<Self>,
+        force: bool,
+        engines: Option<&[EngineType]>,
+        gemini_enabled: bool,
+        disabled: &[EngineType],
+    ) -> Vec<EngineStatus> {
+        if !force && engines.is_none() {
+            // 快照 MUST 按当前黑名单过滤：检测上下文变化（新禁用引擎）后，
+            // 旧缓存里的该引擎不得再透出（D9）。
+            let filter_disabled = |statuses: Vec<EngineStatus>| -> Vec<EngineStatus> {
+                statuses
+                    .into_iter()
+                    .filter(|status| !disabled.contains(&status.engine_type))
+                    .collect()
+            };
+            if self.full_detect_cache_fresh(gemini_enabled, disabled) {
+                return filter_disabled(self.get_all_statuses().await);
+            }
+            self.ensure_last_good_loaded().await;
+            let snapshot = self.get_all_statuses().await;
+            if !snapshot.is_empty() {
+                self.spawn_revalidate_if_idle(gemini_enabled, disabled);
+                return filter_disabled(snapshot);
+            }
+            return self
+                .detect_engines_with_gates(gemini_enabled, disabled)
+                .await;
+        }
+        if let Some(list) = engines {
+            for engine_type in list {
+                if disabled.contains(engine_type) {
+                    continue;
+                }
+                let fresh = self
+                    .detect_single_engine_with_gates(*engine_type, gemini_enabled)
+                    .await;
+                let merged = {
+                    let cached = self.engine_statuses.read().await;
+                    merge_with_poison_guard(cached.get(engine_type), fresh)
+                };
+                let now = Instant::now();
+                {
+                    let mut bk = self.detect_bookkeeping.lock().expect("detect bookkeeping");
+                    bk.per_engine_detected_at.insert(merged.engine_type, now);
+                }
+                self.cache_engine_status(merged).await;
+            }
+            return self.get_all_statuses().await;
+        }
+        self.detect_engines_with_gates(gemini_enabled, disabled)
+            .await
     }
 
     /// Get cached engine status
@@ -1616,5 +1918,153 @@ mod tests {
             config.home_dir.as_deref(),
             Some(home.to_string_lossy().as_ref())
         );
+    }
+    // ==================== B3 检测缓存与 last-good ====================
+
+    fn b3_status(engine_type: EngineType, installed: bool, version: Option<&str>) -> EngineStatus {
+        let mut status = disabled_engine_status(engine_type);
+        status.installed = installed;
+        status.version = version.map(str::to_string);
+        status
+    }
+
+    #[test]
+    fn poison_guard_preserves_installed_last_good_on_probe_failure() {
+        let previous = b3_status(EngineType::Kimi, true, Some("1.0.0"));
+        let mut fresh = b3_status(EngineType::Kimi, false, None);
+        fresh.error = Some("engine detection task failed: panicked".to_string());
+
+        let merged = merge_with_poison_guard(Some(&previous), fresh);
+        assert!(
+            merged.installed,
+            "probe failure must not overwrite installed last-good"
+        );
+        assert_eq!(merged.version.as_deref(), Some("1.0.0"));
+        assert!(
+            merged
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("engine detection task failed"),
+            "failure annotation must be merged in"
+        );
+    }
+
+    #[test]
+    fn poison_guard_propagates_legitimate_uninstall() {
+        let previous = b3_status(EngineType::Kimi, true, Some("1.0.0"));
+        let mut fresh = b3_status(EngineType::Kimi, false, None);
+        fresh.error = Some("No such file or directory (os error 2)".to_string());
+
+        let merged = merge_with_poison_guard(Some(&previous), fresh);
+        assert!(
+            !merged.installed,
+            "legitimate not-installed (external uninstall) must propagate"
+        );
+    }
+
+    #[test]
+    fn poison_guard_adopts_healthy_fresh_result() {
+        let previous = b3_status(EngineType::Kimi, true, Some("0.9.0"));
+        let fresh = b3_status(EngineType::Kimi, true, Some("1.2.0"));
+        let merged = merge_with_poison_guard(Some(&previous), fresh);
+        assert_eq!(merged.version.as_deref(), Some("1.2.0"));
+    }
+
+    #[test]
+    fn engine_status_last_good_entry_round_trips() {
+        let entry = EngineStatusLastGoodEntry {
+            status: b3_status(EngineType::Kimi, true, Some("3.1.4")),
+            detected_at_ms: 1_000,
+        };
+        let json = serde_json::to_string(&entry).expect("serialize entry");
+        let parsed: EngineStatusLastGoodEntry =
+            serde_json::from_str(&json).expect("deserialize entry");
+        assert_eq!(parsed.status.version.as_deref(), Some("3.1.4"));
+        assert!(parsed.status.installed);
+    }
+
+    #[tokio::test]
+    async fn cached_detection_serves_fresh_cache_within_ttl() {
+        let manager = Arc::new(EngineManager::new());
+        let seeded = b3_status(EngineType::Kimi, true, Some("2.0.0"));
+        manager.cache_engine_status(seeded.clone()).await;
+        manager.test_mark_detect_cache_fresh(false, &[]);
+
+        let statuses = manager.detect_engines_cached(false, None, false, &[]).await;
+        let kimi = statuses
+            .iter()
+            .find(|status| status.engine_type == EngineType::Kimi)
+            .expect("kimi cached status must be served");
+        assert_eq!(kimi.version.as_deref(), Some("2.0.0"));
+    }
+
+    #[tokio::test]
+    async fn cached_detection_context_change_invalidates_cache() {
+        let manager = Arc::new(EngineManager::new());
+        manager
+            .cache_engine_status(b3_status(EngineType::Kimi, true, Some("2.0.0")))
+            .await;
+        manager.test_mark_detect_cache_fresh(false, &[]);
+
+        // 黑名单变化（禁用 kimi）→ 缓存上下文失配 → 不得命中 TTL 缓存分支；
+        // 走 SWR/重探路径后 kimi 不应出现在结果中。
+        let statuses = manager
+            .detect_engines_cached(false, None, false, &[EngineType::Kimi])
+            .await;
+        assert!(
+            statuses
+                .iter()
+                .all(|status| status.engine_type != EngineType::Kimi),
+            "disabled engine must not be served from a stale cache entry"
+        );
+    }
+
+    #[tokio::test]
+    async fn cached_detection_serves_last_good_from_disk_before_revalidate() {
+        let dir = std::env::temp_dir().join(format!(
+            "ccgui-b3-last-good-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let file_path = dir.join("engine-status-last-good.json");
+        let entry = EngineStatusLastGoodEntry {
+            status: b3_status(EngineType::Kimi, true, Some("3.1.4")),
+            detected_at_ms: crate::engine::manager::now_ms(),
+        };
+        let mut entries = HashMap::new();
+        entries.insert("kimi".to_string(), entry);
+        let file = EngineStatusLastGoodFile { entries };
+        std::fs::write(
+            &file_path,
+            serde_json::to_string(&file).expect("serialize last good"),
+        )
+        .expect("write last good file");
+        LAST_GOOD_PATH_OVERRIDE
+            .get_or_init(|| StdMutex::new(None))
+            .lock()
+            .expect("lock")
+            .replace(file_path.clone());
+
+        let manager = Arc::new(EngineManager::new());
+        let statuses = manager.detect_engines_cached(false, None, false, &[]).await;
+        let kimi = statuses
+            .iter()
+            .find(|status| status.engine_type == EngineType::Kimi)
+            .expect("last-good entry must be served immediately (SWR)");
+        assert_eq!(kimi.version.as_deref(), Some("3.1.4"));
+        assert!(
+            kimi.installed,
+            "last-good snapshot must be served before background revalidate lands"
+        );
+
+        LAST_GOOD_PATH_OVERRIDE
+            .get()
+            .map(|lock| lock.lock().expect("lock").take());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

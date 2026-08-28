@@ -45,7 +45,7 @@ pub(crate) struct AppState {
         crate::shared_runtime_coordinator::SharedRuntimeCoordinator,
     pub(crate) renderer_heartbeats: Mutex<crate::renderer_stability::RendererHeartbeatStore>,
     pub(crate) semantic_navigation_runtime: crate::code_intel_lsp::SemanticNavigationRuntime,
-    pub(crate) engine_manager: EngineManager,
+    pub(crate) engine_manager: Arc<EngineManager>,
 }
 
 impl AppState {
@@ -225,7 +225,7 @@ impl AppState {
                 None
             }
         };
-        let engine_manager = EngineManager::new();
+        let engine_manager = Arc::new(EngineManager::new());
         let claude_resume_diagnostics_runtime = Arc::clone(&runtime_manager);
         engine_manager
             .claude_manager

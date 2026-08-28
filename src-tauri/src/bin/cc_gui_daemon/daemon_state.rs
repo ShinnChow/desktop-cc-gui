@@ -202,7 +202,7 @@ impl DaemonState {
             web_service_runtime: Mutex::new(web_service_runtime),
             event_sink,
             codex_login_cancels: Mutex::new(HashMap::new()),
-            engine_manager: engine::EngineManager::new(),
+            engine_manager: Arc::new(engine::EngineManager::new()),
             active_engine: Mutex::new(active_engine),
             runtime_manager,
         }
@@ -1005,11 +1005,19 @@ impl DaemonState {
     }
 
     pub(super) async fn detect_engines(&self) -> Vec<engine::EngineStatus> {
+        self.detect_engines_cached(false, None).await
+    }
+
+    pub(super) async fn detect_engines_cached(
+        &self,
+        force: bool,
+        engines: Option<&[engine::EngineType]>,
+    ) -> Vec<engine::EngineStatus> {
         self.sync_engine_configs().await;
         let settings = self.app_settings.lock().await.clone();
         let disabled_engines = engine::detection_disabled_engines(&settings);
         self.engine_manager
-            .detect_engines_with_gates(settings.gemini_enabled, &disabled_engines)
+            .detect_engines_cached(force, engines, settings.gemini_enabled, &disabled_engines)
             .await
     }
 
@@ -1057,9 +1065,21 @@ impl DaemonState {
         self.sync_engine_configs().await;
         let settings = self.app_settings.lock().await.clone();
         let disabled_engines = engine::detection_disabled_engines(&settings);
+        if disabled_engines.contains(&engine_type) {
+            return None;
+        }
+        if let Some(status) = self.engine_manager.get_engine_status(engine_type).await {
+            return Some(status);
+        }
+        // 缓存缺失：轻量单引擎重探（B3 cached per-engine）。
         let statuses = self
             .engine_manager
-            .detect_engines_with_gates(settings.gemini_enabled, &disabled_engines)
+            .detect_engines_cached(
+                false,
+                Some(&[engine_type]),
+                settings.gemini_enabled,
+                &disabled_engines,
+            )
             .await;
         statuses
             .into_iter()

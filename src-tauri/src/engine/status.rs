@@ -751,7 +751,7 @@ pub async fn detect_codex_status(custom_bin: Option<&str>) -> EngineStatus {
     }
 }
 
-async fn detect_opencode_status_with_options(
+pub async fn detect_opencode_status_with_options(
     custom_bin: Option<&str>,
     include_models: bool,
 ) -> EngineStatus {
