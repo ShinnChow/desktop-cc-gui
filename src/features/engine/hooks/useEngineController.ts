@@ -332,6 +332,9 @@ export function useEngineController({
         const nextAvailableEngines = buildAvailableEngines(statuses, true, false);
 
         setEngineStatuses(statuses);
+        statuses.forEach((status) => {
+          lastStatusesByEngineRef.current.set(status.engineType, status);
+        });
         setActiveEngineState(nextActiveEngine);
         setIsInitialized(true);
 
@@ -596,6 +599,7 @@ export function useEngineController({
   // 迟到事件；同一轮连续事件在 microtask 内合批为单次 setState（Render Perf
   // Baseline：低频事件驱动，不进根链高频 setState）。
   const lastAppliedDetectRunIdRef = useRef(0);
+  const lastStatusesByEngineRef = useRef<Map<EngineType, EngineStatus>>(new Map());
   const refreshEngineModelsRef = useRef<typeof refreshEngineModels | null>(null);
   useEffect(() => {
     refreshEngineModelsRef.current = refreshEngineModels;
@@ -652,6 +656,35 @@ export function useEngineController({
           lastAppliedDetectRunIdRef.current,
           maxRunId,
         );
+        // B7 翻转失效（P0 修正版）：① 只有 installed 翻转才算状态翻转——
+        // authState Unknown→Authenticated 是 phase2 的**正常到达**，每次检测
+        // 轮都会发生，绝不能触发缓存失效（曾致 INVALIDATED 风暴 → 原子缓存
+        // 被反复清空 → picker/执行目标竞态读串，模型 chip/思考档/发送全坏）；
+        // ② 翻转检测在 updater 外完成（updater 内副作用会被 StrictMode 双调）。
+        const installedFlips: EngineType[] = [];
+        pending.forEach((item) => {
+          const previous = lastStatusesByEngineRef.current.get(
+            item.status.engineType,
+          );
+          if (
+            previous &&
+            previous.installed !== item.status.installed
+          ) {
+            installedFlips.push(item.status.engineType);
+          }
+          lastStatusesByEngineRef.current.set(
+            item.status.engineType,
+            item.status,
+          );
+        });
+        if (installedFlips.length > 0 && typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent(PROVIDER_TARGET_CATALOG_INVALIDATED_EVENT),
+          );
+          installedFlips.forEach((engineType) => {
+            void refreshEngineModelsRef.current?.(engineType).catch(() => {});
+          });
+        }
         setEngineStatuses((currentStatuses) => {
           let changed = false;
           const next = currentStatuses.map((status) => {
@@ -660,22 +693,6 @@ export function useEngineController({
               return status;
             }
             changed = true;
-            // B7：installed/auth 翻转 → 统一失效菜单与模型下拉两侧
-            // （INVALIDATED 事件清 atomic 缓存 + idle-prewarm 重算 legacy 投影）。
-            if (
-              status.installed !== item.status.installed ||
-              (status.authState ?? "unknown") !==
-                (item.status.authState ?? "unknown")
-            ) {
-              if (typeof window !== "undefined") {
-                window.dispatchEvent(
-                  new CustomEvent(PROVIDER_TARGET_CATALOG_INVALIDATED_EVENT),
-                );
-              }
-              void refreshEngineModelsRef.current?.(status.engineType, {
-                phase: "idle-prewarm",
-              }).catch(() => {});
-            }
             return item.status;
           });
           pending.forEach((item) => {

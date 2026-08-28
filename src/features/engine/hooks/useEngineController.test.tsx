@@ -2023,6 +2023,68 @@ describe("useEngineController per-engine status events", () => {
   });
 });
 
+describe("useEngineController status flip invalidation (P0 修正)", () => {
+  it("authState arrival does NOT invalidate catalogs (only installed flips do)", async () => {
+    const invalidated = vi.fn();
+    window.addEventListener(
+      "ccgui:provider-target-catalog-invalidated",
+      invalidated,
+    );
+    // 初始：已安装 + auth Unknown（phase1 形态）
+    detectEnginesMock.mockResolvedValue([
+      { ...createEngineStatus("qoder", true, []), authState: "unknown" },
+    ]);
+    getActiveEngineMock.mockResolvedValue("qoder");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+    invalidated.mockClear();
+
+    // phase2 正常到达：installed 不变 + authState Unknown→Authenticated
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 2,
+        status: {
+          ...createEngineStatus("qoder", true, []),
+          authState: "authenticated",
+        },
+      });
+    });
+    await waitFor(() => {
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "qoder")
+          ?.authState,
+      ).toBe("authenticated");
+    });
+    expect(invalidated).not.toHaveBeenCalled();
+
+    // installed 翻转（真状态变化）→ 恰好一次失效
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 3,
+        status: createEngineStatus("qoder", false, []),
+      });
+    });
+    await waitFor(() => {
+      expect(invalidated).toHaveBeenCalledTimes(1);
+    });
+    window.removeEventListener(
+      "ccgui:provider-target-catalog-invalidated",
+      invalidated,
+    );
+  });
+});
+
 describe("useEngineController detect failure state", () => {
   it("marks failed on detect rejection and never stays loading forever", async () => {
     detectEnginesMock.mockRejectedValue(new Error("ipc down"));
