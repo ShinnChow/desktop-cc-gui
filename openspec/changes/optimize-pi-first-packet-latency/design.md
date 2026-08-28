@@ -51,9 +51,11 @@
 ### 决策
 
 - 降档判定全部在**发送时刻**完成，单 turn 生效，不写回持久化的思考档偏好：
-  - 条件（全部满足才降）：engine == pi；当前思考档 == 引擎默认档（用户本次会话未手动改档，含前序消息）；prompt 长度 ≤ N（初值 24 字符，实现时可调）；该 thread 无 assistant 历史（新会话首条消息）。
-  - 动作：本 turn 以 `low` 档发送（`set_thinking_level` 走 send 前既有 reconcile 路径，无新 IPC 形态）。
-- 「用户是否手动设过档」的可判定性是实现前置条件：若现有状态无法区分「默认 high」与「用户选了 high」，则以「本会话内无任何用户改档动作」为准（composer thinking selector 的变更事件），无法判定时**不降**（宁可不降不可错降）。
+  - 条件（全部满足才降）：engine == pi；composer effort 为空（用户本次未触碰档位选择器——composer 语义：显式选择才有非空 effort，空 = 跟随引擎默认档）；prompt 长度 ≤ 24 字符；该 thread 是新会话（无 pi session id）。
+  - 动作：本 turn 以 `low` 档发送（`set_thinking_level` 走 send 前既有 reconcile 路径，无新 IPC 形态；pi 档位 allowlist 不含 low 时 send 侧自动跳过，不阻塞 prompt）。
+- **「默认档 vs 用户设档」可判定性（3.1 探明结论）**：composer 侧 effort 为 `null` 即「未触碰」（`resolvedComposerSelection?.effort ?? effort`，显式选择才落非空值），无需新增 touched 标记。
+- **「无 assistant 历史」用「无 session id」作保守代理**：只有 `pi-pending-*` → 首条发送窗口才可能命中；恢复会话即使尚无 assistant 消息也不降（宁可不降不可错降）。
+- **执行目标快照与 wire 参数同值**：`recordNativeTurnTarget` 与 `engineSendMessageService` 都传降档后的 effort，badge 记录与实际执行保持 honest。
 
 ### 取舍
 

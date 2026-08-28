@@ -88,6 +88,7 @@ import {
   shouldSpawnNativeThreadForEngineMismatch,
 } from "../../composer/hooks/explicitComposerEngineSwitch";
 import { resolveSendProviderProfileId } from "./sessionLifecycleController";
+import { resolvePiFirstMessageEffort } from "../utils/piThinkingDowngrade";
 import {
   canonicalQoderProviderProfileId,
   parseQoderSessionIdentity,
@@ -2825,6 +2826,14 @@ export function useThreadMessaging({
                     threadProviderProfileId,
                   }))
                 : resolveSendProviderProfileId({ threadProviderProfileId });
+            // D4 思考档按需降档：新会话首条短消息 + 用户未触碰档位时本 turn
+            // 以 low 发送；执行目标快照与 wire 参数必须同值（保持 honest）。
+            const sendEffort = resolvePiFirstMessageEffort({
+              engine: resolvedEngine,
+              effort: resolvedEffort,
+              hasSession: realSessionId !== null,
+              promptText: finalText,
+            });
             // Native 发送边界固化本轮执行目标（对齐 Shared 的 beginTurn /
             // send.request receipt 时序）：queue drain / recovery resend 等
             // 无 composer options 的路径走 resolved 值兜底合成。
@@ -2836,7 +2845,7 @@ export function useThreadMessaging({
                   providerProfileId,
                   modelCatalogEntryId: selectedModelId,
                   model: modelForSend ?? sanitizedModel,
-                  effort: resolvedEffort,
+                  effort: sendEffort,
                 });
               recordNativeTurnTarget(
                 workspace.id,
@@ -2855,7 +2864,7 @@ export function useThreadMessaging({
               text: finalText,
               engine: resolvedEngine,
               model: modelForSend,
-              effort: resolvedEffort,
+              effort: sendEffort,
               disableThinking: disableThinkingForClaude,
               images: finalImages.length > 0 ? finalImages : null,
               accessMode: resolvedAccessMode,

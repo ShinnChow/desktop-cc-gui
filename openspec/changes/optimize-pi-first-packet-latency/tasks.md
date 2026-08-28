@@ -25,10 +25,10 @@
 
 ## Phase 3 — D4 思考档按需降档
 
-- [ ] 3.1 前置探明：pi 思考档的「默认档 vs 用户手动设档」可判定性（composer thinking selector 变更事件 / thread 设置状态）；不可判定则本阶段降级为「仅新会话首条 + 默认档字段直读」，仍守「无法判定不降」
-- [ ] 3.2 发送时刻降档判定：engine == pi + 当前档 == 默认档 + prompt ≤ N 字符（初值 24）+ 无 assistant 历史 → 本 turn 以 `low` 发送；不写回持久化偏好
-- [ ] 3.3 单测：降 / 不降（手动设档保护、长 prompt、有历史、非 pi 引擎）分支全覆盖
-- [ ] 3.4 自检 + review + 提交：触达层自检同上
+- [x] 3.1 前置探明：composer effort 为 `null` 即「用户未触碰档位」（显式选择才落非空值），无需新增 touched 状态；「无 assistant 历史」以「无 pi session id（新会话）」作保守代理——恢复会话一律不降
+- [x] 3.2 发送时刻降档判定：`piThinkingDowngrade.ts` 纯函数（engine == pi + effort 为空 + prompt ≤ 24 字符 + 新会话）→ 本 turn 以 `low` 发送；`useThreadMessaging` 发送边界接线，执行目标快照与 wire 参数同值；不写回持久化偏好
+- [x] 3.3 单测：降 / 不降（显式 high/medium 保护、长 prompt、恢复会话、非 pi 引擎、空白 effort 归一）6 用例全覆盖
+- [x] 3.4 自检 + review + 提交：piThinkingDowngrade 6/6 + effort 相邻套件 20/20 + tsc 零错误；`useThreadMessaging.context-injection` 8 个失败经 stash 对照确认为存量问题
 
 ## 收口
 
