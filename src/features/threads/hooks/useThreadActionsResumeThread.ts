@@ -678,7 +678,16 @@ export function useThreadActionsResumeThreadForWorkspace(
           if (!isCurrentResumeRequest()) {
             return false;
           }
+          // F4 分段计时（enhance 续）：区分「resolve+load+桥转换」与「前端组装」。
+          const ipcCompletedAtMs =
+            typeof performance !== "undefined"
+              ? performance.now()
+              : Date.now();
           const assembledSnapshot = hydrateHistory(snapshot);
+          const assembledAtMs =
+            typeof performance !== "undefined"
+              ? performance.now()
+              : Date.now();
           const snapshotItems = assembledSnapshot.items;
           const effectiveLocalItems =
             effectiveThreadId === threadId
@@ -776,12 +785,15 @@ export function useThreadActionsResumeThreadForWorkspace(
           const loaderStartedAtMs = loaderStartedAtMsByThread[effectiveThreadId];
           if (typeof loaderStartedAtMs === "number") {
             delete loaderStartedAtMsByThread[effectiveThreadId];
-            const durationMs =
-              (typeof performance !== "undefined"
+            const completedAtMs =
+              typeof performance !== "undefined"
                 ? performance.now()
-                : Date.now()) - loaderStartedAtMs;
+                : Date.now();
+            const durationMs = completedAtMs - loaderStartedAtMs;
             appendRendererDiagnostic("perf.thread-switch", {
               durationMs: Math.round(durationMs),
+              loadMs: Math.round(ipcCompletedAtMs - loaderStartedAtMs),
+              assembleMs: Math.round(assembledAtMs - ipcCompletedAtMs),
               itemCount: snapshotItems.length,
               displayedCount: applied?.displayedCount ?? snapshotItems.length,
               mode: options?.mode ?? "tail-first",

@@ -273,6 +273,9 @@ describe("useThreadActions", () => {
       "perf.thread-switch",
       expect.objectContaining({
         durationMs: expect.any(Number),
+        // 分段计时：区分「resolve+load+桥」与「前端组装」两段成本
+        loadMs: expect.any(Number),
+        assembleMs: expect.any(Number),
         itemCount: 1,
         displayedCount: 1,
         mode: "tail-first",
