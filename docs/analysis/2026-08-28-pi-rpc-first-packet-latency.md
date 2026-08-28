@@ -260,3 +260,5 @@ python3 /tmp/pi_latency_stats2.py
 ---
 
 > 文末：本文件是 review + 设计点，不附 tasks / specs delta。后续 D1/D2 起 OpenSpec change 时复用本文 §三、§四 作为 problem statement 与 design rationale；§二 实测数据可作 verify 阶段的 baseline 引用。
+
+> **补充观测（2026-08-28 晚，用户真机 turn 解剖）**：新会话「1+1=3」（kimi-coding/k3-256k、low 档）总耗时 30s——spawn+握手 1.8s（新会话首条，D1 预热按设计不覆盖 pending）+ 模型侧 27.7s；usage `input: 8,072 + cacheRead: 12,800`。两个修正：① **kimi prompt cache 在小会话路径上命中**，§二「每 turn 冷 prefill、零缓存命中」应理解为大会话上下文形态未命中缓存前缀，而非 kimi 缓存恒关（A1 的 upstream 前提按用户裁定不追）；② 残余延迟为 k3-256k TTFT/prefill 吞吐（~21k 上下文 ~800 tok/s 有效），纯 upstream，客户端无进一步动作。事实源：`~/.pi/agent/sessions/--Users-chenxiangning-code-AI-reach-ai-reach--/2026-08-28T03-59-09-860Z_01a04685-*.jsonl`。已与用户确认：非本地 pi 问题，模型侧不管。
