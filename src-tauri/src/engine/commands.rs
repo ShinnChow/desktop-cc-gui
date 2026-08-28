@@ -1757,6 +1757,72 @@ fn fan_out_provider_engine_event(
     }
 }
 
+/// engine-neutral 预热：对具备 resident 模型的引擎（pi）在用户阅读/打字窗口
+/// 内提前 spawn + handshake，把冷启开销移出发送关键路径。形态对齐
+/// prewarm_codex_disk_runtime（fire-and-forget、调用方对失败静默）。
+/// 返回 true = 执行了预热；false = 引擎不支持或无事可做（no-op 不算错）。
+/// 双轨契约：预热失败只影响本次加速，不影响首条发送的 ensure_resident 主路径。
+#[tauri::command]
+pub async fn engine_prewarm(
+    workspace_id: String,
+    engine: Option<EngineType>,
+    session_id: Option<String>,
+    provider_profile_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    // 远程模式是 daemon 侧运行时，预热是 client-local 优化，不做。
+    if remote_backend::is_remote_mode(&*state).await {
+        return Ok(false);
+    }
+    let manager = &state.engine_manager;
+    let active_engine = manager.get_active_engine().await;
+    let effective_engine = engine.unwrap_or(active_engine);
+    if !matches!(effective_engine, EngineType::Pi) {
+        return Ok(false);
+    }
+    let Some(session_id) = session_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+    else {
+        // pending / 新会话不做预热：send scratch 是每 turn 唯一 turn id，
+        // 预热 resident 无法被 send 命中，只会白起一个进程。
+        return Ok(false);
+    };
+    let workspace_path = {
+        let workspaces = state.workspaces.lock().await;
+        workspaces
+            .get(&workspace_id)
+            .map(|w| std::path::PathBuf::from(&w.path))
+            .ok_or_else(|| "Workspace not found".to_string())?
+    };
+    let effective_provider_profile_id =
+        crate::session_management::resolve_engine_provider_profile_id(
+            state.storage_path.as_path(),
+            &workspace_id,
+            Some(&session_id),
+            "pi",
+            provider_profile_id.as_deref(),
+        )?;
+    let provider_launch_profile =
+        crate::engine::pi_provider_profile::resolve_pi_provider_launch_profile(
+            &workspace_id,
+            effective_provider_profile_id.as_deref(),
+            None,
+        )?;
+    let session = manager
+        .get_or_create_pi_session_for_runtime(
+            &workspace_id,
+            &workspace_path,
+            &provider_launch_profile.runtime_key,
+            provider_launch_profile.home_dir.as_deref(),
+        )
+        .await;
+    session.prewarm_resident(&session_id).await?;
+    Ok(true)
+}
+
 /// Send a message using the active engine
 /// For Claude: spawns async tasks for streaming events to the frontend
 /// via app-server-event, returns immediately with turn ID.

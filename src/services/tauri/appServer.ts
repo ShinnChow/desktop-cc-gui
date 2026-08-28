@@ -346,6 +346,31 @@ export async function engineSendMessage(
 }
 
 /**
+ * engine-neutral 预热（pi resident）：在用户阅读/打字窗口提前 spawn + handshake。
+ * 双轨契约：失败一律静默返回 null——首条发送仍走 engineSendMessage 全路径，
+ * 预热不引入新失败面（optimize-pi-first-packet-latency 阶段二）。
+ */
+export async function enginePrewarm(
+  workspaceId: string,
+  params: {
+    engine: EngineType;
+    sessionId: string;
+    providerProfileId?: string | null;
+  },
+): Promise<boolean | null> {
+  try {
+    return await invoke<boolean>("engine_prewarm", {
+      workspaceId,
+      engine: params.engine,
+      sessionId: params.sessionId,
+      providerProfileId: params.providerProfileId ?? null,
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Send a message using an engine and wait for a final plain-text response.
  */
 export async function engineSendMessageSync(

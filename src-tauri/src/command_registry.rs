@@ -136,6 +136,7 @@ pub(crate) fn invoke_handler(
         crate::engine::opencode_lsp_definition,
         crate::engine::opencode_lsp_references,
         crate::engine::engine_send_message,
+        crate::engine::engine_prewarm,
         crate::engine::engine_send_message_sync,
         crate::engine::engine_interrupt,
         crate::engine::engine_interrupt_turn,

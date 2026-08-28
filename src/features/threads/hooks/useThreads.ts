@@ -36,6 +36,7 @@ import { useThreadLinking } from "./useThreadLinking";
 import { useThreadEventHandlers } from "./useThreadEventHandlers";
 import { useThreadActions } from "./useThreadActions";
 import { useThreadMessaging } from "./useThreadMessaging";
+import { usePiResidentPrewarm } from "./usePiResidentPrewarm";
 import { useThreadApprovals } from "./useThreadApprovals";
 import type { TurnExecutionSnapshot } from "../../shared-session/target/types";
 import {
@@ -356,6 +357,15 @@ export function useThreads({
   const settleSharedDurableTurnRef = useRef<
     (threadId: string, runtimeTurnId: string) => void
   >(() => {});
+  // pi resident 预热：会话激活后延迟 fire-and-forget（双轨契约，见
+  // usePiResidentPrewarm.ts）。只读 activeThreadIdByWorkspace 投影，不进根链。
+  usePiResidentPrewarm({
+    workspaceId: activeWorkspace?.id ?? null,
+    threadId: activeWorkspace
+      ? (state.activeThreadIdByWorkspace[activeWorkspace.id] ?? null)
+      : null,
+    onDebug,
+  });
   const settleSharedDurableTurn = useCallback(
     (threadId: string, runtimeTurnId: string) => {
       settleSharedDurableTurnRef.current(threadId, runtimeTurnId);

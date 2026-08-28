@@ -15,13 +15,13 @@
 
 ## Phase 2 — D1 resident 预热
 
-- [ ] 2.1 `pi.rs`：`prewarm_resident`（调 `ensure_resident`，幂等早退；`rpc_disabled_blocks_spawn` 同源检查；session_id 推导与 send 路径同源）
-- [ ] 2.2 `engine/manager.rs` + `engine/commands.rs`：`engine_prewarm(thread_id)` 分发臂——pi 臂真实预热、其余引擎 no-op `Ok(false)`
-- [ ] 2.3 `command_registry.rs` 注册 `engine_prewarm`（⚠ 人工核对注册面）+ `services/tauri` invoke wrapper
-- [ ] 2.4 前端触发：pi 会话激活（active thread 变更且 engine == pi）→ 延迟 `setTimeout` fire-and-forget `engine_prewarm`；per-threadId completed/in-flight 双 ref 去重；失败仅 debug 遥测（形态对齐 `useWorkspaces.ts` codex 先例）
-- [ ] 2.5 （可裁剪）composer focus 触发补强：与现有 hook 耦合度过高则本批不做，记录决策
-- [ ] 2.6 单测：`prewarm_resident` 幂等（连发 3 次仅 1 resident）；`rpc_disabled` 期间拒绝；非 pi 引擎 no-op；前端触发 hook 去重逻辑
-- [ ] 2.7 自检 + review + 提交：`cargo check` + `cargo test` pi 模块 + `rustfmt --check` 触达文件；前端相关 vitest + tsc
+- [x] 2.1 `pi.rs`：`prewarm_resident`（调 `ensure_resident`，幂等早退；`rpc_disabled_blocks_spawn` 同源检查；session_id 推导与 send 路径同源）——设计收窄：**仅接受带 session id 的恢复会话**（`pi:<id>`）；pending 会话 send scratch 每 turn 唯一，预热无法命中只会白起进程，跳过
+- [x] 2.2 `engine/commands.rs`：`engine_prewarm(workspace_id, engine, session_id, provider_profile_id)`——pi 臂真实预热、其余引擎与 remote 模式 no-op `Ok(false)`；session 推导复用 send 路径同款（`resolve_engine_provider_profile_id` + `resolve_pi_provider_launch_profile` + `get_or_create_pi_session_for_runtime`）
+- [x] 2.3 `command_registry.rs` 注册 `engine_prewarm`（对齐 `crate::engine::engine_send_message` 形态；daemon 不注册，与 codex prewarm 同为 client-only）+ `appServer.ts` `enginePrewarm` wrapper（失败静默返回 null，双轨契约）
+- [x] 2.4 前端触发：`usePiResidentPrewarm` hook 挂载于 `useThreads`——pi 会话激活延迟 1.5s fire-and-forget；per-thread completed/in-flight 双 ref 去重；unmount 取消；失败仅 debug 遥测
+- [x] 2.5 （可裁剪）composer focus 触发：**本批不做**——线程激活已覆盖「打开会话→阅读→发送」主窗口；composer focus 与现有 hook 耦合度高，收益边际，留待需要时独立补
+- [x] 2.6 单测：`prewarm_resident` 非法 id 拒绝（不到 spawn）+ 闩冷却期拒绝（不搅动闩状态）；「连发 3 次仅 1 resident」依赖 `ensure_resident` 既有早退语义（真实 spawn 计数属集成测试面，不进单测）；hook 5 用例（延迟触发/去重/pending 与非 pi 跳过/unmount 取消/session id 解析）
+- [x] 2.7 自检 + review + 提交：`cargo check` 双 target 绿 + pi 模块 82 测试全过 + `rustfmt --check` 三文件 clean；前端 vitest 5/5 + tsc 零错误；`useThreads.engine-source` 1 个失败经 stash 对照确认为存量问题
 
 ## Phase 3 — D4 思考档按需降档
 

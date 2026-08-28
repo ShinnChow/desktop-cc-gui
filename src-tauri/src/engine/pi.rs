@@ -1173,6 +1173,22 @@ impl PiSession {
         }
     }
 
+    /// 预热：spawn + handshake（get_state + refresh_thinking_levels，均在
+    /// PiRpcClient::spawn 内完成）返回即就绪。幂等——已存活 resident 早退；
+    /// rpc_disabled 闩与 ensure_resident 同源拒绝。仅供 engine_prewarm 调用，
+    /// 首次发送仍走 ensure_resident 主路径（双轨，不新增失败路径）。
+    /// 只接受带 session id 的恢复会话：pending 会话的 send scratch 是每 turn
+    /// 唯一的 turn id，预热 resident 无法被 send 命中，只会白起一个进程。
+    pub async fn prewarm_resident(&self, session_id: &str) -> Result<(), String> {
+        let session_id = session_id.trim();
+        if !is_valid_pi_session_id_arg(session_id) {
+            return Err("pi prewarm requires a valid session id".to_string());
+        }
+        self.ensure_resident(Some(session_id), None, "prewarm")
+            .await
+            .map(|_| ())
+    }
+
     async fn rekey_resident(&self, from: &str, to: &str) {
         if from == to {
             return;
@@ -2816,6 +2832,37 @@ mod tests {
         // 无活跃子进程：任何 session（含 None / Some）都不 busy。
         assert!(!session.print_json_fallback_blocked(None).await);
         assert!(!session.print_json_fallback_blocked(Some("s1")).await);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn prewarm_resident_rejects_invalid_session_id_without_spawning() {
+        let dir = std::env::temp_dir().join(format!("pi-prewarm-invalid-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let session = PiSession::new("ws".to_string(), dir.clone(), None);
+        // 空 / flag 形态 / 非法字符：直接拒绝，不到 spawn。
+        assert!(session.prewarm_resident("").await.is_err());
+        assert!(session.prewarm_resident("--model").await.is_err());
+        assert!(session.prewarm_resident("bad/id").await.is_err());
+        assert!(session.residents.read().await.is_empty());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn prewarm_resident_respects_rpc_disabled_latch() {
+        let dir = std::env::temp_dir().join(format!("pi-prewarm-latch-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let session = PiSession::new("ws".to_string(), dir.clone(), None);
+        // 闩冷却期内：合法 session id 同样拒绝（与 ensure_resident 同源 gate），
+        // 且不得搅动闩自愈状态。
+        *session.rpc_disabled_since.lock().await = Some(Instant::now());
+        let error = session
+            .prewarm_resident("validsession1")
+            .await
+            .expect_err("latch must block prewarm");
+        assert!(error.contains("pi rpc disabled"));
+        assert!(session.rpc_disabled_since.lock().await.is_some());
+        assert!(session.residents.read().await.is_empty());
         let _ = std::fs::remove_dir_all(dir);
     }
 
