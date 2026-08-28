@@ -22,6 +22,7 @@ import { McpToolBlock } from './McpToolBlock';
 import { RequestUserInputSubmittedBlock } from './RequestUserInputSubmittedBlock';
 import {
   BackgroundTaskCard,
+  canonicalBackgroundTaskFromRecord,
   isTerminalBackgroundTaskStatus,
   parseBackgroundTaskInput,
   parseBackgroundTaskSnapshot,
@@ -31,6 +32,7 @@ import {
   useLiveItemDelta,
 } from '../../../threads/hooks/useLiveItemDelta';
 import { isLiveDeltaExternalizationEnabled } from '../../../threads/utils/realtimePerfFlags';
+import { useBackgroundTaskLiveSnapshot } from '../../utils/useBackgroundTaskLiveSnapshot';
 
 // A4 二期 live-delta 外部化：模块加载时读一次，翻转 flag 需刷新页面
 //（与 MessageRow 的 LIVE_TEXT_EXTERNALIZATION_ENABLED 同语义）。
@@ -96,6 +98,14 @@ export const ToolBlockRenderer = memo(function ToolBlockRenderer({
         )
       : null;
   const liveOutputOverride = liveToolOutput ?? residualToolOutput;
+  // 后台任务卡片权威快照直读（无条件 hook，仅 backgroundTask 分支消费）：
+  // store 四路合流的 live 记录优先于时间线 output 快照——sink upsert 丢失
+  // （并行双 resident 等运行时条件）时卡片仍能翻终态自愈。
+  const liveTaskRecord = useBackgroundTaskLiveSnapshot(
+    workspaceId,
+    threadId,
+    item.id,
+  );
   // 覆盖 output 后的展示 item：下游所有工具块（Bash/Generic/...）原样读
   // item.output，无需逐块改接线。
   const displayItem = useMemo(
@@ -126,7 +136,10 @@ export const ToolBlockRenderer = memo(function ToolBlockRenderer({
   // 0.5 PI 后台任务卡（bg_run / bg_delegate / fusion_*）：运行中活体卡，
   // 终态原地折叠；不走普通工具块（折叠/分组语义由卡片自治）。
   if (displayItem.toolType === 'backgroundTask') {
-    const task = parseBackgroundTaskSnapshot(displayItem.output);
+    const parsed = parseBackgroundTaskSnapshot(displayItem.output);
+    const live = canonicalBackgroundTaskFromRecord(liveTaskRecord?.task);
+    // store live 快照优先（新），时间线 output 快照兜底（历史/未 hydrate 场景）。
+    const task = live ?? parsed;
     const input = parseBackgroundTaskInput(displayItem.detail);
     const terminal = isTerminalBackgroundTaskStatus(
       task?.status ?? displayItem.status,

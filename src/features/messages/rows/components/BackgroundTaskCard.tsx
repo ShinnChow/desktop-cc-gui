@@ -87,6 +87,31 @@ export function parseBackgroundTaskInput(
   }
 }
 
+/**
+ * store 权威记录（四路合流的 live task）→ CanonicalBackgroundTask。
+ * 与 parseBackgroundTaskSnapshot 对称：卡片状态优先取 store 直读快照
+ * （时间线 upsert 丢失时自愈），output 快照仅作兜底。
+ */
+export function canonicalBackgroundTaskFromRecord(
+  task: Record<string, unknown> | null | undefined,
+): CanonicalBackgroundTask | null {
+  if (!task || typeof task !== "object") return null;
+  const id = typeof task.id === "string" ? task.id.trim() : "";
+  if (!id) return null;
+  return {
+    id,
+    name: typeof task.name === "string" ? task.name : null,
+    command: typeof task.command === "string" ? task.command : null,
+    status: typeof task.status === "string" ? task.status : null,
+    outputPath: typeof task.outputPath === "string" ? task.outputPath : null,
+    exitCode: typeof task.exitCode === "number" ? task.exitCode : null,
+    startTime: typeof task.startTime === "number" ? task.startTime : null,
+    endTime: typeof task.endTime === "number" ? task.endTime : null,
+    pid: typeof task.pid === "number" ? task.pid : null,
+    error: typeof task.error === "string" ? task.error : null,
+  };
+}
+
 function resolveTone(
   task: CanonicalBackgroundTask | null | undefined,
 ): TaskTone {
