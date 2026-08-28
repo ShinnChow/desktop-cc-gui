@@ -2085,6 +2085,43 @@ describe("useEngineController status flip invalidation (P0 修正)", () => {
   });
 });
 
+describe("useEngineController post-switch catalog load (P0)", () => {
+  it("loads target engine catalog after switching to a detached engine", async () => {
+    const runSpy = vi.spyOn(startupOrchestrator, "run");
+    detectEnginesMock.mockResolvedValue([
+      createEngineStatus("pi", true, []),
+      createEngineStatus("kimi", true, []),
+    ]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+    switchEngineMock.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useEngineController({ activeWorkspace: null }),
+    );
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+    runSpy.mockClear();
+
+    await act(async () => {
+      await result.current.setActiveEngine("pi");
+    });
+
+    // 切换后 MUST 触发 pi 目录加载（解耦引擎 on-demand 22s 预算）
+    const piCall = runSpy.mock.calls
+      .map(([descriptor]) => descriptor)
+      .find((descriptor) =>
+        String(descriptor.id).startsWith("engine-models:pi:"),
+      );
+    expect(piCall).toBeDefined();
+    expect(piCall?.timeoutMs).toBe(22_000);
+    expect(getEngineModelsMock).toHaveBeenCalledWith("pi");
+  });
+});
+
 describe("useEngineController detect failure state", () => {
   it("marks failed on detect rejection and never stays loading forever", async () => {
     detectEnginesMock.mockRejectedValue(new Error("ipc down"));

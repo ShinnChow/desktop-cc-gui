@@ -504,6 +504,17 @@ export function useEngineController({
           label: "engine/switch success",
           payload: { engine: engineType, models: targetStatus.models },
         });
+        // P0 修复：B1 把 models 从 detect 解耦后，切换目标引擎的目录必须
+        // 在此显式加载（此前隐含「detect 顺带带回目录」，乐观 models 即真实
+        // 目录；解耦后 pi/qoder/opencode 状态 models 为空，乐观值落到空的
+        // lastGood → 切换后无人加载 → providerModelCatalogs[engine] 永远
+        // 为空 → 思考档/模型列表必现缺失）。phase 由共通决策给出：解耦
+        // 引擎 on-demand 22s 覆盖后端最坏探测链。
+        if (engineSwitchGenerationRef.current === generation) {
+          void loadModelsForEngine(engineType, [], {
+            phase: resolveEngineCatalogLoadPhase(engineType),
+          }).catch(() => {});
+        }
       } catch (error) {
         if (engineSwitchGenerationRef.current === generation) {
           engineChromeRef.current = previousChrome;
@@ -524,7 +535,13 @@ export function useEngineController({
         });
       }
     },
-    [activeEngine, enabledEngineTypes, engineStatuses, onDebug],
+    [
+      activeEngine,
+      enabledEngineTypes,
+      engineStatuses,
+      loadModelsForEngine,
+      onDebug,
+    ],
   );
 
   /**
