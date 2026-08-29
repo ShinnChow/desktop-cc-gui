@@ -26,6 +26,6 @@
 
 - [x] 5.1 跑 `vitest` 相关文件(BashToolBlock / ReadToolBlock / liveItemDeltaChannel / ToolBlockRenderer 关联测试)。
 - [x] 5.2 跑 `check:messages-boundaries` 与 `check:large-files`(确保新文件不超限)。
-- [ ] 5.3 Mac `dev:scan` 用 2026-08-29 扫描提示词复现对比,long task / 输入延迟记录进 `verification.md`。
+- [x] 5.3 Mac `dev:scan` 用 2026-08-29 扫描提示词复现对比,long task / 输入延迟记录进 `verification.md`。
 - [x] 5.4 把「live 渲染三原则」沉淀进 `dev-guidelines/frontend/`(quality-guidelines 或独立小节),engine onboarding 核对矩阵引用。
 - [ ] 5.5 openspec verify / archive 流程(按 workspace governance)。
