@@ -12,6 +12,7 @@ import {
   getLiveItemDeltaSnapshot,
   LIVE_ITEM_DELTA_PUBLISH_INTERVAL_MS,
   LIVE_TOOL_OUTPUT_DISPLAY_LINES,
+  LIVE_TOOL_OUTPUT_DISPLAY_LINES_STREAMING,
   peekLiveItemDelta,
   peekLiveItemDeltaEntry,
   resetLiveItemDeltaChannelForTests,
@@ -20,6 +21,7 @@ import {
 } from "./liveItemDeltaChannel";
 import {
   __resetRealtimePerfFlagCacheForTests,
+  LIVE_TOOL_OUTPUT_STREAMING_TAIL_FLAG_KEY,
   resetRealtimePerfFlags,
 } from "./realtimePerfFlags";
 
@@ -238,7 +240,24 @@ describe("liveItemDeltaChannel", () => {
     expect(`${first}${drained[0]?.text}`).toBe(peek);
   });
 
-  it("publishes only the display tail for commandExecution toolOutput", () => {
+  it("publishes only the streaming display tail for commandExecution toolOutput", () => {
+    const lines = Array.from(
+      { length: LIVE_TOOL_OUTPUT_DISPLAY_LINES + 50 },
+      (_, i) => `row-${i}`,
+    );
+    appendLiveItemDelta("t1", "cmd-1", "toolOutput", lines.join("\n"), "commandExecution");
+    const snapshot = getLiveItemDeltaSnapshot("t1").get("cmd-1:toolOutput") ?? "";
+    // live 流式期帽低于 settle 显示帽（published 快照只在流式期被订阅消费）。
+    expect(snapshot.split("\n").length).toBe(LIVE_TOOL_OUTPUT_DISPLAY_LINES_STREAMING);
+    expect(snapshot.startsWith("row-150\n")).toBe(true);
+    expect(peekLiveItemDelta("t1", "cmd-1", "toolOutput").split("\n").length).toBe(
+      LIVE_TOOL_OUTPUT_DISPLAY_LINES + 50,
+    );
+  });
+
+  it("falls back to the settled display tail when the streaming tail flag is off", () => {
+    window.localStorage.setItem(LIVE_TOOL_OUTPUT_STREAMING_TAIL_FLAG_KEY, "off");
+    __resetRealtimePerfFlagCacheForTests();
     const lines = Array.from(
       { length: LIVE_TOOL_OUTPUT_DISPLAY_LINES + 50 },
       (_, i) => `row-${i}`,
@@ -246,9 +265,7 @@ describe("liveItemDeltaChannel", () => {
     appendLiveItemDelta("t1", "cmd-1", "toolOutput", lines.join("\n"), "commandExecution");
     const snapshot = getLiveItemDeltaSnapshot("t1").get("cmd-1:toolOutput") ?? "";
     expect(snapshot.split("\n").length).toBe(LIVE_TOOL_OUTPUT_DISPLAY_LINES);
-    expect(peekLiveItemDelta("t1", "cmd-1", "toolOutput").split("\n").length).toBe(
-      LIVE_TOOL_OUTPUT_DISPLAY_LINES + 50,
-    );
+    expect(snapshot.startsWith("row-50\n")).toBe(true);
   });
 
   it("does not apply the 256KiB command cap to fileChange live output", () => {

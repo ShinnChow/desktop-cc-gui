@@ -19,6 +19,7 @@
 
 import { doesLiveAssistantTextMatchItem } from "./liveAssistantTextChannel";
 import { boundToolOutput, COMMAND_EXECUTION_OUTPUT_HEAD } from "./boundToolOutput";
+import { isLiveToolOutputStreamingTailEnabled } from "./realtimePerfFlags";
 
 export type LiveItemDeltaLane =
   | "reasoningContent"
@@ -36,8 +37,15 @@ export type LiveItemDeltaEntry = {
   toolType?: string;
 };
 
-/** 与 BashToolBlock 显示帽对齐：流式快照只发这个行数。 */
+/** 与 BashToolBlock settle 显示帽对齐：settled 后 durable 输出按这个行数展示。 */
 export const LIVE_TOOL_OUTPUT_DISPLAY_LINES = 200;
+
+/**
+ * live 流式期 published 快照行数帽（低于 settle 帽）：
+ * published 快照只在流式期被订阅消费，降档直接降低 48ms 每轮的
+ * split / DOM reflow 规模（openspec/changes/perf-live-tool-output-render-budget）。
+ */
+export const LIVE_TOOL_OUTPUT_DISPLAY_LINES_STREAMING = 100;
 
 export function takeLastLines(text: string, maxLines: number): string {
   if (maxLines <= 0 || text.length === 0) {
@@ -57,7 +65,11 @@ export function takeLastLines(text: string, maxLines: number): string {
 }
 
 function takeLiveToolOutputSnapshot(text: string): string {
-  const tailed = takeLastLines(text, LIVE_TOOL_OUTPUT_DISPLAY_LINES);
+  const streamingTail = isLiveToolOutputStreamingTailEnabled();
+  const lineCap = streamingTail
+    ? LIVE_TOOL_OUTPUT_DISPLAY_LINES_STREAMING
+    : LIVE_TOOL_OUTPUT_DISPLAY_LINES;
+  const tailed = takeLastLines(text, lineCap);
   if (tailed.length <= COMMAND_EXECUTION_OUTPUT_HEAD) {
     return tailed;
   }

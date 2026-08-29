@@ -12,6 +12,7 @@ import FileText from 'lucide-react/dist/esm/icons/file-text';
 import type { ConversationItem } from '../../../../types';
 import { cn } from '@/lib/utils';
 import { isImagePath } from '../../../files/utils/fileRenderProfile';
+import { isLiveToolRenderBudgetEnabled } from '../../../threads/utils/realtimePerfFlags';
 import {
   asRecord,
   extractToolName,
@@ -65,6 +66,13 @@ const DIRECTORY_TOOL_NAMES = new Set([
   'list_files',
 ]);
 const OUTPUT_KEYS = ['output', 'result', 'content', 'text'];
+
+/**
+ * live 工具输出渲染预算（openspec/changes/perf-live-tool-output-render-budget）：
+ * markdown 形态的读取输出超过该大小后不进 <Markdown> 同步编译，
+ * 降级为纯文本容器（大文件全文一次编译在 WebView2 上是爆卡源之一）。
+ */
+export const READ_OUTPUT_MARKDOWN_BUDGET = 64 * 1024;
 
 /** Agent Read 工具读图时常见的占位输出前缀（Claude / Grok 等）。 */
 const READ_IMAGE_FILE_PREFIX =
@@ -227,6 +235,12 @@ export const ReadToolBlock = memo(function ReadToolBlock({
 
   const renderAsMarkdown = useMemo(() => {
     if (isImageRead || !renderedOutput) {
+      return false;
+    }
+    if (
+      isLiveToolRenderBudgetEnabled() &&
+      renderedOutput.length > READ_OUTPUT_MARKDOWN_BUDGET
+    ) {
       return false;
     }
     if (isMarkdownPath(filePath)) {

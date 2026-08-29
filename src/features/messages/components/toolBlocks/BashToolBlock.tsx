@@ -8,6 +8,7 @@ import Terminal from "lucide-react/dist/esm/icons/terminal";
 import type { ConversationItem } from "../../../../types";
 import { copyTextToClipboard } from "../../../../utils/clipboard";
 import { highlightLine } from "../../../../utils/syntax";
+import { isLiveToolRenderBudgetEnabled } from "../../../threads/utils/realtimePerfFlags";
 import {
   buildCommandSummary,
   truncateText,
@@ -75,6 +76,11 @@ export const BashToolBlock = memo(function BashToolBlock({
   const [showLiveOutput, setShowLiveOutput] = useState(false);
   const [copiedCommand, setCopiedCommand] = useState(false);
   const [copiedOutput, setCopiedOutput] = useState(false);
+  // live 工具输出渲染预算（openspec/changes/perf-live-tool-output-render-budget）：
+  // 用户折叠意图最高优先——live/长跑自动展开期间点 header 先折叠 live 输出，
+  // 不翻转父层 isExpanded；折叠意图跨 settle 保持，直到用户再次点击。
+  const [liveCollapsed, setLiveCollapsed] = useState(false);
+  const liveRenderBudgetEnabled = isLiveToolRenderBudgetEnabled();
 
   const summaryCommand = useMemo(
     () => buildCommandSummary(item, { includeDetail: false }),
@@ -105,9 +111,15 @@ export const BashToolBlock = memo(function BashToolBlock({
       totalOutputLines: lines.length,
     };
   }, [item.output]);
+  // live 流式期跳过逐行 Prism tokenize（扫描类输出 cache 全 miss，每 48ms
+  // 一轮 200 次 tokenize 是渲染主线程大头），settle 后一次性恢复高亮。
+  const deferLiveHighlight = liveRenderBudgetEnabled && isRunning;
   const highlightedOutputLines = useMemo(
-    () => outputLines.map((line) => highlightLine(line, "bash")),
-    [outputLines],
+    () =>
+      deferLiveHighlight
+        ? ([] as string[])
+        : outputLines.map((line) => highlightLine(line, "bash")),
+    [outputLines, deferLiveHighlight],
   );
   const nonEmptyOutputLines = useMemo(
     () => countNonEmptyLines(outputLines),
@@ -150,7 +162,34 @@ export const BashToolBlock = memo(function BashToolBlock({
   }, [isRunning, showLiveOutput, onRequestAutoScroll]);
 
   const isError = status === "failed";
-  const showBody = isExpanded || (isRunning && showLiveOutput) || isLongRunning || isError;
+  // live/长跑自动展开（不含 isError：错误硬展开保持旧行为，点击走父层 toggle）。
+  const liveAutoExpand = (isRunning && showLiveOutput) || isLongRunning;
+  const showBody =
+    isExpanded ||
+    (liveAutoExpand && !(liveRenderBudgetEnabled && liveCollapsed)) ||
+    isError;
+
+  const handleHeaderToggle = useCallback(() => {
+    if (
+      liveRenderBudgetEnabled &&
+      !isExpanded &&
+      ((isRunning && showLiveOutput) || isLongRunning)
+    ) {
+      // 自动展开的 body 归组件内部管理：首次点击折叠、再次点击恢复，
+      // 不翻转父层 isExpanded（用户折叠意图最高优先）。
+      setLiveCollapsed((prev) => !prev);
+      return;
+    }
+    onToggle(item.id);
+  }, [
+    liveRenderBudgetEnabled,
+    isExpanded,
+    isRunning,
+    showLiveOutput,
+    isLongRunning,
+    onToggle,
+    item.id,
+  ]);
   const isErrorLine = (line: string) =>
     /(?:\berror\b|\bfailed\b|\bexception\b)/i.test(line);
   const isTableLikeLine = (line: string) => /^\s*\|.*\|\s*$/.test(line);
@@ -187,7 +226,7 @@ export const BashToolBlock = memo(function BashToolBlock({
       }
       className="bash-tool-marker"
       expanded={showBody}
-      onToggle={() => onToggle(item.id)}
+      onToggle={handleHeaderToggle}
       trailing={<ToolStatusIcon status={status} />}
       body={
         <div className="bash-panel" title={headerTooltip}>
@@ -252,6 +291,9 @@ export const BashToolBlock = memo(function BashToolBlock({
                       <span>&nbsp;</span>
                     ) : isTableLikeLine(line) ? (
                       <span>{line}</span>
+                    ) : deferLiveHighlight ? (
+                      // live 期纯文本渲染（React 自动转义），settle 后切回高亮。
+                      <span>{line || " "}</span>
                     ) : (
                       <span
                         dangerouslySetInnerHTML={{
