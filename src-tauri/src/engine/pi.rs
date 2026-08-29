@@ -246,6 +246,7 @@ fn pi_resident_map_key(session_id: Option<&str>, scratch: &str) -> String {
 /// stream; steer turns attach and settle together with the run (empty text).
 struct PiRpcRun {
     main_turn_id: String,
+    requested_model: Option<String>,
     attached_turn_ids: Vec<String>,
     waiters: Vec<(String, oneshot::Sender<Result<String, String>>)>,
     response_text: String,
@@ -261,9 +262,14 @@ struct PiRpcRun {
 }
 
 impl PiRpcRun {
-    fn new(main_turn_id: &str, waiter: oneshot::Sender<Result<String, String>>) -> Self {
+    fn new(
+        main_turn_id: &str,
+        waiter: oneshot::Sender<Result<String, String>>,
+        requested_model: Option<String>,
+    ) -> Self {
         Self {
             main_turn_id: main_turn_id.to_string(),
+            requested_model,
             attached_turn_ids: Vec::new(),
             waiters: vec![(main_turn_id.to_string(), waiter)],
             response_text: String::new(),
@@ -289,6 +295,7 @@ impl PiRpcRun {
                 unix_timestamp_ms_for_process_diagnostics()
             ),
             tx,
+            None,
         );
         run.orphan = true;
         run
@@ -430,10 +437,7 @@ fn settle_rpc_run(
         .or_else(|| {
             if run.abort_requested {
                 Some("Session stopped.".to_string())
-            } else if run.stream_error.is_some()
-                && run.response_text.trim().is_empty()
-                && !run.saw_tool_activity
-            {
+            } else if run.stream_error.is_some() {
                 run.stream_error.clone()
             } else {
                 None
@@ -446,6 +450,17 @@ fn settle_rpc_run(
                 None
             }
         });
+    if let Some(error) = failure.as_deref() {
+        log_pi_failure_envelope(
+            run.requested_model.as_deref(),
+            "rpc",
+            "foreground",
+            error,
+            None,
+            !run.response_text.trim().is_empty(),
+            run.saw_tool_activity,
+        );
+    }
     // 收养（orphan run 被首个真实 turn 接管）后 waiters[0] 是合成 turn，
     // main 判定必须按 id 而非下标；非 orphan run 的 waiters[0] id 本就等于
     // main_turn_id，等价无回归。
@@ -481,6 +496,87 @@ fn settle_rpc_run(
             }
         }
     }
+}
+
+fn pi_failure_category(error: &str) -> &'static str {
+    let normalized = error.to_ascii_lowercase();
+    if normalized.contains("fetch failed") || normalized.contains("network") {
+        "upstream_transport"
+    } else if normalized.contains("oauth")
+        || normalized.contains("token")
+        || normalized.contains("unauthorized")
+        || normalized.contains("forbidden")
+    {
+        "authentication"
+    } else if normalized.contains("model") {
+        "model_selection"
+    } else if normalized.contains("stopped") || normalized.contains("cancel") {
+        "cancelled"
+    } else if normalized.contains("exited") {
+        "local_process_exit"
+    } else {
+        "runtime_error"
+    }
+}
+
+fn bounded_pi_diagnostic(value: Option<&str>) -> String {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.chars().take(120).collect())
+        .unwrap_or_else(|| "<unknown>".to_string())
+}
+
+fn log_pi_failure_envelope(
+    model: Option<&str>,
+    runtime_mode: &str,
+    surface: &str,
+    error: &str,
+    task_id: Option<&str>,
+    saw_assistant_output: bool,
+    saw_tool_activity: bool,
+) {
+    log::warn!(
+        "[pi/provider-failure] model={} runtime_mode={} surface={} category={} task_id={} saw_assistant_output={} saw_tool_activity={}",
+        bounded_pi_diagnostic(model),
+        runtime_mode,
+        surface,
+        pi_failure_category(error),
+        bounded_pi_diagnostic(task_id),
+        saw_assistant_output,
+        saw_tool_activity,
+    );
+}
+
+fn pi_background_task_failure(task: &Value) -> bool {
+    matches!(
+        task.get("status").and_then(Value::as_str),
+        Some("failed" | "killed" | "cancelled")
+    ) || task
+        .get("exitCode")
+        .and_then(Value::as_i64)
+        .is_some_and(|code| code != 0)
+}
+
+fn log_pi_background_task_failure(
+    model: Option<&str>,
+    runtime_mode: &str,
+    task: &Value,
+    saw_assistant_output: bool,
+    saw_tool_activity: bool,
+) {
+    if !pi_background_task_failure(task) {
+        return;
+    }
+    log_pi_failure_envelope(
+        model,
+        runtime_mode,
+        "background-task",
+        "background task failed",
+        task.get("id").and_then(Value::as_str),
+        saw_assistant_output,
+        saw_tool_activity,
+    );
 }
 
 /// RPC transport carries images inline as base64 ImageContent blocks (the
@@ -1351,6 +1447,13 @@ impl PiSession {
                                     None
                                 };
                                 if let Some(task) = receipt_task {
+                                    log_pi_background_task_failure(
+                                        run.requested_model.as_deref(),
+                                        "rpc",
+                                        &task,
+                                        !run.response_text.trim().is_empty(),
+                                        run.saw_tool_activity,
+                                    );
                                     // bg 工具 receipt 解析成功：工具卡升级为后台
                                     // 任务卡，不再发普通 ToolCompleted。
                                     emit(
@@ -1390,6 +1493,13 @@ impl PiSession {
                                 if let Some(task) =
                                     parse_pi_background_task_notification(details, &content)
                                 {
+                                    log_pi_background_task_failure(
+                                        run.requested_model.as_deref(),
+                                        "rpc",
+                                        &task,
+                                        !run.response_text.trim().is_empty(),
+                                        run.saw_tool_activity,
+                                    );
                                     emit(
                                         &turn_id,
                                         EngineEvent::BackgroundTaskUpdated {
@@ -1554,7 +1664,7 @@ impl PiSession {
                 self.attach_turn_to_rpc_run(&resident, turn_id, tx).await;
             } else {
                 let mut guard = resident.run.write().await;
-                *guard = Some(PiRpcRun::new(turn_id, tx));
+                *guard = Some(PiRpcRun::new(turn_id, tx, params.model.clone()));
                 drop(guard);
                 let session_id = client
                     .session_id()
@@ -2352,6 +2462,13 @@ impl PiSession {
                             None
                         };
                         if let Some(task) = receipt_task {
+                            log_pi_background_task_failure(
+                                params.model.as_deref(),
+                                "print-json",
+                                &task,
+                                !response_text.trim().is_empty(),
+                                saw_tool_activity,
+                            );
                             self.emit_turn_event(
                                 turn_id,
                                 EngineEvent::BackgroundTaskUpdated {
@@ -2385,6 +2502,13 @@ impl PiSession {
                         saw_tool_activity = true;
                         if let Some(task) = parse_pi_background_task_notification(details, &content)
                         {
+                            log_pi_background_task_failure(
+                                params.model.as_deref(),
+                                "print-json",
+                                &task,
+                                !response_text.trim().is_empty(),
+                                saw_tool_activity,
+                            );
                             self.emit_turn_event(
                                 turn_id,
                                 EngineEvent::BackgroundTaskUpdated {
@@ -2454,10 +2578,17 @@ impl PiSession {
 
         let was_interrupted = self.interrupted_turns.lock().await.remove(turn_id);
         if let Some(error) = stream_error {
-            if response_text.trim().is_empty() && !saw_tool_activity {
-                self.emit_error(turn_id, error.clone());
-                return Err(error);
-            }
+            log_pi_failure_envelope(
+                params.model.as_deref(),
+                "print-json",
+                "foreground",
+                &error,
+                None,
+                !response_text.trim().is_empty(),
+                saw_tool_activity,
+            );
+            self.emit_error(turn_id, error.clone());
+            return Err(error);
         }
         if let Some(status) = status {
             if !status.success() {
@@ -2982,7 +3113,11 @@ mod tests {
         // 非 orphan same-run steer 语义不回归：main（waiters[0]）取全文，
         // attached 取空文本。
         let (main_tx, _main_rx) = oneshot::channel();
-        let mut run = PiRpcRun::new("turn-main", main_tx);
+        let mut run = PiRpcRun::new(
+            "turn-main",
+            main_tx,
+            Some("openai-codex/gpt-5.6".to_string()),
+        );
         run.response_text.push_str("hello");
         let (tx, _rx) = oneshot::channel();
         run.attached_turn_ids.push("turn-attached".to_string());
@@ -3005,6 +3140,44 @@ mod tests {
                 if id == "turn-attached"
                 && result.as_ref().and_then(|r| r.get("text")).and_then(Value::as_str) == Some("")
         ));
+    }
+
+    #[test]
+    fn rpc_provider_error_after_tool_activity_remains_an_error() {
+        let (tx, _rx) = oneshot::channel();
+        let mut run = PiRpcRun::new("turn-main", tx, Some("openai-codex/gpt-5.6".to_string()));
+        run.saw_tool_activity = true;
+        run.stream_error = Some("fetch failed".to_string());
+        let events = std::cell::RefCell::new(Vec::<EngineEvent>::new());
+        settle_rpc_run("ws", run, None, &|_, event| events.borrow_mut().push(event));
+        assert!(matches!(
+            events.borrow().first(),
+            Some(EngineEvent::TurnError { error, .. }) if error == "fetch failed"
+        ));
+    }
+
+    #[test]
+    fn pi_failure_category_keeps_fetch_and_auth_distinct() {
+        assert_eq!(pi_failure_category("fetch failed"), "upstream_transport");
+        assert_eq!(pi_failure_category("OAuth token expired"), "authentication");
+        assert_eq!(
+            pi_failure_category("pi rpc process exited"),
+            "local_process_exit"
+        );
+    }
+
+    #[test]
+    fn pi_background_task_failure_detects_exit_one_without_payload_logging() {
+        assert!(pi_background_task_failure(&json!({
+            "id": "task-1",
+            "status": "failed",
+            "exitCode": 1,
+        })));
+        assert!(!pi_background_task_failure(&json!({
+            "id": "task-2",
+            "status": "completed",
+            "exitCode": 0,
+        })));
     }
 
     #[test]
