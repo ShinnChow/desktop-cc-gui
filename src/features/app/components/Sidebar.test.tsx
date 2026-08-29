@@ -388,7 +388,8 @@ describe("Sidebar", () => {
       });
     }
 
-    const updatedPinBoxes = within(dropdown).getAllByRole("checkbox");
+    const updatedPinBoxes =
+      within(dropdown).getAllByRole<HTMLInputElement>("checkbox");
     expect(updatedPinBoxes.filter((pinBox) => pinBox.disabled)).toHaveLength(1);
     expect(updatedPinBoxes[4]?.disabled).toBe(true);
     expect(

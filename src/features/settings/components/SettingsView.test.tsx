@@ -34,7 +34,6 @@ import {
   resetClientStorageForTests,
   writeClientStoreValue,
 } from "../../../services/clientStorage";
-import { pushErrorToast } from "../../../services/toasts";
 import {
   DEFAULT_CODE_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
