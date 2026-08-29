@@ -253,6 +253,7 @@ export type LayoutNodesFlatOptions = {
   onAddSharedAgent: (
     workspace: WorkspaceInfo,
     engine: SharedSessionSupportedEngine,
+    options?: { providerProfileId?: string },
   ) => Promise<string | null>;
   onAddWorktreeAgent: (workspace: WorkspaceInfo) => Promise<void>;
   onAddCloneAgent: (workspace: WorkspaceInfo) => Promise<void>;

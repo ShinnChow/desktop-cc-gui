@@ -45,12 +45,16 @@ function openWorkspaceActionsMenu(workspaceCard: HTMLElement) {
       within(workspaceCard).getByRole("button", { name: "New Session" }),
     );
   });
-  const menu = screen.getByRole("menu", { name: "Workspace actions" });
-  act(() => {
-    fireEvent.click(
-      within(menu).getByRole("button", { name: "Workspace actions" }),
-    );
+  const menu = screen.getByRole("menu", { name: /New Session/ });
+  const sectionToggle = within(menu).getByRole("button", {
+    name: "Workspace actions",
   });
+  // 三栏默认全部展开：仅在被本地折叠时才点开展开。
+  if (sectionToggle.getAttribute("aria-expanded") === "false") {
+    act(() => {
+      fireEvent.click(sectionToggle);
+    });
+  }
   return menu;
 }
 
@@ -1357,6 +1361,76 @@ describe("Sidebar", () => {
     ).toBeNull();
   });
 
+  it("restores locally persisted section collapse across drawer reopens", async () => {
+    const workspace = {
+      id: "ws-collapse-persist",
+      name: "service",
+      path: "/legacy/a/service",
+      connected: true,
+      kind: "main" as const,
+      settings: {
+        sidebarCollapsed: true,
+        worktreeSetupScript: null,
+      },
+    };
+
+    render(
+      <Sidebar
+        {...baseProps}
+        workspaces={[workspace]}
+        groupedWorkspaces={[
+          {
+            id: null,
+            name: "Ungrouped",
+            workspaces: [workspace],
+          },
+        ]}
+      />,
+    );
+
+    // 第一次打开：折叠 Native CLI 栏。
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "New Session" }));
+      await Promise.resolve();
+    });
+    const menu = screen.getByRole("menu", { name: /New Session/ });
+    // 标题点明所属工作区。
+    expect(
+      screen.getByRole("menu", { name: "New Session · service" }),
+    ).toBeTruthy();
+    // 测试环境无翻译：native 栏标题 name 即 i18n key。
+    fireEvent.click(
+      within(menu).getByRole("button", { name: /sidebar\.nativeCliGroupLabel/ }),
+    );
+    const nativeGroupBody = document.getElementById(
+      "sidebar-workspace-menu-group-new-session",
+    );
+    expect(nativeGroupBody?.hasAttribute("hidden")).toBe(true);
+
+    // 关闭抽屉（点击遮罩）。
+    const backdrop = document.querySelector(".sidebar-workspace-drawer-backdrop");
+    expect(backdrop).toBeTruthy();
+    fireEvent.click(backdrop as Element);
+    expect(screen.queryByRole("menu", { name: "New Session" })).toBeNull();
+
+    // 重新打开：Native CLI 应保持折叠。
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "New Session" }));
+      await Promise.resolve();
+    });
+    const reopened = screen.getByRole("menu", { name: /New Session/ });
+    expect(
+      within(reopened)
+        .getByRole("button", { name: /sidebar\.nativeCliGroupLabel/ })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(
+      document
+        .getElementById("sidebar-workspace-menu-group-new-session")
+        ?.hasAttribute("hidden"),
+    ).toBe(true);
+  });
+
   it("triggers workspace alias prompt from the workspace menu", async () => {
     const workspace = {
       id: "ws-alias-menu",
@@ -1390,10 +1464,13 @@ describe("Sidebar", () => {
       fireEvent.click(screen.getByRole("button", { name: "New Session" }));
       await Promise.resolve();
     });
-    const menu = screen.getByRole("menu", { name: "Workspace actions" });
-    fireEvent.click(
-      within(menu).getByRole("button", { name: "Workspace actions" }),
-    );
+    const menu = screen.getByRole("menu", { name: /New Session/ });
+    const sectionToggle = within(menu).getByRole("button", {
+      name: "Workspace actions",
+    });
+    if (sectionToggle.getAttribute("aria-expanded") === "false") {
+      fireEvent.click(sectionToggle);
+    }
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Set alias" }));
 
     expect(onRenameWorkspaceAlias).toHaveBeenCalledTimes(1);
@@ -2620,7 +2697,10 @@ describe("Sidebar", () => {
         name: /Claude Code.*CLI not installed/,
       }),
     ).toBeNull();
-    const codexItem = screen.getByRole("menuitem", { name: /Codex/ });
+    // Shared / Native 拆组后 Codex 有两行；此处要 native 行（带供应商子菜单）。
+    const codexItem = screen
+      .getAllByRole("menuitem", { name: /Codex/ })
+      .find((item) => item.getAttribute("aria-haspopup") === "menu")!;
     fireEvent.mouseEnter(codexItem);
     await act(async () => {
       fireEvent.click(screen.getByRole("menuitemradio", { name: /本地配置/ }));
@@ -3268,7 +3348,10 @@ describe("Sidebar", () => {
     fireEvent.click(
       within(folderRow).getByRole("button", { name: "New session in project" }),
     );
-    const codexItem = screen.getByRole("menuitem", { name: "Codex" });
+    // Shared / Native 拆组后 Codex 有两行；此处要 native 行（带供应商子菜单）。
+    const codexItem = screen
+      .getAllByRole("menuitem", { name: "Codex" })
+      .find((item) => item.getAttribute("aria-haspopup") === "menu")!;
     fireEvent.mouseEnter(codexItem);
     await act(async () => {
       fireEvent.click(screen.getByRole("menuitemradio", { name: /本地配置/ }));
@@ -3407,14 +3490,13 @@ describe("Sidebar", () => {
     fireEvent.click(
       within(folderRow).getByRole("button", { name: "New session in project" }),
     );
+    // Shared CLI 已平铺成分组行：直接在 shared 分组容器内点 Claude Code。
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole("menuitem", { name: "sidebar.newSharedSession" }),
+      const sharedGroupBody = document.getElementById(
+        "sidebar-workspace-menu-group-new-session-shared",
       );
-    });
-    await act(async () => {
       fireEvent.click(
-        screen.getByRole("menuitemradio", { name: "Claude Code" }),
+        within(sharedGroupBody!).getByRole("menuitem", { name: "Claude Code" }),
       );
     });
 

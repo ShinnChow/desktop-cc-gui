@@ -1652,7 +1652,7 @@ describe("useEngineController", () => {
     expect(refreshResult?.availableEngines.find((engine) => engine.type === "claude")?.installed).toBe(true);
   });
 
-  it("refreshes stale engine status before switching", async () => {
+  it("switches optimistically and refreshes stale status in background", async () => {
     const codexModels: EngineStatus["models"] = [
       {
         id: "gpt-5",
@@ -1683,10 +1683,11 @@ describe("useEngineController", () => {
       await result.current.setActiveEngine("codex");
     });
 
-    expect(detectEnginesMock).toHaveBeenCalledTimes(2);
+    // 新契约：点击路径不 await 检测（后台 per-engine 刷新），switch 乐观执行。
     expect(switchEngineMock).toHaveBeenCalledWith("codex");
-    expect(runCodexDoctorMock).not.toHaveBeenCalled();
     expect(result.current.activeEngine).toBe("codex");
+    await act(async () => {});
+    expect(detectEnginesMock).toHaveBeenCalledTimes(2);
   });
 
   it("optimistically switches activeEngine before switchEngine settles", async () => {
@@ -1877,10 +1878,13 @@ describe("useEngineController", () => {
       await result.current.setActiveEngine("codex");
     });
 
-    expect(switchEngineMock).not.toHaveBeenCalled();
+    // doctor 证据后台收集，不阻塞乐观切换。
+    expect(switchEngineMock).toHaveBeenCalledWith("codex");
+    expect(result.current.activeEngine).toBe("codex");
+    await act(async () => {});
     expect(runCodexDoctorMock).toHaveBeenCalledWith(null, null);
     const switchError = debugEntries.find(
-      (entry) => entry.label === "engine/switch error",
+      (entry) => entry.label === "engine/switch codex doctor evidence",
     );
     expect(switchError?.payload).toMatchObject({
       message: "Engine codex is not installed",

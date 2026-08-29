@@ -18,12 +18,75 @@ import {
 import type { SharedSessionSupportedEngine } from "../utils/sharedSessionEngines";
 
 import {
+  readLastProviderProfileId,
+  type LastProviderEngine,
+} from "../../vendors/lastProviderProfileMemory";
+
+import {
   buildSharedSessionInitialTarget,
   isSharedCreateLocalProvider,
   localProviderSentinelId,
   type SharedCreateProviderProfile,
 } from "./initialTarget";
 import type { ExecutionTarget } from "./types";
+
+// 与原生创建「选供应商 = 启动」同源的引擎集合（pi/qoder 无供应商记忆）。
+const REMEMBERED_PROVIDER_ENGINES: ReadonlySet<string> = new Set([
+  "claude",
+  "codex",
+  "kimi",
+  "grok",
+  "opencode",
+]);
+
+/**
+ * Qoder 无供应商记忆：侧栏 Global/CN 双入口把发行版 id 显式带进来，
+ * 命中固定 distribution 列表时提到首位，交给 resolveFirstSharedCreateProvider。
+ */
+function prioritizePreferredQoderDistribution(
+  engine: SharedSessionSupportedEngine,
+  preferredProviderId: string | null | undefined,
+  providers: ProviderListEntry[],
+): ProviderListEntry[] {
+  const preferredId = preferredProviderId?.trim();
+  if (!preferredId || engine !== "qoder") {
+    return providers;
+  }
+  const index = providers.findIndex((entry) => entry.id === preferredId);
+  if (index <= 0) {
+    return providers;
+  }
+  const next = providers.slice();
+  const [match] = next.splice(index, 1);
+  return [match, ...next];
+}
+
+/**
+ * Shared 创建默认跟随用户记住的供应商：把 last-selected 提到有序列表首位，
+ * 交给 resolveFirstSharedCreateProvider 沿用既有的 local 归一逻辑。
+ * 记忆 id 不在列表（陈旧 / provider 已删）时保持原顺序 = 第一个。
+ */
+function prioritizeRememberedProvider(
+  engine: SharedSessionSupportedEngine,
+  providers: ProviderListEntry[],
+): ProviderListEntry[] {
+  if (!REMEMBERED_PROVIDER_ENGINES.has(engine)) {
+    return providers;
+  }
+  const rememberedId = readLastProviderProfileId(
+    engine as LastProviderEngine,
+  )?.trim();
+  if (!rememberedId) {
+    return providers;
+  }
+  const index = providers.findIndex((entry) => entry.id === rememberedId);
+  if (index <= 0) {
+    return providers;
+  }
+  const next = providers.slice();
+  const [match] = next.splice(index, 1);
+  return [match, ...next];
+}
 
 type ProviderListEntry = {
   id: string;
@@ -181,8 +244,17 @@ export async function resolveSharedSessionCreateInitialTarget(input: {
   engine: SharedSessionSupportedEngine;
   localProviderName: string;
   unavailableModelMessage: string;
+  /** Qoder Global/CN 双入口显式指定的发行版；缺省维持 Global 默认。 */
+  preferredProviderId?: string | null;
 }): Promise<ExecutionTarget> {
-  const providers = await loadOrderedSharedCreateProviders(input.engine);
+  const providers = prioritizePreferredQoderDistribution(
+    input.engine,
+    input.preferredProviderId,
+    prioritizeRememberedProvider(
+      input.engine,
+      await loadOrderedSharedCreateProviders(input.engine),
+    ),
+  );
   const provider = resolveFirstSharedCreateProvider(
     input.engine,
     providers,

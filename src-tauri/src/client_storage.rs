@@ -251,8 +251,20 @@ pub(crate) fn client_panel_lock_password_write(password: String) -> Result<(), S
 }
 
 #[tauri::command]
-pub(crate) fn client_store_read(store: String) -> Result<Value, String> {
+pub(crate) async fn client_store_read(store: String) -> Result<Value, String> {
     validate_store_name(&store)?;
+    let filename = format!("{store}.json");
+    // store IO（全量 parse/serialize + 文件锁等待）禁止在主线程执行：
+    // composer.json 已到 MB 级，同步命令会把 NSApplication 主线程卡死成
+    // 整窗 beachball（2026-08-29 抽屉创建会话卡死事故 sample 实证）。
+    tokio::task::spawn_blocking(move || read_store(&filename))
+        .await
+        .map_err(|error| format!("client store read task failed: {error}"))?
+}
+
+/// 启动期同步读（如菜单语言探测）：只允许一次性低频调用，禁止进请求路径。
+pub(crate) fn client_store_read_sync(store: &str) -> Result<Value, String> {
+    validate_store_name(store)?;
     read_store(&format!("{store}.json"))
 }
 
@@ -272,17 +284,27 @@ fn parse_store_patch_json(payload_json: &str) -> Result<serde_json::Map<String, 
 }
 
 #[tauri::command]
-pub(crate) fn client_store_write(store: String, payload_json: String) -> Result<(), String> {
+pub(crate) async fn client_store_write(store: String, payload_json: String) -> Result<(), String> {
     validate_store_name(&store)?;
-    let data = parse_store_payload_json(&payload_json)?;
-    write_store(&format!("{store}.json"), &data)
+    let filename = format!("{store}.json");
+    tokio::task::spawn_blocking(move || {
+        let data = parse_store_payload_json(&payload_json)?;
+        write_store(&filename, &data)
+    })
+    .await
+    .map_err(|error| format!("client store write task failed: {error}"))?
 }
 
 #[tauri::command]
-pub(crate) fn client_store_patch(store: String, payload_json: String) -> Result<(), String> {
+pub(crate) async fn client_store_patch(store: String, payload_json: String) -> Result<(), String> {
     validate_store_name(&store)?;
-    let patch_map = parse_store_patch_json(&payload_json)?;
-    patch_store(&format!("{store}.json"), &patch_map)
+    let filename = format!("{store}.json");
+    tokio::task::spawn_blocking(move || {
+        let patch_map = parse_store_patch_json(&payload_json)?;
+        patch_store(&filename, &patch_map)
+    })
+    .await
+    .map_err(|error| format!("client store patch task failed: {error}"))?
 }
 
 #[cfg(test)]

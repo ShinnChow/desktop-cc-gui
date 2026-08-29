@@ -156,10 +156,14 @@ vi.mock("../../../services/toasts", () => ({
 
 function openWorkspaceActionsMenu() {
   fireEvent.click(screen.getByRole("button", { name: "New Session" }));
-  const menu = screen.getByRole("menu", { name: "Workspace actions" });
-  fireEvent.click(
-    within(menu).getByRole("button", { name: "Workspace actions" }),
-  );
+  const menu = screen.getByRole("menu", { name: /New Session/ });
+  const sectionToggle = within(menu).getByRole("button", {
+    name: "Workspace actions",
+  });
+  // 三栏默认全部展开：仅在被本地折叠时才点开展开。
+  if (sectionToggle.getAttribute("aria-expanded") === "false") {
+    fireEvent.click(sectionToggle);
+  }
   return menu;
 }
 

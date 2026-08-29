@@ -2,13 +2,17 @@
 
 本页为 `mossx` 已归档 OpenSpec proposal 的完整可点击索引。目录名中的日期是 archive date，不代表 proposal 首次创建时间。
 
-- Updated At: `2026-08-27`
-- Indexed proposals: `928`（以磁盘 `archive/<date>-*` 目录为准；本页逐条索引链接 874，历史存量缺口另计）
+- Updated At: `2026-08-29`
+- Indexed proposals: `929`（以磁盘 `archive/<date>-*` 目录为准；本页逐条索引链接 875，历史存量缺口另计）
 - Source of truth: `openspec/changes/archive/<archive-date>-<change-id>/proposal.md`
 - Back to current changes: [`../README.md`](../README.md)
 - Back to workspace overview: [`../../project.md`](../../project.md)
 
 ## 2026-08
+
+### 2026-08-29
+
+- [`2026-08-29-fix-qoder-new-session-freeze-direct-entries`](2026-08-29-fix-qoder-new-session-freeze-direct-entries/proposal.md) — verified implementation，已同步 `qoder-dual-distribution` / `shared-session-engine-selection` / `sidebar-workspace-menu-group-collapse`；新建会话抽屉卡死收口：`switch_engine` 有限等待、Qoder Global/CN 双直入口、Shared 显式 distribution、client store async IO、AppShell no-op context identity stabilization；renderer diagnostics 复测无 render/freeze storm 与主线程停摆；后置项已登记为独立工作。
 
 ### 2026-08-27
 

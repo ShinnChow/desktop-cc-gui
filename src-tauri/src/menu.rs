@@ -137,7 +137,7 @@ const LABELS_EN: MenuLabels = MenuLabels {
 /// Read the saved UI language from the client `app` store. Defaults to `zh`
 /// (matching the frontend default) when unset or unreadable. Only zh/en exist.
 fn saved_menu_labels() -> &'static MenuLabels {
-    let language = crate::client_storage::client_store_read("app".to_string())
+    let language = crate::client_storage::client_store_read_sync("app")
         .ok()
         .and_then(|value| {
             value

@@ -91,7 +91,8 @@ const NEW_SESSION_ENGINE_ACTION_IDS: Readonly<Record<string, EngineType>> = {
   "new-session-grok": "grok",
   "new-session-pi": "pi",
   "new-session-dsh": "dsh",
-  "new-session-qoder": "qoder",
+  "new-session-qoder-global": "qoder",
+  "new-session-qoder-cn": "qoder",
 };
 
 type ProviderEngine = LastProviderEngine;
@@ -240,8 +241,12 @@ export type WorkspaceMenuAction = {
   onTogglePinned?: () => void;
   /** Hint shown inside the submenu after one of its children is selected. */
   selectionHint?: string;
+  /** 当前记住的供应商名，直接展示在父行上（抽屉内可见「创建的是谁」）。 */
+  selectedChildLabel?: string;
   /** Parent click opens its submenu instead of running a default leaf action. */
   submenuOnly?: boolean;
+  /** 二级子菜单标题旁「?」悬停的长说明（如供应商选择的效果与配置入口）。 */
+  submenuHelpTip?: string;
   onSelect: () => void;
   onRefresh?: () => Promise<void> | void;
   children?: WorkspaceMenuAction[];
@@ -250,6 +255,10 @@ export type WorkspaceMenuAction = {
 export type WorkspaceMenuGroup = {
   id: string;
   label: string;
+  /** 节标题后的简短说明小字（如 Shared/Native 的引擎语义）。 */
+  hint?: string;
+  /** 悬停「?」图标时的长语义说明（给不熟悉概念的用户）。 */
+  helpTip?: string;
   actions: WorkspaceMenuAction[];
   collapsible?: boolean;
   defaultCollapsed?: boolean;
@@ -287,6 +296,7 @@ type SidebarMenuHandlers = {
   onAddSharedAgent?: (
     workspace: WorkspaceInfo,
     engine: SharedSessionSupportedEngine,
+    options?: { providerProfileId?: string },
   ) => Promise<string | null> | string | null | void;
   onAssignNewSessionToFolder?: (
     workspaceId: string,
@@ -1471,11 +1481,11 @@ export function useSidebarMenus({
     };
   }, []);
 
-  const buildSessionMenuGroup = useCallback(
+  const buildSessionMenuGroups = useCallback(
     (
       workspace: WorkspaceInfo,
       options?: { targetFolderId?: string | null },
-    ): WorkspaceMenuGroup => {
+    ): WorkspaceMenuGroup[] => {
       const targetFolderId = options?.targetFolderId?.trim() || null;
       const handleCreatedSession = async (threadId: string | null | void) => {
         if (!targetFolderId || !threadId) {
@@ -1553,10 +1563,10 @@ export function useSidebarMenus({
               statusLabel: t("sidebar.providerUnavailableLabel"),
             }
           : engineMeta;
-      const resolveQoderParentActionMeta = () => {
+      const resolveQoderCnActionMeta = () => {
         const engineMeta = resolveEngineActionMeta(workspace, "qoder");
         // engineOptions 只汇报 Global 的单一 Qoder status，不能拿它阻断
-        // CN child；父项始终可打开二级选择。
+        // CN 入口；CN 行始终可点。
         return {
           ...engineMeta,
           unavailable: false,
@@ -1621,6 +1631,7 @@ export function useSidebarMenus({
         qoder: t("workspace.engineQoder"),
       };
       // Shared CLI 子引擎同样受 CLI 配置管理控制。
+      // Qoder 不进这张通用表：它按发行版拆成 Global/CN 两个显式入口（见下）。
       const sharedEngineEntries = (
         [
           ["claude", "engine-claude"],
@@ -1629,44 +1640,84 @@ export function useSidebarMenus({
           ["kimi", "engine-kimi"],
           ["grok", "engine-grok"],
           ["pi", "engine-pi"],
-          ["qoder", "engine-qoder"],
         ] as const
       ).filter(([engine]) => isEngineSessionEntryVisible(engine));
-      const actions = [
-        ...(sharedEngineEntries.length > 0
-          ? [
-              {
-                id: "new-session-shared",
-                label: t("sidebar.newSharedSession"),
-                iconKind: "new-shared" as const,
-                unavailable: !onAddSharedAgent,
-                submenuOnly: true,
-                onSelect: () => {},
-                children: sharedEngineEntries.map(([engine, iconKind]) => ({
-                  id: `new-session-shared-${engine}`,
-                  label: sharedEngineLabels[engine],
-                  iconKind,
-                  ...resolveEngineActionMeta(workspace, engine),
-                  onSelect: async () => {
-                    if (!isEngineSessionEntryVisible(engine)) {
-                      return;
-                    }
-                    const threadId = await onAddSharedAgent?.(
-                      workspace,
-                      engine,
-                    );
-                    await handleCreatedSession(threadId);
-                  },
-                })),
-              },
-            ]
+      // Shared 创建在后端 resolveSharedSessionCreateInitialTarget 里同样优先
+      // 记住的供应商；行内 label 与对应 native 行同源，让「创建的是谁」可见。
+      const sharedSelectedProviderLabels: Partial<
+        Record<SharedSessionSupportedEngine, string>
+      > = {
+        claude: claudeSelectedProfile?.name,
+        codex: codexSelectedProfile?.name,
+        opencode: opencodeSelectedProfile?.name,
+        kimi: kimiSelectedProfile?.name,
+        grok: grokSelectedProfile?.name,
+      };
+      // Shared CLI 分组：子引擎平铺成一级 action（抽屉内独立成节，不再走二级 flyout）。
+      const sharedEngineActions: WorkspaceMenuAction[] = [
+        ...sharedEngineEntries.map(([engine, iconKind]) => {
+          const engineMeta = resolveEngineActionMeta(workspace, engine);
+          return {
+            id: `new-session-shared-${engine}`,
+            label: sharedEngineLabels[engine],
+            iconKind,
+            selectedChildLabel: sharedSelectedProviderLabels[engine],
+            ...engineMeta,
+            unavailable: !onAddSharedAgent ? true : engineMeta.unavailable,
+            onSelect: async () => {
+              if (!isEngineSessionEntryVisible(engine)) {
+                return;
+              }
+              const threadId = await onAddSharedAgent?.(workspace, engine);
+              await handleCreatedSession(threadId);
+            },
+          };
+        }),
+        // Qoder 发行版入口：CLI 列表层直接平铺 Global/CN，点击即建会话，
+        // 不再走「选择 Qoder 发行版」二级弹层（与供应商弹窗互抢菜单态会把
+        // 新建会话卡死）。Global 行反映 engine status；CN 行不被单一
+        // Global 状态阻断。
+        ...(isEngineSessionEntryVisible("qoder")
+          ? QODER_DISTRIBUTION_PROFILES.map((profile) => {
+              const engineMeta =
+                profile.id === QODER_GLOBAL_PROVIDER_PROFILE_ID
+                  ? resolveEngineActionMeta(workspace, "qoder")
+                  : resolveQoderCnActionMeta();
+              return {
+                id: `new-session-shared-qoder-${
+                  profile.id === QODER_GLOBAL_PROVIDER_PROFILE_ID
+                    ? "global"
+                    : "cn"
+                }`,
+                label: profile.name,
+                iconKind: "engine-qoder" as const,
+                ...engineMeta,
+                unavailable: !onAddSharedAgent ? true : engineMeta.unavailable,
+                onSelect: async () => {
+                  if (!isEngineSessionEntryVisible("qoder")) {
+                    return;
+                  }
+                  const threadId = await onAddSharedAgent?.(workspace, "qoder", {
+                    providerProfileId: profile.id,
+                  });
+                  await handleCreatedSession(threadId);
+                },
+              };
+            })
           : []),
+      ];
+      const actions = [
         {
           id: "new-session-claude",
           label: t("workspace.engineClaudeCode"),
           iconKind: "engine-claude",
           submenuTitle: t("sidebar.claudeProviderChoiceTitle"),
+          submenuHelpTip: t("sidebar.providerChoiceHelp", {
+            defaultValue:
+              "选中后记住，新建会话默认使用该供应商；「跟随全局配置」随启动配置联动，「独立配置」互不影响。可在 设置 → CLI配置管理 → 供应商渠道 维护",
+          }),
           selectionHint: t("sidebar.claudeProviderSelectedTip"),
+          selectedChildLabel: claudeSelectedProfile?.name,
           ...withProviderAvailability(
             resolveEngineActionMeta(workspace, "claude"),
             claudeSelectedProfile,
@@ -1709,7 +1760,12 @@ export function useSidebarMenus({
           label: t("workspace.engineCodex"),
           iconKind: "engine-codex",
           submenuTitle: t("sidebar.codexProviderChoiceTitle"),
+          submenuHelpTip: t("sidebar.providerChoiceHelp", {
+            defaultValue:
+              "选中后记住，新建会话默认使用该供应商；「跟随全局配置」随启动配置联动，「独立配置」互不影响。可在 设置 → CLI配置管理 → 供应商渠道 维护",
+          }),
           selectionHint: t("sidebar.codexProviderSelectedTip"),
+          selectedChildLabel: codexSelectedProfile?.name,
           ...withProviderAvailability(
             resolveEngineActionMeta(workspace, "codex"),
             codexSelectedProfile,
@@ -1753,7 +1809,12 @@ export function useSidebarMenus({
           label: t("workspace.engineOpenCode"),
           iconKind: "engine-opencode",
           submenuTitle: t("sidebar.opencodeProviderChoiceTitle"),
+          submenuHelpTip: t("sidebar.providerChoiceHelp", {
+            defaultValue:
+              "选中后记住，新建会话默认使用该供应商；「跟随全局配置」随启动配置联动，「独立配置」互不影响。可在 设置 → CLI配置管理 → 供应商渠道 维护",
+          }),
           selectionHint: t("sidebar.opencodeProviderSelectedTip"),
+          selectedChildLabel: opencodeSelectedProfile?.name,
           ...withProviderAvailability(
             resolveEngineActionMeta(workspace, "opencode"),
             opencodeSelectedProfile,
@@ -1806,7 +1867,12 @@ export function useSidebarMenus({
           label: t("workspace.engineKimi"),
           iconKind: "engine-kimi",
           submenuTitle: t("sidebar.kimiProviderChoiceTitle"),
+          submenuHelpTip: t("sidebar.providerChoiceHelp", {
+            defaultValue:
+              "选中后记住，新建会话默认使用该供应商；「跟随全局配置」随启动配置联动，「独立配置」互不影响。可在 设置 → CLI配置管理 → 供应商渠道 维护",
+          }),
           selectionHint: t("sidebar.kimiProviderSelectedTip"),
+          selectedChildLabel: kimiSelectedProfile?.name,
           ...withProviderAvailability(
             resolveEngineActionMeta(workspace, "kimi"),
             kimiSelectedProfile,
@@ -1854,48 +1920,36 @@ export function useSidebarMenus({
             await handleCreatedSession(threadId);
           },
         },
-        {
-          id: "new-session-qoder",
-          label: t("workspace.engineQoder"),
-          iconKind: "engine-qoder",
-          submenuTitle: t("sidebar.qoderDistributionChoiceTitle", {
-            defaultValue: "选择 Qoder 发行版",
-          }),
-          selectionHint: t("sidebar.qoderDistributionChoiceHint", {
-            defaultValue: "Global 与 CN 的账号、配置、模型彼此隔离",
-          }),
-          ...withProviderAvailability(
-            resolveQoderParentActionMeta(),
-            QODER_GLOBAL_PROFILE,
-          ),
-          submenuOnly: true,
-          onSelect: () => {},
-          children: QODER_DISTRIBUTION_PROFILES.map((profile) => ({
-            id: `new-session-qoder-distribution-${profile.id}`,
-            label: profile.name,
-            badgeLabel: t("sidebar.providerIsolatedConfigLabel"),
-            iconKind: "engine-qoder" as const,
-            ...withProviderAvailability(
-              profile.id === QODER_GLOBAL_PROVIDER_PROFILE_ID
-                ? resolveEngineActionMeta(workspace, "qoder")
-                : resolveQoderParentActionMeta(),
-              profile,
-            ),
-            onSelect: async () => {
-              const threadId = await runAddAgent(
-                "qoder",
-                creationProviderSelection(profile),
-              );
-              await handleCreatedSession(threadId);
-            },
-          })),
-        },
+        // Qoder 发行版入口：与 Shared 组同形，CLI 列表层直接平铺 Global/CN，
+        // 点击即带显式 profile 建会话（不再有二级发行版弹层）。
+        ...QODER_DISTRIBUTION_PROFILES.map((profile) => ({
+          id: `new-session-qoder-${
+            profile.id === QODER_GLOBAL_PROVIDER_PROFILE_ID ? "global" : "cn"
+          }`,
+          label: profile.name,
+          iconKind: "engine-qoder" as const,
+          ...(profile.id === QODER_GLOBAL_PROVIDER_PROFILE_ID
+            ? resolveEngineActionMeta(workspace, "qoder")
+            : resolveQoderCnActionMeta()),
+          onSelect: async () => {
+            const threadId = await runAddAgent(
+              "qoder",
+              creationProviderSelection(profile),
+            );
+            await handleCreatedSession(threadId);
+          },
+        })),
         {
           id: "new-session-grok",
           label: t("workspace.engineGrok"),
           iconKind: "engine-grok",
           submenuTitle: t("sidebar.grokProviderChoiceTitle"),
+          submenuHelpTip: t("sidebar.providerChoiceHelp", {
+            defaultValue:
+              "选中后记住，新建会话默认使用该供应商；「跟随全局配置」随启动配置联动，「独立配置」互不影响。可在 设置 → CLI配置管理 → 供应商渠道 维护",
+          }),
           selectionHint: t("sidebar.grokProviderSelectedTip"),
+          selectedChildLabel: grokSelectedProfile?.name,
           ...withProviderAvailability(
             resolveEngineActionMeta(workspace, "grok"),
             grokSelectedProfile,
@@ -1954,11 +2008,40 @@ export function useSidebarMenus({
         return isEngineSessionEntryVisible(engine);
       });
 
-      return {
-        id: "new-session",
-        label: t("sidebar.sessionActionsGroup"),
-        actions: visibleActions,
-      };
+      // Shared / Native 拆成两个分组：抽屉里各自带节标题，平级并列。
+      return [
+        ...(sharedEngineActions.length > 0
+          ? [
+              {
+                id: "new-session-shared",
+                label: t("sidebar.newSharedSession"),
+                hint: t("sidebar.sharedCliHint", {
+                  defaultValue: "引擎可切换",
+                }),
+                helpTip: t("sidebar.sharedCliHelp", {
+                  defaultValue:
+                    "多个 CLI 接入同一份对话上下文，中途可切换引擎继续聊",
+                }),
+                collapsible: true,
+                actions: sharedEngineActions,
+              } satisfies WorkspaceMenuGroup,
+            ]
+          : []),
+        {
+          id: "new-session",
+          label: t("sidebar.nativeCliGroupLabel", {
+            defaultValue: "Native CLI",
+          }),
+          hint: t("sidebar.nativeCliHint", {
+            defaultValue: "引擎固定",
+          }),
+          helpTip: t("sidebar.nativeCliHelp", {
+            defaultValue: "每个会话绑定单一引擎，上下文独立互不共享",
+          }),
+          collapsible: true,
+          actions: visibleActions,
+        } satisfies WorkspaceMenuGroup,
+      ];
     },
     [
       t,
@@ -2022,7 +2105,6 @@ export function useSidebarMenus({
         id: "workspace-actions",
         label: t("sidebar.workspaceActionsGroup"),
         collapsible: true,
-        defaultCollapsed: true,
         actions: [
           ...(onActivateWorkspace
             ? [
@@ -2150,17 +2232,16 @@ export function useSidebarMenus({
       if (!prev?.workspace) {
         return prev;
       }
-      const sessionGroup = buildSessionMenuGroup(prev.workspace, {
+      // Shared / Native 两个 session 分组整体重建，保持原顺序（session 组在前）。
+      const sessionGroups = buildSessionMenuGroups(prev.workspace, {
         targetFolderId: prev.targetFolderId,
       });
-      const workspaceGroup = buildWorkspaceMenuGroup(prev.workspace);
-      const nextGroups = prev.groups.map((group) =>
-        group.id === "new-session"
-          ? sessionGroup
-          : group.id === "workspace-actions"
-            ? workspaceGroup
-            : group
+      const hasWorkspaceActionsGroup = prev.groups.some(
+        (group) => group.id === "workspace-actions",
       );
+      const nextGroups = hasWorkspaceActionsGroup
+        ? [...sessionGroups, buildWorkspaceMenuGroup(prev.workspace)]
+        : sessionGroups;
       const prevSignature = JSON.stringify(
         prev.groups.map((group) => ({
           id: group.id,
@@ -2172,6 +2253,7 @@ export function useSidebarMenus({
             statusLabel: action.statusLabel ?? null,
             refreshing: action.refreshing ?? false,
             pinned: action.pinned ?? false,
+            selectedChildLabel: action.selectedChildLabel ?? null,
             children: action.children?.map((child) => ({
               id: child.id,
               unavailable: child.unavailable,
@@ -2192,6 +2274,7 @@ export function useSidebarMenus({
             statusLabel: action.statusLabel ?? null,
             refreshing: action.refreshing ?? false,
             pinned: action.pinned ?? false,
+            selectedChildLabel: action.selectedChildLabel ?? null,
             children: action.children?.map((child) => ({
               id: child.id,
               unavailable: child.unavailable,
@@ -2210,7 +2293,7 @@ export function useSidebarMenus({
       };
     });
   }, [
-    buildSessionMenuGroup,
+    buildSessionMenuGroups,
     buildWorkspaceMenuGroup,
     workspaceMenuState?.workspace,
     workspaceOpenCodeLoginState,
@@ -2510,7 +2593,7 @@ export function useSidebarMenus({
       const { x, y } = resolveWorkspaceMenuPosition(event);
 
       const groups: WorkspaceMenuGroup[] = [
-        buildSessionMenuGroup(workspace),
+        ...buildSessionMenuGroups(workspace),
         buildWorkspaceMenuGroup(workspace),
       ];
 
@@ -2523,7 +2606,7 @@ export function useSidebarMenus({
       });
     },
     [
-      buildSessionMenuGroup,
+      buildSessionMenuGroups,
       buildWorkspaceMenuGroup,
       resolveWorkspaceMenuPosition,
     ],
@@ -2539,16 +2622,17 @@ export function useSidebarMenus({
       event.stopPropagation();
       const { x, y } = resolveWorkspaceMenuPosition(event);
 
+      const sessionGroups = buildSessionMenuGroups(workspace, options);
       setWorkspaceMenuState({
         x,
         y,
         workspaceId: workspace.id,
-        groups: [buildSessionMenuGroup(workspace, options)],
+        groups: sessionGroups,
         workspace,
         targetFolderId: options?.targetFolderId?.trim() || null,
       });
     },
-    [buildSessionMenuGroup, resolveWorkspaceMenuPosition],
+    [buildSessionMenuGroups, resolveWorkspaceMenuPosition],
   );
 
   const showWorktreeMenu = useCallback(

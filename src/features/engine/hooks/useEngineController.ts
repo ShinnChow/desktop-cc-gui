@@ -19,6 +19,14 @@ import {
   type EngineStatusUpdatedEvent,
 } from "../../../services/tauri/appServer";
 import { requestEngineDetection } from "./engineDetectionCoordinator";
+
+/**
+ * switch_engine IPC 没有内建超时：后端 CLI spawn 卡住时，会把绑定它的
+ * 创建流（loading 弹窗）永久挂死（Qoder CN 点击卡死事故）。Chrome 在等待前
+ * 已乐观切换，这里只等有限时长；超时保乐观态返回，迟到的 switch 结果由
+ * generation 守卫在后台合并，不回滚（避免和迟到成功互相打架）。
+ */
+const ENGINE_SWITCH_WAIT_TIMEOUT_MS = 15_000;
 import { PROVIDER_TARGET_CATALOG_INVALIDATED_EVENT } from "../../composer/components/ChatInputBox/hooks/useProviderTargetCatalogOwners";
 import { PI_AUTH_CATALOG_CHANGED_EVENT } from "../../vendors/piAuthCatalogEvent";
 import { startupOrchestrator } from "../../startup-orchestration/utils/startupOrchestrator";
@@ -447,62 +455,69 @@ export function useEngineController({
       let targetStatus =
         engineStatuses.find((status) => status.engineType === engineType) ??
         null;
+      // 硬红线（Qoder CN 点击卡死复盘）：本函数在创建流模态弹窗内执行，
+      // 任何 await 挂住 = 弹窗永不关闭 = 整窗「卡死」。
+      // ① 检测缺失/未安装时不 await 检测（探测要 spawn CLI，慢/挂起无上限），
+      //    只做后台 per-engine 刷新，切换走乐观路径；后端 switch_engine 失败
+      //    会走 error 分支回报。② per-engine（非全量 force，避免 9 引擎风暴）。
       if (!targetStatus?.installed) {
-        try {
-          const refreshedStatuses = (
-            await requestEngineDetection({
-              source: "controller-switch",
-              force: true,
-            })
-          ).filter((status) =>
-            enabledEngineTypes.includes(status.engineType),
-          );
-          setEngineStatuses(refreshedStatuses);
-          targetStatus =
-            refreshedStatuses.find(
+        void requestEngineDetection({
+          source: "controller-switch",
+          force: true,
+          engines: [engineType],
+        })
+          .then((refreshedStatuses) => {
+            const refreshed = refreshedStatuses.filter(
               (status) => status.engineType === engineType,
-            ) ?? null;
-        } catch (error) {
-          onDebug?.({
-            id: `${Date.now()}-engine-detect-error-before-switch`,
-            timestamp: Date.now(),
-            source: "error",
-            label: "engine/detect error",
-            payload: error instanceof Error ? error.message : String(error),
+            );
+            if (refreshed.length === 0) {
+              return;
+            }
+            const refreshedById = new Map(
+              refreshed.map((status) => [status.engineType, status]),
+            );
+            // 合并回现有状态表，不整表替换（避免清掉其他引擎的缓存状态）。
+            setEngineStatuses((prev) =>
+              prev.map((status) => refreshedById.get(status.engineType) ?? status),
+            );
+          })
+          .catch((error: unknown) => {
+            onDebug?.({
+              id: `${Date.now()}-engine-detect-error-before-switch`,
+              timestamp: Date.now(),
+              source: "error",
+              label: "engine/detect error",
+              payload: error instanceof Error ? error.message : String(error),
+            });
           });
-        }
       }
 
-      if (!targetStatus?.installed && engineType === "codex") {
-        let doctorResult: CodexDoctorResult | null = null;
-        let doctorError: unknown = null;
-        try {
-          doctorResult = await runCodexDoctor(null, null);
-        } catch (error) {
-          doctorError = error;
-        }
-        onDebug?.({
-          id: `${Date.now()}-engine-switch-error`,
-          timestamp: Date.now(),
-          source: "error",
-          label: "engine/switch error",
-          payload: buildCodexSwitchUnavailablePayload(doctorResult, doctorError),
-        });
-        return;
-      }
-
-      if (!targetStatus?.installed) {
-        onDebug?.({
-          id: `${Date.now()}-engine-switch-error`,
-          timestamp: Date.now(),
-          source: "error",
-          label: "engine/switch error",
-          payload: {
-            reasonCode: "engine-not-installed",
-            engineType,
-          },
-        });
-        return;
+      // 检测已改为后台刷新，这里不再因「未安装/状态未知」早退：
+      // ① CLI 可能刚装好而状态表还是旧缓存；② doctor / 检测都是
+      // 无上限 spawn，await 会把创建流模态弹窗永久挂死（Qoder CN 卡死）。
+      // 统一乐观放行，真实不可用由 switch_engine 失败走 error 分支回报。
+      // codex 的 doctor 诊断证据改为后台收集（不 await、不早退），仅进 debug。
+      if (targetStatus && !targetStatus.installed && engineType === "codex") {
+        void runCodexDoctor(null, null)
+          .catch((error: unknown) => error as unknown)
+          .then((doctorOutcome) => {
+            const doctorError =
+              doctorOutcome instanceof Error ? doctorOutcome : null;
+            const doctorResult =
+              doctorError || !(doctorOutcome as CodexDoctorResult)
+                ? null
+                : (doctorOutcome as CodexDoctorResult);
+            onDebug?.({
+              id: `${Date.now()}-engine-switch-codex-doctor`,
+              timestamp: Date.now(),
+              source: "error",
+              label: "engine/switch codex doctor evidence",
+              payload: buildCodexSwitchUnavailablePayload(
+                doctorResult,
+                doctorError,
+              ),
+            });
+          });
       }
 
       onDebug?.({
@@ -517,8 +532,10 @@ export function useEngineController({
       const lastGoodTargetModels =
         lastGoodModelsByScopeRef.current.get(`${engineType}:__global__`) ?? [];
       const optimisticModels =
-        targetStatus.models.length > 0
-          ? targetStatus.models.map((model) => normalizeEngineModelEntry(model))
+        (targetStatus?.models.length ?? 0) > 0
+          ? (targetStatus?.models ?? []).map((model) =>
+              normalizeEngineModelEntry(model),
+            )
           : lastGoodTargetModels.map((model) => normalizeEngineModelEntry(model));
       const generation = ++engineSwitchGenerationRef.current;
       // Optimistic chrome: thread-select must not wait on switch_engine IPC
@@ -530,7 +547,39 @@ export function useEngineController({
       visibleCatalogRequestKeyRef.current = `${engineType}:__global__`;
 
       try {
-        await switchEngine(engineType);
+        const switchPromise = switchEngine(engineType);
+        // race 超时后 switch 才 reject 的场景：挂空 catch 防 unhandled rejection。
+        switchPromise.catch(() => {});
+        let switchTimedOut = false;
+        await new Promise<void>((resolve, reject) => {
+          const switchTimer = setTimeout(() => {
+            switchTimedOut = true;
+            resolve();
+          }, ENGINE_SWITCH_WAIT_TIMEOUT_MS);
+          switchPromise.then(
+            () => {
+              clearTimeout(switchTimer);
+              resolve();
+            },
+            (error: unknown) => {
+              clearTimeout(switchTimer);
+              reject(error);
+            },
+          );
+        });
+        if (switchTimedOut) {
+          onDebug?.({
+            id: `${Date.now()}-engine-switch-timeout`,
+            timestamp: Date.now(),
+            source: "error",
+            label: "engine/switch timeout",
+            payload: {
+              reasonCode: "engine-switch-wait-timeout",
+              engineType,
+            },
+          });
+          return;
+        }
         if (engineSwitchGenerationRef.current !== generation) {
           return;
         }
@@ -539,7 +588,7 @@ export function useEngineController({
           timestamp: Date.now(),
           source: "server",
           label: "engine/switch success",
-          payload: { engine: engineType, models: targetStatus.models },
+          payload: { engine: engineType, models: targetStatus?.models ?? [] },
         });
         // P0 修复：B1 把 models 从 detect 解耦后，切换目标引擎的目录必须
         // 在此显式加载（此前隐含「detect 顺带带回目录」，乐观 models 即真实

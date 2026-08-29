@@ -11,6 +11,8 @@ pub(crate) const SESSION_INDEX_IMPORTED_EVENT: &str = "session-index-imported";
 pub(crate) const IMPORT_INTERVAL: Duration = Duration::from_secs(90);
 /// Startup-safe delay: long enough to miss first-click freeze, short enough
 /// that upgrade/cold-start does not sit idle for 45s before the first scan.
+/// 首扫成本已由 list_pi_sessions 有界化（cwd 预过滤 + 64KB/file）压到亚秒级，
+/// 3s 首 tick 不再构成启动风暴源（2026-08-29 复核后维持原契约）。
 pub(crate) const IMPORT_INITIAL_DELAY: Duration = Duration::from_secs(3);
 const IMPORT_LIMIT: usize = 50;
 

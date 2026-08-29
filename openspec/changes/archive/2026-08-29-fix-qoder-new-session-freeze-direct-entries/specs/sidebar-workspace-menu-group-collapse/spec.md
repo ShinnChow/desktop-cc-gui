@@ -1,9 +1,5 @@
-# sidebar-workspace-menu-group-collapse Specification
+## MODIFIED Requirements
 
-## Purpose
-
-Defines sidebar workspace menu group collapse defaults and accessible temporary toggle behavior.
-## Requirements
 ### Requirement: Workspace Actions Group Defaults To Collapsed
 
 The workspace menu groups (Shared CLI, Native CLI, workspace actions) MUST be
@@ -38,6 +34,7 @@ one menu instance stay consistent.
 - **WHEN** a user activates a collapsed group header
 - **THEN** the header reports an expanded state
 - **AND** all configured action rows of that group become available
+
 #### Scenario: Collapse an expanded group
 
 - **WHEN** a user activates an expanded group header

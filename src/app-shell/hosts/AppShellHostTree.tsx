@@ -19,7 +19,6 @@ const AppShellAssembledView = memo(function AppShellAssembledView() {
     appShellDomainContexts,
     searchAndComposerInput,
   } = useAppShellAssemblyHost();
-
   return (
     <AppShellZoneProviders
       runtimeThread={runtimeThreadProviderValue}

@@ -214,6 +214,7 @@ type SidebarProps = {
   onAddSharedAgent?: (
     workspace: WorkspaceInfo,
     engine: SharedSessionSupportedEngine,
+    options?: { providerProfileId?: string },
   ) => Promise<string | null> | string | null | void;
   onAddWorktreeAgent: (workspace: WorkspaceInfo) => void;
   onAddCloneAgent: (workspace: WorkspaceInfo) => void;

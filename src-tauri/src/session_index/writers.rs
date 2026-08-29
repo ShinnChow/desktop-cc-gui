@@ -15,9 +15,13 @@ use super::store::{
 use crate::engine::claude_history::encode_project_path;
 use crate::engine::qoder_provider_profile::canonical_qoder_native_session_id;
 
-/// Freshness window for source fingerprints. Within this, list can skip rescan.
-/// Kept short so CLI-created sessions appear in the sidebar without force refresh.
-pub(crate) const SOURCE_FRESH_MAX_AGE_MS: i64 = 8_000;
+/// Source sync freshness window: time-based fallback on top of the three real
+/// change signals (fingerprint mismatch, invalidate => last_sync_ms=0, disk
+/// newest mtime > ledger max). 8s made the 90s import tick permanently stale,
+/// forcing a full rescan of thousands of session files every tick and pinning
+/// a whole CPU core (2026-08-29 idle-create freeze incident). Session creates
+/// still rescan immediately via invalidation / fingerprint / disk-newest.
+pub(crate) const SOURCE_FRESH_MAX_AGE_MS: i64 = 10 * 60 * 1000;
 
 #[derive(Debug, Default)]
 pub(crate) struct WriterResult {
@@ -132,7 +136,9 @@ fn is_claude_agent_session_id(session_id: &str) -> bool {
 
 fn is_mossx_program_control_text(text: &str) -> bool {
     let trimmed = text.trim();
-    trimmed.len() >= 6 && trimmed[..6].eq_ignore_ascii_case("MOSSX_")
+    // 必须按字节比较：`trimmed[..6]` 在第 6 字节落在 CJK 字符中间时直接
+    // panic（中文标题会话让 import tick 反复中途夭折，2026-08-29 实证）。
+    trimmed.len() >= 6 && trimmed.as_bytes()[..6].eq_ignore_ascii_case(b"MOSSX_")
 }
 
 /// Shared 协议包（完整 token）。截断占位 `MOSSX_CONTE` 不算，避免 empty-prune 把续跑 jsonl 当空会话删盘。
@@ -1530,11 +1536,12 @@ pub(crate) fn gemini_home_fingerprint() -> String {
 
 pub(crate) fn pi_home_fingerprint() -> String {
     let sessions = crate::engine::pi_history::resolve_pi_sessions_root(None);
-    let home = sessions
-        .parent()
-        .map(std::path::Path::to_path_buf)
-        .unwrap_or_else(|| sessions.clone());
-    let mut parts = vec![mtime_fingerprint(&home), mtime_fingerprint(&sessions)];
+    // 禁止把 sessions 的父目录（~/.pi/agent）算进指纹：常驻 pi 进程会持续
+    // 改写 agent 目录下的运行态文件（models-store.json / memory / npm），
+    // 目录 mtime 永远在变 → 每个 import tick 指纹必然失配 → 全量重扫
+    // 数千个会话文件把 CPU 烧满（2026-08-29 静置后创建会话卡死事故实证）。
+    // 会话数据的增减只体现在 sessions 根与各 cwd 子目录的 entry 变化上。
+    let mut parts = vec![mtime_fingerprint(&sessions)];
     // New jsonl lives in sessions/<encoded-cwd>/; parent mtime often stays
     // unchanged, so include each cwd-dir fingerprint.
     if let Ok(entries) = fs::read_dir(&sessions) {

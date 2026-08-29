@@ -455,6 +455,20 @@ describe("appShellDomainContexts", () => {
     );
   });
 
+  it("preserves the outer context bag when every domain is unchanged", () => {
+    const previousContexts = createDomainContexts();
+    const nextContexts = Object.fromEntries(
+      listAppShellDomainContextNames().map((domainName) => [
+        domainName,
+        { ...previousContexts[domainName] },
+      ]),
+    ) as AppShellDomainContexts;
+
+    expect(
+      reuseStableAppShellDomainContexts(previousContexts, nextContexts),
+    ).toBe(previousContexts);
+  });
+
   it("keeps runtime updates isolated from file editor context", () => {
     const previousContexts = createDomainContexts();
     const nextContexts: AppShellDomainContexts = {
@@ -656,6 +670,7 @@ describe("appShellDomainContexts", () => {
   });
 });
 
+
 describe("APP_SHELL_CONSUMER_DOMAIN_SELECTION", () => {
   it("keeps sections/render smaller than layoutNodes (no full-domain flatten)", () => {
     // F5 后全集 14；真实 flatten 已拆成 canvas/chrome/git zone。
@@ -735,4 +750,3 @@ describe("APP_SHELL_CONSUMER_DOMAIN_SELECTION", () => {
     );
   });
 });
-

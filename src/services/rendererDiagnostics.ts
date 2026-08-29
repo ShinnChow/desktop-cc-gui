@@ -972,6 +972,53 @@ export function appendRendererDiagnostic(
 }
 
 /**
+ * 关键路径标记（创建会话/抽屉开关/卡死 watchdog）走 immediate：绕过 30s 节流
+ * 立即落盘。节流窗口内的条目在「冻结后强退」时全部丢失，恰恰丢的是最需要
+ * 的现场（2026-08-29 创建会话卡死排查教训）。
+ */
+export function appendRendererDiagnosticImmediate(
+  label: string,
+  payload: Record<string, unknown> = {},
+) {
+  appendRendererDiagnosticEntry(label, payload, true);
+}
+
+/**
+ * JS 主线程停摆看门狗：1s 心跳，发现心跳间隔超过阈值即记录 stall 长度。
+ * 冻结期间写不进日志没关系——恢复后的第一条 stall 记录会带上冻结时长，
+ * 并触发一次 immediate 持久化，把「卡了多久、卡在什么之后」留档。
+ */
+export function installMainThreadStallWatchdog(
+  stallThresholdMs = 2_000,
+): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const w = window as typeof window & {
+    __ccguiStallWatchdogInstalled?: boolean;
+    __ccguiStallLastBeatMs?: number;
+  };
+  if (w.__ccguiStallWatchdogInstalled) {
+    return;
+  }
+  w.__ccguiStallWatchdogInstalled = true;
+  w.__ccguiStallLastBeatMs = Date.now();
+  window.setInterval(() => {
+    const now = Date.now();
+    const last = w.__ccguiStallLastBeatMs ?? now;
+    w.__ccguiStallLastBeatMs = now;
+    const gapMs = now - last;
+    if (gapMs >= stallThresholdMs) {
+      appendRendererDiagnosticEntry(
+        "perf.main-thread-stall",
+        { gapMs },
+        true,
+      );
+    }
+  }, 1_000);
+}
+
+/**
  * Session-only diagnostic ring for high-frequency samplers. Entries remain
  * visible to live/export surfaces without triggering client-store persistence.
  */

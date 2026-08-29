@@ -747,6 +747,111 @@ async fn read_session_summary(file: &Path) -> Option<PiSessionSummary> {
     })
 }
 
+/// 列表路径专用的有界 summary：只读文件头部（默认 64KB）拿 header + 首条
+/// 用户消息 + 消息存在性；updated_at 用 mtime（mtime 即真实最后写入时间，
+/// 列表排序语义不变）。read_session_summary 的逐行全量 parse 对 MB 级长会话
+/// 是 O(全部会话字节)，3 个并发 scan 就能把 CPU 烧满（2026-08-29 卡死事故
+/// sample 实证：codemoss 工作区单个目录就压着 120MB+ 的会话文件）。
+/// message_count 降级为「有无消息」标记：空会话清剪只判 ==0，语义保留。
+async fn read_session_summary_for_list(
+    file: &Path,
+    max_head_bytes: u64,
+) -> Option<PiSessionSummary> {
+    let file_handle = fs::File::open(file).await.ok()?;
+    let mut header: Option<SessionHeader> = None;
+    let mut first_user_prompt: Option<String> = None;
+    let mut has_message = false;
+    let mut consumed = 0u64;
+
+    let mut lines = AsyncBufReader::new(file_handle).lines();
+    while let Ok(Some(line)) = lines.next_line().await {
+        consumed += line.len() as u64 + 1;
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
+        if event_type == "session" && header.is_none() {
+            header = parse_header(&value, file);
+        } else if event_type == "message" {
+            has_message = true;
+            if first_user_prompt.is_none() {
+                if let Some(message) = value.get("message") {
+                    if message.get("role").and_then(Value::as_str) == Some("user") {
+                        let text = extract_text_blocks(message.get("content"));
+                        // @file 附件拆分。纯附件消息用 [图片]/[附件] 标记兜底。
+                        let (visible, attachments) = {
+                            let (legacy_text, legacy_images) =
+                                crate::engine::cli_image_input::split_pi_prompt_for_display(&text);
+                            if !legacy_images.is_empty() {
+                                (legacy_text, legacy_images)
+                            } else {
+                                crate::engine::cli_image_input::split_pi_file_attachments_for_display(
+                                    &legacy_text,
+                                )
+                            }
+                        };
+                        let title_source = if visible.trim().is_empty() && !attachments.is_empty() {
+                            attachment_title_marker(&attachments)
+                        } else {
+                            visible
+                        };
+                        if !title_source.trim().is_empty() {
+                            first_user_prompt = Some(title_source);
+                        }
+                    }
+                }
+            }
+        }
+        // 拿齐 header 与首条用户消息即可停，避免读进长会话的尾部。
+        if header.is_some() && first_user_prompt.is_some() {
+            break;
+        }
+        if consumed >= max_head_bytes {
+            break;
+        }
+    }
+
+    let header = header.or_else(|| header_from_file_name(file))?;
+    if header.session_id.is_empty() {
+        return None;
+    }
+    let mtime = file_mtime_ms(file).await;
+    let created_at = if header.timestamp_ms > 0 {
+        header.timestamp_ms
+    } else {
+        mtime
+    };
+    let first_message = first_user_prompt
+        .map(|text| truncate_chars(text.trim(), MAX_TITLE_CHARS))
+        .filter(|text| !text.is_empty())
+        .unwrap_or_else(|| {
+            let short = if header.session_id.chars().count() > 8 {
+                truncate_chars(&header.session_id, 8)
+            } else {
+                header.session_id.clone()
+            };
+            format!("PI session {short}")
+        });
+    let file_size = fs::metadata(file).await.ok().map(|m| m.len());
+
+    Some(PiSessionSummary {
+        session_id: header.session_id,
+        first_message,
+        updated_at: mtime,
+        created_at,
+        message_count: if has_message { 1 } else { 0 },
+        file_size_bytes: file_size,
+        engine: Some("pi".to_string()),
+        canonical_session_id: None,
+        attribution_status: None,
+        parent_session_id: header.parent_session_id,
+    })
+}
+
 async fn list_all_session_files(root: &Path) -> Result<Vec<PathBuf>, String> {
     if !root.is_dir() {
         return Ok(Vec::new());
@@ -1161,25 +1266,31 @@ pub async fn list_pi_sessions(
         let files = list_all_session_files(&root).await?;
         let mut sessions = Vec::new();
         for file in files {
-            let Some(summary) = read_session_summary(&file).await else {
-                continue;
-            };
-            // Prefer cwd match when available by re-reading header cwd cheaply.
+            // 廉价 cwd 预过滤：先只读 header 行。read_session_summary 会逐行
+            // parse 整个 jsonl（长会话 MB 级），对全机器几千个会话文件全量
+            // 扫描会把 CPU 烧满数分钟（2026-08-29 创建会话卡死事故 sample
+            // 实证，3 个并发 scan 叠加）。cwd 不匹配的文件到此为止。
             let file_handle = match fs::File::open(&file).await {
                 Ok(handle) => handle,
                 Err(_) => continue,
             };
             let mut lines = AsyncBufReader::new(file_handle).lines();
             let first_line = lines.next_line().await.ok().flatten();
-            let cwd = first_line
+            let first_value: Option<Value> = first_line
                 .as_deref()
-                .and_then(|line| serde_json::from_str::<Value>(line.trim()).ok())
-                .and_then(|value| value.get("cwd").and_then(Value::as_str).map(str::to_string));
-            if let Some(cwd) = cwd {
-                if !paths_match(&cwd, &workspace_variants) {
+                .and_then(|line| serde_json::from_str(line.trim()).ok());
+            if let Some(cwd) = first_value
+                .as_ref()
+                .and_then(|value| value.get("cwd"))
+                .and_then(Value::as_str)
+            {
+                if !paths_match(cwd, &workspace_variants) {
                     continue;
                 }
             }
+            let Some(summary) = read_session_summary_for_list(&file, 64 * 1024).await else {
+                continue;
+            };
             sessions.push(summary);
         }
         sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));

@@ -1038,6 +1038,162 @@
   height: 0;
 }
 
+/* 新建会话抽屉：从侧栏所在侧滑出的整高面板，替代原贴点弹窗。
+   外观与主体界面卡齐：贴满窗口边缘、无边框、无圆角。
+   注意 .sidebar-workspace-menu 类仍被文件夹小弹窗（WorkspaceSessionFolderTree）复用，勿合并。 */
+.sidebar-workspace-drawer-backdrop {
+  z-index: 1200;
+  background: color-mix(in srgb, #000 24%, transparent);
+  animation: sidebar-workspace-drawer-backdrop-in 160ms ease-out;
+}
+
+.sidebar-workspace-drawer {
+  --sidebar-floating-menu-bg: var(--surface-sidebar-opaque);
+  /* Drawer must remain opaque over workspace wallpaper/content. */
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1201;
+  display: flex;
+  flex-direction: column;
+  /* 最小 264px 保证可读；--sidebar-drawer-fit-width 由 overlay 按侧栏实测宽度注入。 */
+  min-width: 264px;
+  width: min(100vw, max(264px, var(--sidebar-drawer-fit-width, 264px)));
+  padding: 10px 8px 8px;
+  background: var(--sidebar-floating-menu-bg);
+  box-shadow: 12px 0 28px rgba(0, 0, 0, 0.28);
+  animation: sidebar-workspace-drawer-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sidebar-workspace-drawer.is-swapped {
+  left: auto;
+  right: 0;
+  box-shadow: -12px 0 28px rgba(0, 0, 0, 0.28);
+  animation-name: sidebar-workspace-drawer-in-swapped;
+}
+
+/* Windows 右上角是最小化/关闭的 web 内窗口控件：swapped 抽屉贴右时
+   下移让开标题栏，否则抽屉会盖住窗口控制按钮。 */
+.sidebar-workspace-drawer.is-windows.is-swapped {
+  top: var(--titlebar-height, 44px);
+}
+
+.sidebar-workspace-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 0 0 auto;
+  /* 顶部多留白：贴顶后给 macOS 原生交通灯让位，标题视觉位置与贴边前一致。 */
+  padding: 14px 4px 8px 8px;
+}
+
+.sidebar-workspace-drawer-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.sidebar-workspace-drawer-close {
+  display: grid;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  place-items: center;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  /* 默认隐藏；鼠标进入抽屉右上 header 区域才浮现，键盘 focus 亦可见。 */
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.16s ease,
+    visibility 0s 0.16s;
+}
+
+.sidebar-workspace-drawer-header:hover .sidebar-workspace-drawer-close,
+.sidebar-workspace-drawer-close:focus-visible,
+.sidebar-workspace-drawer-close:focus {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.16s ease, visibility 0s;
+}
+
+.sidebar-workspace-drawer-close:hover,
+.sidebar-workspace-drawer-close:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.sidebar-workspace-drawer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebar-workspace-drawer-body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.sidebar-workspace-drawer
+  .sidebar-workspace-menu-group
+  + .sidebar-workspace-menu-group {
+  margin-top: 10px;
+}
+
+@keyframes sidebar-workspace-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(-36px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes sidebar-workspace-drawer-in-swapped {
+  from {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes sidebar-workspace-drawer-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-workspace-drawer,
+  .sidebar-workspace-drawer-backdrop {
+    animation: none;
+  }
+}
+
 .renderer-context-menu-flyout {
   z-index: 1601;
   width: min(260px, calc(100vw - 24px));
@@ -1095,6 +1251,66 @@
 
 .sidebar-workspace-menu-group-chevron.is-expanded {
   transform: rotate(90deg);
+}
+
+.sidebar-workspace-menu-group-hint {
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint, var(--text-muted));
+  font-size: 10px;
+  font-weight: 520;
+}
+
+.sidebar-workspace-menu-group-help {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-left: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  color: var(--text-faint, var(--text-muted));
+  font-size: 9px;
+  font-weight: 620;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+}
+
+.sidebar-floating-help-tip {
+  position: fixed;
+  z-index: 1215;
+  width: max-content;
+  max-width: 264px;
+  padding: 6px 9px;
+  border: 1px solid var(--border-quiet);
+  border-radius: 8px;
+  background: var(--surface-popover, #1c1c1c);
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
+  animation: sidebar-floating-help-tip-in 120ms ease-out 60ms backwards;
+}
+
+@keyframes sidebar-floating-help-tip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .sidebar-workspace-menu-divider,
@@ -1268,6 +1484,25 @@
   flex: 0 0 auto;
 }
 
+.sidebar-workspace-menu-item-provider {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 560;
+  line-height: 1.1;
+}
+
+.sidebar-workspace-menu-item-provider
+  + .sidebar-workspace-menu-item-submenu-icon {
+  margin-left: 0;
+}
+
 .sidebar-workspace-submenu {
   --sidebar-floating-menu-bg: color-mix(
     in srgb,
@@ -1280,8 +1515,12 @@
   z-index: 1202;
   min-width: 260px;
   max-width: min(320px, calc(100vw - 24px));
-  max-height: min(52vh, 360px);
+  /* 自适应高度：常规供应商列表不出滚动条；超长列表兜底滚动但滚动条隐藏。 */
+  max-height: min(76vh, 640px);
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 6px;
   border-radius: 10px;
   border: 1px solid var(--border-quiet);
@@ -1292,7 +1531,16 @@
   backdrop-filter: blur(14px);
 }
 
+.sidebar-workspace-submenu::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .sidebar-workspace-submenu-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 8px 7px;
   font-size: 12px;
   font-weight: 650;

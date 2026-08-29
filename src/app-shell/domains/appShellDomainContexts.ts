@@ -809,15 +809,22 @@ export function reuseStableAppShellDomainContexts(
     return nextContexts;
   }
   const stable = {} as AppShellDomainContexts;
+  let changed = false;
   for (const domainName of APP_SHELL_DOMAIN_CONTEXT_NAMES) {
-    stable[domainName] = areAppShellDomainContextValuesShallowEqual(
+    const stableDomain = areAppShellDomainContextValuesShallowEqual(
       previousContexts[domainName],
       nextContexts[domainName],
     )
       ? previousContexts[domainName]
       : nextContexts[domainName];
+    stable[domainName] = stableDomain;
+    changed ||= stableDomain !== previousContexts[domainName];
   }
-  return stable;
+  // Domain values may all be stable even when the assembly hook itself reruns
+  // (for example, a sibling Host publishes an unrelated field). Preserve the
+  // outer bag identity too; otherwise every rerun defeats React memo/deferred
+  // boundaries and rebuilds the entire shell for a no-op snapshot.
+  return changed ? stable : previousContexts;
 }
 
 export function findOverlappingAppShellDomainKeys(): string[] {
