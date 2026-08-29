@@ -2770,7 +2770,10 @@ function SidebarImpl({
               onOpenSpecHub={onOpenSpecHub}
               onOpenProjectMemory={onOpenProjectMemory}
               onOpenSettings={onOpenSettings}
-              onOpenSystemProxy={() => setIsSystemProxyDrawerOpen(true)}
+              onToggleSystemProxy={() =>
+                setIsSystemProxyDrawerOpen((open) => !open)
+              }
+              systemProxyDrawerOpen={isSystemProxyDrawerOpen}
               onAppModeChange={onAppModeChange}
               onOpenRuntimeNotice={onOpenRuntimeNotice}
               showRuntimeNotice={showRuntimeNoticeMenuItem}

@@ -622,6 +622,26 @@ describe("Sidebar", () => {
     });
   });
 
+  it("toggles the proxy drawer closed when the pinned network proxy button is clicked again", async () => {
+    render(<Sidebar {...baseProps} />);
+
+    // 先把 Network Proxy 勾选外显为 pinned 按钮
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const dropdown = screen.getByRole("menu");
+    await act(async () => {
+      fireEvent.click(
+        within(dropdown)
+          .getAllByRole("checkbox", { name: "Show next to settings" })[4],
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Network Proxy" }));
+    expect(screen.getByRole("dialog", { name: "Network Proxy" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Network Proxy" }));
+    expect(screen.queryByRole("dialog", { name: "Network Proxy" })).toBeNull();
+  });
+
   it("keeps Market disabled and opens Extensions as a separate mode", () => {
     const onAppModeChange = vi.fn();
     render(<Sidebar {...baseProps} onAppModeChange={onAppModeChange} />);

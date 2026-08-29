@@ -6,7 +6,6 @@ import LayoutDashboard from "lucide-react/dist/esm/icons/layout-dashboard";
 import Lock from "lucide-react/dist/esm/icons/lock";
 import PanelLeftClose from "lucide-react/dist/esm/icons/panel-left-close";
 import Settings from "lucide-react/dist/esm/icons/settings";
-import WavesLadder from "lucide-react/dist/esm/icons/waves-ladder";
 import type { ReactNode, RefObject } from "react";
 import {
   Tooltip,
@@ -19,6 +18,7 @@ import {
   useSidebarSettingsPinnedActions,
   type SidebarSettingsPinnedActionId,
 } from "../hooks/useSidebarSettingsPinnedActions";
+import { SystemProxyIcon } from "./SystemProxyIcon";
 
 type SidebarSettingsMenuProps = {
   isOpen: boolean;
@@ -32,7 +32,10 @@ type SidebarSettingsMenuProps = {
   onOpenSpecHub: () => void;
   onOpenProjectMemory: () => void;
   onOpenSettings: () => void;
-  onOpenSystemProxy: () => void;
+  /** 网络代理抽屉开/关切换（与 pinned 按钮共用；再点一次关闭） */
+  onToggleSystemProxy: () => void;
+  /** 网络代理抽屉当前是否打开，用于菜单项与 pinned 按钮的 active 态 */
+  systemProxyDrawerOpen: boolean;
   onAppModeChange: (mode: AppMode) => void;
   /** 打开侧栏运行时提示面板（入口已收入设置二级菜单，不再外显） */
   onOpenRuntimeNotice?: () => void;
@@ -71,7 +74,8 @@ export function SidebarSettingsMenu({
   onOpenSpecHub,
   onOpenProjectMemory,
   onOpenSettings,
-  onOpenSystemProxy,
+  onToggleSystemProxy,
+  systemProxyDrawerOpen,
   onAppModeChange,
   onOpenRuntimeNotice,
   showRuntimeNotice = false,
@@ -142,11 +146,12 @@ export function SidebarSettingsMenu({
     {
       id: "system-proxy",
       label: t("settings.behaviorProxyTitle"),
-      icon: <WavesLadder size={14} aria-hidden />,
+      icon: <SystemProxyIcon size={14} aria-hidden />,
       onSelect: () => {
         onClose();
-        onOpenSystemProxy();
+        onToggleSystemProxy();
       },
+      active: systemProxyDrawerOpen,
       visible: true,
     },
     {
