@@ -1,7 +1,6 @@
 import Check from "lucide-react/dist/esm/icons/check";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
-import X from "lucide-react/dist/esm/icons/x";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -14,34 +13,6 @@ import {
   readSidebarWorkspaceMenuCollapsedSectionIds,
   toggleSidebarWorkspaceMenuCollapsedSectionId,
 } from "../hooks/useSidebarWorkspaceMenuSectionCollapse";
-
-/** 侧栏可被 layout-swapped 挪到右侧；抽屉跟随侧栏所在侧滑出。 */
-function isSwappedSidebarLayout(): boolean {
-  if (typeof document === "undefined") {
-    return false;
-  }
-  return Boolean(document.querySelector(".app.layout-swapped"));
-}
-
-/** Windows 宿主：右上角是最小化/关闭的 web 内窗口控件，swapped 抽屉需避让。 */
-function isWindowsDesktopHost(): boolean {
-  if (typeof document === "undefined") {
-    return false;
-  }
-  return Boolean(document.querySelector(".app.windows-desktop"));
-}
-
-/**
- * 抽屉宽度跟随侧栏实际宽度（--sidebar-width 设在 .app 上，portal 到 body
- * 的抽屉读不到 CSS 变量，打开时量一次实测值注入）。量不到时回退 CSS 默认。
- */
-function measureSidebarFitWidth(): string | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-  const rect = document.querySelector("aside.sidebar")?.getBoundingClientRect();
-  return rect && rect.width > 0 ? `${Math.round(rect.width)}px` : null;
-}
 
 type SidebarWorkspaceMenuOverlayProps = {
   menu: {
@@ -237,15 +208,13 @@ export function SidebarWorkspaceMenuOverlay({
     : t("sidebar.workspaceActionsGroup");
   // 标题点明所属工作区，避免多项目时不知道这次新建落在哪里。
   const workspaceName = menu.workspace?.name?.trim() || null;
-  const drawerTitle = workspaceName
+  const menuTitle = workspaceName
     ? `${baseTitle} · ${workspaceName}`
     : baseTitle;
-  // 每次渲染重测成本极低（一次 querySelector+gBCR），菜单生命周期内渲染稀疏。
-  const sidebarFitWidth = measureSidebarFitWidth();
 
   const overlay = (
     <div
-      className="sidebar-workspace-menu-backdrop sidebar-workspace-drawer-backdrop"
+      className="sidebar-workspace-menu-backdrop"
       onClick={onClose}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -254,35 +223,15 @@ export function SidebarWorkspaceMenuOverlay({
     >
       <div
         ref={menuRef}
-        className={`sidebar-workspace-drawer${
-          isSwappedSidebarLayout() ? " is-swapped" : ""
-        }${isWindowsDesktopHost() ? " is-windows" : ""}`}
+        className="sidebar-workspace-menu"
         role="menu"
-        aria-label={drawerTitle}
-        style={
-          sidebarFitWidth
-            ? ({ "--sidebar-drawer-fit-width": sidebarFitWidth } as CSSProperties)
-            : undefined
-        }
+        aria-label={menuTitle}
+        style={{ left: menu.x, top: menu.y }}
         onMouseDown={(event) => event.stopPropagation()}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
         onContextMenu={(event) => event.preventDefault()}
       >
-        <header className="sidebar-workspace-drawer-header">
-          <span className="sidebar-workspace-drawer-title">{drawerTitle}</span>
-          <button
-            type="button"
-            className="sidebar-workspace-drawer-close"
-            onClick={onClose}
-            aria-label={t("common.close")}
-            title={t("common.close")}
-            data-tauri-drag-region="false"
-          >
-            <X size={16} aria-hidden />
-          </button>
-        </header>
-        <div className="sidebar-workspace-drawer-body">
         {menu.groups.map((group, groupIndex) => {
           const isCollapsed =
             Boolean(group.collapsible) && collapsedGroupIds.has(group.id);
@@ -504,7 +453,6 @@ export function SidebarWorkspaceMenuOverlay({
             </div>
           );
         })}
-        </div>
       </div>
       {floatingHelpTip ? (
         <div

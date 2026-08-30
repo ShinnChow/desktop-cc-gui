@@ -2010,38 +2010,33 @@ export function useSidebarMenus({
         return isEngineSessionEntryVisible(engine);
       });
 
-      // Shared / Native 拆成两个分组：抽屉里各自带节标题，平级并列。
+      // 贴点小弹窗回归单组布局：Shared CLI 作为首行二级菜单（submenuOnly），
+      // 子项沿用 sharedEngineActions 平铺行（含 Qoder Global/CN 直入行与
+      // providerProfileId 透传，防「选择发行版」二级弹层互抢菜单态的修复不回退）。
       return [
-        ...(sharedEngineActions.length > 0
-          ? [
-              {
-                id: "new-session-shared",
-                label: t("sidebar.newSharedSession"),
-                hint: t("sidebar.sharedCliHint", {
-                  defaultValue: "引擎可切换",
-                }),
-                helpTip: t("sidebar.sharedCliHelp", {
-                  defaultValue:
-                    "多个 CLI 接入同一份对话上下文，中途可切换引擎继续聊",
-                }),
-                collapsible: true,
-                actions: sharedEngineActions,
-              } satisfies WorkspaceMenuGroup,
-            ]
-          : []),
         {
           id: "new-session",
-          label: t("sidebar.nativeCliGroupLabel", {
-            defaultValue: "Native CLI",
-          }),
-          hint: t("sidebar.nativeCliHint", {
-            defaultValue: "引擎固定",
-          }),
-          helpTip: t("sidebar.nativeCliHelp", {
-            defaultValue: "每个会话绑定单一引擎，上下文独立互不共享",
-          }),
-          collapsible: true,
-          actions: visibleActions,
+          label: t("sidebar.sessionActionsGroup"),
+          actions: [
+            ...(sharedEngineActions.length > 0
+              ? [
+                  {
+                    id: "new-session-shared",
+                    label: t("sidebar.newSharedSession"),
+                    iconKind: "new-shared" as const,
+                    unavailable: !onAddSharedAgent,
+                    submenuOnly: true,
+                    onSelect: () => {},
+                    children: sharedEngineActions.map((action) => ({
+                      ...action,
+                      // 子行渲染器只展示 badgeLabel：把记住的供应商透出到 flyout。
+                      badgeLabel: action.badgeLabel ?? action.selectedChildLabel,
+                    })),
+                  },
+                ]
+              : []),
+            ...visibleActions,
+          ],
         } satisfies WorkspaceMenuGroup,
       ];
     },

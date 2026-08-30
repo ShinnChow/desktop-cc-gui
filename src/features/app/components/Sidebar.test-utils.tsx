@@ -36,6 +36,7 @@ vi.mock("react-i18next", () => ({
         "common.cancel": "Cancel",
         "common.delete": "Delete",
         "sidebar.sessionActionsGroup": "New Session",
+        "sidebar.newSharedSession": "Shared CLI",
         "sidebar.newSessionInFolder": "New session in project",
         "sidebar.workspaceActionsGroup": "Workspace actions",
         "sidebar.toggleSearch": "Toggle search",

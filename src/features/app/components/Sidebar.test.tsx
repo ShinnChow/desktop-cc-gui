@@ -1361,7 +1361,7 @@ describe("Sidebar", () => {
     ).toBeNull();
   });
 
-  it("restores locally persisted section collapse across drawer reopens", async () => {
+  it("restores locally persisted section collapse across menu reopens", async () => {
     const workspace = {
       id: "ws-collapse-persist",
       name: "service",
@@ -1388,7 +1388,7 @@ describe("Sidebar", () => {
       />,
     );
 
-    // 第一次打开：折叠 Native CLI 栏。
+    // 第一次打开：折叠「工作区操作」栏（单组 new-session 不再 collapsible）。
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "New Session" }));
       await Promise.resolve();
@@ -1398,22 +1398,24 @@ describe("Sidebar", () => {
     expect(
       screen.getByRole("menu", { name: "New Session · service" }),
     ).toBeTruthy();
-    // 测试环境无翻译：native 栏标题 name 即 i18n key。
+    // 测试环境有翻译：工作区操作栏标题为 stub 文案。
     fireEvent.click(
-      within(menu).getByRole("button", { name: /sidebar\.nativeCliGroupLabel/ }),
+      within(menu).getByRole("button", {
+        name: "Workspace actions",
+      }),
     );
-    const nativeGroupBody = document.getElementById(
-      "sidebar-workspace-menu-group-new-session",
+    const workspaceActionsBody = document.getElementById(
+      "sidebar-workspace-menu-group-workspace-actions",
     );
-    expect(nativeGroupBody?.hasAttribute("hidden")).toBe(true);
+    expect(workspaceActionsBody?.hasAttribute("hidden")).toBe(true);
 
-    // 关闭抽屉（点击遮罩）。
-    const backdrop = document.querySelector(".sidebar-workspace-drawer-backdrop");
+    // 关闭弹窗（点击遮罩）。
+    const backdrop = document.querySelector(".sidebar-workspace-menu-backdrop");
     expect(backdrop).toBeTruthy();
     fireEvent.click(backdrop as Element);
     expect(screen.queryByRole("menu", { name: "New Session" })).toBeNull();
 
-    // 重新打开：Native CLI 应保持折叠。
+    // 重新打开：「工作区操作」应保持折叠。
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "New Session" }));
       await Promise.resolve();
@@ -1421,12 +1423,14 @@ describe("Sidebar", () => {
     const reopened = screen.getByRole("menu", { name: /New Session/ });
     expect(
       within(reopened)
-        .getByRole("button", { name: /sidebar\.nativeCliGroupLabel/ })
+        .getByRole("button", {
+          name: "Workspace actions",
+        })
         .getAttribute("aria-expanded"),
     ).toBe("false");
     expect(
       document
-        .getElementById("sidebar-workspace-menu-group-new-session")
+        .getElementById("sidebar-workspace-menu-group-workspace-actions")
         ?.hasAttribute("hidden"),
     ).toBe(true);
   });
@@ -3490,13 +3494,21 @@ describe("Sidebar", () => {
     fireEvent.click(
       within(folderRow).getByRole("button", { name: "New session in project" }),
     );
-    // Shared CLI 已平铺成分组行：直接在 shared 分组容器内点 Claude Code。
+    // Shared CLI 回归首行二级菜单：点父行展开 flyout，再点其中的 Claude Code。
     await act(async () => {
-      const sharedGroupBody = document.getElementById(
-        "sidebar-workspace-menu-group-new-session-shared",
+      const sessionGroupBody = document.getElementById(
+        "sidebar-workspace-menu-group-new-session",
       );
       fireEvent.click(
-        within(sharedGroupBody!).getByRole("menuitem", { name: "Claude Code" }),
+        within(sessionGroupBody!).getByRole("menuitem", {
+          name: /Shared CLI/,
+        }),
+      );
+    });
+    await act(async () => {
+      fireEvent.click(
+        // 子行名带 badgeLabel（记住的供应商），用正则匹配引擎名。
+        screen.getByRole("menuitemradio", { name: /Claude Code/ }),
       );
     });
 

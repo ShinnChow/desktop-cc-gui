@@ -77,8 +77,21 @@ describe("SidebarWorkspaceMenuOverlay", () => {
     resetClientStorageForTests();
   });
 
-  it("renders Shared CLI engines as flat rows in their own group and runs the picked engine", () => {
-    const sharedEngineAction = createSharedEngineAction();
+  it("runs the picked engine from the Shared CLI flyout submenu", () => {
+    const sharedEngineChild: WorkspaceMenuAction = {
+      id: "new-session-shared-grok",
+      label: "Grok CLI",
+      iconKind: "engine-grok",
+      onSelect: vi.fn(),
+    };
+    const sharedParent: WorkspaceMenuAction = {
+      id: "new-session-shared",
+      label: "Shared CLI",
+      iconKind: "new-shared",
+      submenuOnly: true,
+      onSelect: vi.fn(),
+      children: [sharedEngineChild],
+    };
     const onAction = vi.fn();
 
     render(
@@ -88,9 +101,9 @@ describe("SidebarWorkspaceMenuOverlay", () => {
           y: 28,
           groups: [
             {
-              id: "new-session-shared",
-              label: "Shared CLI",
-              actions: [sharedEngineAction],
+              id: "new-session",
+              label: "New session",
+              actions: [sharedParent],
             },
           ],
         }}
@@ -101,13 +114,17 @@ describe("SidebarWorkspaceMenuOverlay", () => {
       />,
     );
 
-    expect(screen.getByText("Shared CLI")).toBeTruthy();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Grok CLI" }));
+    // 父行 submenuOnly：点击只展开 flyout，不触发动作。
+    fireEvent.click(screen.getByRole("menuitem", { name: "Shared CLI" }));
+    expect(onAction).not.toHaveBeenCalled();
+    expect(sharedParent.onSelect).not.toHaveBeenCalled();
 
-    expect(onAction).toHaveBeenCalledWith(sharedEngineAction);
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Grok CLI" }));
+
+    expect(onAction).toHaveBeenCalledWith(sharedEngineChild);
   });
 
-  it("scopes the drawer title to the workspace and renders section hints", () => {
+  it("scopes the menu label to the workspace and renders section hints", () => {
     const workspaceStub = {
       id: "ws-1",
       name: "guanjia",
@@ -163,7 +180,7 @@ describe("SidebarWorkspaceMenuOverlay", () => {
     ).toBeTruthy();
   });
 
-  it("renders the drawer header with a close button that closes the drawer", () => {
+  it("anchors the popover at the menu coordinates and closes from the backdrop", () => {
     const onClose = vi.fn();
 
     render(
@@ -174,7 +191,7 @@ describe("SidebarWorkspaceMenuOverlay", () => {
           groups: [
             {
               id: "new-session",
-              label: "Native CLI",
+              label: "New session",
               actions: [createCodexAction()],
             },
           ],
@@ -186,46 +203,16 @@ describe("SidebarWorkspaceMenuOverlay", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("menu", { name: "New session" }),
-    ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    const menu = screen.getByRole("menu", { name: "New session" });
+    expect(menu.classList.contains("sidebar-workspace-menu")).toBe(true);
+    // 贴点定位：弹窗出现在触发坐标处，而不是从侧栏顶部滑出。
+    expect(menu.style.left).toBe("32px");
+    expect(menu.style.top).toBe("28px");
+    expect(document.querySelector(".sidebar-workspace-drawer")).toBeNull();
+
+    fireEvent.click(document.querySelector(".sidebar-workspace-menu-backdrop") as Element);
 
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it("slides the drawer from the right edge when the sidebar layout is swapped", () => {
-    const swappedApp = document.createElement("div");
-    swappedApp.className = "app layout-swapped";
-    document.body.appendChild(swappedApp);
-
-    try {
-      render(
-        <SidebarWorkspaceMenuOverlay
-          menu={{
-            x: 32,
-            y: 28,
-            groups: [
-              {
-                id: "new-session",
-                label: "Native CLI",
-                actions: [createCodexAction()],
-              },
-            ],
-          }}
-          t={t}
-          onClose={vi.fn()}
-          onAction={vi.fn()}
-          renderIcon={() => null}
-        />,
-      );
-
-      const drawer = document.querySelector(".sidebar-workspace-drawer");
-      expect(drawer).toBeTruthy();
-      expect(drawer?.classList.contains("is-swapped")).toBe(true);
-    } finally {
-      swappedApp.remove();
-    }
   });
 
   it("still opens an unavailable parent submenu so the user can pick another provider", () => {

@@ -629,35 +629,32 @@ describe("useSidebarMenus", () => {
     expect(sessionActionIds).not.toContain("new-session-grok");
     expect(sessionActionIds).not.toContain("new-session-gemini");
 
-    expect(sessionActionIds).not.toContain("new-session-shared");
-
-    const sharedGroup = result.current.workspaceMenuState?.groups.find(
-      (group) => group.id === "new-session-shared",
+    // 单组布局：Shared CLI 是首行 submenuOnly 父行，shared 引擎平铺行为其 children。
+    const sharedParent = sessionActions.find(
+      (action) => action.id === "new-session-shared",
     );
-    expect(sharedGroup?.collapsible).toBe(true);
-    expect(typeof sharedGroup?.helpTip).toBe("string");
-    expect(sharedGroup?.helpTip?.length).toBeGreaterThan(0);
-    expect(sharedGroup?.actions.map((action) => action.id)).toEqual([
+    expect(sharedParent?.submenuOnly).toBe(true);
+    expect(sharedParent?.children?.map((action) => action.id)).toEqual([
       "new-session-shared-claude",
       "new-session-shared-codex",
       "new-session-shared-pi",
       "new-session-shared-qoder-global",
       "new-session-shared-qoder-cn",
     ]);
-    // shared 行与对应 native 行的供应商 label 同源（记住的供应商）。
-    const sharedClaude = sharedGroup?.actions.find(
+    // shared 子行与对应 native 行的供应商 label 同源（记住的供应商）。
+    const sharedClaude = sharedParent?.children?.find(
       (action) => action.id === "new-session-shared-claude",
     );
-    const nativeClaude = result.current.workspaceMenuState?.groups
-      .find((group) => group.id === "new-session")
-      ?.actions.find((action) => action.id === "new-session-claude");
+    const nativeClaude = sessionActions.find(
+      (action) => action.id === "new-session-claude",
+    );
     expect(sharedClaude?.selectedChildLabel).toBeDefined();
     expect(sharedClaude?.selectedChildLabel).toEqual(
       nativeClaude?.selectedChildLabel,
     );
     // pi/qoder 无供应商记忆，不出 label。
     expect(
-      sharedGroup?.actions.find(
+      sharedParent?.children?.find(
         (action) => action.id === "new-session-shared-pi",
       )?.selectedChildLabel,
     ).toBeUndefined();
@@ -686,11 +683,10 @@ describe("useSidebarMenus", () => {
     expect(sessionActionIds).not.toContain("new-session-shared");
     expect(sessionActionIds).not.toContain("new-session-claude");
     expect(sessionActionIds).not.toContain("new-session-codex");
+    // shared 引擎全停用：不再出现独立 shared 分组（单组内也无 Shared CLI 父行）。
     expect(
-      result.current.workspaceMenuState?.groups.find(
-        (group) => group.id === "new-session-shared",
-      ),
-    ).toBeUndefined();
+      result.current.workspaceMenuState?.groups.map((group) => group.id),
+    ).toEqual(["new-session", "workspace-actions"]);
   });
 
   it("moves workspace quick actions into the workspace actions menu group", async () => {
@@ -2700,11 +2696,11 @@ describe("useSidebarMenus", () => {
       result.current.showWorkspaceMenu(event, workspace);
     });
 
-    const sharedGroup = result.current.workspaceMenuState?.groups.find(
-      (group) => group.id === "new-session-shared",
-    );
+    const sharedParent = result.current.workspaceMenuState?.groups
+      .find((group) => group.id === "new-session")
+      ?.actions.find((action) => action.id === "new-session-shared");
 
-    expect(sharedGroup?.actions.map((action) => action.id)).toEqual([
+    expect(sharedParent?.children?.map((action) => action.id)).toEqual([
       "new-session-shared-claude",
       "new-session-shared-codex",
       "new-session-shared-opencode",
@@ -2715,7 +2711,7 @@ describe("useSidebarMenus", () => {
       "new-session-shared-qoder-cn",
     ]);
 
-    const grokAction = sharedGroup?.actions.find(
+    const grokAction = sharedParent?.children?.find(
       (action) => action.id === "new-session-shared-grok",
     );
     expect(grokAction).toBeTruthy();
@@ -2742,12 +2738,10 @@ describe("useSidebarMenus", () => {
       result.current.showWorkspaceMenu(event, workspace);
     });
 
-    const sharedGroup = result.current.workspaceMenuState?.groups.find(
-      (group) => group.id === "new-session-shared",
-    );
-    const qoderCnAction = sharedGroup?.actions.find(
-      (action) => action.id === "new-session-shared-qoder-cn",
-    );
+    const qoderCnAction = result.current.workspaceMenuState?.groups
+      .find((group) => group.id === "new-session")
+      ?.actions.find((action) => action.id === "new-session-shared")
+      ?.children?.find((action) => action.id === "new-session-shared-qoder-cn");
     expect(qoderCnAction).toBeTruthy();
 
     await act(async () => {
@@ -2926,13 +2920,16 @@ describe("useSidebarMenus", () => {
     });
 
     expect(result.current.workspaceMenuState?.groups.map((group) => group.id)).toEqual([
-      "new-session-shared",
       "new-session",
     ]);
-    expect(
+    const sessionActions =
       result.current.workspaceMenuState?.groups
-        .find((group) => group.id === "new-session-shared")
-        ?.actions.map((action) => action.id),
+        .find((group) => group.id === "new-session")
+        ?.actions ?? [];
+    expect(
+      sessionActions
+        .find((action) => action.id === "new-session-shared")
+        ?.children?.map((action) => action.id),
     ).toEqual([
       "new-session-shared-claude",
       "new-session-shared-codex",
@@ -2943,11 +2940,8 @@ describe("useSidebarMenus", () => {
       "new-session-shared-qoder-global",
       "new-session-shared-qoder-cn",
     ]);
-    expect(
-      result.current.workspaceMenuState?.groups
-        .find((group) => group.id === "new-session")
-        ?.actions.map((action) => action.id),
-    ).toEqual([
+    expect(sessionActions.map((action) => action.id)).toEqual([
+      "new-session-shared",
       "new-session-claude",
       "new-session-codex",
       "new-session-opencode",
