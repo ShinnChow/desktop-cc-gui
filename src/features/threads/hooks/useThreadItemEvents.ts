@@ -75,8 +75,24 @@ import {
   setBackgroundTaskUpdateSink,
 } from "../../messages/utils/backgroundTaskStore";
 import { inferEngineFromLegacyThreadId } from "../contracts/engineRuntimeIdentity";
+import {
+  canProgressEventStartProcessing,
+  createDebugPreview,
+  isClaudeStreamDebugEnabled,
+  isClaudeThread,
+  inferItemEngineSource,
+  isDshEventThread,
+  isGeminiEventThread,
+  isGrokEventThread,
+  isInterruptedThread,
+  isKimiEventThread,
+  isPiEventThread,
+  isQoderEventThread,
+  readHighResolutionNowMs,
+  type ReasoningEngineHint,
+} from "./threadItemEventPredicates";
+export { canProgressEventStartProcessing } from "./threadItemEventPredicates";
 
-const CLAUDE_STREAM_DEBUG_FLAG_KEY = "ccgui.debug.claude.stream";
 // A4 流式正文外部化（docs/perf/a4-live-text-externalization-plan.md）：
 // 模块加载时读一次，翻转 flag 需刷新页面（与其余 perf flag 同语义）。
 const LIVE_TEXT_EXTERNALIZATION_ENABLED = isLiveTextExternalizationEnabled();
@@ -89,168 +105,6 @@ const LIVE_DELTA_EXTERNALIZATION_ENABLED = isLiveDeltaExternalizationEnabled();
  * Claude/Gemini/Kimi/OpenCode threads use "<engine>:" or "<engine>-pending-" prefixes.
  */
 const inferEngineFromThreadId = inferEngineFromLegacyThreadId;
-
-export function canProgressEventStartProcessing(
-  engine:
-    | "claude"
-    | "codex"
-    | "gemini"
-    | "grok"
-    | "kimi"
-    | "opencode"
-    | "pi"
-    | "dsh"
-    | "qoder",
-) {
-  return engine !== "codex";
-}
-
-function isClaudeThread(threadId: string) {
-  return (
-    threadId.startsWith("claude:") || threadId.startsWith("claude-pending-")
-  );
-}
-
-function isGeminiThread(threadId: string) {
-  return (
-    threadId.startsWith("gemini:") || threadId.startsWith("gemini-pending-")
-  );
-}
-
-function isGrokThread(threadId: string) {
-  return threadId.startsWith("grok:") || threadId.startsWith("grok-pending-");
-}
-
-function isKimiThread(threadId: string) {
-  return threadId.startsWith("kimi:") || threadId.startsWith("kimi-pending-");
-}
-
-function isDshThread(threadId: string) {
-  return threadId.startsWith("dsh:") || threadId.startsWith("dsh-pending-");
-}
-
-function isPiThread(threadId: string) {
-  return threadId.startsWith("pi:") || threadId.startsWith("pi-pending-");
-}
-
-function isQoderThread(threadId: string) {
-  return threadId.startsWith("qoder:") || threadId.startsWith("qoder-pending-");
-}
-
-function readHighResolutionNowMs() {
-  return typeof performance !== "undefined" ? performance.now() : Date.now();
-}
-
-type ReasoningEngineHint =
-  | "gemini"
-  | "grok"
-  | "kimi"
-  | "pi"
-  | "dsh"
-  | "qoder"
-  | null;
-
-function isGeminiEventThread(
-  threadId: string,
-  engineHint?: ReasoningEngineHint,
-) {
-  return engineHint === "gemini" || isGeminiThread(threadId);
-}
-
-function isGrokEventThread(threadId: string, engineHint?: ReasoningEngineHint) {
-  return engineHint === "grok" || isGrokThread(threadId);
-}
-
-function isKimiEventThread(threadId: string, engineHint?: ReasoningEngineHint) {
-  return engineHint === "kimi" || isKimiThread(threadId);
-}
-
-function isDshEventThread(threadId: string, engineHint?: ReasoningEngineHint) {
-  return engineHint === "dsh" || isDshThread(threadId);
-}
-
-function isPiEventThread(threadId: string, engineHint?: ReasoningEngineHint) {
-  return engineHint === "pi" || isPiThread(threadId);
-}
-
-function isQoderEventThread(
-  threadId: string,
-  engineHint?: ReasoningEngineHint,
-) {
-  return engineHint === "qoder" || isQoderThread(threadId);
-}
-
-function inferItemEngineSource(
-  item: Record<string, unknown>,
-  threadId: string,
-):
-  | "claude"
-  | "codex"
-  | "gemini"
-  | "grok"
-  | "kimi"
-  | "opencode"
-  | "pi"
-  | "dsh"
-  | "qoder" {
-  const rawEngineSource = asString(
-    item.engineSource ?? item.engine_source ?? "",
-  )
-    .trim()
-    .toLowerCase();
-  if (
-    rawEngineSource === "claude" ||
-    rawEngineSource === "codex" ||
-    rawEngineSource === "gemini" ||
-    rawEngineSource === "grok" ||
-    rawEngineSource === "kimi" ||
-    rawEngineSource === "opencode" ||
-    rawEngineSource === "pi" ||
-    rawEngineSource === "dsh" ||
-    rawEngineSource === "qoder"
-  ) {
-    return rawEngineSource;
-  }
-  return inferEngineFromThreadId(threadId);
-}
-
-function isInterruptedThread(
-  interruptedThreadsRef: MutableRefObject<WorkspaceScopedMap<true>>,
-  workspaceId: string | null,
-  threadId: string,
-) {
-  return workspaceScopedHas(
-    interruptedThreadsRef.current,
-    workspaceId,
-    threadId,
-  );
-}
-
-function isClaudeStreamDebugEnabled() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  try {
-    const value = window.localStorage.getItem(CLAUDE_STREAM_DEBUG_FLAG_KEY);
-    if (!value) {
-      return false;
-    }
-    const normalized = value.trim().toLowerCase();
-    return normalized === "1" || normalized === "true" || normalized === "on";
-  } catch {
-    return false;
-  }
-}
-
-function createDebugPreview(value: string, maxLength = 160) {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return "";
-  }
-  return normalized.length > maxLength
-    ? `${normalized.slice(0, maxLength)}...`
-    : normalized;
-}
 
 type UseThreadItemEventsOptions = {
   activeThreadId: string | null;

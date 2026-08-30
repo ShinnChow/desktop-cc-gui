@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T16:40:21.215Z",
+  "generatedAt": "2026-08-30T16:56:47.517Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -554,16 +554,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src/features/threads/hooks/useThreadItemEvents.ts",
-      "lines": 2668,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src/features/settings/components/settings-view/sections/SessionManagementSection.tsx",
       "lines": 2648,
       "type": "ts/tsx",
@@ -650,6 +640,16 @@
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
       "warnThreshold": 2200,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/threads/hooks/useThreadItemEvents.ts",
+      "lines": 2522,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -796,16 +796,6 @@
     {
       "path": "src/features/threads/hooks/useThreadActionsResumeThread.ts",
       "lines": 2293,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/threads/hooks/useQueuedSend.ts",
-      "lines": 2287,
       "type": "ts/tsx",
       "policyId": "feature-hotpath",
       "priority": "P1",
@@ -2414,6 +2404,16 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
+      "path": "src/features/threads/hooks/useQueuedSend.ts",
+      "lines": 1164,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
       "path": "src/features/status-panel/hooks/useStatusPanelData.ts",
       "lines": 1149,
       "type": "ts/tsx",
@@ -3310,6 +3310,16 @@
       "policyId": "test-files",
       "priority": "P2",
       "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/threads/hooks/useQueueDrainEffects.ts",
+      "lines": 916,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
