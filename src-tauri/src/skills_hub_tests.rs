@@ -384,7 +384,9 @@ fn skill_block_line(ts: &str, blocks: &[(&str, &str)], usage: &str) -> String {
     let content: Vec<String> = blocks
         .iter()
         .map(|(id, skill)| {
-            format!(r#"{{"type":"tool_use","name":"Skill","id":"{id}","input":{{"skill":"{skill}"}}}}"#)
+            format!(
+                r#"{{"type":"tool_use","name":"Skill","id":"{id}","input":{{"skill":"{skill}"}}}}"#
+            )
         })
         .collect();
     format!(

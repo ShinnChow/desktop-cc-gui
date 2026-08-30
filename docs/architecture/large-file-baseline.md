@@ -8,10 +8,10 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T15:21:23.929Z
+- Generated at: 2026-08-30T15:35:38.952Z
 - Scope: fail
 - Policy version: 2026-08-30.policy-v5
-- Count: 49
+- Count: 48
 
 | File | Lines | Type | Policy | Priority | Warn | Fail | Severity | Status | Baseline | Delta |
 |---|---:|---|---|---|---:|---:|---|---|---:|---:|
@@ -52,7 +52,6 @@ status: generated
 | `src/features/threads/loaders/historyLoaders.test.ts` | 3089 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadEventHandlers.test.ts` | 3078 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/styles/diff.css` | 3077 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
-| `src-tauri/src/bin/cc_gui_daemon.rs` | 3076 | rust | default-source | P1 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadActions.ts` | 3066 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
 | `src/styles/messages.part1.css` | 3035 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src/features/app/hooks/useSidebarMenus.test.tsx` | 3032 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |

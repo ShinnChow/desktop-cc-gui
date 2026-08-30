@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T15:21:24.785Z",
+  "generatedAt": "2026-08-30T15:35:39.825Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -374,16 +374,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src-tauri/src/bin/cc_gui_daemon.rs",
-      "lines": 3076,
-      "type": "rust",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src/features/threads/hooks/useThreadActions.ts",
       "lines": 3066,
       "type": "ts/tsx",
@@ -666,6 +656,16 @@
     {
       "path": "src-tauri/src/local_usage/tests.rs",
       "lines": 2577,
+      "type": "rust",
+      "policyId": "default-source",
+      "priority": "P1",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/bin/cc_gui_daemon.rs",
+      "lines": 2562,
       "type": "rust",
       "policyId": "default-source",
       "priority": "P1",
