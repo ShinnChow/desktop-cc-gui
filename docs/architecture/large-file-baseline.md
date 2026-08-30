@@ -8,10 +8,10 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T14:59:25.907Z
+- Generated at: 2026-08-30T15:10:12.610Z
 - Scope: fail
 - Policy version: 2026-08-30.policy-v5
-- Count: 51
+- Count: 50
 
 | File | Lines | Type | Policy | Priority | Warn | Fail | Severity | Status | Baseline | Delta |
 |---|---:|---|---|---|---:|---:|---|---|---:|---:|
@@ -61,7 +61,6 @@ status: generated
 | `src/styles/file-view-panel.css` | 2980 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src-tauri/src/engine/claude_history.rs` | 2881 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/hooks/useGitHistoryPanelInteractions.tsx` | 2878 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
-| `src-tauri/src/types.rs` | 2828 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src-tauri/src/git/mod.rs` | 2720 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src-tauri/src/shared_runtime_coordinator.rs` | 2670 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src/features/settings/components/settings-view/sections/SessionManagementSection.tsx` | 2648 | ts/tsx | settings-view-sections | P1 | 1500 | 2000 | fail | captured |  |  |

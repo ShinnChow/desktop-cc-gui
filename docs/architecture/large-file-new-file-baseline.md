@@ -8,7 +8,7 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T14:59:26.833Z
+- Generated at: 2026-08-30T15:10:13.488Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
 - Count: 388
@@ -63,7 +63,6 @@ status: generated
 | `src-tauri/src/engine/claude_history.rs` | 2881 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/hooks/useGitHistoryPanelInteractions.tsx` | 2878 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/app/components/Sidebar.tsx` | 2847 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
-| `src-tauri/src/types.rs` | 2828 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/session-activity/components/WorkspaceSessionActivityPanel.test.tsx` | 2821 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/project_map_api_contracts.rs` | 2793 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/styles/multi-agent.css` | 2789 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
@@ -233,6 +232,7 @@ status: generated
 | `src/features/note-cards/components/WorkspaceNoteCardPanel.tsx` | 1323 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/shared_projection/projector.rs` | 1322 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadMessagingSessionTooling.ts` | 1319 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
+| `src-tauri/src/types/settings.rs` | 1308 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/files/components/FileViewBody.tsx` | 1305 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/app-shell/sections/useWorkspaceThreadListHydration.test.tsx` | 1303 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/shared-session/runtime/sendSharedSessionTurnV2.test.ts` | 1300 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |

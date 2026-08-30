@@ -461,7 +461,7 @@ mod storage;
 #[path = "../text_encoding.rs"]
 mod text_encoding;
 #[allow(dead_code)]
-#[path = "../types.rs"]
+#[path = "../types/mod.rs"]
 mod types;
 #[path = "../utils.rs"]
 mod utils;
