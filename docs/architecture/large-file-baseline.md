@@ -8,16 +8,16 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T16:58:02.033Z
+- Generated at: 2026-08-30T17:24:11.579Z
 - Scope: fail
 - Policy version: 2026-08-30.policy-v5
 - Count: 47
 
 | File | Lines | Type | Policy | Priority | Warn | Fail | Severity | Status | Baseline | Delta |
 |---|---:|---|---|---|---:|---:|---|---|---:|---:|
-| `src-tauri/src/engine/commands.rs` | 5432 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src-tauri/src/shared_session_v2.rs` | 5349 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src-tauri/src/bin/cc_gui_daemon/daemon_state.rs` | 5339 | rust | default-source | P1 | 2600 | 3000 | fail | captured |  |  |
+| `src-tauri/src/engine/commands.rs` | 5047 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/components/GitHistoryPanelImpl.tsx` | 4933 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadMessaging.ts` | 4600 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
 | `src/features/app/hooks/useAppServerEvents.test.tsx` | 4327 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |

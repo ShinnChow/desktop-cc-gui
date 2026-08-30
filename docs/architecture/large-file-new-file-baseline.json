@@ -1,18 +1,8 @@
 {
-  "generatedAt": "2026-08-30T16:58:03.038Z",
+  "generatedAt": "2026-08-30T17:24:12.514Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
-    {
-      "path": "src-tauri/src/engine/commands.rs",
-      "lines": 5432,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
     {
       "path": "src-tauri/src/shared_session_v2.rs",
       "lines": 5349,
@@ -30,6 +20,16 @@
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/engine/commands.rs",
+      "lines": 5047,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -524,16 +524,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src/features/app/hooks/useSidebarMenus.ts",
-      "lines": 2688,
-      "type": "ts/tsx",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src/features/session-activity/components/WorkspaceSessionActivityPanel.tsx",
       "lines": 2679,
       "type": "ts/tsx",
@@ -644,16 +634,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src/features/threads/hooks/useThreadItemEvents.ts",
-      "lines": 2522,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src-tauri/src/codex/installer.rs",
       "lines": 2512,
       "type": "rust",
@@ -730,6 +710,16 @@
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
       "warnThreshold": 2200,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/app/hooks/useSidebarMenus.ts",
+      "lines": 2387,
+      "type": "ts/tsx",
+      "policyId": "default-source",
+      "priority": "P1",
+      "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -1426,6 +1416,16 @@
     {
       "path": "src/features/threads/hooks/useThreadTurnEvents.ts",
       "lines": 1732,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/threads/hooks/useThreadItemEvents.ts",
+      "lines": 1726,
       "type": "ts/tsx",
       "policyId": "feature-hotpath",
       "priority": "P1",
