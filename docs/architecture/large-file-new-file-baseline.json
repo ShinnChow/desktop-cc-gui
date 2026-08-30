@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T15:35:39.825Z",
+  "generatedAt": "2026-08-30T15:51:57.312Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -334,16 +334,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src-tauri/src/codex/mod.rs",
-      "lines": 3120,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src/features/threads/loaders/historyLoaders.test.ts",
       "lines": 3089,
       "type": "ts/tsx",
@@ -596,16 +586,6 @@
     {
       "path": "src/features/threads/hooks/useQueuedSend.ts",
       "lines": 2648,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/threads/hooks/useThreadActions.helpers.ts",
-      "lines": 2646,
       "type": "ts/tsx",
       "policyId": "feature-hotpath",
       "priority": "P1",
@@ -2644,6 +2624,16 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
+      "path": "src/features/threads/hooks/useThreadActions.helpers.recovery.ts",
+      "lines": 1094,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
       "path": "src-tauri/src/engine/claude/user_input.rs",
       "lines": 1093,
       "type": "rust",
@@ -2916,6 +2906,16 @@
     {
       "path": "src/features/composer/components/ChatInputBox/hooks/useProviderTargetCatalogOwners.ts",
       "lines": 994,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/threads/hooks/useThreadActions.helpers.engineSummaries.ts",
+      "lines": 988,
       "type": "ts/tsx",
       "policyId": "feature-hotpath",
       "priority": "P1",

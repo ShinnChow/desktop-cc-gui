@@ -8,7 +8,7 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T15:35:39.823Z
+- Generated at: 2026-08-30T15:51:57.310Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
 - Count: 387
@@ -48,7 +48,6 @@ status: generated
 | `src-tauri/src/local_usage.rs` | 3169 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/files/components/FileViewPanel.tsx` | 3149 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/GitHistoryPanel.test.tsx` | 3134 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
-| `src-tauri/src/codex/mod.rs` | 3120 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/threads/loaders/historyLoaders.test.ts` | 3089 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadEventHandlers.test.ts` | 3078 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/styles/diff.css` | 3077 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
@@ -75,7 +74,6 @@ status: generated
 | `src/features/threads/hooks/useThreadItemEvents.ts` | 2668 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/settings/components/settings-view/sections/SessionManagementSection.tsx` | 2648 | ts/tsx | settings-view-sections | P1 | 1500 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useQueuedSend.ts` | 2648 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
-| `src/features/threads/hooks/useThreadActions.helpers.ts` | 2646 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/files/components/FileTreePanel.tsx` | 2622 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/grok_history.rs` | 2620 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/settings/components/SettingsView.tsx` | 2611 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
@@ -279,6 +277,7 @@ status: generated
 | `src/features/workspaces/hooks/useWorkspaces.ts` | 1105 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/shared/workspace_listing.rs` | 1104 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/models/hooks/useModels.ts` | 1101 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
+| `src/features/threads/hooks/useThreadActions.helpers.recovery.ts` | 1094 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/claude/user_input.rs` | 1093 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/messages/components/Messages.reasoning-render.test.tsx` | 1089 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadActions.native-session-bridges.test.tsx` | 1086 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
@@ -307,6 +306,7 @@ status: generated
 | `src/features/status-panel/components/StatusPanel.tsx` | 999 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/app-shell/sections/useAppShellLayoutNodesSection.test.ts` | 994 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/composer/components/ChatInputBox/hooks/useProviderTargetCatalogOwners.ts` | 994 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
+| `src/features/threads/hooks/useThreadActions.helpers.engineSummaries.ts` | 988 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/app-shell/sections/useAppShellSearchRadarSection.ts` | 986 | ts/tsx | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/dsh/mod.rs` | 984 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `.agents/skills/huashu-design/scripts/html2pptx.js` | 979 | js/jsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
