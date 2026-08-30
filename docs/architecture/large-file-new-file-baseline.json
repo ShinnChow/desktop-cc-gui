@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T15:51:57.312Z",
+  "generatedAt": "2026-08-30T16:01:45.512Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -654,16 +654,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src/features/threads/loaders/claudeHistoryLoader.ts",
-      "lines": 2552,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src-tauri/src/email/session_continuation.rs",
       "lines": 2551,
       "type": "rust",
@@ -1180,6 +1170,16 @@
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
       "warnThreshold": 2200,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/threads/loaders/claudeHistoryLoader.ts",
+      "lines": 1962,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
