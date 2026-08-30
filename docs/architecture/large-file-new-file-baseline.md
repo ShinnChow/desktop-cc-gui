@@ -8,7 +8,7 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T16:02:03.489Z
+- Generated at: 2026-08-30T16:15:47.696Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
 - Count: 387
@@ -132,7 +132,6 @@ status: generated
 | `src/features/project-map/hooks/useProjectMapDataset.test.tsx` | 2006 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/layout/hooks/useLayoutNodes.client-ui-visibility.test.tsx` | 1996 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/gemini_history.rs` | 1977 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
-| `src/features/threads/loaders/claudeHistoryLoader.ts` | 1962 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/threads/utils/streamLatencyDiagnostics.ts` | 1948 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/project-map/components/ProjectMapPanel.tsx` | 1945 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadActions.helpers.test.ts` | 1932 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
@@ -284,6 +283,7 @@ status: generated
 | `src/i18n/locales/en/projectMap.ts` | 1086 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/composer/components/ChatInputBox/ChatInputBoxFooter.tsx` | 1083 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreads.sidebar-cache.test.tsx` | 1077 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
+| `src/features/threads/loaders/claudeHistoryLoader.ts` | 1077 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/composer/components/ChatInputBox/types.ts` | 1068 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/skills.rs` | 1056 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/project_memory/tests.rs` | 1055 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
