@@ -9,6 +9,7 @@ mod settings;
 mod worktree;
 
 pub(crate) use commands::*;
+pub(crate) use worktree::*;
 pub(crate) use open_app::*;
 pub(crate) use external_changes::DetachedExternalChangeRuntime;
 pub(crate) use rewind_export::*;

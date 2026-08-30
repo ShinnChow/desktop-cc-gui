@@ -8,10 +8,10 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T18:44:02.051Z
+- Generated at: 2026-08-30T18:58:57.015Z
 - Scope: fail
 - Policy version: 2026-08-30.policy-v5
-- Count: 43
+- Count: 42
 
 | File | Lines | Type | Policy | Priority | Warn | Fail | Severity | Status | Baseline | Delta |
 |---|---:|---|---|---|---:|---:|---|---|---:|---:|
@@ -44,7 +44,6 @@ status: generated
 | `src/features/files/components/FileViewPanel.tsx` | 3149 | ts/tsx | default-source | P1 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/git-history/components/GitHistoryPanel.test.tsx` | 3134 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/threads/loaders/historyLoaders.test.ts` | 3089 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
-| `src/features/composer/components/Composer.tsx` | 3085 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadEventHandlers.test.ts` | 3078 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/styles/diff.css` | 3077 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadActions.ts` | 3066 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |

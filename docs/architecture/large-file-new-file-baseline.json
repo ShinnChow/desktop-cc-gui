@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T18:44:03.161Z",
+  "generatedAt": "2026-08-30T18:58:57.924Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -294,16 +294,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src/features/composer/components/Composer.tsx",
-      "lines": 3085,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src/features/threads/hooks/useThreadEventHandlers.test.ts",
       "lines": 3078,
       "type": "ts/tsx",
@@ -544,16 +534,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src-tauri/src/workspaces/commands.rs",
-      "lines": 2606,
-      "type": "rust",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src-tauri/src/runtime/mod.rs",
       "lines": 2585,
       "type": "rust",
@@ -570,6 +550,16 @@
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/composer/components/Composer.tsx",
+      "lines": 2573,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -819,6 +809,16 @@
       "type": "ts/tsx",
       "policyId": "test-files",
       "priority": "P2",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/workspaces/commands.rs",
+      "lines": 2224,
+      "type": "rust",
+      "policyId": "default-source",
+      "priority": "P1",
       "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
