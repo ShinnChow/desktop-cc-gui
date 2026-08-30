@@ -20,6 +20,8 @@ export type CanonicalBackgroundTask = {
   endTime?: number | null;
   pid?: number | null;
   error?: string | null;
+  /** 终态通知里的人类可读摘要（`<summary>`/`<result>` 清洗后），实时与历史同源。 */
+  completionText?: string | null;
 };
 
 export type BackgroundTaskCardProps = {
@@ -67,6 +69,8 @@ export function parseBackgroundTaskSnapshot(
       endTime: typeof parsed.endTime === "number" ? parsed.endTime : null,
       pid: typeof parsed.pid === "number" ? parsed.pid : null,
       error: typeof parsed.error === "string" ? parsed.error : null,
+      completionText:
+        typeof parsed.completionText === "string" ? parsed.completionText : null,
     };
   } catch {
     return null;
@@ -109,6 +113,8 @@ export function canonicalBackgroundTaskFromRecord(
     endTime: typeof task.endTime === "number" ? task.endTime : null,
     pid: typeof task.pid === "number" ? task.pid : null,
     error: typeof task.error === "string" ? task.error : null,
+    completionText:
+      typeof task.completionText === "string" ? task.completionText : null,
   };
 }
 
@@ -235,6 +241,13 @@ export const BackgroundTaskCard = memo(function BackgroundTaskCard({
       t("messages.backgroundTaskCardFieldOutput"),
       task?.outputPath,
     );
+    if (task?.completionText) {
+      push(
+        "completion",
+        t("messages.backgroundTaskFoldFieldSummary"),
+        task.completionText,
+      );
+    }
     if (task?.error) {
       push("error", t("messages.backgroundTaskCardFieldError"), task.error);
     }
