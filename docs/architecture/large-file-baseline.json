@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T17:37:32.294Z",
+  "generatedAt": "2026-08-30T18:17:08.582Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -54,16 +54,6 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src/features/composer/components/Composer.tsx",
-      "lines": 4127,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
       "path": "src/features/threads/hooks/useThreadMessaging.test.tsx",
       "lines": 4101,
       "type": "ts/tsx",
@@ -94,26 +84,6 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src-tauri/src/engine/commands.rs",
-      "lines": 3923,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/app/hooks/useAppServerEvents.ts",
-      "lines": 3843,
-      "type": "ts/tsx",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 3000,
-      "thresholdSource": "policy"
-    },
-    {
       "path": "src/features/composer/components/ChatInputBox/selectors/ModelSelect.test.tsx",
       "lines": 3679,
       "type": "ts/tsx",
@@ -141,6 +111,16 @@
       "priority": "P2",
       "warnThreshold": 2600,
       "failThreshold": 3000,
+      "thresholdSource": "policy"
+    },
+    {
+      "path": "src/features/composer/components/Composer.tsx",
+      "lines": 3601,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 2800,
       "thresholdSource": "policy"
     },
     {
