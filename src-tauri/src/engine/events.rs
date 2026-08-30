@@ -1132,6 +1132,23 @@ pub fn engine_event_to_app_server_event_with_turn_context(
                     }
                 }
             } else {
+                // pi：agent_settled 生命周期标记 → thread/runSettled 信号。
+                // pi 的 run 含多个原生 turn，每 turn 一次 turn/completed 会让
+                // 完成音等「整轮结束」语义连响；整轮粒度的消费者监听本信号。
+                if matches!(engine, EngineType::Pi)
+                    && data.get("kind").and_then(Value::as_str) == Some("agent_settled")
+                {
+                    return Some(AppServerEvent {
+                        workspace_id,
+                        message: json!({
+                            "method": "thread/runSettled",
+                            "params": {
+                                "threadId": thread_id,
+                                "turnId": turn_id_context.unwrap_or(""),
+                            }
+                        }),
+                    });
+                }
                 let mut params = match data {
                     Value::Object(map) => map.clone(),
                     _ => {

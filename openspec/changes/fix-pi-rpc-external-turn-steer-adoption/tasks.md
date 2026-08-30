@@ -67,3 +67,23 @@
 ## 10. 发版
 
 - [ ] 重启 dev 客户端后复验：同一会话连续两轮「双后台任务」，两轮实时幕布均须与历史一致（含最终报告）。daemon（安装版）路径下一并复验。
+
+## 11. 复验二轮回归（2026-08-30 下午，未提交，待用户验证后收口）
+
+> 真机复验发现「每段叙述渲染两遍 + 完成音连响 + 响应中卡死（38min）」。
+> 前端 threadSessionLog 实证：A 的唤醒 turn 完成稿在 B 的 turn 活跃时被
+> `turn-mismatch` 拒绝，结算永久丢失。三个叠加缺陷：
+
+- [x] **跨 send turn 串台**：同 resident 广播全体 forwarder 可见，`is_attached_followup_turn` 分支把别的 send 的 run 放进了本 send 线程。修复：pump 在 `PiTurnEvent` 上加 `run_owner` 归属戳，共享纯函数 `is_pi_forwardable_send_turn` 判定「本 send 的 primary/派生/绑定 steer turn」才放行，`is_attached_followup_turn` 及其状态机删除。
+- [x] **前端单 activeTurnId 结算错配**：`onTurnCompleted` 守卫加在途 turn 集合分支（`isRealtimeTurnInFlight`，noteRealtimeTurnStarted 登记 / markRealtimeTurnTerminal 移除），在途集合内的完成稿一律结算；旧 turn 迟到完成稿维持拒绝。其他引擎行为不变（原分支全保留，纯增量）。
+- [x] **完成音连响 + 重复叙述**：完成音改 run 粒度——`agent_settled` 标记经 `events.rs` 中央转换为 `thread/runSettled` 信号，`useAgentSoundNotifications` 对 pi 线程只听它（一次发送一声）；合成 `item/completed` 的 itemId 兜底改回 `gemini_agent_completion_item_id`（最后文本段），完成稿 upsert 进已流式气泡，不再造新 id 渲染第二遍。
+- [ ] 用户复验：多轮工具对话（每段叙述不重复）、双会话交错发送（响应中正常收口）、完成音一次发送一声。
+
+## 13. Windows daemon 构建校验（codex 交叉审查补充，2026-08-30 晚）
+
+- [x] Windows 身份源改用 PowerShell `Get-CimInstance Win32_Process` 完整 ExecutablePath（替代 tasklist 镜像名）；`inspect_daemon_process_freshness` 的 Windows 分支按「大小写不敏感全路径比较」判定：同路径收编、异源终止重建。
+- [x] 修复路径含空格截断缺陷（`C:\Program Files\...` 被首 token 切成 `C:\Program` → 误判异源、每次启动误杀 daemon）：Windows 分支不再按空格切分，unix 分支保留首 token（`ps -o command=` 含参数，需剥参数）。
+- [ ] **Windows 实机验证两场景**：① daemon 安装路径含空格时不再误杀；② PowerShell 被禁用/缺失时流程退化为 Unknown → 收编（语义决策：宁收编不误杀；如需改为"无法确认即重建"须另行评审）。
+- [ ] 已知限制记录：Windows 下"二进制被替换的旧进程"无法用启动时间识别（ps lstart 不可用），兜底 = 安装器停止服务 / 用户重启。
+- [ ] 遗留加固（unix 同类缺陷）：`ps -o command=` 首 token 切分在安装路径含空格时同样会截断（当前默认部署路径无空格，低风险）；加固方向 = 用 expected_path 前缀匹配代替切分。
+- [ ] 遗留（结算层）：`onTurnError` / `onTurnStalled` 未同步在途集合放宽（交错错误场景仍可能拒结算 + 在途条目滞留）；在途集合不随线程 rename 迁移（依赖旧 activeTurnId 分支兜底）。

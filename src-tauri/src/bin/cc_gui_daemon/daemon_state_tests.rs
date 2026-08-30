@@ -38,24 +38,56 @@ fn pi_external_wakeup_without_notification_stays_blocked_after_pending_tasks_cle
 }
 
 #[test]
-fn pi_foreground_native_turns_include_primary_and_derived_ids() {
-    // 实测 pi 0.84.4：run 内每个工具往返都是一个新原生 turn，派生
-    // `{primary}:t{n}` 前台 id。daemon 必须放行 primary 本体与派生 id，
-    // 其余（外部合成 id / 陌生真实 id）不在此列。
-    let primary = "pi-turn-1111";
-    assert!(is_pi_foreground_native_turn(primary, primary));
-    assert!(is_pi_foreground_native_turn(
-        &format!("{primary}:t1"),
-        primary
+fn pi_forwardable_send_turn_accepts_own_primary_and_derived_ids() {
+    // 实测 pi 0.84.4：run 内每个工具往返都是一个新原生 turn。本 send 的
+    // forwarder 放行 primary 本体与自己 run 的派生 id。
+    let mine = "pi-turn-1111";
+    assert!(is_pi_forwardable_send_turn(mine, mine, mine));
+    assert!(is_pi_forwardable_send_turn(
+        mine,
+        &format!("{mine}:t1"),
+        mine
     ));
-    assert!(is_pi_foreground_native_turn(
-        &format!("{primary}:t7"),
-        primary
+    assert!(is_pi_forwardable_send_turn(
+        mine,
+        &format!("{mine}:t7"),
+        mine
     ));
-    assert!(!is_pi_foreground_native_turn("pi-external-1-1", primary));
-    assert!(!is_pi_foreground_native_turn("pi-turn-2222", primary));
-    // 前缀相似但非本 run 的 id 不得误放行。
-    assert!(!is_pi_foreground_native_turn("pi-turn-11119999", primary));
+}
+
+#[test]
+fn pi_forwardable_send_turn_accepts_own_id_bound_into_foreign_run() {
+    // steer 场景：本 send id 被绑定进别的 run（run_owner = 对方 primary），
+    // 回复归属本 send 的线程，waiter 也在本 send 手里 ⇒ 必须放行。
+    let foreign_run = "pi-turn-aaaa";
+    let mine = "pi-turn-1111";
+    assert!(is_pi_forwardable_send_turn(foreign_run, mine, mine));
+}
+
+#[test]
+fn pi_forwardable_send_turn_rejects_foreign_send_runs() {
+    // 同 resident 广播串台防护：别的 send 的 run（其 primary/派生 turn）
+    // 以及陌生 id 一律拒绝——放行会让 A 的 turn 串进 B 的线程，交错结算
+    // 错配后永久丢结算（2026-08-30 响应中卡死实证）。
+    let mine = "pi-turn-1111";
+    let foreign_send = "pi-turn-aaaa";
+    assert!(!is_pi_forwardable_send_turn(
+        foreign_send,
+        &format!("{foreign_send}:t1"),
+        mine
+    ));
+    assert!(!is_pi_forwardable_send_turn(
+        foreign_send,
+        foreign_send,
+        mine
+    ));
+    assert!(!is_pi_forwardable_send_turn(mine, "pi-external-1-1", mine));
+    // 前缀相似但非本 run 的派生 id 不得误放行。
+    assert!(!is_pi_forwardable_send_turn(
+        mine,
+        &format!("{mine}-9999:t1"),
+        mine
+    ));
 }
 
 #[test]

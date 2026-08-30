@@ -291,6 +291,16 @@ type UseThreadTurnEventsOptions = {
     turnId: string | null | undefined,
   ) => string | null;
   getActiveTurnIdForThread?: (threadId: string) => string | null;
+  /**
+   * turnId 是否为本线程当前在途（已 started、未 terminal）的 turn。
+   * 多 turn 交错（pi 双 send/后台唤醒）时，完成稿只要属于在途集合就 MUST
+   * 结算——单 activeTurnId 严格匹配会在交错时错配，永久丢结算导致
+   * 「响应中」卡死（2026-08-30 实证）。
+   */
+  isTurnInFlightForThread?: (
+    threadId: string,
+    turnId: string | null | undefined,
+  ) => boolean;
   getThreadProviderProfileId?: (
     workspaceId: string,
     threadId: string,
@@ -325,6 +335,7 @@ export function useThreadTurnEvents({
   resolvePendingThreadForSession,
   resolvePendingThreadForTurn,
   getActiveTurnIdForThread,
+  isTurnInFlightForThread,
   getThreadProviderProfileId,
   hasEstablishedThreadItems,
   renamePendingMemoryCaptureKey,
@@ -620,7 +631,11 @@ export function useThreadTurnEvents({
         (target) =>
           !turnId ||
           target.activeTurnId === null ||
-          target.activeTurnId === turnId,
+          target.activeTurnId === turnId ||
+          // 多 turn 交错：完成稿属于在途集合即结算，否则错配方永久丢结算
+          // （isProcessing 卡 true → 「响应中」卡死，2026-08-30 实证）。
+          // 旧 turn 的迟到完成稿不在在途集合内，仍按原逻辑拒绝。
+          (isTurnInFlightForThread?.(target.threadId, turnId) ?? false),
       );
       const rejectedTargets = targetSnapshots.filter(
         (target) => !safeTargets.some((safeTarget) => safeTarget.threadId === target.threadId),
@@ -642,6 +657,8 @@ export function useThreadTurnEvents({
         return false;
       }
       safeTargets.forEach(({ threadId: targetThreadId }) => {
+        const hasRemainingInFlight =
+          isTurnInFlightForThread?.(targetThreadId, null) ?? false;
         // A4 live-text 外部化：terminal settlement 必须把通道内「全文」一次写入
         // durable item。只 append shell 后尾段时，若 shell 首 delta 未进 reducer
         // 或 shellTextLength 失真，isStreaming 关闭后 UI 会只剩「已」「**」这类
@@ -651,30 +668,38 @@ export function useThreadTurnEvents({
           type: "clearProcessingGeneratedImages",
           threadId: targetThreadId,
         });
-        dispatch({ type: "markTerminalSettlement", threadId: targetThreadId });
-        dispatch({
-          type: "finalizePendingToolStatuses",
-          threadId: targetThreadId,
-          status: "completed",
-        });
-        dispatch({
-          type: "markContextCompacting",
-          threadId: targetThreadId,
-          isCompacting: false,
-          timestamp: Date.now(),
-        });
-        dispatch({
-          type: "settleThreadPlanInProgress",
-          threadId: targetThreadId,
-          targetStatus: "completed",
-        });
-        markProcessing(targetThreadId, false);
-        setActiveTurnId(targetThreadId, null);
+        if (!hasRemainingInFlight) {
+          dispatch({ type: "markTerminalSettlement", threadId: targetThreadId });
+        }
+        if (!hasRemainingInFlight) {
+          dispatch({
+            type: "finalizePendingToolStatuses",
+            threadId: targetThreadId,
+            status: "completed",
+          });
+          dispatch({
+            type: "markContextCompacting",
+            threadId: targetThreadId,
+            isCompacting: false,
+            timestamp: Date.now(),
+          });
+          dispatch({
+            type: "settleThreadPlanInProgress",
+            threadId: targetThreadId,
+            targetStatus: "completed",
+          });
+        }
+        if (!hasRemainingInFlight) {
+          markProcessing(targetThreadId, false);
+          setActiveTurnId(targetThreadId, null);
+        }
         workspaceScopedDelete(pendingInterruptsRef.current, workspaceId, targetThreadId);
         workspaceScopedDelete(interruptedThreadsRef.current, workspaceId, targetThreadId);
         // 重置分段计数，为下一个 turn 做准备
-        dispatch({ type: "resetAgentSegment", threadId: targetThreadId });
-        dispatch({ type: "markLatestAssistantMessageFinal", threadId: targetThreadId });
+        if (!hasRemainingInFlight) {
+          dispatch({ type: "resetAgentSegment", threadId: targetThreadId });
+          dispatch({ type: "markLatestAssistantMessageFinal", threadId: targetThreadId });
+        }
       });
       emitTurnSettlementAudit("settled", {
         workspaceId,
@@ -701,6 +726,7 @@ export function useThreadTurnEvents({
       emitTurnSettlementAudit,
       getActiveTurnIdForThread,
       interruptedThreadsRef,
+      isTurnInFlightForThread,
       markProcessing,
       pendingInterruptsRef,
       resolvePendingAliasThread,

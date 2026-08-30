@@ -301,6 +301,14 @@ fn inspect_daemon_process_freshness(
     let Some(identity) = read_process_identity(pid).ok().flatten() else {
         return ProcessFreshness::Unknown;
     };
+    // Unix `ps` 返回的是“命令 + 参数”，取首 token；Windows PowerShell 返回
+    // 完整 ExecutablePath，不能按空格切分（例如 `C:\Program Files\...`）。
+    #[cfg(windows)]
+    let running_binary = Some({
+        let path = PathBuf::from(identity.trim());
+        path.canonicalize().unwrap_or(path)
+    });
+    #[cfg(not(windows))]
     let running_binary = identity
         .split_whitespace()
         .next()
@@ -309,13 +317,31 @@ fn inspect_daemon_process_freshness(
     let Some(running_binary) = running_binary else {
         return ProcessFreshness::Unknown;
     };
+
+    // Windows：identity 为 PowerShell 拿到的完整 ExecutablePath（无可靠的
+    // 进程启动时间源，ps lstart 不可用），退化为「大小写不敏感的全路径
+    // 比较」：同路径视为当前构建收编；二进制被替换的旧进程无法据此识别，
+    // 由安装器停止服务/用户重启兜底（已知限制）。异源路径以本 app 的构建
+    // 为准重建。
+    if cfg!(windows) {
+        return if running_binary
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&expected_path.to_string_lossy())
+        {
+            ProcessFreshness::Current
+        } else {
+            ProcessFreshness::Stale
+        };
+    }
+
     if running_binary != expected_path {
         // 异源二进制（dev target/debug vs 安装版 /Applications 等）：
         // 一律以本 app 的构建为准重建。
         return ProcessFreshness::Stale;
     }
     // 同路径：cargo/安装器替换二进制后，老进程内存里仍是旧代码。
-    // 二进制 mtime 晚于进程启动 ⇒ 旧构建。
+    // 二进制 mtime 晚于进程启动 ⇒ 旧构建。ps lstart 输出为 C locale
+    // 英文缩写（macOS/Linux 实证），非 C locale 环境解析失败时保守收编。
     let (Ok(output), Some(binary_modified)) = (
         crate::utils::std_command("ps")
             .arg("-p")
@@ -460,33 +486,23 @@ fn read_process_identity(pid: u32) -> Result<Option<String>, String> {
 
 #[cfg(windows)]
 fn read_process_identity(pid: u32) -> Result<Option<String>, String> {
-    let output = crate::utils::std_command("tasklist")
-        .arg("/FI")
-        .arg(format!("PID eq {pid}"))
-        .arg("/FO")
-        .arg("CSV")
-        .arg("/NH")
+    let output = crate::utils::std_command("powershell")
+        .arg("-NoProfile")
+        .arg("-NonInteractive")
+        .arg("-Command")
+        .arg(format!(
+            "(Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}').ExecutablePath"
+        ))
         .output()
         .map_err(|error| format!("failed to inspect process identity for pid {pid}: {error}"))?;
     if !output.status.success() {
         return Ok(None);
     }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let line = stdout.lines().next().map(str::trim).unwrap_or_default();
-    if line.is_empty() || line.starts_with("INFO:") {
+    let identity = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if identity.is_empty() {
         return Ok(None);
     }
-    let image_name = line
-        .split(',')
-        .next()
-        .map(|value| value.trim_matches('"').trim())
-        .unwrap_or_default()
-        .to_string();
-    if image_name.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(image_name))
-    }
+    Ok(Some(identity))
 }
 
 fn is_moss_daemon_identity(identity: &str) -> bool {

@@ -459,6 +459,11 @@ export function useThreadItemEvents({
   const activeRealtimeTurnIdByThreadRef = useRef<Map<string, string>>(
     new Map(),
   );
+  // 在途 turn 集合（按线程）：多 turn 交错（pi 双 send/后台唤醒）时同一线程
+  // 可同时有多个未结算 turn，结算守卫按集合成员判定而非单 activeTurnId。
+  const inFlightRealtimeTurnIdsByThreadRef = useRef<Map<string, Set<string>>>(
+    new Map(),
+  );
   // 全局已终态 turnId 集合。按 turnId（回合的全局唯一身份）判定终态，
   // 使迟到事件无论落在主线程还是别名线程都能被识别为已结束，避免复燃。
   const terminalRealtimeTurnIdsRef = useRef<Set<string>>(new Set());
@@ -586,6 +591,14 @@ export function useThreadItemEvents({
         return;
       }
       activeRealtimeTurnIdByThreadRef.current.set(threadId, normalizedTurnId);
+      // 在途 turn 集合：同一线程允许多个 turn 流交错（如 pi 同 resident 双
+      // send、后台唤醒 turn 与新 send 交错），结算守卫按集合成员判定而非
+      // 单 activeTurnId，错配不再永久丢结算。
+      const inFlightSet =
+        inFlightRealtimeTurnIdsByThreadRef.current.get(threadId) ??
+        new Set<string>();
+      inFlightSet.add(normalizedTurnId);
+      inFlightRealtimeTurnIdsByThreadRef.current.set(threadId, inFlightSet);
       // 新回合开始：解除该线程的「已结算」态，避免上一回合的结算态
       // 误杀本回合的无 turnId 事件。
       settledRealtimeThreadsRef.current.delete(threadId);
@@ -621,7 +634,22 @@ export function useThreadItemEvents({
         }
         settledThreads.delete(oldestThreadId);
       }
-      activeRealtimeTurnIdByThreadRef.current.delete(threadId);
+      // 该 turn 落终态：移出在途集合（多 turn 交错时其余 turn 不受影响）。
+      const inFlightSet = inFlightRealtimeTurnIdsByThreadRef.current.get(threadId);
+      inFlightSet?.delete(normalizedTurnId);
+      if (!inFlightSet || inFlightSet.size === 0) {
+        inFlightRealtimeTurnIdsByThreadRef.current.delete(threadId);
+        activeRealtimeTurnIdByThreadRef.current.delete(threadId);
+      } else if (
+        activeRealtimeTurnIdByThreadRef.current.get(threadId) === normalizedTurnId
+      ) {
+        // 保留一个仍在途的 turn 作为线程级 active id，避免 A 先结束时把
+        // B 的实时状态清成 null。
+        activeRealtimeTurnIdByThreadRef.current.set(
+          threadId,
+          inFlightSet.values().next().value as string,
+        );
+      }
       // 诊断汇总：本回合期间被终态守卫拦下的迟到事件数（>0 表示确有
       // 迟到事件试图复燃线程，这正是「结束后仍显示生成中」的根因）。
       const droppedLateEvents = droppedLateRealtimeEventCountRef.current;
@@ -650,6 +678,21 @@ export function useThreadItemEvents({
         allowActiveTurnFallback: false,
       }),
     [isRealtimeTurnTerminal],
+  );
+
+  /** turnId 是否为本线程当前在途（已 started、未 terminal）的 turn。 */
+  const isRealtimeTurnInFlight = useCallback(
+    (threadId: string, turnId?: string | null) => {
+      const normalizedTurnId = normalizeTurnId(turnId);
+      if (!threadId) {
+        return false;
+      }
+      const inFlightSet = inFlightRealtimeTurnIdsByThreadRef.current.get(threadId);
+      // 空 turnId 查询线程是否仍有其他 turn 在途。
+      if (!normalizedTurnId) return (inFlightSet?.size ?? 0) > 0;
+      return inFlightSet?.has(normalizedTurnId) ?? false;
+    },
+    [],
   );
 
   const applyRealtimeDeltaOperation = useCallback(
@@ -2617,6 +2660,7 @@ export function useThreadItemEvents({
     __getSubmitScheduleInstrumentationForTests,
     flushPendingRealtimeEvents,
     isRealtimeTurnTerminalExact,
+    isRealtimeTurnInFlight,
     noteRealtimeTurnStarted,
     markRealtimeTurnTerminal,
     drainLiveItemDeltasForThread,

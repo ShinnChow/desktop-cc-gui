@@ -150,6 +150,16 @@ export type AppServerEventHandlers = {
     threadId: string,
     turnId: string,
   ) => void;
+  /**
+   * pi 专属：一个 agent run 彻底 settle（pump `agent_settled` 生命周期标记）。
+   * pi 的 run 含多个原生 turn，完成音等「整轮结束」语义的消费者 MUST 监听
+   * 本信号而非 turn/completed（后者每原生 turn 一次，会连响）。
+   */
+  onThreadRunSettled?: (
+    workspaceId: string,
+    threadId: string,
+    turnId: string,
+  ) => void;
   onProcessingHeartbeat?: (
     workspaceId: string,
     threadId: string,
@@ -2797,6 +2807,21 @@ export function dispatchAppServerEvent(
           ? { executionTargetSnapshot: sharedBridge.executionTargetSnapshot }
           : {}),
       });
+    }
+    return;
+  }
+
+  if (method === "thread/runSettled") {
+    // pi：run 彻底 settle 的生命周期信号（pump agent_settled → 转发器转换）。
+    // 供完成音等「整轮结束」语义消费；不进入 turn 状态机（turn/completed
+    // 已逐原生 turn 结算）。
+    const params = message.params as Record<string, unknown>;
+    const threadId = sharedBridge?.sharedThreadId ?? extractThreadIdFromParams(params);
+    const turnId = asString(
+      params.turnId ?? params.turn_id ?? "",
+    ).trim();
+    if (threadId) {
+      handlers.onThreadRunSettled?.(workspace_id, threadId, turnId);
     }
     return;
   }

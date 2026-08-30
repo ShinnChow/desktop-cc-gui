@@ -31,7 +31,7 @@ use super::events::{engine_event_to_app_server_event_with_turn_context, EngineEv
 use super::grok::resolve_grok_session_id_for_engine_send;
 use super::kimi::resolve_kimi_session_id_for_engine_send;
 use super::pi::{
-    is_pi_agent_settled_marker, is_pi_external_wakeup_allowed, is_pi_foreground_native_turn,
+    is_pi_agent_settled_marker, is_pi_external_wakeup_allowed, is_pi_forwardable_send_turn,
     resolve_pi_session_id_for_engine_send,
 };
 use super::remote_bridge::{
@@ -2971,8 +2971,6 @@ pub async fn engine_send_message(
                         } else {
                             accumulated_agent_text.clone()
                         };
-                        // Always emit agentMessage item/completed so project-memory
-                        // fusion runs after normal TextDelta streaming (Claude-parity).
                         // Use text-lane id so the frontend upserts the streamed bubble.
                         if !completed_text.trim().is_empty() {
                             let completion_item_id =
@@ -3204,8 +3202,6 @@ pub async fn engine_send_message(
                 let mut background_task_aliases = HashMap::<String, String>::new();
                 let mut active_external_wakeup_turn_ids = HashSet::<String>::new();
                 let mut pending_external_wakeup = false;
-                let mut awaiting_attached_followup_turn = false;
-                let mut primary_turn_completed = false;
                 let mut primary_run_settled = false;
                 let mut active_forwarded_turn_id = turn_id_for_forwarder.clone();
                 loop {
@@ -3232,25 +3228,20 @@ pub async fn engine_send_message(
                         pending_external_wakeup,
                         is_known_external_wakeup,
                     );
-                    // 用户自己 run 的后续原生 turn（`{primary}:t{n}`）：普通多轮
-                    // 工具对话里每个 assistant 回合都是一个新原生 turn（实测 pi
-                    // 0.84.4），它们是前台流的一部分，无条件放行——套用外部 turn
-                    // 门控会把第二段回复静默丢掉，实时幕布缺尾、历史重载才完整。
-                    let is_primary_native_turn =
-                        is_pi_foreground_native_turn(&turn_event.turn_id, &turn_id_for_forwarder);
-                    let is_attached_followup_turn = !is_external_turn
-                        && !is_primary_native_turn
-                        && turn_event.turn_id != turn_id_for_forwarder
-                        // 用户 steer 可在 primary turn 结束后、后台任务仍挂起时
-                        // 到达，保持在同一条实时流里。
-                        && (!primary_turn_completed
-                            || !pending_background_tasks.is_empty()
-                            || awaiting_attached_followup_turn);
+                    // run 归属判定（run_owner 戳）：只转发本 send 自己 run 的
+                    // 原生 turn（primary / {primary}:t{n} 派生）与本 send id 被
+                    // 绑定进其他 run 的 steer turn。别的 send 的 run（含其唤醒/
+                    // 派生 turn）一律拒绝——放行会串台到本 send 的线程，前端单
+                    // activeTurnId 结算守卫错配后永久丢结算（2026-08-30 实证）。
+                    let is_my_run_turn = is_pi_forwardable_send_turn(
+                        &turn_event.run_owner,
+                        &turn_event.turn_id,
+                        &turn_id_for_forwarder,
+                    );
                     let is_lifecycle_marker = is_pi_agent_settled_marker(&turn_event.event);
                     if turn_event.turn_id != turn_id_for_forwarder
-                        && !is_primary_native_turn
+                        && !is_my_run_turn
                         && !is_external_wakeup
-                        && !is_attached_followup_turn
                         && !is_lifecycle_marker
                     {
                         continue;
@@ -3295,7 +3286,6 @@ pub async fn engine_send_message(
                         } => {
                             if source == "notification" {
                                 pending_external_wakeup = true;
-                                awaiting_attached_followup_turn = !primary_turn_completed;
                             }
                             let task_id = task.get("id").and_then(Value::as_str);
                             let status = task
@@ -3364,6 +3354,10 @@ pub async fn engine_send_message(
                     let routed_item_id =
                         next_gemini_routed_item_id(&mut render_state, render_lane, &item_id_clone);
 
+                    if let EngineEvent::ToolStarted { .. } = &event {
+                        accumulated_agent_text.clear();
+                    }
+
                     if let EngineEvent::TextDelta { text, .. } = &event {
                         render_state.saw_text_delta = true;
                         accumulated_agent_text.push_str(text);
@@ -3373,15 +3367,11 @@ pub async fn engine_send_message(
                     if let EngineEvent::TurnCompleted { result, .. } = &event {
                         let fallback_text =
                             extract_turn_result_text(result.as_ref()).unwrap_or_default();
-                        let completed_text = if should_prefer_turn_result_text(result.as_ref()) {
-                            fallback_text
-                        } else if accumulated_agent_text.trim().is_empty() {
-                            fallback_text
-                        } else {
+                        let completed_text = if render_state.saw_text_delta {
                             accumulated_agent_text.clone()
+                        } else {
+                            fallback_text
                         };
-                        // Always emit agentMessage item/completed so project-memory
-                        // fusion runs after normal TextDelta streaming (Claude-parity).
                         // Use text-lane id so the frontend upserts the streamed bubble.
                         if !completed_text.trim().is_empty() {
                             let completion_item_id =
@@ -3451,17 +3441,10 @@ pub async fn engine_send_message(
                         }
                     }
 
-                    if is_terminal {
-                        if is_external_turn {
-                            // pending_external_wakeup 保持 true 直到 run settle
-                            // 标记处复位（唤醒 run 自身多原生 turn）。
-                            active_external_wakeup_turn_ids.remove(&turn_event.turn_id);
-                        } else if event_turn_id == turn_id_for_forwarder {
-                            primary_turn_completed = true;
-                            awaiting_attached_followup_turn = false;
-                        } else if is_attached_followup_turn {
-                            awaiting_attached_followup_turn = false;
-                        }
+                    if is_terminal && is_external_turn {
+                        // pending_external_wakeup 保持 true 直到 run settle
+                        // 标记处复位（唤醒 run 自身多原生 turn）。
+                        active_external_wakeup_turn_ids.remove(&turn_event.turn_id);
                     }
                     // break 必须等 pump 的 agent_settled 生命周期标记：第一个
                     // 原生 turn 的 TurnCompleted 后 run 内通常还有后续原生 turn
@@ -3470,7 +3453,6 @@ pub async fn engine_send_message(
                     if primary_run_settled
                         && pending_background_tasks.is_empty()
                         && active_external_wakeup_turn_ids.is_empty()
-                        && (!awaiting_attached_followup_turn || primary_turn_completed)
                     {
                         break;
                     }
@@ -3990,8 +3972,6 @@ pub async fn engine_send_message(
                         } else {
                             accumulated_agent_text.clone()
                         };
-                        // Always emit agentMessage item/completed so project-memory
-                        // fusion runs after normal TextDelta streaming (Claude-parity).
                         // Use text-lane id so the frontend upserts the streamed bubble.
                         if !completed_text.trim().is_empty() {
                             let completion_item_id =

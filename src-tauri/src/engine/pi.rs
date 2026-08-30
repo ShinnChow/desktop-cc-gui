@@ -194,6 +194,12 @@ fn extract_at_file_references(text: &str, workspace_path: &Path) -> AtReferenceE
 #[derive(Debug, Clone)]
 pub struct PiTurnEvent {
     pub turn_id: String,
+    /// 产生本事件的 run 的 main turn id（归属戳）。同一 resident 的广播
+    /// 会被多个 send 的 forwarder 同时收到；转发器据此判定「这是不是我自己
+    /// run 的 turn」，防止别的 send 的唤醒/派生 turn 串台到本 send 的线程
+    /// （2026-08-30 实证：两个 send 交错时，A 的唤醒 turn 泄漏进 B 的
+    /// forwarder，前端单 activeTurnId 结算守卫错配 → 响应中永久卡死）。
+    pub run_owner: String,
     pub event: EngineEvent,
 }
 
@@ -353,11 +359,24 @@ pub(crate) fn is_pi_agent_settled_marker(event: &EngineEvent) -> bool {
     )
 }
 
-/// 用户自己 run 的原生 turn：primary 本体与 `{primary}:t{n}` 派生 id。
-/// 普通多轮工具对话里每个 assistant 回合都是一个新原生 turn（实测 pi
-/// 0.84.4），它们是前台流的一部分，forwarder 必须无条件放行。
-pub(crate) fn is_pi_foreground_native_turn(turn_id: &str, primary_turn_id: &str) -> bool {
-    turn_id == primary_turn_id || turn_id.starts_with(&format!("{primary_turn_id}:"))
+/// forwarder 归属判定（与 `PiTurnEvent.run_owner` 归属戳配套）：一个 send 的
+/// forwarder 只转发——
+/// 1. 自己 send id 的 turn（primary 本体，或 steer 绑定到别的 run 里的自身
+///    turn——waiter 在本 send 手里，回复归属本 send 的线程）；
+/// 2. 自己 run 的派生 turn（`{send}:t{n}`，普通多轮工具对话每回合一个）。
+/// **别的 send 的 run（含其唤醒/派生 turn）一律拒绝**——同一 resident 的
+/// 广播所有 forwarder 都收得到，放行会让 A 的 turn 串台进 B 的线程，前端
+/// 单 activeTurnId 结算守卫错配后永久丢结算（2026-08-30 响应中卡死实证）。
+/// 外部唤醒 turn（`pi-external-*`）与生命周期标记由各自门控单独放行。
+pub(crate) fn is_pi_forwardable_send_turn(
+    run_owner: &str,
+    turn_id: &str,
+    send_turn_id: &str,
+) -> bool {
+    if turn_id == send_turn_id {
+        return true;
+    }
+    run_owner == send_turn_id && turn_id.starts_with(&format!("{send_turn_id}:"))
 }
 
 /// Bind the next native turn inside an active run.
@@ -370,6 +389,13 @@ pub(crate) fn is_pi_foreground_native_turn(turn_id: &str, primary_turn_id: &str)
 ///   0.84.4），daemon 必须无条件放行，不得套用外部门控。
 fn bind_next_native_turn_id(run: &mut PiRpcRun) -> String {
     if let Some(turn_id) = run.pending_turn_ids.pop_front() {
+        if run.orphan {
+            // 外部唤醒期间 attach 的真实用户 turn 接管后续 run；否则下一
+            // 个原生 turn 仍会被错误生成成 pi-external-*，用户回复会丢失。
+            run.orphan = false;
+            run.main_turn_id = turn_id.clone();
+            run.active_turn_id = turn_id.clone();
+        }
         return turn_id;
     }
     if run.orphan {
@@ -1359,6 +1385,8 @@ impl PiSession {
     fn emit_turn_event(&self, turn_id: &str, event: EngineEvent) {
         let _ = self.event_sender.send(PiTurnEvent {
             turn_id: turn_id.to_string(),
+            // 发送边事件（SessionStarted/TurnStarted/结算错误）归属本 send 的 turn。
+            run_owner: turn_id.to_string(),
             event,
         });
     }
@@ -1515,9 +1543,14 @@ impl PiSession {
         let residents = self.residents.clone();
         let workspace_id = self.workspace_id.clone();
         tokio::spawn(async move {
+            // 当前事件所属 run 的归属戳：pump 在每个事件处理时刷新（orphan
+            // 建 run / turn_start 换绑不改变 main），emit 时随事件带出。
+            let current_run_owner = std::sync::Mutex::new(String::new());
             let emit = |turn_id: &str, event: EngineEvent| {
+                let run_owner = current_run_owner.lock().ok().map(|owner| owner.clone());
                 let _ = event_sender.send(PiTurnEvent {
                     turn_id: turn_id.to_string(),
+                    run_owner: run_owner.unwrap_or_default(),
                     event,
                 });
             };
@@ -1609,6 +1642,7 @@ impl PiSession {
                         let Some(run) = guard.as_mut() else {
                             continue;
                         };
+                        *current_run_owner.lock().unwrap() = run.main_turn_id.clone();
                         let turn_id = run.active_turn_id.clone();
                         match parse_pi_stream_line(&value) {
                             PiStreamLine::TurnStart => {
@@ -1979,6 +2013,7 @@ impl PiSession {
                                 &|turn_id, event| {
                                     let _ = self.event_sender.send(PiTurnEvent {
                                         turn_id: turn_id.to_string(),
+                                        run_owner: turn_id.to_string(),
                                         event,
                                     });
                                 },
@@ -2048,6 +2083,7 @@ impl PiSession {
                         settle_rpc_run(&workspace_id, run, None, &|turn_id, event| {
                             let _ = sender.send(PiTurnEvent {
                                 turn_id: turn_id.to_string(),
+                                run_owner: turn_id.to_string(),
                                 event,
                             });
                         });
@@ -2077,6 +2113,7 @@ impl PiSession {
                     &|turn_id, event| {
                         let _ = sender.send(PiTurnEvent {
                             turn_id: turn_id.to_string(),
+                            run_owner: turn_id.to_string(),
                             event,
                         });
                     },
@@ -2250,6 +2287,7 @@ impl PiSession {
                 &|turn_id, event| {
                     let _ = sender.send(PiTurnEvent {
                         turn_id: turn_id.to_string(),
+                        run_owner: turn_id.to_string(),
                         event,
                     });
                 },
@@ -3404,17 +3442,17 @@ mod tests {
     }
 
     #[test]
-    fn orphan_run_queues_user_turn_without_adopting_external_stream() {
+    fn orphan_run_adopts_user_turn_for_followups_without_rewriting_prior_stream() {
         let mut run = PiRpcRun::new_orphan();
         let synthetic_id = run.main_turn_id.clone();
         run.response_text.push_str("外部回合正文");
         run.pending_turn_ids.push_back("turn-user-1".to_string());
-        assert!(run.orphan);
-        assert_eq!(run.main_turn_id, synthetic_id);
-        assert_eq!(
-            run.pending_turn_ids.pop_front().as_deref(),
-            Some("turn-user-1")
-        );
+        assert_eq!(bind_next_native_turn_id(&mut run), "turn-user-1");
+        assert!(!run.orphan);
+        assert_eq!(run.main_turn_id, "turn-user-1");
+        assert_ne!(run.main_turn_id, synthetic_id);
+        assert_eq!(bind_next_native_turn_id(&mut run), "turn-user-1:t1");
+        assert_eq!(run.response_text, "外部回合正文");
     }
 
     #[test]

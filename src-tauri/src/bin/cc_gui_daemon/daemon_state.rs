@@ -3,7 +3,7 @@ use engine::grok::resolve_grok_session_id_for_engine_send;
 use engine::kimi::resolve_kimi_session_id_for_engine_send;
 use engine::pi::{
     is_pi_agent_settled_marker, is_pi_background_notification_event, is_pi_external_wakeup_allowed,
-    is_pi_foreground_native_turn, resolve_pi_session_id_for_engine_send,
+    is_pi_forwardable_send_turn, resolve_pi_session_id_for_engine_send,
 };
 use engine::qoder::resolve_qoder_session_id_for_engine_send;
 use std::collections::HashSet;
@@ -2355,8 +2355,6 @@ impl DaemonState {
                     let mut background_task_aliases = HashMap::<String, String>::new();
                     let mut active_external_wakeup_turn_ids = HashSet::<String>::new();
                     let mut pending_external_wakeup = false;
-                    let mut awaiting_attached_followup_turn = false;
-                    let mut primary_turn_completed = false;
                     // pump 在 agent_settled 时发出的生命周期标记：本 run 彻底
                     // settle（无重试/无排队 continuation）。break 必须等它——
                     // 第一个原生 turn 的 TurnCompleted 之后 run 内通常还有
@@ -2382,31 +2380,21 @@ impl DaemonState {
                             pending_external_wakeup,
                             is_known_external_wakeup,
                         );
-                        // 用户自己 run 的后续原生 turn（`{primary}:t{n}`）：
-                        // 普通多轮工具对话里每个 assistant 回合都是一个新原生
-                        // turn（实测 pi 0.84.4），它们是前台流的一部分，无条件
-                        // 放行——套用外部 turn 门控会把第二段回复静默丢掉，
-                        // 实时幕布缺尾、历史重载才完整。
-                        let is_primary_native_turn = is_pi_foreground_native_turn(
+                        // run 归属判定（run_owner 戳）：只转发本 send 自己
+                        // run 的原生 turn（primary / {primary}:t{n} 派生）与
+                        // 本 send id 被绑定进其他 run 的 steer turn。别的 send
+                        // 的 run（含其唤醒/派生 turn）一律拒绝——放行会串台到
+                        // 本 send 的线程，前端单 activeTurnId 结算守卫错配后
+                        // 永久丢结算（2026-08-30 响应中卡死实证）。
+                        let is_my_run_turn = is_pi_forwardable_send_turn(
+                            &turn_event.run_owner,
                             &turn_event.turn_id,
                             &turn_id_for_forwarder,
                         );
-                        let is_attached_followup_turn = !is_external_turn
-                            && !is_primary_native_turn
-                            && turn_event.turn_id != turn_id_for_forwarder
-                            // A user steer can arrive after the primary turn has
-                            // completed but while background tasks are still
-                            // pending. Keep that native turn in the same realtime
-                            // stream instead of dropping it at the external-turn
-                            // filter.
-                            && (!primary_turn_completed
-                                || !pending_background_tasks.is_empty()
-                                || awaiting_attached_followup_turn);
                         let is_lifecycle_marker = is_pi_agent_settled_marker(&turn_event.event);
                         if turn_event.turn_id != turn_id_for_forwarder
-                            && !is_primary_native_turn
+                            && !is_my_run_turn
                             && !is_external_wakeup
-                            && !is_attached_followup_turn
                             && !is_lifecycle_marker
                         {
                             continue;
@@ -2427,6 +2415,9 @@ impl DaemonState {
                         // to the primary id merges the second realtime segment into
                         // the first one and makes the history/realtime anchors drift.
                         let event_turn_id = turn_event.turn_id.as_str();
+                        if let engine::events::EngineEvent::ToolStarted { .. } = &event {
+                            accumulated_agent_text.clear();
+                        }
                         if event_turn_id != active_forwarded_turn_id {
                             active_forwarded_turn_id = event_turn_id.to_string();
                             // Each PI follow-up is a distinct assistant turn. Keep the
@@ -2467,7 +2458,6 @@ impl DaemonState {
                             } => {
                                 if source == "notification" {
                                     pending_external_wakeup = true;
-                                    awaiting_attached_followup_turn = !primary_turn_completed;
                                 }
                                 let task_id = task.get("id").and_then(Value::as_str);
                                 let status = task
@@ -2565,16 +2555,20 @@ impl DaemonState {
                             // authoritative `message_end` snapshot. Streamed deltas
                             // can be a prefix when the final follow-up turn races the
                             // forwarder, so never let the accumulator overwrite it.
-                            let completed_text = if !fallback_text.trim().is_empty() {
-                                fallback_text
-                            } else {
+                            // 本 turn 流出过正文 ⇒ 只落最后一段(可能为空);
+                            // 纯工具 turn 回退 result 文本(同样为空)。
+                            let completed_text = if render_state.saw_text_delta {
                                 accumulated_agent_text.clone()
+                            } else {
+                                fallback_text
                             };
                             if !completed_text.trim().is_empty() {
+                                // 完成稿必须 upsert 进已流式的文本气泡：turn
+                                // 以工具收尾时 Tool lane 会清空
+                                // active_text_item_id，凭空造新 id 会把同一段
+                                // 正文渲染第二遍（重复叙述）。回退到最后文本段。
                                 let completion_item_id =
-                                    render_state.active_text_item_id.clone().unwrap_or_else(|| {
-                                        format!("{item_id_clone}:pi-turn-{event_turn_id}")
-                                    });
+                                    gemini_agent_completion_item_id(&render_state, &item_id_clone);
                                 event_sink.emit_app_server_event(AppServerEvent {
                                     workspace_id: event.workspace_id().to_string(),
                                     message: json!({
@@ -2633,19 +2627,12 @@ impl DaemonState {
                             }
                         }
 
-                        if is_terminal {
-                            if is_external_turn {
-                                // pending_external_wakeup 保持 true 直到 run
-                                // settle 标记：唤醒 run 内的后续原生 turn 仍需
-                                // 门控放行（最终汇总在同一个 run 的下一个
-                                // 原生 turn 里）。
-                                active_external_wakeup_turn_ids.remove(&turn_event.turn_id);
-                            } else if event_turn_id == turn_id_for_forwarder {
-                                primary_turn_completed = true;
-                                awaiting_attached_followup_turn = false;
-                            } else if is_attached_followup_turn {
-                                awaiting_attached_followup_turn = false;
-                            }
+                        if is_terminal && is_external_turn {
+                            // pending_external_wakeup 保持 true 直到 run
+                            // settle 标记：唤醒 run 内的后续原生 turn 仍需
+                            // 门控放行（最终汇总在同一个 run 的下一个
+                            // 原生 turn 里）。
+                            active_external_wakeup_turn_ids.remove(&turn_event.turn_id);
                         }
                         // break 必须等 pump 的 agent_settled 生命周期标记：
                         // 第一个原生 turn 的 TurnCompleted 后 run 内通常还有
@@ -2655,7 +2642,6 @@ impl DaemonState {
                         if primary_run_settled
                             && pending_background_tasks.is_empty()
                             && active_external_wakeup_turn_ids.is_empty()
-                            && (!awaiting_attached_followup_turn || primary_turn_completed)
                         {
                             break;
                         }

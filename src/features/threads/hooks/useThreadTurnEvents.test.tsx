@@ -74,6 +74,10 @@ type SetupOverrides = {
   onDebug?: ReturnType<typeof vi.fn>;
   activeWorkspaceId?: string;
   establishedThreadIds?: string[];
+  isTurnInFlightForThread?: (
+    threadId: string,
+    turnId: string | null | undefined,
+  ) => boolean;
 };
 
 const makeOptions = (overrides: SetupOverrides = {}) => {
@@ -106,6 +110,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
   const hasEstablishedThreadItems = vi.fn((threadId: string) =>
     establishedThreadIds.includes(threadId),
   );
+  const isTurnInFlightForThread = overrides.isTurnInFlightForThread;
   const renamePendingMemoryCaptureKey = vi.fn();
   // chat-stream-render-isolation-2026-06 task 8: workspace-scope ref
   // shape migrated from Set<threadId> to Map<workspaceId, Map<threadId, true>>.
@@ -155,6 +160,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
       resolvePendingThreadForSession,
       resolvePendingThreadForTurn,
       getActiveTurnIdForThread,
+      isTurnInFlightForThread,
       getThreadProviderProfileId,
       hasEstablishedThreadItems,
       renamePendingMemoryCaptureKey,
@@ -181,6 +187,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
     resolvePendingThreadForSession,
     resolvePendingThreadForTurn,
     getActiveTurnIdForThread,
+    isTurnInFlightForThread,
     getThreadProviderProfileId,
     hasEstablishedThreadItems,
     renamePendingMemoryCaptureKey,
@@ -715,6 +722,54 @@ describe("useThreadTurnEvents", () => {
     expect(workspaceScopedHas(pendingInterruptsRef.current, "ws-1", "claude:session-1")).toBe(false);
     expect(engineInterruptTurn).toHaveBeenCalledWith("ws-1", "turn-7", "claude");
     expect(interruptTurn).not.toHaveBeenCalled();
+  });
+
+  it("settles an interleaved in-flight turn even when another turn is active", () => {
+    // pi 多原生 turn / 双 send 交错：A 的 turn 未结算时 B 的 turn 已接管
+    // activeTurnId。A 的完成稿属于在途集合 ⇒ 必须结算，否则 A 的状态
+    // 永久残留「响应中」（2026-08-30 响应中卡死实证）。
+    const inFlight = new Set(["turn-a", "turn-b"]);
+    const isTurnInFlightForThread = vi.fn(
+      (_threadId: string, turnId: string | null | undefined) =>
+        turnId ? inFlight.has(turnId) : false,
+    );
+    const { result, markProcessing, setActiveTurnId, dispatch } = makeOptions({
+      activeTurnIdByThread: { "pi:s1": "turn-b" },
+      isTurnInFlightForThread,
+    });
+
+    act(() => {
+      result.current.onTurnCompleted("ws-1", "pi:s1", "turn-a");
+    });
+
+    expect(markProcessing).toHaveBeenCalledWith("pi:s1", false);
+    expect(setActiveTurnId).toHaveBeenCalledWith("pi:s1", null);
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "finalizePendingToolStatuses",
+      threadId: "pi:s1",
+      status: "completed",
+    });
+  });
+
+  it("still rejects turn-completed for turns that are neither active nor in flight", () => {
+    // 防过度放松：旧 turn 的迟到完成稿不在在途集合内 ⇒ 维持原拒绝语义，
+    // 不复燃已结算线程。
+    const inFlight = new Set<string>(["turn-b"]);
+    const isTurnInFlightForThread = vi.fn(
+      (_threadId: string, turnId: string | null | undefined) =>
+        turnId ? inFlight.has(turnId) : false,
+    );
+    const { result, markProcessing, setActiveTurnId } = makeOptions({
+      activeTurnIdByThread: { "pi:s1": "turn-b" },
+      isTurnInFlightForThread,
+    });
+
+    act(() => {
+      result.current.onTurnCompleted("ws-1", "pi:s1", "turn-stale");
+    });
+
+    expect(markProcessing).not.toHaveBeenCalledWith("pi:s1", false);
+    expect(setActiveTurnId).not.toHaveBeenCalled();
   });
 
   it("clears pending interrupt and active turn on turn completed", () => {
