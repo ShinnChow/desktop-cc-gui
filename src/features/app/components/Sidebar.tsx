@@ -329,7 +329,7 @@ function SidebarImpl({
   hydratedThreadListWorkspaceIds,
   runningSessionCountByWorkspaceId: _runningSessionCountByWorkspaceId = {},
   recentSessionCountByWorkspaceId: _recentSessionCountByWorkspaceId = {},
-  threadListLoadingByWorkspace: _threadListLoadingByWorkspace,
+  threadListLoadingByWorkspace,
   threadListPagingByWorkspace,
   threadListCursorByWorkspace,
   activeWorkspaceId,
@@ -1212,6 +1212,7 @@ function SidebarImpl({
     onOpenClaudeTui,
     onReloadWorkspaceThreads:
       onQuickReloadWorkspaceThreads ?? onReloadWorkspaceThreads,
+    threadListLoadingByWorkspace,
     onSelectThread,
     onProviderContinuationTargetReady,
     isThreadAvailable: (workspaceId, threadId) =>
@@ -2236,7 +2237,7 @@ function SidebarImpl({
               deletingWorktreeIds={deletingWorktreeIds}
               threadsByWorkspace={threadsByWorkspace}
               threadStatusById={threadStatusById}
-              threadListLoadingByWorkspace={_threadListLoadingByWorkspace}
+              threadListLoadingByWorkspace={threadListLoadingByWorkspace}
               threadListPagingByWorkspace={threadListPagingByWorkspace}
               threadListCursorByWorkspace={threadListCursorByWorkspace}
               threadListPageByWorkspace={threadListPageByWorkspace}
@@ -2449,7 +2450,7 @@ function SidebarImpl({
       threadsByWorkspace,
       toggleExitedSessionsHidden,
       worktreesByParent,
-      _threadListLoadingByWorkspace,
+      threadListLoadingByWorkspace,
     ],
   );
 

@@ -340,6 +340,7 @@ type SidebarMenuHandlers = {
   onReloadWorkspaceThreads: (
     workspaceId: string,
   ) => Promise<void> | void;
+  threadListLoadingByWorkspace?: Record<string, boolean>;
   onSelectThread: (workspaceId: string, threadId: string) => void;
   /**
    * Provider 续接成功后：把目标 model/effort 落到新会话 composer，
@@ -425,6 +426,7 @@ export function useSidebarMenus({
   onOpenThreadFolderPicker,
   onOpenClaudeTui,
   onReloadWorkspaceThreads,
+  threadListLoadingByWorkspace = {},
   onSelectThread,
   onProviderContinuationTargetReady,
   isThreadAvailable,
@@ -2121,8 +2123,13 @@ export function useSidebarMenus({
             id: "reload-threads",
             label: t("threads.reloadThreads"),
             iconKind: "reload",
+            refreshing: threadListLoadingByWorkspace[workspaceId] === true,
             ...createRowPinMeta("reload-threads"),
-            onSelect: () => onReloadWorkspaceThreads(workspaceId),
+            onSelect: () => {
+              if (threadListLoadingByWorkspace[workspaceId] !== true) {
+                onReloadWorkspaceThreads(workspaceId);
+              }
+            },
           },
           ...(showExitedSessionsToggle && onToggleExitedSessions
             ? [
@@ -2211,6 +2218,7 @@ export function useSidebarMenus({
       t,
       createRowPinMeta,
       onReloadWorkspaceThreads,
+      threadListLoadingByWorkspace,
       onActivateWorkspace,
       onCreateSessionFolder,
       onToggleExitedSessions,

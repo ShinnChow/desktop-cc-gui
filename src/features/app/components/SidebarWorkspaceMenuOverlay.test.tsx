@@ -348,6 +348,30 @@ describe("SidebarWorkspaceMenuOverlay", () => {
     expect(readSidebarWorkspaceMenuCollapsedSectionIds()).toEqual([]);
   });
 
+  it("shows a busy disabled reload action while sessions are loading", () => {
+    const action: WorkspaceMenuAction = {
+      id: "reload-threads",
+      label: "Reload threads",
+      iconKind: "reload",
+      refreshing: true,
+      onSelect: vi.fn(),
+    };
+    render(
+      <SidebarWorkspaceMenuOverlay
+        menu={{ x: 0, y: 0, groups: [{ id: "workspace-actions", label: "Workspace actions", actions: [action] }] }}
+        t={t}
+        onClose={vi.fn()}
+        onAction={vi.fn()}
+        renderIcon={() => null}
+      />,
+    );
+
+    const item = screen.getByRole("menuitem", { name: "Reload threads" });
+    expect((item as HTMLButtonElement).disabled).toBe(true);
+    expect(item.getAttribute("aria-busy")).toBe("true");
+    expect(item.classList.contains("is-refreshing")).toBe(true);
+  });
+
   it("restores locally persisted collapsed sections on mount", () => {
     writeClientStoreValue("app", SIDEBAR_WORKSPACE_MENU_COLLAPSED_SECTIONS_KEY, [
       "new-session-shared",

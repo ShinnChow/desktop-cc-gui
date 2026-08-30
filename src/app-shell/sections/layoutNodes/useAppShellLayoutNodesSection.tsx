@@ -6,7 +6,6 @@ import {
 } from "../../../services/clientStorage";
 import { useEventCallback } from "../../../utils/useEventCallback";
 import type { QoderSettingsHighlightTarget } from "../../../features/app/hooks/useSettingsModalState";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { useLayoutNodes } from "../../../features/layout/hooks/useLayoutNodes";
 import { useMainHeaderActionItems } from "../../../features/app/components/MainHeaderActions";
 import { useExitedSessionVisibility } from "../../../features/app/hooks/useExitedSessionVisibility";
@@ -116,6 +115,7 @@ const APP_SHELL_LAYOUT_NODES_GIT_DOMAIN_NAMES =
  */
 const USER_RELOAD_THREAD_LIST_OPTIONS = {
   forceSessionIndexSync: true,
+  sessionIndexOnly: true,
 } as const;
 
 function reportMainFileExternalChangeMonitorCleanupError(error: unknown) {
@@ -1584,50 +1584,7 @@ export function useAppShellLayoutNodesSection(
     },
   );
   const handleReloadWorkspaceThreads = useEventCallback(
-    async (workspaceId: string) => {
-      const workspace = workspacesById.get(workspaceId);
-      if (!workspace) {
-        return;
-      }
-      const workspaceName =
-        workspace.name || t("workspace.noWorkspaceSelected");
-      const detailLines = [
-        t("workspace.reloadWorkspaceThreadsEffectRefresh"),
-        t("workspace.reloadWorkspaceThreadsEffectDisplayOnly"),
-        t("workspace.reloadWorkspaceThreadsEffectNoDelete"),
-        t("workspace.reloadWorkspaceThreadsEffectNoGitWrite"),
-      ];
-      const confirmed = await ask(
-        `${t("workspace.reloadWorkspaceThreadsConfirm", { name: workspaceName })}\n\n${t("workspace.reloadWorkspaceThreadsBeforeYouConfirm")}\n${detailLines.map((line) => `• ${line}`).join("\n")}`,
-        {
-          title: t("workspace.reloadWorkspaceThreadsTitle"),
-          kind: "warning",
-          okLabel: t("threads.reloadThreads"),
-          cancelLabel: t("common.cancel"),
-        },
-      );
-      if (!confirmed) {
-        return;
-      }
-      const targets =
-        workspace.kind === "main"
-          ? [
-              workspace,
-              ...workspaces.filter(
-                (candidate: WorkspaceInfo) =>
-                  candidate.parentId === workspace.id,
-              ),
-            ]
-          : [workspace];
-      void Promise.allSettled(
-        targets.map((target) =>
-          listThreadsForWorkspaceTracked(
-            target,
-            USER_RELOAD_THREAD_LIST_OPTIONS,
-          ),
-        ),
-      );
-    },
+    (workspaceId: string) => handleQuickReloadWorkspaceThreads(workspaceId),
   );
   const handleToggleLiveEditPreview = useEventCallback(() => {
     setLiveEditPreviewEnabled((current: boolean) => !current);

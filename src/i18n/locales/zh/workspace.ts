@@ -305,17 +305,6 @@ const workspace = {
     deleteWorkspaceEffectNoGitWrite:
       "不会执行 merge/rebase/push 等 Git 写操作。",
     deleteWorkspaceEffectReAdd: "可随时通过“添加工作区”重新接入，继续开发。",
-    reloadWorkspaceThreadsTitle: "重新加载会话",
-    reloadWorkspaceThreadsConfirm: '确认重新加载 "{{name}}" 的会话列表吗？',
-    reloadWorkspaceThreadsBeforeYouConfirm: "执行后会进行以下操作：",
-    reloadWorkspaceThreadsEffectRefresh:
-      "重新扫描该工作区的会话并刷新列表显示。",
-    reloadWorkspaceThreadsEffectDisplayOnly:
-      "仅更新显示结果，列表顺序可能按最新活动时间变化。",
-    reloadWorkspaceThreadsEffectNoDelete:
-      "不会删除任何会话、代码文件、分支或工作区。",
-    reloadWorkspaceThreadsEffectNoGitWrite:
-      "不会执行 checkout/merge/rebase 等 Git 写操作。",
     deleteWorktreeTitle: "删除工作树",
     deleteWorktreeConfirm: '确定要删除 "{{name}}" 吗？',
     deleteWorktreeMessage: "这将关闭代理、移除工作树，并从 ccgui 中删除它。",

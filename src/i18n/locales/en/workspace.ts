@@ -326,17 +326,6 @@ const workspace = {
       "No merge/rebase/push or other Git write operation will be executed.",
     deleteWorkspaceEffectReAdd:
       "You can add this workspace back later at any time and continue working.",
-    reloadWorkspaceThreadsTitle: "Reload Threads",
-    reloadWorkspaceThreadsConfirm: 'Reload the thread list for "{{name}}"?',
-    reloadWorkspaceThreadsBeforeYouConfirm: "This action will:",
-    reloadWorkspaceThreadsEffectRefresh:
-      "Rescan this workspace's sessions and refresh the sidebar list.",
-    reloadWorkspaceThreadsEffectDisplayOnly:
-      "Only refresh displayed results; ordering may change by latest activity.",
-    reloadWorkspaceThreadsEffectNoDelete:
-      "Not delete any sessions, code files, branches, or workspace entries.",
-    reloadWorkspaceThreadsEffectNoGitWrite:
-      "Not run checkout/merge/rebase or any other Git write operation.",
     deleteWorktreeTitle: "Delete Worktree",
     deleteWorktreeConfirm: 'Are you sure you want to delete "{{name}}"?',
     deleteWorktreeMessage:

@@ -421,6 +421,8 @@ export function useThreadActions({
          * first-paint). Default false so warm SQLite answers in ms.
          */
         forceSessionIndexSync?: boolean;
+        /** Explicit sidebar reload consumes only the authoritative Session Index page. */
+        sessionIndexOnly?: boolean;
         /** Orchestrator cancel/stale flag — skip late setThreads after soft-ignore cancel. */
         isStale?: () => boolean;
         /** Importer refresh: merge SQLite rows onto the current list. */
@@ -708,6 +710,60 @@ export function useThreadActions({
           }
         } else if (sessionIndexPage === null) {
           rememberPartialSource("session-index-timeout");
+        }
+
+        if (options?.sessionIndexOnly) {
+          if (sessionIndexPage === null || !Array.isArray(sessionIndexPage.data)) {
+            return { applied: false, visibleCount: 0, authoritativeEmpty: false };
+          }
+          const hiddenSharedBindingIds = unionHideSets(
+            visibilityHideSet,
+            verifiedHideSet,
+            expandHiddenSharedBindingIds([...getCollabWorkerNativeHideIds()]),
+          );
+          reconcilePiDerivedHideWithAuthoritativeRows(sessionIndexPage.data);
+          const indexSummaries = projectNativeIndexRowsToSummaries(
+            sessionIndexPage.data,
+            {
+              workspaceId: workspace.id,
+              mappedTitles: {},
+              getCustomName,
+              hiddenSharedBindingIds,
+            },
+          );
+          if (isLatestThreadListRequest()) {
+            dispatch({
+              type: "setThreads",
+              workspaceId: workspace.id,
+              threads: indexSummaries,
+              unionMembership: sessionIndexPage.hasMore === true,
+            });
+            const oldest = sessionIndexPage.data.at(-1);
+            dispatch({
+              type: "setThreadListCursor",
+              workspaceId: workspace.id,
+              cursor: resolveThreadListCursorForDisplay({
+                catalogCursor: null,
+                catalogPartialSource: null,
+                runtimeCursor: null,
+                sessionIndexHasMore: sessionIndexPage.hasMore === true,
+                sessionIndexOldestKey: oldest
+                  ? {
+                      updatedAt: Number(oldest.updatedAt) || 0,
+                      sessionId: String(oldest.sessionId ?? "").trim(),
+                    }
+                  : null,
+              }),
+            });
+            appliedThreadListUpdate = true;
+            visibleThreadCount = indexSummaries.length;
+            authoritativeEmpty = sessionIndexPage.data.length === 0;
+          }
+          return {
+            applied: appliedThreadListUpdate,
+            visibleCount: visibleThreadCount,
+            authoritativeEmpty,
+          };
         }
 
         let mappedTitles: Record<string, string> = {};

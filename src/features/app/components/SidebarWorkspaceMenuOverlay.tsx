@@ -368,10 +368,12 @@ export function SidebarWorkspaceMenuOverlay({
                           action.tone === "danger" ? " is-danger" : ""
                         }${action.deprecated ? " is-deprecated" : ""}${
                           action.unavailable ? " is-unavailable" : ""
-                        }`}
+                        }${action.refreshing ? " is-refreshing" : ""}`}
                         disabled={
-                          action.unavailable && !action.children?.length
+                          (action.unavailable && !action.children?.length) ||
+                          action.refreshing === true
                         }
+                        aria-busy={action.refreshing || undefined}
                         aria-haspopup={
                           action.children?.length ? "menu" : undefined
                         }

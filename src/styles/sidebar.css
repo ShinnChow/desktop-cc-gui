@@ -1629,6 +1629,11 @@
   animation: sidebar-workspace-menu-spin 0.85s linear infinite;
 }
 
+.sidebar-workspace-menu-item.is-refreshing
+  .sidebar-workspace-menu-item-icon svg {
+  animation: sidebar-workspace-menu-spin 0.85s linear infinite;
+}
+
 .sidebar-workspace-menu-item-pin {
   flex: 0 0 auto;
   width: 14px;

@@ -13,6 +13,7 @@ import {
   loadCodexSession,
   renameThreadTitleKey,
   listThreads,
+  listSessionIndexForWorkspace,
   resumeThread,
 } from "../../../services/tauri";
 import {
@@ -1693,6 +1694,44 @@ describe("useThreadActions", () => {
       workspaceId: "ws-1",
       threads: [],
     });
+  });
+
+  it("reloads from the forced Session Index without legacy engine fan-out", async () => {
+    vi.mocked(listSessionIndexForWorkspace).mockResolvedValue({
+      data: [
+        {
+          engine: "codex",
+          sessionId: "session-index-1",
+          title: "Indexed session",
+          updatedAt: 123,
+          workspacePath: workspace.path,
+        },
+      ],
+      source: "session-index",
+      synced: true,
+      engines: ["codex"],
+      hasMore: false,
+      visibility: { available: true, freshness: "verified", hiddenNativeIds: [] },
+    });
+    const { result, dispatch } = renderActions();
+
+    await act(async () => {
+      await result.current.listThreadsForWorkspace(workspace, {
+        forceSessionIndexSync: true,
+        sessionIndexOnly: true,
+      });
+    });
+
+    expect(listSessionIndexForWorkspace).toHaveBeenCalledWith("ws-1", {
+      limit: expect.any(Number),
+      syncIfNeeded: true,
+      forceSync: true,
+    });
+    expect(getOpenCodeSessionList).not.toHaveBeenCalled();
+    expect(listClaudeSessions).not.toHaveBeenCalled();
+    expectSetThreadsDispatched(dispatch, "ws-1", [
+      { id: "session-index-1", name: "Indexed session" },
+    ]);
   });
 
   it("ignores stale thread list responses that finish after a newer refresh", async () => {
