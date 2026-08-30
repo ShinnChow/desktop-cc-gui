@@ -24,24 +24,6 @@ import {
   listQoderSessions as listQoderSessionsService,
   invalidateSessionIndexForWorkspace as invalidateSessionIndexForWorkspaceService,
 } from "../../../services/tauri";
-import { sendSharedSessionTurnRouted } from "../../shared-session/runtime/sendSharedSessionTurn";
-import {
-  SharedActiveAttemptObserverError,
-  type SendSharedSessionTurnV2Result,
-} from "../../shared-session/runtime/sendSharedSessionTurnV2";
-import { subscribeSharedSessionAttemptSettlements } from "../../shared-session/runtime/reattachSharedSessionAttempt";
-import { isSharedV2SendEnabled } from "../../shared-session/runtime/sharedV2SendFlag";
-import {
-  getSharedSendActiveAttemptId,
-  getSharedSendState,
-  releaseSharedSendAdmission,
-  tryAcquireSharedSend,
-} from "../../shared-session/runtime/sharedSendStateStore";
-import {
-  getSharedTargetState,
-  selectNextTarget,
-} from "../../shared-session/target/targetStore";
-import { isResolvedExecutionTarget } from "../../shared-session/target/types";
 import { rememberRuntimeReceipt } from "../utils/runtimeModelReceipt";
 import {
   recordNativeTurnTarget,
@@ -49,7 +31,6 @@ import {
 } from "../utils/nativeTurnTargetLedger";
 import { appendTurnTargetBadge } from "../utils/turnTargetBadgeStorage";
 import { subscribeMultiAgentConversationItems } from "../../multi-agent/runtime/conversationBridge";
-import { reconcileAtomicReasoningEffort } from "../../models/atomicModelReasoning";
 import {
   consumeExplicitComposerEngineSwitch,
   shouldSpawnNativeThreadForEngineMismatch,
@@ -79,7 +60,17 @@ import { injectMemoryPickContext } from "../../project-memory/memoryPick/injectM
 import { emitMemoryPickTelemetry } from "../../project-memory/memoryPick/memoryPickTelemetry";
 import { resolvePickSemanticContext } from "./threadMessagingMemoryPick";
 import { runMemoryPickGate } from "./threadMessagingPickGate";
-import { runSquadRequestSend } from "./threadMessagingSharedSquadSend";
+import {
+  acquireSharedSendAdmission,
+  noteSharedProviderRetryUserSendIfShared,
+  resolveSharedActiveLifecycleCatch,
+  resolveSharedSendPreflight,
+  runSharedV2Send,
+  settleSharedSendFailure,
+  shouldEmitThreadMessagingDevLogs,
+  useSharedAttemptSettlementCleanup,
+  type SharedSendContext,
+} from "./threadMessagingSharedSend";
 import { noteCardsFacade } from "../../note-cards/services/noteCardsFacade";
 import {
   injectSelectedNoteCardsContext,
@@ -95,10 +86,7 @@ import {
 import { pushErrorToast } from "../../../services/toasts";
 import { pushThreadFailureRuntimeNotice } from "../../../services/globalRuntimeNotices";
 import { resolveAgentIconForAgent } from "../../../utils/agentIcons";
-import {
-  isSharedSessionSupportedEngine,
-  normalizeSharedSessionEngine,
-} from "../../shared-session/utils/sharedSessionEngines";
+import { normalizeSharedSessionEngine } from "../../shared-session/utils/sharedSessionEngines";
 import {
   engineSupportsImageInput,
   findOversizedImageAttachment,
@@ -166,11 +154,6 @@ import { useCodexMessageRecovery } from "./useCodexMessageRecovery";
 import { assertEngineExecutionEnabled } from "../../../utils/engineExecutionPolicy";
 import { resolveSelectedAgentForSend } from "../utils/resolveSelectedAgentForSend";
 import { BUILT_IN_AGENT_RESOLUTION_FAILED_EVENT } from "../../agent-catalog/events";
-import {
-  noteSharedProviderRetryTurnSettled,
-  noteSharedProviderRetryUserSend,
-  cancelSharedProviderRetry,
-} from "../../shared-session/provider-retry/noteSharedProviderRetryTurn";
 
 import type {
   HandleFusionStalledOptions,
@@ -184,21 +167,6 @@ export type { ThreadMessageDispatchResult } from "./threadMessagingTypes";
 const AGENT_PROMPT_HEADER = "## Agent Role and Instructions";
 const AGENT_PROMPT_NAME_PREFIX = "Agent Name:";
 const AGENT_PROMPT_ICON_PREFIX = "Agent Icon:";
-
-const isThreadMessagingTestMode = (() => {
-  try {
-    return import.meta.env.MODE === "test";
-  } catch {
-    return false;
-  }
-})();
-const shouldEmitThreadMessagingDevLogs = (() => {
-  try {
-    return import.meta.env.DEV && !isThreadMessagingTestMode;
-  } catch {
-    return false;
-  }
-})();
 
 export function useThreadMessaging({
   activeWorkspace,
@@ -293,30 +261,12 @@ export function useThreadMessaging({
     startThreadForWorkspace,
   });
 
-  useEffect(
-    () =>
-      subscribeSharedSessionAttemptSettlements(
-        ({ workspaceId, threadId, attemptId, runtimeTurnId }) => {
-          // Reattachment 绕过原 send Promise；必须复用正常 V2 terminal 的
-          // barrier → processing cleanup 顺序，避免迟到 realtime event 复燃 Stop。
-          onSharedDurableTurnCommitted?.(threadId, runtimeTurnId);
-          if (
-            getSharedSendActiveAttemptId(workspaceId, threadId) !== attemptId
-          ) {
-            return;
-          }
-          markProcessing(threadId, false);
-          setActiveTurnId(threadId, null);
-          safeMessageActivity();
-        },
-      ),
-    [
-      markProcessing,
-      onSharedDurableTurnCommitted,
-      safeMessageActivity,
-      setActiveTurnId,
-    ],
-  );
+  useSharedAttemptSettlementCleanup({
+    onSharedDurableTurnCommitted,
+    markProcessing,
+    setActiveTurnId,
+    safeMessageActivity,
+  });
 
   useEffect(
     () =>
@@ -407,100 +357,35 @@ export function useThreadMessaging({
           return;
         }
       }
-      const sharedV2SendEnabled =
-        threadKind === "shared" && isSharedV2SendEnabled();
-      const storedSharedTarget =
-        threadKind === "shared"
-          ? (options?.sharedExecutionTarget ??
-            getSharedTargetState(workspace.id, threadId).selectedNextTarget)
-          : null;
+      const sharedCtx: SharedSendContext = {
+        dispatch,
+        getCustomName,
+        markProcessing,
+        setActiveTurnId,
+        safeMessageActivity,
+        pushThreadErrorMessage,
+        onDebug,
+        onSharedDurableTurnCommitted,
+        onInputMemoryCaptured,
+        itemsByThread,
+        interruptedThreadsRef,
+        i18n,
+        t,
+      };
+      const sharedSendPreflight = await resolveSharedSendPreflight(sharedCtx, {
+        workspace,
+        threadId,
+        threadKind,
+        messageText,
+        images,
+        options,
+      });
+      if (sharedSendPreflight.kind === "return") {
+        return sharedSendPreflight.result;
+      }
+      const sharedV2SendEnabled = sharedSendPreflight.sharedV2SendEnabled;
       const supportedStoredSharedTarget =
-        storedSharedTarget &&
-        isSharedSessionSupportedEngine(storedSharedTarget.engine)
-          ? storedSharedTarget
-          : null;
-      const sharedSendState = sharedV2SendEnabled
-        ? getSharedSendState(workspace.id, threadId)
-        : null;
-      if (sharedSendState && sharedSendState.state !== "idle") {
-        onDebug?.({
-          id: `${Date.now()}-client-shared-turn-submit-blocked`,
-          timestamp: Date.now(),
-          source: "client",
-          label: "shared-session/turn blocked",
-          payload: {
-            workspaceId: workspace.id,
-            threadId,
-            state: sharedSendState.state,
-          },
-        });
-        if (options?.squadRequest) {
-          throw new Error(
-            `agent-request-busy: Shared Session state=${sharedSendState.state}`,
-          );
-        }
-        return {
-          status: "blocked",
-          state: sharedSendState.state,
-          reason: "shared-send-not-idle",
-        };
-      }
-      if (storedSharedTarget && !supportedStoredSharedTarget) {
-        if (options?.squadRequest) {
-          throw new Error(
-            "agent-request-target-unavailable: stored Shared Session target is unsupported",
-          );
-        }
-        pushThreadErrorMessage(
-          workspace.id,
-          threadId,
-          "当前 Shared Session 目标暂不可执行，请重新选择可用的 CLI 和 Provider。",
-        );
-        safeMessageActivity();
-        return {
-          status: "target-unavailable",
-          reason: "shared-target-unsupported",
-        };
-      }
-      if (
-        sharedV2SendEnabled &&
-        !isResolvedExecutionTarget(supportedStoredSharedTarget)
-      ) {
-        if (options?.squadRequest) {
-          throw new Error(
-            "agent-request-target-incomplete: Shared Session target is incomplete",
-          );
-        }
-        pushThreadErrorMessage(
-          workspace.id,
-          threadId,
-          "当前 Shared Session 目标不完整，请重新选择 CLI、Provider 和 Model。",
-        );
-        safeMessageActivity();
-        return {
-          status: "target-unavailable",
-          reason: "shared-target-incomplete",
-        };
-      }
-      if (options?.squadRequest) {
-        await runSquadRequestSend({
-          workspace,
-          threadId,
-          threadKind,
-          sharedV2SendEnabled,
-          supportedStoredSharedTarget,
-          messageText,
-          images,
-          options,
-          itemsByThread,
-          dispatch,
-          getCustomName,
-          markProcessing,
-          safeMessageActivity,
-          t,
-        });
-        return;
-      }
+        sharedSendPreflight.supportedStoredSharedTarget;
       const resolvedEngine =
         threadKind === "shared"
           ? normalizeSharedSessionEngine(
@@ -597,13 +482,12 @@ export function useThreadMessaging({
               ? options.providerRetryAtMs
               : undefined,
         };
-        if (threadKind === "shared") {
-          noteSharedProviderRetryUserSend({
-            workspaceId: workspace.id,
-            threadId,
-            originKind: options?.originKind ?? null,
-          });
-        }
+        noteSharedProviderRetryUserSendIfShared({
+          workspace,
+          threadId,
+          threadKind,
+          options,
+        });
         dispatch({
           type: "upsertItem",
           workspaceId: workspace.id,
@@ -1260,35 +1144,15 @@ export function useThreadMessaging({
           modelForSend: modelForSend ?? null,
         },
       });
-      let sharedSendAdmissionRevision: number | undefined;
-      if (sharedV2SendEnabled) {
-        const admission = tryAcquireSharedSend(workspace.id, threadId);
-        if (!admission.acquired) {
-          onDebug?.({
-            id: `${Date.now()}-client-shared-turn-admission-blocked`,
-            timestamp: Date.now(),
-            source: "client",
-            label: "shared-session/turn blocked",
-            payload: {
-              workspaceId: workspace.id,
-              threadId,
-              state: admission.state,
-              phase: "atomic-admission",
-            },
-          });
-          return;
-        }
-        sharedSendAdmissionRevision = admission.revision;
-        // handoff 前若同步 UI mutation 抛错/早退，精确释放本 caller 的 admission。
-        // 正常路径中 V2 在第一个 await 前消费 revision，此 microtask 不会误解锁。
-        queueMicrotask(() => {
-          releaseSharedSendAdmission(
-            workspace.id,
-            threadId,
-            admission.revision,
-          );
-        });
+      const sharedSendAdmission = acquireSharedSendAdmission(sharedCtx, {
+        workspace,
+        threadId,
+        sharedV2SendEnabled,
+      });
+      if (!sharedSendAdmission.acquired) {
+        return;
       }
+      const sharedSendAdmissionRevision = sharedSendAdmission.revision;
       const wasProcessing =
         (threadStatusById[threadId]?.isProcessing ?? false) && steerEnabled;
       // 若入口已打 early bubble，这里只补 metadata / 便签附图 / codex 出图占位；
@@ -1644,216 +1508,27 @@ export function useThreadMessaging({
       try {
         let response: Record<string, unknown>;
         if (threadKind === "shared") {
-          const sharedResolvedEngine = normalizeSharedSessionEngine(
-            supportedStoredSharedTarget?.engine ?? resolvedEngine,
-          );
-          dispatch({
-            type: "setThreadEngine",
-            workspaceId: workspace.id,
+          const sharedV2SendOutcome = await runSharedV2Send(sharedCtx, {
+            workspace,
             threadId,
-            engine: sharedResolvedEngine,
-          });
-          // Shared Picker 写入的 selectedNextTarget 是下一轮唯一权威输入。
-          // 旧的全局 Composer selection 可能仍指向上一个 CLI/Provider，不能在
-          // send boundary 重新组装并覆盖用户刚选中的 Target。
-          // effort：对 Codex catalog 模型在 send 边界再 reconcile 一次，
-          // 避免 hydrate 遗留 null / 非法档位直送 CLI。
-          const sharedTargetBase = supportedStoredSharedTarget ?? {
-            engine: sharedResolvedEngine,
-            providerProfileId:
-              resolvedComposerSelection?.providerProfileId?.trim() || null,
-            model: modelForSend ?? null,
-            modelCatalogEntryId: resolvedComposerSelection?.id?.trim() || null,
-            reasoning: resolvedEffort ? { effort: resolvedEffort } : null,
-          };
-          const sharedReconciledEffort = reconcileAtomicReasoningEffort({
-            engine: sharedTargetBase.engine,
-            model: {
-              id:
-                sharedTargetBase.modelCatalogEntryId?.trim() ||
-                sharedTargetBase.model?.trim() ||
-                null,
-              model: sharedTargetBase.model?.trim() || null,
-            },
-            effort: sharedTargetBase.reasoning?.effort ?? null,
-          });
-          const sharedNextTarget = {
-            ...sharedTargetBase,
-            reasoning: sharedReconciledEffort
-              ? { effort: sharedReconciledEffort }
-              : null,
-          };
-          if (!sharedV2SendEnabled && !supportedStoredSharedTarget) {
-            selectNextTarget(workspace.id, threadId, sharedNextTarget);
-          }
-          rememberRuntimeReceipt(workspace.id, threadId, {
-            model: sharedNextTarget.model ?? undefined,
-            modelSource: "send.request",
-          });
-          response = (await sendSharedSessionTurnRouted({
-            workspaceId: workspace.id,
-            threadId,
-            engine: sharedResolvedEngine,
-            text: finalText,
-            model: sharedNextTarget.model ?? null,
-            effort: sharedNextTarget.reasoning?.effort ?? null,
-            disableThinking: disableThinkingForClaude,
-            collaborationMode: sanitizedCollaborationMode,
-            accessMode: resolvedAccessMode,
-            images: finalImages,
-            preferredLanguage: i18n.language.toLowerCase().startsWith("zh")
-              ? "zh"
-              : "en",
-            customSpecRoot: resolveWorkspaceSpecRoot(workspace.id),
+            resolvedEngine,
+            supportedStoredSharedTarget,
+            sharedV2SendEnabled,
+            resolvedComposerSelection: resolvedComposerSelection ?? null,
+            modelForSend,
+            resolvedEffort,
+            disableThinkingForClaude,
+            sanitizedCollaborationMode,
+            resolvedAccessMode,
+            finalText,
+            visibleUserText,
+            finalImages,
             sharedSendAdmissionRevision,
-            target: sharedNextTarget,
-          })) as Record<string, unknown>;
-          // V2 begin 早退（recovery-required / target-unavailable）：编排层已驱动
-          // send 状态机，这里不按发送失败处理，也不抛出；复位 processing，
-          // 让 Composer 按状态机渲染恢复/不可用 UI。
-          if (
-            sharedV2SendEnabled &&
-            (response?.status === "blocked" ||
-              response?.status === "recovery-required" ||
-              response?.status === "target-unavailable")
-          ) {
-            markProcessing(threadId, false);
-            setActiveTurnId(threadId, null);
-            safeMessageActivity();
-            cancelSharedProviderRetry(workspace.id, threadId, "idle");
-            return response as SendSharedSessionTurnV2Result;
-          }
-          const sharedNativeThreadId = asString(
-            response?.nativeThreadId ?? "",
-          ).trim();
-          if (
-            sharedNativeThreadId &&
-            !sharedNativeThreadId.startsWith("shared:")
-          ) {
-            dispatch({
-              type: "hideThread",
-              workspaceId: workspace.id,
-              threadId: sharedNativeThreadId,
-            });
-          }
-
-          onDebug?.({
-            id: `${Date.now()}-server-shared-turn-start`,
-            timestamp: Date.now(),
-            source: "server",
-            label: "shared-session/turn/start response",
-            payload: response,
           });
-          const sharedV2Result =
-            response.v2 && typeof response.v2 === "object"
-              ? (response.v2 as Record<string, unknown>)
-              : null;
-          if (sharedV2SendEnabled && sharedV2Result?.committed === true) {
-            // Shared V2 command 直到 Runtime terminal 被 canonical commit 后才返回。
-            // 先用 exact Runtime identity 建立 terminal barrier，避免已排队的
-            // assistant/reasoning/item event 在 UI cleanup 后复燃 Stop。
-            const sharedRuntimeTurnId = asString(
-              response.runtimeTurnId ?? "",
-            ).trim();
-            if (sharedRuntimeTurnId) {
-              onSharedDurableTurnCommitted?.(threadId, sharedRuntimeTurnId);
-            } else {
-              onDebug?.({
-                id: `${Date.now()}-shared-durable-terminal-runtime-id-missing`,
-                timestamp: Date.now(),
-                source: "error",
-                label: "shared-session/durable-terminal-runtime-id-missing",
-                payload: {
-                  workspaceId: workspace.id,
-                  threadId,
-                  attemptId: asString(sharedV2Result.attemptId).trim() || null,
-                  logicalTurnId:
-                    asString(sharedV2Result.logicalTurnId).trim() || null,
-                },
-              });
-            }
-            // Project-memory input capture for shared V2 (native path is skipped
-            // by this early return). Prefer runtimeTurnId so fusion matches
-            // turn/completed / onAgentMessageCompleted turnId.
-            const sharedMemoryTurnId =
-              sharedRuntimeTurnId ||
-              asString(sharedV2Result.logicalTurnId).trim();
-            if (sharedMemoryTurnId && visibleUserText.trim()) {
-              void projectMemoryFacade
-                .captureTurnInput({
-                  workspaceId: workspace.id,
-                  userInput: visibleUserText,
-                  threadId,
-                  turnId: sharedMemoryTurnId,
-                  workspaceName: workspace.name ?? null,
-                  workspacePath: workspace.path ?? null,
-                  engine: sharedResolvedEngine,
-                })
-                .then((captured) => {
-                  onInputMemoryCaptured?.({
-                    workspaceId: workspace.id,
-                    threadId,
-                    turnId: sharedMemoryTurnId,
-                    inputText: visibleUserText,
-                    memoryId: captured?.id ?? null,
-                    workspaceName: workspace.name ?? null,
-                    workspacePath: workspace.path ?? null,
-                    engine: sharedResolvedEngine,
-                  });
-                })
-                .catch((err) => {
-                  if (shouldEmitThreadMessagingDevLogs) {
-                    console.warn(
-                      "[project-memory] shared auto capture failed:",
-                      err,
-                    );
-                  }
-                });
-            }
-            // 此处只收敛 Shared UI projection；不得落入 Native turn-start lifecycle。
-            markProcessing(threadId, false);
-            setActiveTurnId(threadId, null);
-            safeMessageActivity();
-            return response as SendSharedSessionTurnV2Result;
+          if (sharedV2SendOutcome.kind === "return") {
+            return sharedV2SendOutcome.result;
           }
-          // Shared V1 (or V2 without committed): still capture input when we have
-          // a stable turn identity; native capture block is not reached.
-          const sharedV1MemoryTurnId =
-            asString(response.runtimeTurnId ?? "").trim() ||
-            asString(sharedV2Result?.logicalTurnId).trim() ||
-            asString(response.logicalTurnId ?? response.turnId ?? "").trim();
-          if (sharedV1MemoryTurnId && visibleUserText.trim()) {
-            void projectMemoryFacade
-              .captureTurnInput({
-                workspaceId: workspace.id,
-                userInput: visibleUserText,
-                threadId,
-                turnId: sharedV1MemoryTurnId,
-                workspaceName: workspace.name ?? null,
-                workspacePath: workspace.path ?? null,
-                engine: sharedResolvedEngine,
-              })
-              .then((captured) => {
-                onInputMemoryCaptured?.({
-                  workspaceId: workspace.id,
-                  threadId,
-                  turnId: sharedV1MemoryTurnId,
-                  inputText: visibleUserText,
-                  memoryId: captured?.id ?? null,
-                  workspaceName: workspace.name ?? null,
-                  workspacePath: workspace.path ?? null,
-                  engine: sharedResolvedEngine,
-                });
-              })
-              .catch((err) => {
-                if (shouldEmitThreadMessagingDevLogs) {
-                  console.warn(
-                    "[project-memory] shared auto capture failed:",
-                    err,
-                  );
-                }
-              });
-          }
+          response = sharedV2SendOutcome.response;
         } else {
           const isClaudeSession = threadId.startsWith("claude:");
           const isOpenCodeSession = threadId.startsWith("opencode:");
@@ -2782,30 +2457,16 @@ export function useThreadMessaging({
         if (await retryCodexSendAfterThreadRefresh(rawMessage)) {
           return;
         }
-        const preserveSharedActiveLifecycle =
-          threadKind === "shared" &&
-          error instanceof SharedActiveAttemptObserverError &&
-          getSharedSendActiveAttemptId(workspace.id, threadId) ===
-            error.attemptId;
-        if (preserveSharedActiveLifecycle) {
-          // Runtime 已 accepted；这里只是 frontend observer 脱离。禁止把它投影成
-          // Turn failure 或清 processing，recovery card 负责 exact-Attempt reattach。
-          onDebug?.({
-            id: `${Date.now()}-shared-terminal-observer-detached`,
-            timestamp: Date.now(),
-            source: "error",
-            label: "shared terminal observer detached",
-            payload: {
-              threadId,
-              attemptId: error.attemptId,
-              rawMessage,
-            },
+        const sharedActiveLifecycleCatchResult =
+          resolveSharedActiveLifecycleCatch(sharedCtx, {
+            workspace,
+            threadId,
+            threadKind,
+            error,
+            rawMessage,
           });
-          safeMessageActivity();
-          return {
-            status: "ambiguous-error",
-            reason: rawMessage,
-          };
+        if (sharedActiveLifecycleCatchResult) {
+          return sharedActiveLifecycleCatchResult;
         }
         const stabilityDiagnostic =
           resolveThreadStabilityDiagnostic(rawMessage);
@@ -2874,33 +2535,14 @@ export function useThreadMessaging({
         }
         safeMessageActivity();
         if (threadKind === "shared") {
-          noteSharedProviderRetryTurnSettled({
-            workspaceId: workspace.id,
+          return settleSharedSendFailure(sharedCtx, {
+            workspace,
             threadId,
-            engine: resolvedEngine,
-            providerProfileId:
-              supportedStoredSharedTarget?.providerProfileId ??
-              getSharedTargetState(workspace.id, threadId).selectedNextTarget
-                ?.providerProfileId ??
-              null,
-            model:
-              supportedStoredSharedTarget?.model ??
-              getSharedTargetState(workspace.id, threadId).selectedNextTarget
-                ?.model ??
-              null,
-            message: rawMessage,
-            outcome: "failed",
-            wasLocalInterrupt: workspaceScopedHas(
-              interruptedThreadsRef.current,
-              workspace.id,
-              threadId,
-            ),
-            originKind: options?.originKind ?? null,
+            resolvedEngine,
+            supportedStoredSharedTarget,
+            options,
+            rawMessage,
           });
-          return {
-            status: "ambiguous-error",
-            reason: rawMessage,
-          };
         }
       }
     },
