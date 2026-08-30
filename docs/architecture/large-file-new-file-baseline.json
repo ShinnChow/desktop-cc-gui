@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T18:17:09.464Z",
+  "generatedAt": "2026-08-30T18:25:11.747Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -114,16 +114,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src/features/composer/components/Composer.tsx",
-      "lines": 3601,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src/services/tauri.test.ts",
       "lines": 3508,
       "type": "ts/tsx",
@@ -180,6 +170,16 @@
       "policyId": "styles",
       "priority": "P1",
       "warnThreshold": 2200,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/composer/components/Composer.tsx",
+      "lines": 3405,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },

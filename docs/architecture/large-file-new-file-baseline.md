@@ -8,7 +8,7 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T18:17:09.463Z
+- Generated at: 2026-08-30T18:25:11.744Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
 - Count: 393
@@ -26,13 +26,13 @@ status: generated
 | `src/features/composer/components/ChatInputBox/selectors/ModelSelect.test.tsx` | 3679 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/app/components/Sidebar.test.tsx` | 3620 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/messages/components/Messages.live-behavior.test.tsx` | 3606 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
-| `src/features/composer/components/Composer.tsx` | 3601 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/services/tauri.test.ts` | 3508 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadsReducer.ts` | 3506 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/workspaces/commands.rs` | 3493 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/claude.rs` | 3430 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/components/GitHistoryPanelView.tsx` | 3425 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/styles/sidebar.css` | 3409 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
+| `src/features/composer/components/Composer.tsx` | 3405 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreads.ts` | 3385 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadActions.test.tsx` | 3330 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/backend/app_server_cli.rs` | 3306 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
