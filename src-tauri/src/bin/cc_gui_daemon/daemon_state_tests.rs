@@ -2,6 +2,86 @@ use super::*;
 use std::{cell::RefCell, rc::Rc};
 
 #[test]
+fn pi_external_wakeup_notification_is_allowed_after_pending_tasks_clear() {
+    let notification = engine::events::EngineEvent::BackgroundTaskUpdated {
+        workspace_id: "ws-1".to_string(),
+        tool_id: None,
+        task: json!({"id": "task-1", "status": "completed"}),
+        source: "notification".to_string(),
+    };
+
+    assert!(is_pi_external_wakeup_allowed(
+        "pi-external-follow-up",
+        "pi-turn-primary",
+        &notification,
+        false,
+        false,
+        false,
+    ));
+}
+
+#[test]
+fn pi_external_wakeup_without_notification_stays_blocked_after_pending_tasks_clear() {
+    let unrelated = engine::events::EngineEvent::TextDelta {
+        workspace_id: "ws-1".to_string(),
+        text: "unrelated".to_string(),
+    };
+
+    assert!(!is_pi_external_wakeup_allowed(
+        "pi-external-unrelated",
+        "pi-turn-primary",
+        &unrelated,
+        false,
+        false,
+        false,
+    ));
+}
+
+#[test]
+fn pi_foreground_native_turns_include_primary_and_derived_ids() {
+    // 实测 pi 0.84.4：run 内每个工具往返都是一个新原生 turn，派生
+    // `{primary}:t{n}` 前台 id。daemon 必须放行 primary 本体与派生 id，
+    // 其余（外部合成 id / 陌生真实 id）不在此列。
+    let primary = "pi-turn-1111";
+    assert!(is_pi_foreground_native_turn(primary, primary));
+    assert!(is_pi_foreground_native_turn(
+        &format!("{primary}:t1"),
+        primary
+    ));
+    assert!(is_pi_foreground_native_turn(
+        &format!("{primary}:t7"),
+        primary
+    ));
+    assert!(!is_pi_foreground_native_turn("pi-external-1-1", primary));
+    assert!(!is_pi_foreground_native_turn("pi-turn-2222", primary));
+    // 前缀相似但非本 run 的 id 不得误放行。
+    assert!(!is_pi_foreground_native_turn("pi-turn-11119999", primary));
+}
+
+#[test]
+fn pi_agent_settled_marker_detected_only_for_settled_kind() {
+    let marker = engine::events::EngineEvent::Raw {
+        workspace_id: "ws-1".to_string(),
+        engine: engine::EngineType::Pi,
+        data: json!({"source": "pi_rpc", "kind": "agent_settled"}),
+    };
+    assert!(is_pi_agent_settled_marker(&marker));
+
+    let compaction = engine::events::EngineEvent::Raw {
+        workspace_id: "ws-1".to_string(),
+        engine: engine::EngineType::Pi,
+        data: json!({"source": "pi_rpc", "kind": "compaction_start"}),
+    };
+    assert!(!is_pi_agent_settled_marker(&compaction));
+
+    let completed = engine::events::EngineEvent::TurnCompleted {
+        workspace_id: "ws-1".to_string(),
+        result: None,
+    };
+    assert!(!is_pi_agent_settled_marker(&completed));
+}
+
+#[test]
 fn daemon_active_engine_normalizes_legacy_gemini_to_supported_fallback() {
     let mut settings = AppSettings::default();
     settings.gemini_enabled = true;

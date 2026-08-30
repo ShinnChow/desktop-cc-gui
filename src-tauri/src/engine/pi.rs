@@ -7,11 +7,11 @@
 //! - `session` { id }
 //! - `message_update` { assistantMessageEvent: { type: text_delta|thinking_delta, delta } }
 //! - `tool_execution_start` / `tool_execution_end`
-//! - `message_end` (assistant usage / errors)
+//! - `message_end` (assistant snapshot / usage / errors)
 //! - `agent_end` / `turn_end` with errorMessage (auth failures etc.)
 
 use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -242,22 +242,32 @@ fn pi_resident_map_key(session_id: Option<&str>, scratch: &str) -> String {
         .unwrap_or_else(|| format!("scratch:{scratch}"))
 }
 
-/// State of one streaming RPC agent run. The main turn owns the content
-/// stream; steer turns attach and settle together with the run (empty text).
+/// State of one streaming RPC agent run. PI can emit several native turns
+/// inside one agent run (实测 0.84.4：每个工具往返都是一个新原生 turn ——
+/// `turn_start`/`turn_end` 边界在 assistant 消息之间出现）；`active_turn_id`
+/// tracks the native boundary while pending user turn ids wait for the next
+/// `turn_start`.
 struct PiRpcRun {
     main_turn_id: String,
+    active_turn_id: String,
+    seen_turn_start: bool,
+    pending_turn_ids: VecDeque<String>,
+    completed_turn_ids: HashSet<String>,
+    /// 本 run 内已派生的 follow-up turn 数（非 orphan run 专用）。
+    native_turn_seq: usize,
     requested_model: Option<String>,
     attached_turn_ids: Vec<String>,
     waiters: Vec<(String, oneshot::Sender<Result<String, String>>)>,
     response_text: String,
+    authoritative_text: Option<String>,
     saw_tool_activity: bool,
     tool_names_by_id: HashMap<String, String>,
     tool_inputs_by_id: HashMap<String, Option<Value>>,
     stream_error: Option<String>,
     abort_requested: bool,
     /// True while the main turn is synthetic：run 承接的是 pi 自唤醒 turn
-    /// （bg 任务完成通知注入等，不经过 ccgui 发送路径）。首个真实 turn
-    /// steer attach 时收养主流（见 `adopt_orphan_run`）。
+    /// （bg 任务完成通知注入等，不经过 ccgui 发送路径）。真实用户 turn
+    /// 只排队到下一个原生 `turn_start`，不会收养外部正文。
     orphan: bool,
 }
 
@@ -269,10 +279,16 @@ impl PiRpcRun {
     ) -> Self {
         Self {
             main_turn_id: main_turn_id.to_string(),
+            active_turn_id: main_turn_id.to_string(),
+            seen_turn_start: false,
+            pending_turn_ids: VecDeque::new(),
+            completed_turn_ids: HashSet::new(),
+            native_turn_seq: 0,
             requested_model,
             attached_turn_ids: Vec::new(),
             waiters: vec![(main_turn_id.to_string(), waiter)],
             response_text: String::new(),
+            authoritative_text: None,
             saw_tool_activity: false,
             tool_names_by_id: HashMap::new(),
             tool_inputs_by_id: HashMap::new(),
@@ -286,35 +302,81 @@ impl PiRpcRun {
     /// （settle 时 send 失败静默跳过）。事件发往合成 id，被 daemon
     /// forwarder 按 turn_id 过滤天然丢弃，不污染任何真实会话 UI。
     fn new_orphan() -> Self {
-        static ORPHAN_SEQ: AtomicU64 = AtomicU64::new(0);
-        let seq = ORPHAN_SEQ.fetch_add(1, Ordering::SeqCst);
         let (tx, _rx) = oneshot::channel();
-        let mut run = Self::new(
-            &format!(
-                "pi-external-{}-{seq}",
-                unix_timestamp_ms_for_process_diagnostics()
-            ),
-            tx,
-            None,
-        );
+        let mut run = Self::new(&next_pi_external_turn_id(), tx, None);
         run.orphan = true;
         run
     }
 }
 
-/// orphan run 被首个真实 turn 收养：改写 main turn id 并返回待回放的已
-/// 缓冲文本（无缓冲时收养但不回放）。非 orphan run 原样返回 None。
-fn adopt_orphan_run(run: &mut PiRpcRun, turn_id: &str) -> Option<String> {
-    if !run.orphan {
-        return None;
+fn next_pi_external_turn_id() -> String {
+    static EXTERNAL_TURN_SEQ: AtomicU64 = AtomicU64::new(0);
+    let seq = EXTERNAL_TURN_SEQ.fetch_add(1, Ordering::SeqCst);
+    format!(
+        "pi-external-{}-{seq}",
+        unix_timestamp_ms_for_process_diagnostics()
+    )
+}
+
+/// pi 后台任务终态通知事件（扩展 `<background-task-notification>` 唤醒）。
+pub(crate) fn is_pi_background_notification_event(event: &EngineEvent) -> bool {
+    matches!(
+        event,
+        EngineEvent::BackgroundTaskUpdated { source, .. } if source == "notification"
+    )
+}
+
+/// daemon/app forwarder 的外部 turn 门控：`pi-external-*` 仅在携带后台
+/// 通知、仍有待回收后台任务、或属已知唤醒 turn 时放行进入当前会话。
+pub(crate) fn is_pi_external_wakeup_allowed(
+    external_turn_id: &str,
+    primary_turn_id: &str,
+    event: &EngineEvent,
+    has_pending_background_tasks: bool,
+    pending_external_wakeup: bool,
+    is_known_external_wakeup: bool,
+) -> bool {
+    external_turn_id.starts_with("pi-external-")
+        && (is_pi_background_notification_event(event)
+            || has_pending_background_tasks
+            || pending_external_wakeup
+            || is_known_external_wakeup)
+        && external_turn_id != primary_turn_id
+}
+
+/// pump 在 `agent_settled` 时发出的生命周期标记（run 彻底 settle）。
+pub(crate) fn is_pi_agent_settled_marker(event: &EngineEvent) -> bool {
+    matches!(
+        event,
+        EngineEvent::Raw { data, .. }
+            if data.get("kind").and_then(Value::as_str) == Some("agent_settled")
+    )
+}
+
+/// 用户自己 run 的原生 turn：primary 本体与 `{primary}:t{n}` 派生 id。
+/// 普通多轮工具对话里每个 assistant 回合都是一个新原生 turn（实测 pi
+/// 0.84.4），它们是前台流的一部分，forwarder 必须无条件放行。
+pub(crate) fn is_pi_foreground_native_turn(turn_id: &str, primary_turn_id: &str) -> bool {
+    turn_id == primary_turn_id || turn_id.starts_with(&format!("{primary_turn_id}:"))
+}
+
+/// Bind the next native turn inside an active run.
+///
+/// 用户 steer 的真实 turn id 优先（pending 队列）。没有排队 turn 时：
+/// - orphan run（pi 自唤醒）→ 合成 `pi-external-*` id，由 daemon 的外部
+///   turn 门控决定是否投影；
+/// - 用户自己的 run → 派生 `{main}:t{n}` id。这是**前台**流的一部分
+///   （普通多轮工具对话里每个 assistant 回合都是一个新原生 turn，实测
+///   0.84.4），daemon 必须无条件放行，不得套用外部门控。
+fn bind_next_native_turn_id(run: &mut PiRpcRun) -> String {
+    if let Some(turn_id) = run.pending_turn_ids.pop_front() {
+        return turn_id;
     }
-    run.orphan = false;
-    run.main_turn_id = turn_id.to_string();
-    if run.response_text.is_empty() {
-        None
-    } else {
-        Some(run.response_text.clone())
+    if run.orphan {
+        return next_pi_external_turn_id();
     }
+    run.native_turn_seq += 1;
+    format!("{}:t{}", run.main_turn_id, run.native_turn_seq)
 }
 
 /// 单 resident 的发送决策：本地有活跃 run 必 steer；本地无 run 但 pi 仍在
@@ -424,15 +486,53 @@ fn unix_timestamp_ms_for_process_diagnostics() -> u64 {
         .unwrap_or(0)
 }
 
-/// Settle an RPC run: main turn gets the accumulated text, attached steer
-/// turns settle with empty text (their content is part of the same run's
-/// stream). Failures settle every waiting turn with the same error.
+fn should_backfill_last_assistant_text(run: &PiRpcRun) -> bool {
+    resolve_rpc_turn_text(run).trim().is_empty() && (run.orphan || !run.saw_tool_activity)
+}
+
+fn resolve_rpc_turn_text(run: &PiRpcRun) -> String {
+    run.authoritative_text
+        .as_deref()
+        .filter(|text| !text.trim().is_empty())
+        .unwrap_or(&run.response_text)
+        .to_string()
+}
+
+fn commit_rpc_turn(workspace_id: &str, run: &mut PiRpcRun, emit: &dyn Fn(&str, EngineEvent)) {
+    let turn_id = run.active_turn_id.clone();
+    if !run.completed_turn_ids.insert(turn_id.clone()) {
+        return;
+    }
+    let text = resolve_rpc_turn_text(run);
+    run.response_text = text.clone();
+    emit(
+        &turn_id,
+        EngineEvent::TurnCompleted {
+            workspace_id: workspace_id.to_string(),
+            result: Some(json!({ "text": text })),
+        },
+    );
+    if let Some(index) = run
+        .waiters
+        .iter()
+        .position(|(waiter_turn_id, _)| waiter_turn_id == &turn_id)
+    {
+        let (_, waiter) = run.waiters.remove(index);
+        let _ = waiter.send(Ok(resolve_rpc_turn_text(run)));
+    }
+    run.authoritative_text = None;
+    run.response_text.clear();
+}
+
+/// Settle an RPC run when PI closes without a per-turn boundary. Preserve the
+/// main/active text and do not copy it into unrelated attached waiters.
 fn settle_rpc_run(
     workspace_id: &str,
     run: PiRpcRun,
     fatal: Option<String>,
     emit: &dyn Fn(&str, EngineEvent),
 ) {
+    let settled_text = resolve_rpc_turn_text(&run);
     let failure = fatal
         .or_else(|| {
             if run.abort_requested {
@@ -444,7 +544,7 @@ fn settle_rpc_run(
             }
         })
         .or_else(|| {
-            if run.response_text.trim().is_empty() && !run.saw_tool_activity {
+            if settled_text.trim().is_empty() && !run.saw_tool_activity {
                 Some("PI exited without assistant output.".to_string())
             } else {
                 None
@@ -457,13 +557,12 @@ fn settle_rpc_run(
             "foreground",
             error,
             None,
-            !run.response_text.trim().is_empty(),
+            !settled_text.trim().is_empty(),
             run.saw_tool_activity,
         );
     }
-    // 收养（orphan run 被首个真实 turn 接管）后 waiters[0] 是合成 turn，
-    // main 判定必须按 id 而非下标；非 orphan run 的 waiters[0] id 本就等于
-    // main_turn_id，等价无回归。
+    // main waiter 仍按 id 判定；外部回合的 synthetic waiter 不得把正文
+    // 错投给后续用户 turn。
     let main_turn_id = run.main_turn_id.clone();
     for (turn_id, waiter) in run.waiters.into_iter() {
         let is_main = turn_id == main_turn_id;
@@ -480,8 +579,8 @@ fn settle_rpc_run(
                 let _ = waiter.send(Err(error.clone()));
             }
             None => {
-                let text = if is_main {
-                    run.response_text.clone()
+                let text = if is_main || turn_id == run.active_turn_id {
+                    settled_text.clone()
                 } else {
                     String::new()
                 };
@@ -685,8 +784,11 @@ fn expand_rpc_prompt_attachments(
 
 enum PiStreamLine {
     SessionId(String),
+    TurnStart,
+    TurnEnd,
     TextDelta(String),
     ThinkingDelta(String),
+    AssistantSnapshot(String),
     ToolStart {
         tool_id: String,
         tool_name: String,
@@ -892,10 +994,50 @@ pub(crate) fn parse_pi_background_task_notification(
     details: Option<Value>,
     content: &str,
 ) -> Option<Value> {
-    if let Some(details) = details {
-        if details.get("id").and_then(Value::as_str).is_some() {
-            return Some(details);
+    fn strip_xml_tags(value: &str) -> String {
+        let mut output = String::with_capacity(value.len());
+        let mut in_tag = false;
+        for ch in value.chars() {
+            match ch {
+                '<' => in_tag = true,
+                '>' if in_tag => in_tag = false,
+                _ if !in_tag => output.push(ch),
+                _ => {}
+            }
         }
+        output.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+    fn is_machine_completion_summary(value: &str) -> bool {
+        let normalized = value.trim().to_ascii_lowercase();
+        let machine_prefixes = [
+            "background task ",
+            "background shell task ",
+            "background command ",
+        ];
+        let terminal_suffixes = [
+            " completed",
+            " failed",
+            " killed",
+            " cancelled",
+            " canceled",
+        ];
+        machine_prefixes
+            .iter()
+            .any(|prefix| normalized.starts_with(prefix))
+            && terminal_suffixes
+                .iter()
+                .any(|suffix| normalized.ends_with(suffix))
+    }
+    fn completion_text_from_details(details: &Value) -> Option<String> {
+        ["summary", "result"]
+            .iter()
+            .filter_map(|key| details.get(*key))
+            .find_map(|value| {
+                value
+                    .as_str()
+                    .map(strip_xml_tags)
+                    .filter(|text| !text.is_empty() && !is_machine_completion_summary(text))
+            })
     }
     fn tag<'a>(text: &'a str, name: &str) -> Option<&'a str> {
         let open = format!("<{name}>");
@@ -907,6 +1049,36 @@ pub(crate) fn parse_pi_background_task_notification(
             None
         } else {
             Some(value)
+        }
+    }
+    let content_completion_text = ["summary", "result"]
+        .iter()
+        .filter_map(|name| tag(content, name))
+        .find_map(|value| {
+            let text = strip_xml_tags(value);
+            (!text.is_empty() && !is_machine_completion_summary(&text)).then_some(text)
+        });
+    if let Some(details) = details {
+        if details.get("id").and_then(Value::as_str).is_some() {
+            let mut task = details;
+            let existing_machine_summary = task
+                .get("completionText")
+                .and_then(Value::as_str)
+                .map(is_machine_completion_summary)
+                .unwrap_or(false);
+            if task.get("completionText").is_none() || existing_machine_summary {
+                if let Some(text) = content_completion_text
+                    .clone()
+                    .or_else(|| completion_text_from_details(&task))
+                {
+                    task["completionText"] = json!(text);
+                } else if existing_machine_summary {
+                    if let Some(object) = task.as_object_mut() {
+                        object.remove("completionText");
+                    }
+                }
+            }
+            return Some(task);
         }
     }
     let id = tag(content, "task-id")?;
@@ -922,6 +1094,9 @@ pub(crate) fn parse_pi_background_task_notification(
     }
     if let Some(output) = tag(content, "output-file") {
         task["outputPath"] = json!(output);
+    }
+    if let Some(description) = content_completion_text {
+        task["completionText"] = json!(description);
     }
     Some(task)
 }
@@ -1004,6 +1179,30 @@ fn extract_error_message(value: &Value) -> Option<String> {
                 .filter(|v| !v.is_empty())
                 .map(str::to_string)
         })
+}
+
+fn extract_assistant_text(message: &Value) -> Option<String> {
+    if message.get("role").and_then(Value::as_str) != Some("assistant") {
+        return None;
+    }
+    let content = message.get("content")?;
+    let text = match content {
+        Value::String(value) => value.clone(),
+        Value::Array(parts) => parts
+            .iter()
+            .filter_map(|part| match part {
+                Value::String(value) => Some(value.as_str()),
+                Value::Object(object) => {
+                    let kind = object.get("type").and_then(Value::as_str).unwrap_or("");
+                    matches!(kind, "text" | "output_text")
+                        .then(|| object.get("text").and_then(Value::as_str).unwrap_or(""))
+                }
+                _ => None,
+            })
+            .collect::<String>(),
+        _ => String::new(),
+    };
+    (!text.trim().is_empty()).then_some(text)
 }
 
 /// Parse one NDJSON line from `pi --print --mode json`.
@@ -1096,19 +1295,28 @@ fn parse_pi_stream_line(value: &Value) -> PiStreamLine {
                 return parse_pi_custom_message_line(event_type, message);
             }
             if role == "assistant" {
+                if event_type == "message_end" {
+                    if let Some(text) = message.and_then(extract_assistant_text) {
+                        return PiStreamLine::AssistantSnapshot(text);
+                    }
+                }
                 if let Some(usage) = message.and_then(|m| m.get("usage")) {
                     return PiStreamLine::Usage(usage.clone());
                 }
             }
             PiStreamLine::Other
         }
-        "agent_end" | "turn_end" => {
+        "turn_start" => PiStreamLine::TurnStart,
+        "turn_end" => {
             if let Some(error) = extract_error_message(value) {
                 PiStreamLine::AssistantError(error)
             } else {
-                PiStreamLine::Other
+                PiStreamLine::TurnEnd
             }
         }
+        "agent_end" => extract_error_message(value)
+            .map(PiStreamLine::AssistantError)
+            .unwrap_or(PiStreamLine::Other),
         _ => PiStreamLine::Other,
     }
 }
@@ -1327,8 +1535,21 @@ impl PiSession {
                         let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
                         if event_type == "agent_settled" {
                             let run = rpc_run.write().await.take();
+                            // 生命周期标记：run 彻底 settle（无重试/无排队
+                            // continuation）。daemon forwarder 以此判定
+                            // 「本 run 真正结束」，避免在第一个原生 turn 的
+                            // TurnCompleted 处过早断开、丢掉 run 内后续
+                            // 原生 turn（实测 0.84.4 的多 turn 结构）。
+                            let settled_marker_turn_id = run
+                                .as_ref()
+                                .map(|run| run.main_turn_id.clone())
+                                .unwrap_or_else(|| format!("pi-settled-{workspace_id}"));
                             if let Some(mut run) = run {
-                                if run.response_text.trim().is_empty() && !run.saw_tool_activity {
+                                // 自唤醒回合通常先收到 custom notification，因而会被
+                                // 标记为 tool activity；该回合的 assistant 正文仍可能只
+                                // 保存在 resident 的 last assistant message 中。
+                                // 普通 tool-only 回合继续禁止回读，避免把上一轮正文带入本轮。
+                                if should_backfill_last_assistant_text(&run) {
                                     if let Ok(text) = client.get_last_assistant_text().await {
                                         if !text.trim().is_empty() {
                                             run.response_text = text;
@@ -1337,6 +1558,17 @@ impl PiSession {
                                 }
                                 settle_rpc_run(&workspace_id, run, None, &emit);
                             }
+                            emit(
+                                &settled_marker_turn_id,
+                                EngineEvent::Raw {
+                                    workspace_id: workspace_id.clone(),
+                                    engine: EngineType::Pi,
+                                    data: json!({
+                                        "source": "pi_rpc",
+                                        "kind": "agent_settled",
+                                    }),
+                                },
+                            );
                             continue;
                         }
                         if event_type == "compaction_start" || event_type == "compaction_end" {
@@ -1370,16 +1602,46 @@ impl PiSession {
                         let mut guard = rpc_run.write().await;
                         if guard.is_none() && event_type == "agent_start" {
                             // pi 自唤醒 turn（bg 任务完成通知注入等）不经过
-                            // ccgui 发送路径：建 orphan run 承接事件流，
-                            // agent_settled 按既有逻辑结算；首个真实 turn
-                            // steer attach 时收养主流。
+                            // ccgui 发送路径：建 orphan run 承接事件流；真实
+                            // 用户消息稍后只排队到下一个原生 turn。
                             *guard = Some(PiRpcRun::new_orphan());
                         }
                         let Some(run) = guard.as_mut() else {
                             continue;
                         };
-                        let turn_id = run.main_turn_id.clone();
+                        let turn_id = run.active_turn_id.clone();
                         match parse_pi_stream_line(&value) {
+                            PiStreamLine::TurnStart => {
+                                let is_first_turn = !run.seen_turn_start;
+                                run.seen_turn_start = true;
+                                if is_first_turn {
+                                    if run.orphan {
+                                        emit(
+                                            &run.active_turn_id,
+                                            EngineEvent::TurnStarted {
+                                                workspace_id: workspace_id.clone(),
+                                                turn_id: run.active_turn_id.clone(),
+                                            },
+                                        );
+                                    }
+                                } else {
+                                    run.active_turn_id = bind_next_native_turn_id(run);
+                                    run.response_text.clear();
+                                    run.authoritative_text = None;
+                                    if !run.completed_turn_ids.contains(&run.active_turn_id) {
+                                        emit(
+                                            &run.active_turn_id,
+                                            EngineEvent::TurnStarted {
+                                                workspace_id: workspace_id.clone(),
+                                                turn_id: run.active_turn_id.clone(),
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                            PiStreamLine::TurnEnd => {
+                                commit_rpc_turn(&workspace_id, run, &emit);
+                            }
                             PiStreamLine::TextDelta(delta) => {
                                 run.response_text.push_str(&delta);
                                 emit(
@@ -1389,6 +1651,9 @@ impl PiSession {
                                         text: delta,
                                     },
                                 );
+                            }
+                            PiStreamLine::AssistantSnapshot(text) => {
+                                run.authoritative_text = Some(text);
                             }
                             PiStreamLine::ThinkingDelta(delta) => {
                                 emit(
@@ -1625,72 +1890,109 @@ impl PiSession {
             plan_rpc_send_mode(resident.run.read().await.is_some(), client.is_streaming())
         };
         if send_mode == RpcSendMode::Steer {
+            // Queue the user turn before writing to PI. `steer` can return after
+            // PI has already emitted `turn_start`; attaching afterwards races
+            // that boundary and assigns the native turn a synthetic id.
+            self.attach_turn_to_rpc_run(&resident, turn_id, tx).await;
             if let Err(error) = client.steer(&expanded.text, images).await {
+                self.detach_turn_from_rpc_run(&resident, turn_id).await;
                 return Err(PiRpcSendError::Failed(format!(
                     "pi rpc steer failed: {error}"
                 )));
             }
-            self.attach_turn_to_rpc_run(&resident, turn_id, tx).await;
         } else {
             resident.in_flight.store(true, Ordering::SeqCst);
             *resident.in_flight_turn.lock().await = Some(turn_id.to_string());
-            let prompt_result = client.prompt(&expanded.text, images.clone()).await;
-            resident.in_flight.store(false, Ordering::SeqCst);
-            *resident.in_flight_turn.lock().await = None;
-            let busy_steered = match prompt_result {
-                Ok(()) => false,
-                Err(error) if is_rpc_busy_error(&error) => {
-                    // 判定与到达之间的竞态：pi 已开始处理（多为 bg 任务完成
-                    // 自唤醒），prompt 在 preflight 被拒、消息未入队 → 转
-                    // steer 重投一次，随当前 turn 结算。
-                    log::warn!(
-                        "[pi/rpc] prompt rejected as busy; retrying as steer (workspace={})",
-                        self.workspace_id
+            // 先建 real run 再写 prompt：pi 接受 prompt 后立即开始推事件，
+            // RPC response 与事件广播是两条并发通道（实测 0.84.4 两者同毫秒
+            // 到达）。若等 prompt 返回才建 run，pump 会先收到 agent_start 并
+            // 误建 orphan 承接本 run（turn_start 在 orphan 上消耗）——随后
+            // 真实 run 覆盖槽位、seen_turn_start 丢失，第二个原生 turn 被当
+            // 成 first turn 折叠回 primary id，而 primary 已被前端终态账本
+            // 标记，后续内容全部丢弃（同会话第二次发送必现丢尾的根因）。
+            // busy 竞态下若槽位已被 pump 抢建（pi 恰好自唤醒），沿用既有
+            // attach 语义，不覆盖在跑的 run。
+            // 槽位非空（pump 恰好为 pi 自唤醒抢建了 orphan）：走既有 attach
+            // 语义，waiter 入队等下一个原生 turn_start 绑定；rx 已随 attach
+            // 进入 run.waiters，prompt 后直接落入看门狗等待结算。
+            let attached_to_existing_run = {
+                let mut guard = resident.run.write().await;
+                if guard.is_none() {
+                    *guard = Some(PiRpcRun::new(turn_id, tx, params.model.clone()));
+                    self.emit_turn_event(
+                        turn_id,
+                        EngineEvent::TurnStarted {
+                            workspace_id: self.workspace_id.clone(),
+                            turn_id: turn_id.to_string(),
+                        },
                     );
-                    if let Err(error) = client.steer(&expanded.text, images).await {
-                        return Err(PiRpcSendError::Failed(format!(
-                            "pi rpc steer failed: {error}"
-                        )));
-                    }
+                    false
+                } else {
+                    drop(guard);
+                    self.attach_turn_to_rpc_run(&resident, turn_id, tx).await;
                     true
                 }
-                Err(error) => {
+            };
+            if attached_to_existing_run {
+                let prompt_result = client.prompt(&expanded.text, images.clone()).await;
+                resident.in_flight.store(false, Ordering::SeqCst);
+                *resident.in_flight_turn.lock().await = None;
+                if let Err(error) = prompt_result {
                     return Err(PiRpcSendError::Failed(format!(
                         "pi rpc prompt failed: {error}"
                     )));
                 }
-            };
-            if busy_steered {
-                self.attach_turn_to_rpc_run(&resident, turn_id, tx).await;
+                self.finish_prompt_send_resident_state(&client, &scratch_key, turn_id)
+                    .await;
+                // 落入下方看门狗等待结算。
             } else {
-                let mut guard = resident.run.write().await;
-                *guard = Some(PiRpcRun::new(turn_id, tx, params.model.clone()));
-                drop(guard);
-                let session_id = client
-                    .session_id()
-                    .await
-                    .unwrap_or_else(|| "pending".to_string());
-                if is_valid_pi_session_id_arg(&session_id) {
-                    self.rekey_resident(&scratch_key, &format!("session:{session_id}"))
+                let prompt_result = client.prompt(&expanded.text, images.clone()).await;
+                resident.in_flight.store(false, Ordering::SeqCst);
+                *resident.in_flight_turn.lock().await = None;
+                let busy_steered = match prompt_result {
+                    Ok(()) => false,
+                    Err(error) if is_rpc_busy_error(&error) => {
+                        // 判定与到达之间的竞态：pi 已开始处理（多为 bg 任务完成
+                        // 自唤醒），prompt 在 preflight 被拒、消息未入队 → 转
+                        // steer 重投一次，随当前 turn 结算。waiter 已是本 run 的
+                        // main（预创建），随 run 原生结算，无需再 attach。
+                        log::warn!(
+                            "[pi/rpc] prompt rejected as busy; retrying as steer (workspace={})",
+                            self.workspace_id
+                        );
+                        if let Err(error) = client.steer(&expanded.text, images).await {
+                            return Err(PiRpcSendError::Failed(format!(
+                                "pi rpc steer failed: {error}"
+                            )));
+                        }
+                        true
+                    }
+                    Err(error) => {
+                        // prompt 被拒、本 run 不会开始：摘下预创建的 run 并按失败
+                        // 结算 waiter，避免发送边悬挂到看门狗超时。
+                        let run = resident.run.write().await.take();
+                        if let Some(run) = run {
+                            settle_rpc_run(
+                                &self.workspace_id,
+                                run,
+                                Some(format!("pi rpc prompt failed: {error}")),
+                                &|turn_id, event| {
+                                    let _ = self.event_sender.send(PiTurnEvent {
+                                        turn_id: turn_id.to_string(),
+                                        event,
+                                    });
+                                },
+                            );
+                        }
+                        return Err(PiRpcSendError::Failed(format!(
+                            "pi rpc prompt failed: {error}"
+                        )));
+                    }
+                };
+                if !busy_steered {
+                    self.finish_prompt_send_resident_state(&client, &scratch_key, turn_id)
                         .await;
-                    self.set_session_id(Some(session_id.clone())).await;
                 }
-                self.emit_turn_event(
-                    turn_id,
-                    EngineEvent::SessionStarted {
-                        workspace_id: self.workspace_id.clone(),
-                        session_id,
-                        engine: EngineType::Pi,
-                        turn_id: Some(turn_id.to_string()),
-                    },
-                );
-                self.emit_turn_event(
-                    turn_id,
-                    EngineEvent::TurnStarted {
-                        workspace_id: self.workspace_id.clone(),
-                        turn_id: turn_id.to_string(),
-                    },
-                );
             }
         }
 
@@ -1864,46 +2166,64 @@ impl PiSession {
     }
 
     /// steer 发送后的统一 attach：run 缺失（pi 自唤醒 turn 的 agent_start
-    /// 尚未泵到）时补 orphan run；orphan run 被首个真实 turn 收养——改写
-    /// main turn id，`TurnStarted` 后回放已缓冲文本为一条 `TextDelta`，
-    /// settle 时取得完整 response_text；非 orphan run 维持既有 attached
-    /// 语义（settle 空文本，前端乐观气泡既有链路）。
+    /// 尚未泵到）时补 orphan run；真实用户 turn 只进入 pending 队列，
+    /// 在下一个原生 `turn_start` 到达时绑定，禁止把外部 turn 的正文收养
+    /// 到用户消息。
     async fn attach_turn_to_rpc_run(
         &self,
         resident: &PiResident,
         turn_id: &str,
         tx: oneshot::Sender<Result<String, String>>,
     ) {
-        let replay = {
+        {
             let mut guard = resident.run.write().await;
             if guard.is_none() {
                 *guard = Some(PiRpcRun::new_orphan());
             }
             let run = guard.as_mut().expect("run just ensured");
-            let was_orphan = run.orphan;
-            let replay = adopt_orphan_run(run, turn_id);
-            if !was_orphan {
-                run.attached_turn_ids.push(turn_id.to_string());
-            }
+            run.pending_turn_ids.push_back(turn_id.to_string());
+            run.attached_turn_ids.push(turn_id.to_string());
             run.waiters.push((turn_id.to_string(), tx));
-            replay
+        }
+    }
+
+    async fn detach_turn_from_rpc_run(&self, resident: &PiResident, turn_id: &str) {
+        let mut guard = resident.run.write().await;
+        let Some(run) = guard.as_mut() else {
+            return;
         };
+        run.pending_turn_ids.retain(|pending| pending != turn_id);
+        run.attached_turn_ids.retain(|attached| attached != turn_id);
+        run.waiters
+            .retain(|(waiter_turn_id, _)| waiter_turn_id != turn_id);
+    }
+
+    /// prompt 被接受后的 resident 收尾：回填 session id、rekey、广播
+    /// SessionStarted。TurnStarted 已在预创建 run 时发出，不再重复。
+    async fn finish_prompt_send_resident_state(
+        &self,
+        client: &Arc<PiRpcClient>,
+        scratch_key: &str,
+        turn_id: &str,
+    ) {
+        let session_id = client
+            .session_id()
+            .await
+            .unwrap_or_else(|| "pending".to_string());
+        if is_valid_pi_session_id_arg(&session_id) {
+            self.rekey_resident(scratch_key, &format!("session:{session_id}"))
+                .await;
+            self.set_session_id(Some(session_id.clone())).await;
+        }
         self.emit_turn_event(
             turn_id,
-            EngineEvent::TurnStarted {
+            EngineEvent::SessionStarted {
                 workspace_id: self.workspace_id.clone(),
-                turn_id: turn_id.to_string(),
+                session_id,
+                engine: EngineType::Pi,
+                turn_id: Some(turn_id.to_string()),
             },
         );
-        if let Some(text) = replay {
-            self.emit_turn_event(
-                turn_id,
-                EngineEvent::TextDelta {
-                    workspace_id: self.workspace_id.clone(),
-                    text,
-                },
-            );
-        }
     }
 
     /// Self-heal a single resident: run present but RPC not streaming means
@@ -2316,6 +2636,7 @@ impl PiSession {
         });
 
         let mut response_text = String::new();
+        let mut authoritative_response_text: Option<String> = None;
         let mut saw_tool_activity = false;
         let mut tool_names_by_id: HashMap<String, String> = HashMap::new();
         let mut tool_inputs_by_id: HashMap<String, Option<Value>> = HashMap::new();
@@ -2404,6 +2725,9 @@ impl PiSession {
                                 text: delta,
                             },
                         );
+                    }
+                    PiStreamLine::AssistantSnapshot(text) => {
+                        authoritative_response_text = Some(text);
                     }
                     PiStreamLine::ThinkingDelta(delta) => {
                         self.emit_turn_event(
@@ -2523,7 +2847,10 @@ impl PiSession {
                     PiStreamLine::AssistantError(error) => {
                         stream_error = Some(error);
                     }
-                    PiStreamLine::Usage(_) | PiStreamLine::Other => {}
+                    PiStreamLine::TurnStart
+                    | PiStreamLine::TurnEnd
+                    | PiStreamLine::Usage(_)
+                    | PiStreamLine::Other => {}
                 },
                 Err(_) => {
                     error_output.push_str(&line);
@@ -2532,6 +2859,12 @@ impl PiSession {
             }
         }
 
+        if let Some(text) = authoritative_response_text
+            .as_deref()
+            .filter(|text| !text.trim().is_empty())
+        {
+            response_text = text.to_string();
+        }
         let stdout_eof_ms = turn_started_at.elapsed().as_millis();
         let mut child = {
             let mut active = self.active_processes.lock().await;
@@ -3056,56 +3389,154 @@ mod tests {
     }
 
     #[test]
-    fn adopt_orphan_run_promotes_main_and_replays_buffer() {
-        // 有缓冲：收养 + 返回待回放文本。
+    fn orphan_run_backfills_last_assistant_text_after_notification() {
         let mut run = PiRpcRun::new_orphan();
-        run.response_text.push_str("已流出一截");
-        let replay = adopt_orphan_run(&mut run, "turn-u1");
-        assert_eq!(replay.as_deref(), Some("已流出一截"));
-        assert!(!run.orphan);
-        assert_eq!(run.main_turn_id, "turn-u1");
-        // 第二个 turn attach：非 orphan，不收养不回放。
-        assert!(adopt_orphan_run(&mut run, "turn-u2").is_none());
-        assert_eq!(run.main_turn_id, "turn-u1");
-        // 无缓冲 orphan：收养但不回放。
-        let mut empty = PiRpcRun::new_orphan();
-        assert!(adopt_orphan_run(&mut empty, "turn-v1").is_none());
-        assert!(!empty.orphan);
-        assert_eq!(empty.main_turn_id, "turn-v1");
+        run.saw_tool_activity = true;
+        assert!(should_backfill_last_assistant_text(&run));
     }
 
     #[test]
-    fn settle_adopted_orphan_run_gives_full_text_to_adopting_turn() {
-        // orphan run 被真实 turn 收养后：settle 必须把完整 response_text 给
-        // 收养 turn（main 判定按 id 非下标）；合成 waiter 取空文本、事件发
-        // 往合成 id（daemon forwarder 按 turn_id 过滤丢弃）。
+    fn tool_only_foreground_run_does_not_backfill_stale_text() {
+        let (tx, _rx) = oneshot::channel();
+        let mut run = PiRpcRun::new("turn-main", tx, None);
+        run.saw_tool_activity = true;
+        assert!(!should_backfill_last_assistant_text(&run));
+    }
+
+    #[test]
+    fn orphan_run_queues_user_turn_without_adopting_external_stream() {
         let mut run = PiRpcRun::new_orphan();
         let synthetic_id = run.main_turn_id.clone();
-        run.response_text.push_str("后台任务全部完成，结果如下");
-        let _ = adopt_orphan_run(&mut run, "turn-user-1");
+        run.response_text.push_str("外部回合正文");
+        run.pending_turn_ids.push_back("turn-user-1".to_string());
+        assert!(run.orphan);
+        assert_eq!(run.main_turn_id, synthetic_id);
+        assert_eq!(
+            run.pending_turn_ids.pop_front().as_deref(),
+            Some("turn-user-1")
+        );
+    }
+
+    #[test]
+    fn foreground_run_binds_derived_ids_for_followup_native_turns() {
+        // 实测 pi 0.84.4：一个 run 内每个工具往返都是一个新原生 turn。
+        // 用户自己 run 的后续原生 turn 是前台流，必须派生 `{main}:t{n}`
+        // id（daemon 无条件放行），而不是 pi-external-* 合成 id。
+        let (tx, _rx) = oneshot::channel();
+        let mut run = PiRpcRun::new("pi-turn-primary", tx, None);
+        assert!(!run.orphan);
+        assert_eq!(bind_next_native_turn_id(&mut run), "pi-turn-primary:t1");
+        assert_eq!(bind_next_native_turn_id(&mut run), "pi-turn-primary:t2");
+    }
+
+    #[test]
+    fn pending_user_turn_id_wins_over_derived_native_id() {
+        let (tx, _rx) = oneshot::channel();
+        let mut run = PiRpcRun::new("pi-turn-primary", tx, None);
+        run.pending_turn_ids.push_back("turn-steer-1".to_string());
+        assert_eq!(bind_next_native_turn_id(&mut run), "turn-steer-1");
+        assert_eq!(bind_next_native_turn_id(&mut run), "pi-turn-primary:t1");
+    }
+
+    #[test]
+    fn orphan_run_binds_external_ids_for_followup_native_turns() {
+        let mut run = PiRpcRun::new_orphan();
+        let first = bind_next_native_turn_id(&mut run);
+        let second = bind_next_native_turn_id(&mut run);
+        assert!(first.starts_with("pi-external-"));
+        assert!(second.starts_with("pi-external-"));
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn probe_replay_run1_two_native_turns_commit_per_turn() {
+        // 回放 2026-08-30 探针实测序列（run 1）：
+        // agent_start → turn_start → assistant#1(text1+bg_run×2) → turn_end
+        // → turn_start → assistant#2(text2) → turn_end → agent_end → agent_settled
         let (tx, mut rx) = oneshot::channel();
-        run.waiters.push(("turn-user-1".to_string(), tx));
+        let mut run = PiRpcRun::new("pi-turn-primary", tx, None);
         let events = std::cell::RefCell::new(Vec::<(String, EngineEvent)>::new());
-        settle_rpc_run("ws", run, None, &|turn_id, event| {
+        let emit = |turn_id: &str, event: EngineEvent| {
+            events.borrow_mut().push((turn_id.to_string(), event));
+        };
+
+        // turn 1：thinking/text deltas + message_end 快照（text1）。
+        // 首 turn 不走 bind：active_turn_id 就是 main（与 pump 一致）。
+        assert_eq!(run.active_turn_id, "pi-turn-primary");
+        for delta in ["好的，", "并行启动两个后台任务。"] {
+            run.response_text.push_str(delta);
+            emit(
+                &run.active_turn_id,
+                EngineEvent::TextDelta {
+                    workspace_id: "ws".into(),
+                    text: delta.into(),
+                },
+            );
+        }
+        run.authoritative_text = Some("好的，并行启动两个后台任务。".to_string());
+        commit_rpc_turn("ws", &mut run, &emit);
+        // turn 2：run 内第二个原生 turn，派生前台 id。
+        run.active_turn_id = bind_next_native_turn_id(&mut run);
+        assert_eq!(run.active_turn_id, "pi-turn-primary:t1");
+        run.response_text.push_str("两个任务已并行启动：");
+        run.authoritative_text = Some("两个任务已并行启动：".to_string());
+        commit_rpc_turn("ws", &mut run, &emit);
+
+        let events = events.borrow();
+        let completed: Vec<(String, String)> = events
+            .iter()
+            .filter_map(|(id, event)| match event {
+                EngineEvent::TurnCompleted { result, .. } => Some((
+                    id.clone(),
+                    result
+                        .as_ref()
+                        .and_then(|r| r.get("text"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
+                )),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            completed,
+            vec![
+                (
+                    "pi-turn-primary".to_string(),
+                    "好的，并行启动两个后台任务。".to_string()
+                ),
+                (
+                    "pi-turn-primary:t1".to_string(),
+                    "两个任务已并行启动：".to_string()
+                ),
+            ]
+        );
+        // 主 waiter 在第一个原生 turn 就结算（bg 等待/前台流不阻塞发送边）。
+        let settled = rx.try_recv().expect("main waiter settles");
+        assert_eq!(settled.as_deref(), Ok("好的，并行启动两个后台任务。"));
+    }
+
+    #[test]
+    fn commit_rpc_turn_prefers_authoritative_snapshot_and_settles_waiter() {
+        let (tx, mut rx) = oneshot::channel();
+        let mut run = PiRpcRun::new("turn-main", tx, None);
+        run.response_text.push_str("partial");
+        run.authoritative_text = Some("complete response".to_string());
+        let events = std::cell::RefCell::new(Vec::<(String, EngineEvent)>::new());
+        commit_rpc_turn("ws", &mut run, &|turn_id, event| {
             events.borrow_mut().push((turn_id.to_string(), event));
         });
-        let events = events.borrow();
-        assert_eq!(events.len(), 2);
         assert!(matches!(
-            &events[0],
+            &events.borrow()[0],
             (id, EngineEvent::TurnCompleted { result, .. })
-                if id == &synthetic_id
-                && result.as_ref().and_then(|r| r.get("text")).and_then(Value::as_str) == Some("")
+                if id == "turn-main"
+                    && result.as_ref().and_then(|r| r.get("text")).and_then(Value::as_str)
+                        == Some("complete response")
         ));
-        assert!(matches!(
-            &events[1],
-            (id, EngineEvent::TurnCompleted { result, .. })
-                if id == "turn-user-1"
-                && result.as_ref().and_then(|r| r.get("text")).and_then(Value::as_str)
-                    == Some("后台任务全部完成，结果如下")
-        ));
-        let settled = rx.try_recv().expect("adopting waiter settles");
-        assert_eq!(settled.as_deref(), Ok("后台任务全部完成，结果如下"));
+        assert_eq!(
+            rx.try_recv().expect("main waiter settles").as_deref(),
+            Ok("complete response")
+        );
     }
 
     #[test]
@@ -3215,6 +3646,32 @@ mod tests {
             PiStreamLine::ThinkingDelta(d) => assert_eq!(d, "plan"),
             _ => panic!("expected ThinkingDelta"),
         }
+    }
+
+    #[test]
+    fn parses_authoritative_assistant_snapshot_and_turn_boundaries() {
+        let snapshot = json!({
+            "type": "message_end",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {"type": "text", "text": "complete "},
+                    {"type": "output_text", "text": "response"}
+                ]
+            }
+        });
+        match parse_pi_stream_line(&snapshot) {
+            PiStreamLine::AssistantSnapshot(text) => assert_eq!(text, "complete response"),
+            _ => panic!("expected authoritative assistant snapshot"),
+        }
+        assert!(matches!(
+            parse_pi_stream_line(&json!({"type": "turn_start"})),
+            PiStreamLine::TurnStart
+        ));
+        assert!(matches!(
+            parse_pi_stream_line(&json!({"type": "turn_end"})),
+            PiStreamLine::TurnEnd
+        ));
     }
 
     #[test]
@@ -3358,6 +3815,39 @@ mod tests {
     }
 
     #[test]
+    fn background_task_notification_extracts_description_without_machine_fields() {
+        let content = "<background-task-notification><task-id>x</task-id><status>completed</status><summary>Hello world 5s</summary><exit-code>0</exit-code></background-task-notification>";
+        let task =
+            parse_pi_background_task_notification(None, content).expect("notification parses");
+        assert_eq!(
+            task.get("completionText").and_then(Value::as_str),
+            Some("Hello world 5s")
+        );
+        assert!(task.get("task-id").is_none());
+        assert!(task.get("exit-code").is_none());
+    }
+
+    #[test]
+    fn structured_notification_drops_machine_summary_but_keeps_result() {
+        let content = "<background-task-notification><task-id>x</task-id><summary>Background task \"Sleep 10s task\" completed</summary><result>content output</result></background-task-notification>";
+        let task = parse_pi_background_task_notification(
+            Some(json!({
+                "id":"x",
+                "status":"completed",
+                "exitCode":0,
+                "completionText":"Background task \"Sleep 10s task\" completed",
+                "result":"real output"
+            })),
+            content,
+        )
+        .expect("structured notification parses");
+        assert_eq!(
+            task.get("completionText").and_then(Value::as_str),
+            Some("content output")
+        );
+    }
+
+    #[test]
     fn background_task_notification_content_fallback_without_details() {
         let start = json!({
             "type":"message_start",
@@ -3443,7 +3933,7 @@ mod tests {
             &parsed[2],
             PiStreamLine::TextDelta(delta) if delta == "pong"
         ));
-        assert!(matches!(parsed[3], PiStreamLine::Other));
+        assert!(matches!(parsed[3], PiStreamLine::TurnEnd));
         assert!(matches!(parsed[4], PiStreamLine::Other));
         assert!(matches!(parsed[5], PiStreamLine::Other));
     }

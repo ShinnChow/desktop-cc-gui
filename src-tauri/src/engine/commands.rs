@@ -9,7 +9,7 @@ use chrono::{
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -30,7 +30,10 @@ use super::codex_prompt_service::{normalize_custom_spec_root, run_codex_prompt_s
 use super::events::{engine_event_to_app_server_event_with_turn_context, EngineEvent};
 use super::grok::resolve_grok_session_id_for_engine_send;
 use super::kimi::resolve_kimi_session_id_for_engine_send;
-use super::pi::resolve_pi_session_id_for_engine_send;
+use super::pi::{
+    is_pi_agent_settled_marker, is_pi_external_wakeup_allowed, is_pi_foreground_native_turn,
+    resolve_pi_session_id_for_engine_send,
+};
 use super::remote_bridge::{
     call_remote_typed, remote_detect_engines_request, remote_engine_interrupt_request,
     remote_engine_send_message_sync_request,
@@ -3193,6 +3196,18 @@ pub async fn engine_send_message(
                 .or_else(|| provider_binding_lookup_session_id.clone());
             tokio::spawn(async move {
                 let mut render_state = GeminiRenderRoutingState::default();
+                // PI 专属门控状态——与 cc_gui_daemon 的 PI forwarder（daemon_state.rs）
+                // 同一套语义，两份拷贝必须同步演进（dev 模式引擎跑在 app 进程内，
+                // 走的是这份；安装版走 daemon 那份。2026-08-30 实测：仅改 daemon
+                // 导致 dev 全程验证失效）。
+                let mut pending_background_tasks = HashSet::<String>::new();
+                let mut background_task_aliases = HashMap::<String, String>::new();
+                let mut active_external_wakeup_turn_ids = HashSet::<String>::new();
+                let mut pending_external_wakeup = false;
+                let mut awaiting_attached_followup_turn = false;
+                let mut primary_turn_completed = false;
+                let mut primary_run_settled = false;
+                let mut active_forwarded_turn_id = turn_id_for_forwarder.clone();
                 loop {
                     let turn_event = match receiver.recv().await {
                         Ok(event) => event,
@@ -3206,11 +3221,117 @@ pub async fn engine_send_message(
                             continue;
                         }
                     };
-                    if turn_event.turn_id != turn_id_for_forwarder {
+                    let is_external_turn = turn_event.turn_id.starts_with("pi-external-");
+                    let is_known_external_wakeup =
+                        active_external_wakeup_turn_ids.contains(&turn_event.turn_id);
+                    let is_external_wakeup = is_pi_external_wakeup_allowed(
+                        &turn_event.turn_id,
+                        &turn_id_for_forwarder,
+                        &turn_event.event,
+                        !pending_background_tasks.is_empty(),
+                        pending_external_wakeup,
+                        is_known_external_wakeup,
+                    );
+                    // 用户自己 run 的后续原生 turn（`{primary}:t{n}`）：普通多轮
+                    // 工具对话里每个 assistant 回合都是一个新原生 turn（实测 pi
+                    // 0.84.4），它们是前台流的一部分，无条件放行——套用外部 turn
+                    // 门控会把第二段回复静默丢掉，实时幕布缺尾、历史重载才完整。
+                    let is_primary_native_turn =
+                        is_pi_foreground_native_turn(&turn_event.turn_id, &turn_id_for_forwarder);
+                    let is_attached_followup_turn = !is_external_turn
+                        && !is_primary_native_turn
+                        && turn_event.turn_id != turn_id_for_forwarder
+                        // 用户 steer 可在 primary turn 结束后、后台任务仍挂起时
+                        // 到达，保持在同一条实时流里。
+                        && (!primary_turn_completed
+                            || !pending_background_tasks.is_empty()
+                            || awaiting_attached_followup_turn);
+                    let is_lifecycle_marker = is_pi_agent_settled_marker(&turn_event.event);
+                    if turn_event.turn_id != turn_id_for_forwarder
+                        && !is_primary_native_turn
+                        && !is_external_wakeup
+                        && !is_attached_followup_turn
+                        && !is_lifecycle_marker
+                    {
                         continue;
+                    }
+                    if is_external_wakeup && !is_known_external_wakeup {
+                        // pending_external_wakeup 保持到 run settle 标记处复位：
+                        // 唤醒 run 自身也是多原生 turn 的（最终汇总在同一个 run
+                        // 的下一个原生 turn 里）。
+                        active_external_wakeup_turn_ids.insert(turn_event.turn_id.clone());
                     }
 
                     let event = turn_event.event;
+                    let event_turn_id = turn_event.turn_id.as_str();
+                    if event_turn_id != active_forwarded_turn_id {
+                        active_forwarded_turn_id = event_turn_id.to_string();
+                        // 每个 PI follow-up 都是独立的 assistant turn：保留单调
+                        // item 计数，只重置 lane 局部状态，避免第二轮锚到第一轮。
+                        render_state.last_render_lane = GeminiRenderLane::Other;
+                        render_state.active_text_item_id = None;
+                        render_state.saw_text_delta = false;
+                        accumulated_agent_text.clear();
+                    }
+                    match &event {
+                        EngineEvent::TurnStarted { .. } => {
+                            // 新 run / 新原生 turn 开始：解除 settled 标记。
+                            primary_run_settled = false;
+                        }
+                        EngineEvent::Raw { .. } if is_pi_agent_settled_marker(&event) => {
+                            primary_run_settled = true;
+                            // run 彻底 settle：唤醒窗口关闭。后续后台任务回收后
+                            // 的下一个唤醒 run 会重新置 true。
+                            pending_external_wakeup = false;
+                        }
+                        EngineEvent::BackgroundTaskStarted { tool_id, .. } => {
+                            pending_background_tasks.insert(tool_id.clone());
+                        }
+                        EngineEvent::BackgroundTaskUpdated {
+                            tool_id,
+                            task,
+                            source,
+                            ..
+                        } => {
+                            if source == "notification" {
+                                pending_external_wakeup = true;
+                                awaiting_attached_followup_turn = !primary_turn_completed;
+                            }
+                            let task_id = task.get("id").and_then(Value::as_str);
+                            let status = task
+                                .get("status")
+                                .and_then(Value::as_str)
+                                .unwrap_or("")
+                                .trim()
+                                .to_ascii_lowercase();
+                            let is_terminal_background_status = matches!(
+                                status.as_str(),
+                                "completed" | "failed" | "killed" | "cancelled" | "canceled"
+                            );
+                            if is_terminal_background_status {
+                                if let Some(tool_id) = tool_id {
+                                    pending_background_tasks.remove(tool_id);
+                                }
+                                if let Some(task_id) = task_id {
+                                    pending_background_tasks.remove(task_id);
+                                    if let Some(tool_id) = background_task_aliases.remove(task_id) {
+                                        pending_background_tasks.remove(&tool_id);
+                                    }
+                                }
+                            } else if let Some(task_id) = task_id {
+                                // receipt 通常同时带 tool ID 与后台 task ID；后续
+                                // notification 可能只有 task ID。切换 canonical
+                                // task ID 并保留别名用于终态回收。
+                                if let Some(tool_id) = tool_id {
+                                    pending_background_tasks.remove(tool_id);
+                                    background_task_aliases
+                                        .insert(task_id.to_string(), tool_id.clone());
+                                }
+                                pending_background_tasks.insert(task_id.to_string());
+                            }
+                        }
+                        _ => {}
+                    }
                     if let (
                         Some(binding),
                         EngineEvent::SessionStarted {
@@ -3264,13 +3385,16 @@ pub async fn engine_send_message(
                         // Use text-lane id so the frontend upserts the streamed bubble.
                         if !completed_text.trim().is_empty() {
                             let completion_item_id =
-                                gemini_agent_completion_item_id(&render_state, &item_id_clone);
+                                render_state.active_text_item_id.clone().unwrap_or_else(|| {
+                                    format!("{item_id_clone}:pi-turn-{event_turn_id}")
+                                });
                             let synthetic = AppServerEvent {
                                 workspace_id: event.workspace_id().to_string(),
                                 message: json!({
                                     "method": "item/completed",
                                     "params": {
                                         "threadId": &current_thread_id,
+                                        "turnId": event_turn_id,
                                         "item": {
                                             "id": completion_item_id,
                                             "type": "agentMessage",
@@ -3284,12 +3408,25 @@ pub async fn engine_send_message(
                         }
                     }
 
-                    if let Some(payload) = engine_event_to_app_server_event_with_turn_context(
+                    if let Some(mut payload) = engine_event_to_app_server_event_with_turn_context(
                         &event,
                         &current_thread_id,
                         &routed_item_id,
-                        Some(&turn_id_for_forwarder),
+                        Some(event_turn_id),
                     ) {
+                        // Text/reasoning/tool 事件历史上不带 turnId；外部 PI
+                        // follow-up 在原 turn settle 之后到达，前端需要每个事件
+                        // 携带 turn 身份才能通过终态守卫。
+                        if let Some(params) = payload
+                            .message
+                            .get_mut("params")
+                            .and_then(Value::as_object_mut)
+                        {
+                            params.insert(
+                                "turnId".to_string(),
+                                Value::String(event_turn_id.to_string()),
+                            );
+                        }
                         app_server_events.push(payload);
                     }
                     fan_out_provider_engine_event(
@@ -3315,6 +3452,26 @@ pub async fn engine_send_message(
                     }
 
                     if is_terminal {
+                        if is_external_turn {
+                            // pending_external_wakeup 保持 true 直到 run settle
+                            // 标记处复位（唤醒 run 自身多原生 turn）。
+                            active_external_wakeup_turn_ids.remove(&turn_event.turn_id);
+                        } else if event_turn_id == turn_id_for_forwarder {
+                            primary_turn_completed = true;
+                            awaiting_attached_followup_turn = false;
+                        } else if is_attached_followup_turn {
+                            awaiting_attached_followup_turn = false;
+                        }
+                    }
+                    // break 必须等 pump 的 agent_settled 生命周期标记：第一个
+                    // 原生 turn 的 TurnCompleted 后 run 内通常还有后续原生 turn
+                    // （普通多轮工具对话的常态）；后台唤醒的下一个 run 会复位
+                    // 标记。pending 任务全部回收且 run 彻底 settle 才断开。
+                    if primary_run_settled
+                        && pending_background_tasks.is_empty()
+                        && active_external_wakeup_turn_ids.is_empty()
+                        && (!awaiting_attached_followup_turn || primary_turn_completed)
+                    {
                         break;
                     }
                 }

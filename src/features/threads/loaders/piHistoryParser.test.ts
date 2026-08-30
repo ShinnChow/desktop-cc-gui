@@ -112,7 +112,12 @@ describe("parsePiHistoryMessages", () => {
         id: "m5",
         kind: "backgroundTaskNotification",
         role: "assistant",
-        toolOutput: { id: "b2e2f48ad", status: "completed", exitCode: 0 },
+        toolOutput: {
+          id: "b2e2f48ad",
+          status: "completed",
+          exitCode: 0,
+          completionText: "Hello world 5s",
+        },
       },
     ]);
 
@@ -133,6 +138,7 @@ describe("parsePiHistoryMessages", () => {
     expect(task.status).toBe("completed"); // 通知终态覆盖 receipt running
     expect(task.exitCode).toBe(0);
     expect(task.outputPath).toBe(".pi/tasks/session-1-1/b2e2f48ad.output"); // receipt 字段保留
+    expect(task.completionText).toBe("Hello world 5s");
     expect(items[2]).toEqual(
       expect.objectContaining({ id: "m4", kind: "message", role: "assistant" }),
     );

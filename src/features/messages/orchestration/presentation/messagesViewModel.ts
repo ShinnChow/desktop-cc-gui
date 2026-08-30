@@ -117,6 +117,11 @@ function isAssistantMessageWithVisibleText(item: ConversationItem): boolean {
 
 /** Process items that can form a causal phase above assistant prose. */
 function isCollapsibleProcessItem(item: ConversationItem): boolean {
+  // BackgroundTaskCard has its own fold control. Keep the card mounted so its
+  // completion receipt remains anchored beside it in minimal transcript mode.
+  if (item.kind === "tool" && item.toolType === "backgroundTask") {
+    return false;
+  }
   // SubAgent 小队卡与其它 tool 一样参与 process-phase 折叠：
   // 收起时 hard-unmount 进「已处理」chip，展开后落在折叠区域内，
   // 禁止再钉在 chip 外侧单独占位。

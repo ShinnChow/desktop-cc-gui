@@ -20,6 +20,7 @@ import {
 } from "./workspaceScopedMap";
 import {
   resetBackgroundTaskStoreForTests,
+  listBackgroundTasks,
 } from "../../messages/utils/backgroundTaskStore";
 
 vi.mock("../../../utils/threadItems", () => ({
@@ -1775,37 +1776,133 @@ describe("onBackgroundTaskUpdated post-settle terminal update", () => {
     expect(markProcessing).not.toHaveBeenCalledWith("pi:s1", true);
   });
 
-  it("does not emit any extra timeline item beyond the task card on terminal update", () => {
-    // 完成留痕行已移除（2026-08-29 复盘）：终态更新只翻任务卡，
-    // 等待语义完全由 background-awaiting 幕布承载。
+});
+
+describe("pi external wakeup turns keep the live tail aligned with history", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetLiveAssistantShadowTranscriptsForTests();
+    resetBackgroundTaskStoreForTests();
+    window.localStorage.removeItem("ccgui.perf.realtimeBatching");
+  });
+
+  it("commits assistant text for the primary turn and every self-wakeup turn after settlement", () => {
+    // 2026-08-30 实证（截图）：bg 任务完成通知由 pi 进程内部注入并自唤醒
+    // 新 turn（RPC 外部 turn，不经过 ccgui 发送路径）。daemon 已按 native
+    // turn id 放行转发；前端 realtime ledger 必须让已 settle 的线程接受
+    // `pi-external-*` turn 的正文，否则实时幕布缺尾部、历史重载才完整。
     const { result, dispatch } = makeOptions({
       activeThreadId: "pi:s1",
       resolveCanonicalThreadId: (id) => id,
     });
-    const taskCard = {
+
+    const feedTurn = (turnId: string, itemId: string, text: string) => {
+      result.current.noteRealtimeTurnStarted("pi:s1", turnId);
+      result.current.onAgentMessageDelta({
+        workspaceId: "ws-1",
+        threadId: "pi:s1",
+        itemId,
+        delta: text,
+        turnId,
+      });
+      result.current.onAgentMessageCompleted({
+        workspaceId: "ws-1",
+        threadId: "pi:s1",
+        itemId,
+        text,
+        turnId,
+      });
+      result.current.markRealtimeTurnTerminal("pi:s1", turnId);
+    };
+
+    act(() => {
+      // 主 run 的两个原生 turn（实测 pi 0.84.4：每个工具往返都是一个新
+      // 原生 turn，第二个 turn 使用 `{primary}:t{n}` 派生前台 id）。
+      feedTurn("pi-turn-primary", "pi-item-1", "好的，并行启动两个后台任务。");
+      feedTurn(
+        "pi-turn-primary:t1",
+        "pi-item-1:text-2",
+        "两个任务已并行启动，等待完成通知后汇报。",
+      );
+      // 自唤醒 run 1（3秒任务完成通知触发，orphan 外部 turn）。
+      feedTurn(
+        "pi-external-1",
+        "pi-item-1:text-3",
+        "3秒任务已完成 (exit 0)。10秒任务还在跑，等它完成后再统一汇总报告。",
+      );
+      // 自唤醒 run 2（10秒任务完成通知触发，尾部汇总）。
+      feedTurn("pi-external-2", "pi-item-1:text-4", "两个后台任务都顺利完成 ✅");
+    });
+
+    const completedTexts = dispatch.mock.calls
+      .map((call) => call[0] as { type: string; text?: string })
+      .filter((action) => action.type === "flushAgentCompletedBatch")
+      .map((action) => action.text);
+    expect(completedTexts).toEqual([
+      "好的，并行启动两个后台任务。",
+      "两个任务已并行启动，等待完成通知后汇报。",
+      "3秒任务已完成 (exit 0)。10秒任务还在跑，等它完成后再统一汇总报告。",
+      "两个后台任务都顺利完成 ✅",
+    ]);
+  });
+
+  it("keeps terminal notifications off the timeline while the card carries completionText (D1 对齐)", () => {
+    const { result, dispatch, markProcessing } = makeOptions({
+      activeThreadId: "pi:s1",
+      resolveCanonicalThreadId: (id) => id,
+    });
+    const converted = {
       id: "tool-bg-1",
       kind: "tool",
       toolType: "backgroundTask",
       title: "bg_run",
       detail: "",
       status: "completed",
-      output: JSON.stringify({ id: "t-1", status: "completed" }),
+      output: JSON.stringify({
+        id: "t-1",
+        status: "completed",
+        exitCode: 0,
+        completionText: "Hello world 5s",
+      }),
     } as const;
     vi.mocked(buildConversationItem).mockReturnValue(
-      taskCard as unknown as ReturnType<typeof buildConversationItem>,
+      converted as unknown as ReturnType<typeof buildConversationItem>,
     );
+
+    act(() => {
+      result.current.markRealtimeTurnTerminal("pi:s1", "pi-turn-primary");
+    });
 
     act(() => {
       result.current.onBackgroundTaskUpdated("ws-1", "pi:s1", {
         toolId: "tool-bg-1",
-        task: { id: "t-1", status: "completed", exitCode: 0 },
+        task: {
+          id: "t-1",
+          status: "completed",
+          exitCode: 0,
+          completionText: "Hello world 5s",
+        },
         source: "notification",
       });
     });
 
+    // 实时幕布不得比历史多出行：终态通知只翻任务卡，不追加 assistant 气泡
+    // （历史侧 D1：通知不成行；completionText 合并进卡片快照，两侧同构）。
     const upserts = dispatch.mock.calls
-      .map((call) => call[0] as { type: string; item: { id: string } })
+      .map((call) => call[0] as { type: string })
       .filter((action) => action.type === "upsertItem");
-    expect(upserts.map((action) => action.item.id)).toEqual(["tool-bg-1"]);
+    expect(upserts).toHaveLength(1);
+    expect(
+      dispatch.mock.calls.some(
+        (call) => (call[0] as { type: string }).type === "flushAgentCompletedBatch",
+      ),
+    ).toBe(false);
+    expect(markProcessing).not.toHaveBeenCalledWith("pi:s1", true);
+
+    // live store 与历史解析同一口径：completionText 留在卡片快照里。
+    const record = listBackgroundTasks("ws-1", "pi:s1").find(
+      (entry) => entry.taskId === "t-1",
+    );
+    expect(record?.task.completionText).toBe("Hello world 5s");
   });
 });
