@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-25.policy-v4",
+  "version": "2026-08-30.policy-v5",
   "newFileFailThreshold": 800,
   "growthAllowanceLines": 50,
   "policies": [
@@ -32,7 +32,14 @@
           "src/services/tauri.ts",
           "src/app-shell.tsx",
           "src/app-shell/assembly/useAppShellRootComposition.ts",
-          "src/app-shell/sections/layoutNodes/useAppShellLayoutNodesSection.tsx"
+          "src/app-shell/sections/layoutNodes/useAppShellLayoutNodesSection.tsx",
+          "src-tauri/src/shared_session_v2.rs",
+          "src-tauri/src/shared_runtime_coordinator.rs",
+          "src-tauri/src/session_management.rs",
+          "src-tauri/src/skills_hub.rs",
+          "src-tauri/src/local_usage.rs",
+          "src-tauri/src/types.rs",
+          "src-tauri/src/shared_sessions.rs"
         ],
         "prefixes": [
           "src-tauri/src/backend/",
@@ -42,6 +49,18 @@
           "src-tauri/src/codex/",
           "src-tauri/src/computer_use/",
           "src/app-shell/"
+        ]
+      }
+    },
+    {
+      "id": "settings-view-sections",
+      "description": "Settings view sections regrew after the 2026-07 split (SessionManagementSection 2547->2648); hold them below the feature-hotpath gate.",
+      "priority": "P1",
+      "warnThreshold": 1500,
+      "failThreshold": 2000,
+      "match": {
+        "prefixes": [
+          "src/features/settings/components/settings-view/sections/"
         ]
       }
     },
