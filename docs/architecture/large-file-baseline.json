@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T20:28:51.074Z",
+  "generatedAt": "2026-08-30T20:31:26.945Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -29,16 +29,6 @@
       "type": "ts/tsx",
       "policyId": "test-files",
       "priority": "P2",
-      "warnThreshold": 2600,
-      "failThreshold": 3000,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/layout/hooks/useLayoutNodes.tsx",
-      "lines": 4127,
-      "type": "ts/tsx",
-      "policyId": "default-source",
-      "priority": "P1",
       "warnThreshold": 2600,
       "failThreshold": 3000,
       "thresholdSource": "policy"

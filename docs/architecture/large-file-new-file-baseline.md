@@ -8,7 +8,7 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T20:28:51.947Z
+- Generated at: 2026-08-30T20:31:27.840Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
 - Count: 398
@@ -18,7 +18,6 @@ status: generated
 | `src-tauri/src/shared_session_v2.rs` | 5349 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/components/GitHistoryPanelImpl.tsx` | 4933 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/app/hooks/useAppServerEvents.test.tsx` | 4327 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
-| `src/features/layout/hooks/useLayoutNodes.tsx` | 4127 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadMessaging.test.tsx` | 4101 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/styles/settings.part2.basic-redesign.css` | 4074 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadMessaging.ts` | 4025 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
@@ -50,6 +49,7 @@ status: generated
 | `src-tauri/src/engine/status.rs` | 3020 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadTurnEvents.test.tsx` | 2994 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/styles/file-view-panel.css` | 2980 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
+| `src/features/layout/hooks/useLayoutNodes.tsx` | 2943 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/claude_history.rs` | 2881 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/hooks/useGitHistoryPanelInteractions.tsx` | 2878 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/session-activity/components/WorkspaceSessionActivityPanel.test.tsx` | 2821 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
