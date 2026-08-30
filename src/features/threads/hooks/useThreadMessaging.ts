@@ -25,11 +25,6 @@ import {
   invalidateSessionIndexForWorkspace as invalidateSessionIndexForWorkspaceService,
 } from "../../../services/tauri";
 import { rememberRuntimeReceipt } from "../utils/runtimeModelReceipt";
-import {
-  recordNativeTurnTarget,
-  resolveNativeSendExecutionTarget,
-} from "../utils/nativeTurnTargetLedger";
-import { appendTurnTargetBadge } from "../utils/turnTargetBadgeStorage";
 import { subscribeMultiAgentConversationItems } from "../../multi-agent/runtime/conversationBridge";
 import {
   consumeExplicitComposerEngineSwitch,
@@ -59,6 +54,11 @@ import {
 import { injectMemoryPickContext } from "../../project-memory/memoryPick/injectMemoryPickContext";
 import { emitMemoryPickTelemetry } from "../../project-memory/memoryPick/memoryPickTelemetry";
 import { resolvePickSemanticContext } from "./threadMessagingMemoryPick";
+import {
+  recordNativeSendTurnTarget,
+  runNativeSendResolve,
+  type NativeResolveContext,
+} from "./threadMessagingNativeResolve";
 import { runMemoryPickGate } from "./threadMessagingPickGate";
 import {
   acquireSharedSendAdmission,
@@ -109,14 +109,10 @@ import {
 } from "./threadMessagingSpecRoot";
 import {
   extractSessionIdFromEngineSendResponse,
-  resolveDshModelForSend,
-  resolveDshSendFallbackCatalogId,
   isCodexMissingThreadBindingError,
-  isLikelyForeignModelForGemini,
   isRecoverableCodexThreadBindingError,
   classifyTurnStartReasonCode,
   mapNetworkErrorToUserMessage,
-  normalizeAccessMode,
   collectOccupiedGrokSessionIds,
   pickLikelyGeminiSessionId,
   pickLikelyGrokSessionId,
@@ -124,7 +120,6 @@ import {
   pickLikelyPiSessionId,
   pickLikelyQoderSessionId,
   primeThreadStreamLatencyForSend,
-  resolveCollaborationModeIdFromPayload,
   resolveRecoverableCodexFirstPacketTimeout,
 } from "./threadMessagingHelpers";
 import {
@@ -147,7 +142,6 @@ import { formatBrowserContextPromptOnce } from "../../browser-agent";
 import {
   buildLocalizedMemoryScoutPreviewText,
   extractClaudeCandidateSessionId,
-  normalizeEngineScopedEffort,
   withMemoryScoutTimeout,
 } from "./messageRuntimeController";
 import { useCodexMessageRecovery } from "./useCodexMessageRecovery";
@@ -960,189 +954,37 @@ export function useThreadMessaging({
           },
         });
       }
-      const rawComposerSelection = resolveComposerSelection?.(threadId) ?? null;
-      // A stale render may still expose the previous native thread snapshot.
-      // Do not let it cross the send boundary even if an injected resolver
-      // ignores the requested thread argument.
-      const resolvedComposerSelection =
-        rawComposerSelection?.threadId &&
-        rawComposerSelection.threadId !== threadId
-          ? null
-          : rawComposerSelection;
-      const modelFromOptions =
-        options?.model !== undefined ? options.model : undefined;
-      // resolver 在场时是 Native send 唯一模型权威：禁止回落到全局 / 其他会话 hook model。
-      // A frozen native target is the Composer/send boundary contract. Without
-      // one, an existing resolver remains authoritative; a mismatched resolver
-      // must fail closed rather than falling back to another thread's global model.
-      const modelFromHook =
-        options?.nativeExecutionTarget?.model?.trim() ||
-        options?.nativeExecutionTarget?.modelCatalogEntryId?.trim() ||
-        (resolveComposerSelection
-          ? (resolvedComposerSelection?.model?.trim() ||
-            resolvedComposerSelection?.id?.trim() ||
-            null)
-          : model);
-      const selectedModelId =
-        threadKind === "shared"
-          ? (supportedStoredSharedTarget?.modelCatalogEntryId ?? null)
-          : (options?.nativeExecutionTarget?.modelCatalogEntryId?.trim() ||
-            resolvedComposerSelection?.id?.trim() ||
-            null);
-      const selectedModelSource =
-        threadKind === "shared"
-          ? (supportedStoredSharedTarget?.providerProfileSource ?? "unknown")
-          : (resolvedComposerSelection?.source ?? "unknown");
-      const resolvedModel =
-        threadKind === "shared" && supportedStoredSharedTarget
-          ? (supportedStoredSharedTarget.model ?? null)
-          : modelFromOptions !== undefined
-            ? modelFromOptions
-            : modelFromHook;
-      const rawResolvedEffort =
-        threadKind === "shared" && supportedStoredSharedTarget
-          ? (supportedStoredSharedTarget.reasoning?.effort ?? null)
-          : options?.nativeExecutionTarget?.reasoning?.effort ??
-            (options?.effort !== undefined
-              ? options.effort
-              : (resolvedComposerSelection?.effort ?? effort));
-      const resolvedEffort = normalizeEngineScopedEffort(
-        resolvedEngine,
-        rawResolvedEffort,
-      );
-      const disableThinkingForClaude =
-        resolvedEngine === "claude" && claudeThinkingVisible === false;
-      const resolvedCollaborationMode =
-        options?.collaborationMode !== undefined
-          ? options.collaborationMode
-          : (resolvedComposerSelection?.collaborationMode ?? collaborationMode);
-      const sanitizedCollaborationMode =
-        resolvedCollaborationMode &&
-        typeof resolvedCollaborationMode === "object" &&
-        "settings" in resolvedCollaborationMode
-          ? resolvedCollaborationMode
-          : null;
-      const resolvedCollaborationModeIdForSend =
-        resolveCollaborationModeIdFromPayload(sanitizedCollaborationMode);
-      const userCollaborationMode =
-        resolvedEngine === "codex" ? resolvedCollaborationModeIdForSend : null;
-      const accessModeForSend =
-        resolvedEngine === "claude" &&
-        resolvedCollaborationModeIdForSend === "plan"
-          ? "read-only"
-          : options?.accessMode !== undefined
-            ? options.accessMode
-            : accessMode;
-      const resolvedAccessMode = normalizeAccessMode(
-        accessModeForSend,
-        resolvedEngine,
-      );
-      const resolvedOpenCodeAgent =
-        resolvedEngine === "opencode"
-          ? (resolveOpenCodeAgent?.(threadId) ?? null)
-          : null;
-      const resolvedOpenCodeVariant =
-        resolvedEngine === "opencode"
-          ? (resolveOpenCodeVariant?.(threadId) ?? null)
-          : null;
-      const sanitizeOpenCodeModel = (candidate: string | null | undefined) => {
-        if (!candidate) {
-          return null;
-        }
-        const trimmed = candidate.trim();
-        if (!trimmed) {
-          return null;
-        }
-        // Guard against cross-engine leakage like "claude-sonnet-*".
-        if (trimmed.startsWith("claude-")) {
-          return null;
-        }
-        return trimmed;
+      const nativeResolveCtx: NativeResolveContext = {
+        resolveComposerSelection,
+        model,
+        effort,
+        collaborationMode,
+        accessMode,
+        claudeThinkingVisible,
+        resolveOpenCodeAgent,
+        resolveOpenCodeVariant,
+        lastOpenCodeModelByThreadRef,
+        onDebug,
+        t,
       };
-      const sanitizedModel =
-        resolvedEngine === "claude" && resolvedModel
-          ? resolvedModel.trim() || null
-          : resolvedEngine === "codex" &&
-              resolvedModel &&
-              resolvedModel.startsWith("claude-")
-            ? null
-            : resolvedEngine === "gemini" &&
-                resolvedModel &&
-                isLikelyForeignModelForGemini(resolvedModel)
-              ? null
-              : resolvedModel;
-      const sanitizedOpenCodeModel =
-        resolvedEngine === "opencode"
-          ? sanitizeOpenCodeModel(sanitizedModel)
-          : sanitizedModel;
-      const modelForSend =
-        resolvedEngine === "opencode"
-          ? (sanitizedOpenCodeModel ?? "openai/gpt-5.3-codex")
-          : resolvedEngine === "dsh"
-            ? resolveDshModelForSend({
-                // Picker catalog id first: official kimi/minimax must not lose
-                // to a stale DeepSeek ledger after a same-id PI catalog collision.
-                catalogId: modelFromOptions ?? selectedModelId,
-                runtimeModel: selectedModelId ?? sanitizedOpenCodeModel,
-                fallbackCatalogId: resolveDshSendFallbackCatalogId(
-                  threadId,
-                  getComposerEnginePrefForEngine("dsh").modelId,
-                ),
-              })
-            : sanitizedOpenCodeModel;
-      if (resolvedEngine === "opencode") {
-        const normalizedModel = (modelForSend ?? "").trim().toLowerCase();
-        const prevModel = lastOpenCodeModelByThreadRef.current.get(threadId);
-        const isSessionThread = threadId.startsWith("opencode:");
-        if (
-          isSessionThread &&
-          prevModel &&
-          normalizedModel &&
-          prevModel !== normalizedModel
-        ) {
-          pushErrorToast({
-            title: t("messages.opencodeModelSwitchTitle"),
-            message: t("messages.opencodeModelSwitchMessage"),
-            durationMs: 3200,
-          });
-        }
-        if (normalizedModel) {
-          lastOpenCodeModelByThreadRef.current.set(threadId, normalizedModel);
-        }
-      }
-      if (
-        resolvedEngine === "opencode" &&
-        resolvedModel &&
-        !sanitizedOpenCodeModel
-      ) {
-        onDebug?.({
-          id: `${Date.now()}-client-opencode-model-sanitize`,
-          timestamp: Date.now(),
-          source: "client",
-          label: "model/sanitize",
-          payload: {
-            reason: "invalid-opencode-model",
-            model: resolvedModel,
-            fallback: "openai/gpt-5.3-codex",
-          },
-        });
-      }
-      onDebug?.({
-        id: `${Date.now()}-client-model-resolve`,
-        timestamp: Date.now(),
-        source: "client",
-        label: "model/resolve",
-        payload: {
-          threadId,
-          engine: resolvedEngine,
-          selectedModelId,
-          selectedModelSource,
-          modelFromOptions: modelFromOptions ?? null,
-          modelFromHook: modelFromHook ?? null,
-          resolvedModel: resolvedModel ?? null,
-          sanitizedModel: sanitizedModel ?? null,
-          modelForSend: modelForSend ?? null,
-        },
+      const {
+        resolvedComposerSelection,
+        selectedModelId,
+        resolvedEffort,
+        disableThinkingForClaude,
+        sanitizedCollaborationMode,
+        userCollaborationMode,
+        resolvedAccessMode,
+        resolvedOpenCodeAgent,
+        resolvedOpenCodeVariant,
+        modelForSend,
+        sanitizedModel,
+      } = runNativeSendResolve(nativeResolveCtx, {
+        threadId,
+        threadKind,
+        options,
+        resolvedEngine,
+        supportedStoredSharedTarget,
       });
       const sharedSendAdmission = acquireSharedSendAdmission(sharedCtx, {
         workspace,
@@ -1828,26 +1670,17 @@ export function useThreadMessaging({
               hasSession: realSessionId !== null,
               promptText: finalText,
             });
-            // Native 发送边界固化本轮执行目标（对齐 Shared 的 beginTurn /
-            // send.request receipt 时序）：queue drain / recovery resend 等
-            // 无 composer options 的路径走 resolved 值兜底合成。
-            {
-              const nativeTurnExecutionSnapshot =
-                resolveNativeSendExecutionTarget({
-                  frozen: options?.nativeExecutionTarget ?? null,
-                  engine: resolvedEngine,
-                  providerProfileId,
-                  modelCatalogEntryId: selectedModelId,
-                  model: modelForSend ?? sanitizedModel,
-                  effort: sendEffort,
-                });
-              recordNativeTurnTarget(
-                workspace.id,
-                threadId,
-                nativeTurnExecutionSnapshot,
-              );
-              appendTurnTargetBadge(threadId, nativeTurnExecutionSnapshot);
-            }
+            recordNativeSendTurnTarget({
+              workspace,
+              threadId,
+              options,
+              resolvedEngine,
+              providerProfileId,
+              selectedModelId,
+              modelForSend,
+              sanitizedModel,
+              sendEffort,
+            });
             if (modelForSend) {
               rememberRuntimeReceipt(workspace.id, threadId, {
                 model: modelForSend,
