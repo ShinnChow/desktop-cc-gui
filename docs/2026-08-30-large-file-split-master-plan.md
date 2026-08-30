@@ -328,6 +328,36 @@ open-app 探测簇(722 行,高度自包含)→ `workspaces/open_app.rs`(~750);wo
 | 高 churn 冲突(useLayoutNodes 151/3月) | 代理实测 | §5 降冲突纪律四条 |
 
 ## 10. 进度追踪与度量
+### 2026-08-31 执行记录（本会话，21 个 commit 落在 feat/code-quality-optimization）
+
+**已完成（全部逐字搬运 + 验证矩阵通过 + gate 绿）**：
+- 阶段 0：PR 0.1（policy v5 + 7 根级 Rust 纳管 + sections 防反弹）已于 ba1a5e1cc 落地；本会话修复 gate 至绿
+- Wave 1 轨 A 全量：status.rs 4594→3020 / shared_session_v2 7685→5349 / coordinator 4864→2670 / pi.rs 4318→3201 / shared_sessions 2816→2061 / skills_hub 测试外移
+- B1 claudeHistoryLoader 2552→1077（primitives/classifier/askUser/shadowRecovery/finalTiming 五件）
+- B2 i18n en/zh settings 四桶目录（leaf 等价比对 PASS）
+- B3 types.rs 2828→types/ 目录（mod.rs 34 行）
+- B4 skills_hub.rs 3574→skills_hub/ 目录（mod.rs 162）
+- B5 codex/mod.rs 3120→654（六兄弟模块）
+- B6 useQueuedSend 2648→1164（helpers + drain effects + fusion 三刀）
+- B7 useThreadActions.helpers 2646→243（四族 + re-export 桶）
+- B8 useThreadsReducer 一期 3728→3495（equalityGuards + providerBinding；completeAgentMessage 依赖面 22 项超零风险界，回退留二期）
+- B9 cc_gui_daemon.rs 七内联 mod 落盘 3076→2555
+- Wave 2：A1 useThreadItemEvents 2668→1726（predicates + deltaQueue + normalizedPipeline 三刀）；A2 useThreadEventHandlers 2747→908（diagnosticsRuntime/lifecycleHandlers/deferredReconciliation）；A3 ResumeThread 2293→1394（文本锁测试已改写为跨文件断言）；B1 useSidebarMenus 2688→2365（types/constants）；B2 Composer 4127→2066（Composer/ 子目录 11 件）；B3 Sidebar 2847→1537（逻辑六件，JSX 未动）；C2 useThreadMessaging 4600→4025（外圈 interrupt/review）；链 D commands.rs 5432→1340（八臂自由函数×async/sync）
+- Wave 3：R1 daemon_state 5339→mod.rs 136 + 九分块；R7 workspaces/commands 3493→2224（open_app + worktree 两刀）；R8 git/mod.rs 2720→61（五子模块）
+- F1 useAppServerEvents 一期 3843→1981（types/extractors/emitters/normalizedRouting）
+- F3 启动：WorkspaceSessionActivityPanel 2679→2086（helpers 层）
+
+**收尾增补（同日稍后落地）**：
+- A4 useThreadActions 3066→2244（indexEarlyPaint 324 + engineAsyncMerge 815；dispatch 次序与 ownsRequest 结算原位）
+- B4 useLayoutNodes 一期 3235→2935（engineResolve/sidebarNode/messagesNode/composerNode 四段；gitDiffPanelNode/panelNodes/chromeNodes 留二期）
+- T3.7 allowlist 登记 legacyFallback.ts（拆分随迁桥）
+- 已知存量违规（非本次引入）：useEngineAvailabilityProjection 两处 direct app-shell/ import（分支在途提交 1a7463e01）
+
+**实测指标（2026-08-31 最终）**：>2000 行 95（107→95，↓12）；>800 行 344（369→344，↓25）；全仓最大 shared_session_v2 5349（原 7685）；tsc 全仓零 error；check:large-files:gate 绿
+
+**教训增补**：① tsc 增量缓存会漏报新文件错误——拆分验证必须删 tsbuildinfo 或用全新输出确认；② 段切分必须把 doc 注释/cfg 属性/tauri::command 宏随函数走（三次事故均为此）；③ 子代理建临时基线 worktree 会污染共享 target 的 build-script 缓存（/private/tmp/baseline_wt 事故），下次子代理任务书须禁共享 CARGO_TARGET_DIR。
+
+**下会话入口**：在途两项验证收尾 → Wave 2 剩余（A4 收尾、B4 续、C1 reducer 二期、C2 messaging 主干）→ Wave 3 剩余（R2 claude.rs、R3 v2 主体、R4 coordinator 主体、R5 session_management、R6 shared_sessions 主体）→ F2 GitDiffPanel 续 → F4 useThreads → Wave 4 git-history。
 
 - 每 wave 末:重生成 baseline,`git diff docs/architecture/large-file-baseline.json` 随 PR 提交,PR 描述说明;
 - 追踪指标(写进每 wave 收尾 PR):>2000 行文件数、>800 行文件数、全仓最大文件行数、P0 区超阈值文件数;
