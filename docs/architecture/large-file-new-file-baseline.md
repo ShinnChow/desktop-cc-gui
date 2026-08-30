@@ -8,10 +8,10 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T14:54:59.805Z
+- Generated at: 2026-08-30T14:56:33.668Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
-- Count: 386
+- Count: 387
 
 | File | Lines | Type | Policy | Priority | Warn | Fail | Severity | Status | Baseline | Delta |
 |---|---:|---|---|---|---:|---:|---|---|---:|---:|
@@ -19,7 +19,6 @@ status: generated
 | `src-tauri/src/shared_session_v2.rs` | 5349 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/bin/cc_gui_daemon/daemon_state.rs` | 5339 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/components/GitHistoryPanelImpl.tsx` | 4933 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
-| `src-tauri/src/shared_runtime_coordinator.rs` | 4864 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadMessaging.ts` | 4600 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/app/hooks/useAppServerEvents.test.tsx` | 4327 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/pi.rs` | 4318 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
@@ -76,6 +75,7 @@ status: generated
 | `src/features/settings/components/SettingsView.test.tsx` | 2691 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/app/hooks/useSidebarMenus.ts` | 2688 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/session-activity/components/WorkspaceSessionActivityPanel.tsx` | 2679 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
+| `src-tauri/src/shared_runtime_coordinator.rs` | 2670 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadItemEvents.ts` | 2668 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/settings/components/settings-view/sections/SessionManagementSection.tsx` | 2648 | ts/tsx | settings-view-sections | P1 | 1500 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useQueuedSend.ts` | 2648 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
@@ -111,6 +111,7 @@ status: generated
 | `src/features/engine/hooks/useEngineController.test.tsx` | 2230 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/styles/session-activity.css` | 2212 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
 | `src/features/threads/loaders/claudeHistoryLoader.test.ts` | 2202 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
+| `src-tauri/src/coordinator_tests.rs` | 2195 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/messages/components/MessagesCore.tsx` | 2191 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/manager.rs` | 2175 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/session_index/store.rs` | 2169 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
