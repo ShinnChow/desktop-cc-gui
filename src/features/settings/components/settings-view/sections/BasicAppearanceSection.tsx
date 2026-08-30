@@ -96,6 +96,7 @@ import {
 } from "../../../../theme/utils/workspaceWallpaper";
 import { LanguageSelector } from "../../LanguageSelector";
 import { SyntaxAndDiffPreview } from "./SyntaxAndDiffPreview";
+import { HomeAppearanceSettings } from "../../../../home/components/HomeAppearanceSettings";
 
 type BasicAppearanceSectionProps = {
   appSettings: AppSettings;
@@ -542,6 +543,7 @@ export function BasicAppearanceSection({
 
   return (
     <div className="settings-basic-appearance settings-basic-surface">
+      <HomeAppearanceSettings />
       <div className="settings-basic-group-card settings-basic-group-card--list settings-pref-card">
         <div className="settings-pref-row settings-pref-row--theme">
           <div className="settings-pref-meta">

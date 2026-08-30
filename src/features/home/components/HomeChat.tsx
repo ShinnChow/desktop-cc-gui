@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useRef, useState, type ReactNode } from "react";
 import Check from "lucide-react/dist/esm/icons/check";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import Folder from "lucide-react/dist/esm/icons/folder";
@@ -26,6 +26,8 @@ import {
   ComposerBranchBadge,
   type ComposerBranchControl,
 } from "../../composer/components/ComposerBranchBadge";
+import { ParticleWordmark } from "./ParticleWordmark";
+import { useHomeAppearance } from "../hooks/useHomeAppearance";
 
 type HomeChatProps = {
   workspaces: Array<{
@@ -79,10 +81,14 @@ export function HomeChat({
   branchControl = null,
 }: HomeChatProps) {
   const { t } = useTranslation();
+  const heroRef = useRef<HTMLDivElement | null>(null);
+  const { appearance } = useHomeAppearance();
+  const [failedLogo, setFailedLogo] = useState<string | null>(null);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [workspaceQuery, setWorkspaceQuery] = useState("");
   const engineLabel = getEngineLabel(selectedEngine);
-  const homeTitle = t("homeChat.minimalTitle", "Create anything");
+  const homeTitle = appearance.title || t("homeChat.minimalTitle", "Create anything");
+  const logoDataUrl = appearance.logoDataUrl !== failedLogo ? appearance.logoDataUrl : "";
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId)
     ?? workspaces[0]
     ?? null;
@@ -118,25 +124,30 @@ export function HomeChat({
     <div className="home-chat">
       <div className="home-chat-shell">
         <SetupIncompleteBanner />
-        <header className="home-chat-hero">
-          <div
-            className="home-chat-engine-mark"
-            role="img"
-            aria-label={engineLabel}
-          >
-            <EngineIcon
-              engine={selectedEngine}
-              size={32}
-              className="home-chat-engine-icon"
-            />
-          </div>
+        <div className="home-chat-hero-wrap" ref={heroRef}>
+          <ParticleWordmark containerRef={heroRef} appearance={appearance}
+            contentKey={`${selectedEngine}:${homeTitle}:${logoDataUrl}`} />
+          <header className="home-chat-hero">
+            <div
+              className="home-chat-engine-mark"
+              role="img"
+              aria-label={logoDataUrl ? t("homeChat.appearance.logo") : engineLabel}
+            >
+              {logoDataUrl ? <img src={logoDataUrl} alt="" className="home-chat-engine-icon"
+                onError={() => setFailedLogo(logoDataUrl)} /> : <EngineIcon
+                engine={selectedEngine}
+                size={32}
+                className="home-chat-engine-icon"
+              />}
+            </div>
 
-          <div className="home-chat-headline">
-            <h1 className="home-chat-title">
-              {homeTitle}
-            </h1>
-          </div>
-        </header>
+            <div className="home-chat-headline">
+              <h1 className="home-chat-title" data-title-style={appearance.titleStyle}>
+                {homeTitle}
+              </h1>
+            </div>
+          </header>
+        </div>
 
         <section className="home-chat-stage">
           <section
