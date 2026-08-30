@@ -131,6 +131,12 @@
 - 「启动时生效的持久化设置」若错误值可致起不来 / 进不了设置页，必须配 startup guard（模板 `src/utils/uiScaleStartupGuard.ts`）：危险值留 pending 记录，未证明健康则下次会话临时回退安全值，**禁止改写用户存储**，禁止拿 timeout 当修复。
 - 平台结论必须按证据分级（已证实 / 已排除 / 未验证）；「没接到投诉」不算安全证据。
 
+### Engine Forwarder Dual-Path Gate（2026-08-30 pi 实时幕布丢尾沉淀）
+
+- 改引擎事件链（pump / 转发器 / 门控 / 结算 / break 条件）前，必读 `dev-guidelines/guides/engine-forwarder-dual-path-pitfall.md`，并先确认目标进程拓扑：**dev（`npm run tauri dev`）引擎跑在 cc-gui app 进程内**（pi 转发器在 `engine/commands.rs` 对应引擎 arm），**安装版引擎跑在 cc_gui_daemon**（转发器在 `bin/cc_gui_daemon/daemon_state.rs`）。
+- 两份转发器拷贝必须同步演进；纯判定函数一律下沉 `engine/<engine>.rs` 共享（如 pi 的 `is_pi_external_wakeup_allowed` 等），禁止在 bin 层复制实现。
+- 验证引擎修复前必须核对运行进程血统（`ps -o pid,ppid,lstart,command -p <resident_pid>` 看父进程、`lsof -iTCP:4732/4733 -sTCP:LISTEN` 看端口归属），禁止只看仓库代码下结论；bootstrap 收编 daemon 前校验同 build（二进制路径 + mtime vs 进程启动时间），不一致终止重衍——daemon 常驻跨升级存活，孤儿/旧构建占端口会让新 app 永远拿不到新代码。
+
 ### Windows Cold-Start Click Freeze Gate（2026-08-14 版本记录 / 权限选择 P0 沉淀）
 
 - 改 `bootstrapApp` / Release Notes auto-open / ComposerGate / `ChatInputBox` Light 路径 / first-click 调度，或处理「Windows 启动后点按钮卡死」前，必读 `dev-guidelines/guides/windows-cold-start-click-freeze-pitfall.md`。
