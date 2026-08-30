@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T18:25:10.898Z",
+  "generatedAt": "2026-08-30T18:44:02.052Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -134,16 +134,6 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src-tauri/src/workspaces/commands.rs",
-      "lines": 3493,
-      "type": "rust",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 3000,
-      "thresholdSource": "policy"
-    },
-    {
       "path": "src-tauri/src/engine/claude.rs",
       "lines": 3430,
       "type": "rust",
@@ -170,16 +160,6 @@
       "policyId": "styles",
       "priority": "P1",
       "warnThreshold": 2200,
-      "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/composer/components/Composer.tsx",
-      "lines": 3405,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
       "failThreshold": 2800,
       "thresholdSource": "policy"
     },
@@ -311,6 +291,16 @@
       "priority": "P2",
       "warnThreshold": 2600,
       "failThreshold": 3000,
+      "thresholdSource": "policy"
+    },
+    {
+      "path": "src/features/composer/components/Composer.tsx",
+      "lines": 3085,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 2800,
       "thresholdSource": "policy"
     },
     {

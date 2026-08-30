@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T18:25:11.747Z",
+  "generatedAt": "2026-08-30T18:44:03.161Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -134,16 +134,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src-tauri/src/workspaces/commands.rs",
-      "lines": 3493,
-      "type": "rust",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src-tauri/src/engine/claude.rs",
       "lines": 3430,
       "type": "rust",
@@ -170,16 +160,6 @@
       "policyId": "styles",
       "priority": "P1",
       "warnThreshold": 2200,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/composer/components/Composer.tsx",
-      "lines": 3405,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -310,6 +290,16 @@
       "policyId": "test-files",
       "priority": "P2",
       "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/composer/components/Composer.tsx",
+      "lines": 3085,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -454,16 +444,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src/features/threads/hooks/useThreadEventHandlers.ts",
-      "lines": 2747,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src-tauri/src/git/mod.rs",
       "lines": 2720,
       "type": "rust",
@@ -560,6 +540,16 @@
       "policyId": "feature-hotpath",
       "priority": "P1",
       "warnThreshold": 2400,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/workspaces/commands.rs",
+      "lines": 2606,
+      "type": "rust",
+      "policyId": "default-source",
+      "priority": "P1",
+      "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -2554,6 +2544,16 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
+      "path": "src/features/threads/hooks/useTurnDiagnosticsRuntime.ts",
+      "lines": 1110,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
       "path": "src/styles/home-chat.css",
       "lines": 1110,
       "type": "css",
@@ -3384,6 +3384,16 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
+      "path": "src/features/threads/hooks/useThreadEventHandlers.ts",
+      "lines": 908,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
       "path": "src-tauri/src/engine/kimi.rs",
       "lines": 904,
       "type": "rust",
@@ -3417,6 +3427,16 @@
       "path": "src/features/project-map/components/ProjectMapRelationshipGraphWorkspace.tsx",
       "lines": 896,
       "type": "ts/tsx",
+      "policyId": "default-source",
+      "priority": "P1",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/workspaces/open_app.rs",
+      "lines": 895,
+      "type": "rust",
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
