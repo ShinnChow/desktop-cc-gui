@@ -1042,6 +1042,18 @@ export function ThreadList({
         ) : null}
       </>
     ) : null;
+  const threadListFooter = showHiddenExitedSummary || pagingControls ? (
+    <div className="thread-list-footer">
+      {showHiddenExitedSummary && (
+        <div className="thread-list-hidden-summary">
+          {t("threads.exitedSessionsHidden", {
+            count: hiddenExitedCount,
+          })}
+        </div>
+      )}
+      {pagingControls}
+    </div>
+  ) : null;
 
   return (
     <ThreadRowStatusProvider threadStatusById={threadStatusById}>
@@ -1084,14 +1096,7 @@ export function ThreadList({
                 );
               })}
             </div>
-            {showHiddenExitedSummary && (
-              <div className="thread-list-hidden-summary">
-                {t("threads.exitedSessionsHidden", {
-                  count: hiddenExitedCount,
-                })}
-              </div>
-            )}
-            {pagingControls}
+            {threadListFooter}
           </>
         ) : (
           <>
@@ -1101,14 +1106,7 @@ export function ThreadList({
                 <div className="thread-list-separator" aria-hidden="true" />
               )}
             {displayedUnpinnedRows.map((row) => renderThreadRow(row))}
-            {showHiddenExitedSummary && (
-              <div className="thread-list-hidden-summary">
-                {t("threads.exitedSessionsHidden", {
-                  count: hiddenExitedCount,
-                })}
-              </div>
-            )}
-            {pagingControls}
+            {threadListFooter}
           </>
         )}
       </div>

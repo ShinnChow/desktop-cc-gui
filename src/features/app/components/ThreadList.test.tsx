@@ -1615,3 +1615,20 @@ it("does not virtualize a small thread list", () => {
   expect(listEl?.getAttribute("data-virtualized")).toBeNull();
   expect(container.querySelector(".thread-list-virtual-spacer")).toBeNull();
 });
+
+it("keeps pagination controls outside the workspace tree rows", () => {
+  const { container } = render(
+    <ThreadList
+      {...baseProps}
+      unpinnedRows={[{ thread, depth: 0 }]}
+      totalThreadRoots={2}
+      visibleThreadRootCount={1}
+      isExpanded={false}
+    />,
+  );
+
+  const footer = container.querySelector(".thread-list-footer");
+  expect(footer).toBeTruthy();
+  expect(footer?.querySelector(".thread-more")).toBeTruthy();
+  expect(footer?.querySelector(".thread-row")).toBeNull();
+});
