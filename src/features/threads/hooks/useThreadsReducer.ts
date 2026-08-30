@@ -48,7 +48,6 @@ import {
   isKimiReasoningThread,
   shouldAcceptReasoningDelta,
 } from "./threadReducerReasoningGuards";
-import { areEquivalentAssistantMessageTexts } from "../assembly/conversationNormalization";
 import { resolveMergedThreadCreatedAt } from "../utils/threadSummarySort";
 import { mergeRuntimeReceipt } from "../utils/runtimeModelReceipt";
 import {
@@ -135,10 +134,22 @@ import {
   resolveLiveReasoningItemId,
   withThreadStatusDefaults,
 } from "./threadReducerCoreHelpers";
+import {
+  conversationItemsShallowEqual,
+  findEquivalentAssistantSnapshotIndex,
+  threadActivityStatusEqual,
+  threadSummaryListEqual,
+} from "./threadReducerEqualityGuards";
+import {
+  mergeProviderBindingFields,
+  normalizeEnsureThreadMetadataValue,
+  parentThreadIdFromEnsureThreadAction,
+  providerBindingFieldsEqual,
+  providerBindingFromEnsureThreadAction,
+} from "./threadReducerProviderBinding";
 import type {
   CodexCompactionLifecycleState,
   ThreadAction,
-  ThreadActivityStatus,
   ThreadState,
 } from "./threadReducerTypes";
 import {
@@ -221,239 +232,6 @@ export const __profile = {
     };
   },
 };
-
-type ThreadProviderBindingFields = Pick<
-  ThreadSummary,
-  | "sourceLabel"
-  | "providerProfileId"
-  | "providerProfileSource"
-  | "providerProfileName"
-  | "providerAvailability"
->;
-
-function normalizeEnsureThreadMetadataValue(value: string | null | undefined) {
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : undefined;
-}
-
-function parentThreadIdFromEnsureThreadAction(
-  action: Extract<ThreadAction, { type: "ensureThread" }>,
-) {
-  const parentThreadId = normalizeEnsureThreadMetadataValue(action.parentThreadId);
-  return parentThreadId && parentThreadId !== action.threadId
-    ? parentThreadId
-    : undefined;
-}
-
-function providerBindingFromEnsureThreadAction(
-  action: Extract<ThreadAction, { type: "ensureThread" }>,
-): Partial<ThreadProviderBindingFields> {
-  const sourceLabel = normalizeEnsureThreadMetadataValue(action.sourceLabel);
-  const providerProfileId = normalizeEnsureThreadMetadataValue(
-    action.providerProfileId,
-  );
-  const providerProfileSource = normalizeEnsureThreadMetadataValue(
-    action.providerProfileSource,
-  );
-  const providerProfileName = normalizeEnsureThreadMetadataValue(
-    action.providerProfileName,
-  );
-  const providerAvailability = normalizeEnsureThreadMetadataValue(
-    action.providerAvailability,
-  );
-  return {
-    ...(sourceLabel ? { sourceLabel } : {}),
-    ...(providerProfileId ? { providerProfileId } : {}),
-    ...(providerProfileSource ? { providerProfileSource } : {}),
-    ...(providerProfileName ? { providerProfileName } : {}),
-    ...(providerAvailability ? { providerAvailability } : {}),
-  };
-}
-
-function providerBindingFieldsEqual(
-  left: Partial<ThreadProviderBindingFields>,
-  right: Partial<ThreadProviderBindingFields>,
-) {
-  return (
-    (left.sourceLabel ?? undefined) === (right.sourceLabel ?? undefined) &&
-    (left.providerProfileId ?? undefined) ===
-      (right.providerProfileId ?? undefined) &&
-    (left.providerProfileSource ?? undefined) ===
-      (right.providerProfileSource ?? undefined) &&
-    (left.providerProfileName ?? undefined) ===
-      (right.providerProfileName ?? undefined) &&
-    (left.providerAvailability ?? undefined) ===
-      (right.providerAvailability ?? undefined)
-  );
-}
-
-function shallowRecordEqual(
-  left: Record<string, unknown>,
-  right: Record<string, unknown>,
-) {
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-  if (leftKeys.length !== rightKeys.length) {
-    return false;
-  }
-  return leftKeys.every((key) => Object.is(left[key], right[key]));
-}
-
-function conversationItemsShallowEqual(
-  left: ConversationItem,
-  right: ConversationItem,
-) {
-  if (left.kind === "message" && right.kind === "message") {
-    const {
-      presentationMetadata: _leftPresentationMetadata,
-      ...leftSourceFields
-    } = left;
-    const {
-      presentationMetadata: _rightPresentationMetadata,
-      ...rightSourceFields
-    } = right;
-    return shallowRecordEqual(leftSourceFields, rightSourceFields);
-  }
-  return shallowRecordEqual(
-    left as unknown as Record<string, unknown>,
-    right as unknown as Record<string, unknown>,
-  );
-}
-
-function threadActivityStatusEqual(
-  left: ThreadActivityStatus | undefined,
-  right: ThreadActivityStatus,
-) {
-  if (!left) {
-    return false;
-  }
-  return shallowRecordEqual(
-    left as unknown as Record<string, unknown>,
-    right as unknown as Record<string, unknown>,
-  );
-}
-
-function stringArrayEqual(left: string[] | undefined, right: string[] | undefined) {
-  if (left === right) {
-    return true;
-  }
-  if (!left || !right || left.length !== right.length) {
-    return false;
-  }
-  return left.every((value, index) => value === right[index]);
-}
-
-function autoSessionEqual(
-  left: ThreadSummary["autoSession"],
-  right: ThreadSummary["autoSession"],
-) {
-  if (left === right) {
-    return true;
-  }
-  if (!left || !right) {
-    return (left ?? null) === (right ?? null);
-  }
-  return (
-    left.sessionPurpose === right.sessionPurpose &&
-    left.visibility === right.visibility &&
-    left.ownerFeature === right.ownerFeature &&
-    (left.autoArchive ?? null) === (right.autoArchive ?? null) &&
-    left.createdBy === right.createdBy
-  );
-}
-
-function threadSummaryEqual(left: ThreadSummary, right: ThreadSummary) {
-  return (
-    left.id === right.id &&
-    left.name === right.name &&
-    left.updatedAt === right.updatedAt &&
-    (left.createdAt ?? null) === (right.createdAt ?? null) &&
-    (left.archivedAt ?? null) === (right.archivedAt ?? null) &&
-    (left.threadKind ?? null) === (right.threadKind ?? null) &&
-    (left.sizeBytes ?? null) === (right.sizeBytes ?? null) &&
-    (left.physicalPath ?? null) === (right.physicalPath ?? null) &&
-    (left.engineSource ?? null) === (right.engineSource ?? null) &&
-    (left.selectedEngine ?? null) === (right.selectedEngine ?? null) &&
-    (left.source ?? null) === (right.source ?? null) &&
-    (left.provider ?? null) === (right.provider ?? null) &&
-    (left.sourceLabel ?? null) === (right.sourceLabel ?? null) &&
-    (left.providerProfileId ?? null) === (right.providerProfileId ?? null) &&
-    (left.providerProfileSource ?? null) ===
-      (right.providerProfileSource ?? null) &&
-    (left.providerProfileName ?? null) === (right.providerProfileName ?? null) &&
-    (left.providerAvailability ?? null) ===
-      (right.providerAvailability ?? null) &&
-    (left.partialSource ?? null) === (right.partialSource ?? null) &&
-    (left.isDegraded ?? false) === (right.isDegraded ?? false) &&
-    (left.degradedReason ?? null) === (right.degradedReason ?? null) &&
-    (left.folderId ?? null) === (right.folderId ?? null) &&
-    autoSessionEqual(left.autoSession ?? null, right.autoSession ?? null) &&
-    stringArrayEqual(left.nativeThreadIds, right.nativeThreadIds) &&
-    (left.parentThreadId ?? null) === (right.parentThreadId ?? null)
-  );
-}
-
-function threadSummaryListEqual(left: ThreadSummary[], right: ThreadSummary[]) {
-  if (left === right) {
-    return true;
-  }
-  if (left.length !== right.length) {
-    return false;
-  }
-  return left.every((thread, index) => {
-    const rightThread = right[index];
-    return rightThread ? threadSummaryEqual(thread, rightThread) : false;
-  });
-}
-
-function findEquivalentAssistantSnapshotIndex(
-  list: ConversationItem[],
-  incomingText: string,
-) {
-  if (!incomingText.trim()) {
-    return -1;
-  }
-  for (let index = list.length - 1; index >= 0; index -= 1) {
-    const item = list[index];
-    if (isUserMessageItem(item)) {
-      return -1;
-    }
-    if (!isAssistantMessageItem(item)) {
-      continue;
-    }
-    if (
-      areEquivalentAssistantMessageTexts(
-        item.text,
-        incomingText,
-        mergeCompletedAgentText,
-      )
-    ) {
-      return index;
-    }
-  }
-  return -1;
-}
-
-function mergeProviderBindingFields<T extends ThreadSummary>(
-  incoming: T,
-  existing?: ThreadSummary,
-): T {
-  if (!existing) {
-    return incoming;
-  }
-  return {
-    ...incoming,
-    sourceLabel: incoming.sourceLabel ?? existing.sourceLabel,
-    providerProfileId: incoming.providerProfileId ?? existing.providerProfileId,
-    providerProfileSource:
-      incoming.providerProfileSource ?? existing.providerProfileSource,
-    providerProfileName:
-      incoming.providerProfileName ?? existing.providerProfileName,
-    providerAvailability:
-      incoming.providerAvailability ?? existing.providerAvailability,
-  };
-}
 
 export const initialState: ThreadState = {
   activeThreadIdByWorkspace: {},

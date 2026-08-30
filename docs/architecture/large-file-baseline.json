@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T16:24:10.608Z",
+  "generatedAt": "2026-08-30T16:39:08.483Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -114,16 +114,6 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src/features/threads/hooks/useThreadsReducer.ts",
-      "lines": 3728,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
       "path": "src/features/composer/components/ChatInputBox/selectors/ModelSelect.test.tsx",
       "lines": 3679,
       "type": "ts/tsx",
@@ -161,6 +151,16 @@
       "priority": "P2",
       "warnThreshold": 2600,
       "failThreshold": 3000,
+      "thresholdSource": "policy"
+    },
+    {
+      "path": "src/features/threads/hooks/useThreadsReducer.ts",
+      "lines": 3506,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 2800,
       "thresholdSource": "policy"
     },
     {

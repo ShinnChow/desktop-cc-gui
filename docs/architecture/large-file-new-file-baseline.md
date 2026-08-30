@@ -8,10 +8,10 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T16:24:11.566Z
+- Generated at: 2026-08-30T16:39:09.424Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
-- Count: 387
+- Count: 389
 
 | File | Lines | Type | Policy | Priority | Warn | Fail | Severity | Status | Baseline | Delta |
 |---|---:|---|---|---|---:|---:|---|---|---:|---:|
@@ -26,11 +26,11 @@ status: generated
 | `src/styles/settings.part2.basic-redesign.css` | 4074 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/session_management.rs` | 4008 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/app/hooks/useAppServerEvents.ts` | 3843 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
-| `src/features/threads/hooks/useThreadsReducer.ts` | 3728 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/composer/components/ChatInputBox/selectors/ModelSelect.test.tsx` | 3679 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/app/components/Sidebar.test.tsx` | 3620 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/messages/components/Messages.live-behavior.test.tsx` | 3606 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/services/tauri.test.ts` | 3508 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
+| `src/features/threads/hooks/useThreadsReducer.ts` | 3506 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/workspaces/commands.rs` | 3493 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/claude.rs` | 3430 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/components/GitHistoryPanelView.tsx` | 3425 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
@@ -66,7 +66,6 @@ status: generated
 | `src/features/threads/hooks/useThreadEventHandlers.ts` | 2747 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/git/mod.rs` | 2720 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useQueuedSend.test.tsx` | 2718 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
-| `src/i18n/locales/en/settings.ts` | 2700 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/settings/components/SettingsView.test.tsx` | 2691 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/app/hooks/useSidebarMenus.ts` | 2688 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/session-activity/components/WorkspaceSessionActivityPanel.tsx` | 2679 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
@@ -80,7 +79,6 @@ status: generated
 | `src-tauri/src/local_usage/tests.rs` | 2577 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/bin/cc_gui_daemon.rs` | 2562 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/email/session_continuation.rs` | 2551 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
-| `src/i18n/locales/zh/settings.ts` | 2548 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/app-shell/sections/layoutNodes/useAppShellLayoutNodesSection.tsx` | 2531 | ts/tsx | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/codex/installer.rs` | 2512 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/styles/status-panel.css` | 2445 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
@@ -307,6 +305,7 @@ status: generated
 | `src/app-shell/sections/useAppShellLayoutNodesSection.test.ts` | 994 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/composer/components/ChatInputBox/hooks/useProviderTargetCatalogOwners.ts` | 994 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadActions.helpers.engineSummaries.ts` | 988 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
+| `src/i18n/locales/en/settings/engines-vendors.ts` | 987 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/app-shell/sections/useAppShellSearchRadarSection.ts` | 986 | ts/tsx | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/dsh/mod.rs` | 984 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `.agents/skills/huashu-design/scripts/html2pptx.js` | 979 | js/jsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
@@ -334,6 +333,7 @@ status: generated
 | `src/features/composer/components/ChatInputBox/styles/context-bar.css` | 946 | css | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/commands_opencode.rs` | 944 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/git/utils/semanticDiffSummary.ts` | 944 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
+| `src/i18n/locales/zh/settings/engines-vendors.ts` | 944 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/claude/event_conversion.rs` | 939 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/workspaces/rewind_export.rs` | 936 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/messages/timeline/components/TimelineRowRenderer.tsx` | 934 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
@@ -354,6 +354,7 @@ status: generated
 | `src/features/git-history/components/GitHistoryWorktreePanel.test.tsx` | 897 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/project-map/components/ProjectMapRelationshipGraphWorkspace.tsx` | 896 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/messages/components/Messages.runtime-reconnect.test.tsx` | 894 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
+| `src/i18n/locales/en/settings/workspace-behavior.ts` | 890 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/settings/components/settings-view/hooks/useWorkspaceSessionCatalog.test.tsx` | 887 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/composer/components/ClaudeRewindConfirmDialog.tsx` | 882 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadActions.start-fork.test.tsx` | 882 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
@@ -378,6 +379,7 @@ status: generated
 | `src-tauri/src/git/commands_pr_workflow.rs` | 843 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/pi_rpc.rs` | 842 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadActions.timeout-fallback.test.tsx` | 841 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
+| `src/i18n/locales/zh/settings/workspace-behavior.ts` | 839 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/tests/shared_session_v2.rs` | 835 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/multi-agent/components/ConversationSurface.tsx` | 835 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `scripts/check-large-files.mjs` | 834 | mjs | default-source | P1 | 2600 | 800 | fail | captured |  |  |

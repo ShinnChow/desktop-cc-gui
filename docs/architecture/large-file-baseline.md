@@ -8,7 +8,7 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T16:24:10.607Z
+- Generated at: 2026-08-30T16:39:08.482Z
 - Scope: fail
 - Policy version: 2026-08-30.policy-v5
 - Count: 47
@@ -26,11 +26,11 @@ status: generated
 | `src/styles/settings.part2.basic-redesign.css` | 4074 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src-tauri/src/session_management.rs` | 4008 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src/features/app/hooks/useAppServerEvents.ts` | 3843 | ts/tsx | default-source | P1 | 2600 | 3000 | fail | captured |  |  |
-| `src/features/threads/hooks/useThreadsReducer.ts` | 3728 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
 | `src/features/composer/components/ChatInputBox/selectors/ModelSelect.test.tsx` | 3679 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/app/components/Sidebar.test.tsx` | 3620 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/messages/components/Messages.live-behavior.test.tsx` | 3606 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/services/tauri.test.ts` | 3508 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
+| `src/features/threads/hooks/useThreadsReducer.ts` | 3506 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
 | `src-tauri/src/workspaces/commands.rs` | 3493 | rust | default-source | P1 | 2600 | 3000 | fail | captured |  |  |
 | `src-tauri/src/engine/claude.rs` | 3430 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/components/GitHistoryPanelView.tsx` | 3425 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
