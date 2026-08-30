@@ -1,7 +1,5 @@
-import type { GitFileDiff, GitHubPullRequest, GitLogEntry } from "../../../types";
+import type { GitLogEntry } from "../../../types";
 import {
-  getGitDiffs,
-  getGitFileFullDiff,
   openFolderInFileManager,
   revealInFileManager,
   type CommitMessageEngine,
@@ -29,7 +27,6 @@ import Search from "lucide-react/dist/esm/icons/search";
 import Upload from "lucide-react/dist/esm/icons/upload";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { copyTextToClipboard } from "../../../utils/clipboard";
 import { matchesShortcutForPlatform } from "../../../utils/shortcuts";
 import { formatRelativeTime } from "../../../utils/time";
 import { FileIcon } from "../../../components/FileIcon";
@@ -50,27 +47,18 @@ import {
   compactDiffTree,
 } from "../utils/diffTree";
 import { WorkspaceEditableDiffReviewSurface } from "./WorkspaceEditableDiffReviewSurface";
-import type { EditableDiffDraftActions } from "./WorkspaceEditableDiffCompare";
 import {
   normalizeDiffPath,
 } from "./GitDiffPanelInclusion";
-import {
-  clampRendererContextMenuPosition,
-  estimateRendererContextMenuHeight,
-  RendererContextMenu,
-  type RendererContextMenuItem,
-  type RendererContextMenuState,
-} from "../../../components/ui/RendererContextMenu";
+import { RendererContextMenu } from "../../../components/ui/RendererContextMenu";
 import type { GitDiffPanelProps } from "./GitDiffPanelTypes";
 import {
   joinWorkspaceAbsolutePath,
-  resolveGitRootWorkspacePrefix,
 } from "../../../utils/workspacePaths";
 import {
   GitMultiRepositoryChanges,
   type RepositoryCommitSelection,
 } from "./GitMultiRepositoryChanges";
-import { countDiffStats } from "../utils/gitChangeModel";
 import { useGitCommitComposerPlacement } from "../hooks/useGitCommitComposerPlacement";
 import { useCommitMessageGenerationMenu } from "../hooks/useCommitMessageGenerationMenu";
 import { readInitialCommitMessageMenuEngine } from "../utils/commitMessageMenuConfig";
@@ -79,9 +67,7 @@ import {
   isMissingRepo,
   normalizeRootPath,
 } from "./gitDiffPanelLayout";
-import { buildGitDiffPanelFileContextMenuItems } from "./GitDiffPanelFileContextMenu";
 import {
-  resolveGitDiffFileHistoryTarget,
   resolveRepositoryWorkspaceFilePath,
 } from "./GitDiffPanelFileScope";
 import {
@@ -90,6 +76,11 @@ import {
 } from "../../files/utils/openHtmlInBrowser";
 import { pushErrorToast } from "../../../services/toasts";
 import { getRevealInOsFileManagerLabelKey } from "../../../utils/rendererPlatform";
+import { useGitDiffPreview } from "./useGitDiffPreview";
+import {
+  useGitDiffContextMenus,
+  type GitPanelContextMenuState,
+} from "./gitDiffContextMenus";
 
 type ModeMenuLayout = {
   align: "left" | "right";
@@ -102,22 +93,7 @@ function GitModeSelectorMount({ target, children }: { target: HTMLElement | null
   return target ? createPortal(children, target) : children;
 }
 
-type GitDiffSectionKey = "staged" | "unstaged";
-
-type GitPanelContextMenuState = RendererContextMenuState & {
-  source?: "git-diff-file";
-};
-
-type PreviewFileState = DiffFile & {
-  section: GitDiffSectionKey;
-  repositoryRoot: string | null;
-  scopedDiffEntry: GitFileDiff | null;
-  isDiffLoading: boolean;
-  // 单文件兜底结果：批量 diff 列表缺失/为空时通过 get_git_file_full_diff 取回。
-  fallbackDiffEntry: GitFileDiff | null;
-  // 兜底取回成功但内容为空：文件没有文本级差异（如 CRLF 幻影修改），而非加载失败。
-  fallbackResolvedEmpty: boolean;
-};
+export type GitDiffSectionKey = "staged" | "unstaged";
 
 function renderModeIcon(mode: GitDiffPanelProps["mode"], className: string, size = 12) {
   switch (mode) {
@@ -348,16 +324,6 @@ function GitDiffPanelImpl({
   const gitStatusRefreshSpinTimerRef = useRef<number | null>(null);
   const gitStatusRefreshSpinRafRef = useRef<number | null>(null);
   const [isGitStatusRefreshing, setIsGitStatusRefreshing] = useState(false);
-  const [previewFile, setPreviewFile] = useState<PreviewFileState | null>(null);
-  const [isPreviewModalMaximized, setIsPreviewModalMaximized] = useState(false);
-  const [isPreviewModalDirty, setIsPreviewModalDirty] = useState(false);
-  const [isPreviewSaveInFlight, setIsPreviewSaveInFlight] = useState(false);
-  const [isUnsavedCloseDialogOpen, setIsUnsavedCloseDialogOpen] = useState(false);
-  const [previewHeaderControlsTarget, setPreviewHeaderControlsTarget] = useState<HTMLDivElement | null>(null);
-  const previewDraftActionsRef = useRef<EditableDiffDraftActions | null>(null);
-  const handledModalPreviewRequestIdRef = useRef<number | null>(null);
-  const scopedPreviewRequestIdRef = useRef(0);
-  const previewContextKeyRef = useRef<string | null>(null);
   const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const [commitMessageMenuEngine, setCommitMessageMenuEngine] =
     useState<CommitMessageEngine>(() => readInitialCommitMessageMenuEngine());
@@ -447,63 +413,36 @@ function GitDiffPanelImpl({
     stagedFiles: stagedCommitFiles,
     unstagedFiles: unstagedCommitFiles,
   });
-  const previewDiffEntry = useMemo(
-    () => {
-      if (!previewFile) {
-        return null;
-      }
-      if (previewFile.fallbackDiffEntry) {
-        return previewFile.fallbackDiffEntry;
-      }
-      if (previewFile.repositoryRoot !== null) {
-        return previewFile.scopedDiffEntry;
-      }
-      return diffEntries.find(
-        (entry) => normalizeDiffPath(entry.path) === normalizeDiffPath(previewFile.path),
-      ) ?? null;
-    },
-    [diffEntries, previewFile],
-  );
-  const previewStats = useMemo(() => {
-    if (previewFile && (previewFile.additions !== 0 || previewFile.deletions !== 0)) {
-      return { additions: previewFile.additions, deletions: previewFile.deletions };
-    }
-    if (previewDiffEntry && !previewDiffEntry.isImage) {
-      return countDiffStats(previewDiffEntry.diff ?? "");
-    }
-    return { additions: previewFile?.additions ?? 0, deletions: previewFile?.deletions ?? 0 };
-  }, [previewDiffEntry, previewFile]);
-  const closePreviewModalNow = useCallback(() => {
-    scopedPreviewRequestIdRef.current += 1;
-    setIsPreviewModalDirty(false);
-    setIsPreviewSaveInFlight(false);
-    setIsUnsavedCloseDialogOpen(false);
-    setPreviewFile(null);
-    setIsPreviewModalMaximized(false);
-  }, []);
-  const discardAndClosePreviewModal = useCallback(() => {
-    previewDraftActionsRef.current?.discard();
-    closePreviewModalNow();
-  }, [closePreviewModalNow]);
-  const closePreviewModal = useCallback(() => {
-    if (isPreviewModalDirty) {
-      setIsUnsavedCloseDialogOpen(true);
-      return;
-    }
-    closePreviewModalNow();
-  }, [closePreviewModalNow, isPreviewModalDirty]);
-  const handlePreviewDraftActionsChange = useCallback((actions: EditableDiffDraftActions | null) => {
-    previewDraftActionsRef.current = actions;
-    setIsPreviewSaveInFlight(actions?.isSaving ?? false);
-  }, []);
-  const saveAndClosePreviewModal = useCallback(async () => {
-    const saved = await previewDraftActionsRef.current?.save();
-    if (!saved) {
-      return false;
-    }
-    closePreviewModalNow();
-    return true;
-  }, [closePreviewModalNow]);
+  const {
+    previewFile,
+    isPreviewModalMaximized,
+    setIsPreviewModalMaximized,
+    isPreviewModalDirty,
+    setIsPreviewModalDirty,
+    isPreviewSaveInFlight,
+    isUnsavedCloseDialogOpen,
+    setIsUnsavedCloseDialogOpen,
+    previewHeaderControlsTarget,
+    setPreviewHeaderControlsTarget,
+    previewDiffEntry,
+    previewStats,
+    closePreviewModalNow,
+    discardAndClosePreviewModal,
+    closePreviewModal,
+    handlePreviewDraftActionsChange,
+    saveAndClosePreviewModal,
+    handleOpenFilePreview,
+    handleOpenRepositoryFilePreview,
+    previewFullDiffLoader,
+  } = useGitDiffPreview({
+    diffEntries,
+    allFiles,
+    modalPreviewRequest,
+    workspaceId,
+    workspacePath,
+    gitRoot,
+    multiRepositoryMode,
+  });
 
   const handleOpenInlinePreview = useCallback(
     (path: string) => {
@@ -627,213 +566,6 @@ function GitDiffPanelImpl({
     [openLocalHtmlInBuiltInBrowser],
   );
 
-  const resolvePreviewRepositoryRoot = useCallback((repositoryRoot: string | null) => {
-    if (repositoryRoot !== null) {
-      return repositoryRoot;
-    }
-    if (gitRoot === "") {
-      return "";
-    }
-    if (workspacePath && gitRoot) {
-      return resolveGitRootWorkspacePrefix(workspacePath, gitRoot);
-    }
-    return null;
-  }, [gitRoot, workspacePath]);
-  // 批量 diff 列表缺失/为空时的单文件兜底：内容非空则回填弹窗，空则标记
-  // 「无文本差异」，失败则回落「差异不可用」。请求过期（关闭/换文件）直接丢弃。
-  const loadPreviewFallbackDiff = useCallback(async (target: PreviewFileState) => {
-    if (!workspaceId) {
-      return;
-    }
-    const requestId = scopedPreviewRequestIdRef.current;
-    const repositoryRoot = resolvePreviewRepositoryRoot(target.repositoryRoot);
-    try {
-      const fullDiff = await getGitFileFullDiff(workspaceId, target.path, repositoryRoot);
-      if (scopedPreviewRequestIdRef.current !== requestId) {
-        return;
-      }
-      setPreviewFile((current) => {
-        if (
-          !current
-          || current.path !== target.path
-          || current.section !== target.section
-          || current.repositoryRoot !== target.repositoryRoot
-        ) {
-          return current;
-        }
-        if (fullDiff.trim().length === 0) {
-          return { ...current, isDiffLoading: false, fallbackResolvedEmpty: true };
-        }
-        return {
-          ...current,
-          isDiffLoading: false,
-          fallbackDiffEntry: { path: current.path, diff: fullDiff },
-        };
-      });
-    } catch (error) {
-      console.error("Failed to load preview fallback git diff", error);
-      if (scopedPreviewRequestIdRef.current !== requestId) {
-        return;
-      }
-      setPreviewFile((current) => {
-        if (
-          !current
-          || current.path !== target.path
-          || current.section !== target.section
-          || current.repositoryRoot !== target.repositoryRoot
-        ) {
-          return current;
-        }
-        return { ...current, isDiffLoading: false };
-      });
-    }
-  }, [resolvePreviewRepositoryRoot, workspaceId]);
-
-  const handleOpenFilePreview = useCallback((
-    file: DiffFile,
-    section: "staged" | "unstaged",
-    maximized = false,
-  ) => {
-    scopedPreviewRequestIdRef.current += 1;
-    setIsPreviewModalDirty(false);
-    setIsPreviewModalMaximized(maximized);
-    const normalizedPath = normalizeDiffPath(file.path);
-    const existingEntry = diffEntries.find(
-      (entry) => normalizeDiffPath(entry.path) === normalizedPath,
-    ) ?? null;
-    const existingEntryHasContent = Boolean(
-      existingEntry
-      && (existingEntry.isImage || existingEntry.diff.trim().length > 0),
-    );
-    const target: PreviewFileState = {
-      ...file,
-      section,
-      repositoryRoot: null,
-      scopedDiffEntry: null,
-      fallbackDiffEntry: null,
-      fallbackResolvedEmpty: false,
-      isDiffLoading: !existingEntryHasContent,
-    };
-    setPreviewFile(target);
-    if (!existingEntryHasContent) {
-      void loadPreviewFallbackDiff(target);
-    }
-  }, [diffEntries, loadPreviewFallbackDiff]);
-  const handleOpenRepositoryFilePreview = useCallback(async (
-    repositoryRoot: string,
-    file: DiffFile,
-    section: GitDiffSectionKey,
-  ) => {
-    if (!workspaceId) {
-      return;
-    }
-    const requestId = scopedPreviewRequestIdRef.current + 1;
-    scopedPreviewRequestIdRef.current = requestId;
-    setIsPreviewModalDirty(false);
-    setIsPreviewModalMaximized(false);
-    setPreviewFile({
-      ...file,
-      section,
-      repositoryRoot,
-      scopedDiffEntry: null,
-      fallbackDiffEntry: null,
-      fallbackResolvedEmpty: false,
-      isDiffLoading: true,
-    });
-    try {
-      const scopedDiffs = await getGitDiffs(workspaceId, repositoryRoot);
-      if (scopedPreviewRequestIdRef.current !== requestId) {
-        return;
-      }
-      const normalizedPath = normalizeDiffPath(file.path);
-      const scopedDiffEntry = scopedDiffs.find(
-        (entry) => normalizeDiffPath(entry.path) === normalizedPath,
-      ) ?? null;
-      const scopedDiffEntryHasContent = Boolean(
-        scopedDiffEntry
-        && (scopedDiffEntry.isImage || scopedDiffEntry.diff.trim().length > 0),
-      );
-      const target: PreviewFileState = {
-        ...file,
-        section,
-        repositoryRoot,
-        scopedDiffEntry,
-        fallbackDiffEntry: null,
-        fallbackResolvedEmpty: false,
-        isDiffLoading: !scopedDiffEntryHasContent,
-      };
-      setPreviewFile(target);
-      if (!scopedDiffEntryHasContent) {
-        void loadPreviewFallbackDiff(target);
-      }
-    } catch (error) {
-      if (scopedPreviewRequestIdRef.current !== requestId) {
-        return;
-      }
-      console.error("Failed to load repository-scoped git diff", error);
-      setPreviewFile({
-        ...file,
-        section,
-        repositoryRoot,
-        scopedDiffEntry: null,
-        fallbackDiffEntry: null,
-        fallbackResolvedEmpty: false,
-        isDiffLoading: false,
-      });
-    }
-  }, [loadPreviewFallbackDiff, workspaceId]);
-  const previewFullDiffLoader = useMemo(() => {
-    if (!workspaceId || !previewFile) {
-      return null;
-    }
-    const repositoryRoot = previewFile.repositoryRoot !== null
-      ? previewFile.repositoryRoot
-      : gitRoot === ""
-        ? ""
-        : workspacePath && gitRoot
-          ? resolveGitRootWorkspacePrefix(workspacePath, gitRoot)
-          : null;
-    if (repositoryRoot === null) {
-      return null;
-    }
-    return (path: string) => getGitFileFullDiff(workspaceId, path, repositoryRoot);
-  }, [gitRoot, previewFile, workspaceId, workspacePath]);
-  const previewContextKey = JSON.stringify([
-    workspaceId,
-    multiRepositoryMode ? "multi" : "single",
-    multiRepositoryMode ? null : gitRoot,
-  ]);
-  useEffect(() => {
-    if (previewContextKeyRef.current === null) {
-      previewContextKeyRef.current = previewContextKey;
-      return;
-    }
-    if (previewContextKeyRef.current === previewContextKey) {
-      return;
-    }
-    previewContextKeyRef.current = previewContextKey;
-    previewDraftActionsRef.current?.discard();
-    closePreviewModalNow();
-  }, [closePreviewModalNow, previewContextKey]);
-  useEffect(() => {
-    if (
-      !modalPreviewRequest ||
-      handledModalPreviewRequestIdRef.current === modalPreviewRequest.requestId
-    ) {
-      return;
-    }
-    const requestedFile = allFiles.find(
-      (file) => normalizeDiffPath(file.path) === normalizeDiffPath(modalPreviewRequest.path),
-    );
-    if (requestedFile) {
-      handledModalPreviewRequestIdRef.current = modalPreviewRequest.requestId;
-      handleOpenFilePreview(
-        requestedFile,
-        requestedFile.section,
-        modalPreviewRequest.maximized === true,
-      );
-    }
-  }, [allFiles, handleOpenFilePreview, modalPreviewRequest]);
   const modeOptions = useMemo(
     () => [
       {
@@ -1260,95 +992,6 @@ function GitDiffPanelImpl({
     });
   }, []);
 
-  const githubBaseUrl = useMemo(() => {
-    if (!gitRemoteUrl) {
-      return null;
-    }
-    const trimmed = gitRemoteUrl.trim();
-    if (!trimmed) {
-      return null;
-    }
-    let path = "";
-    if (trimmed.startsWith("git@github.com:")) {
-      path = trimmed.slice("git@github.com:".length);
-    } else if (trimmed.startsWith("ssh://git@github.com/")) {
-      path = trimmed.slice("ssh://git@github.com/".length);
-    } else if (trimmed.includes("github.com/")) {
-      path = trimmed.split("github.com/")[1] ?? "";
-    }
-    path = path.replace(/\.git$/, "").replace(/\/$/, "");
-    if (!path) {
-      return null;
-    }
-    return `https://github.com/${path}`;
-  }, [gitRemoteUrl]);
-
-  const showLogMenu = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>, entry: GitLogEntry) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const items: RendererContextMenuItem[] = [
-        {
-          type: "item",
-          id: "copy-sha",
-          label: "Copy SHA",
-          onSelect: async () => {
-            await copyTextToClipboard(entry.sha);
-          },
-        },
-      ];
-      if (githubBaseUrl) {
-        items.push({
-          type: "item",
-          id: "open-github",
-          label: "Open on GitHub",
-          onSelect: async () => {
-            await openUrl(`${githubBaseUrl}/commit/${entry.sha}`);
-          },
-        });
-      }
-      const position = clampRendererContextMenuPosition(event.clientX, event.clientY, {
-        width: 220,
-        height: githubBaseUrl ? 120 : 80,
-      });
-      setGitContextMenu({
-        ...position,
-        label: "Commit actions",
-        items,
-      });
-    },
-    [githubBaseUrl],
-  );
-
-  const showPullRequestMenu = useCallback(
-    (
-      event: ReactMouseEvent<HTMLDivElement>,
-      pullRequest: GitHubPullRequest,
-    ) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const position = clampRendererContextMenuPosition(event.clientX, event.clientY, {
-        width: 220,
-        height: 80,
-      });
-      setGitContextMenu({
-        ...position,
-        label: "Pull request actions",
-        items: [
-          {
-            type: "item",
-            id: "open-github",
-            label: "Open on GitHub",
-            onSelect: async () => {
-              await openUrl(pullRequest.url);
-            },
-          },
-        ],
-      });
-    },
-    [],
-  );
-
   const discardFiles = useCallback(
     async (paths: string[]) => {
       if ((!onRevertFile && !onRevertFiles) || paths.length === 0 || discardDialogSubmitting) {
@@ -1460,244 +1103,36 @@ function GitDiffPanelImpl({
     [discardFiles],
   );
 
-  const showFileMenu = useCallback(
-    (
-      event: ReactMouseEvent<HTMLDivElement>,
-      path: string,
-      section: GitDiffSectionKey,
-    ) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const sectionFiles = section === "staged" ? stagedFiles : unstagedFiles;
-      const filesByNormalizedPath = new Map(
-        sectionFiles.map((file) => [normalizeDiffPath(file.path), file]),
-      );
-      const clickedFile = filesByNormalizedPath.get(normalizeDiffPath(path));
-      if (!clickedFile) {
-        setGitContextMenu(null);
-        return;
-      }
-
-      const mutationEnabled = !isFileMutationDisabled(clickedFile);
-      const isInSelection =
-        mutationEnabled &&
-        Array.from(selectedFiles).some(
-          (selectedPath) =>
-            normalizeDiffPath(selectedPath) === normalizeDiffPath(path),
-        );
-      const selectedTargetPaths =
-        mutationEnabled && isInSelection && selectedFiles.size > 1
-          ? Array.from(selectedFiles)
-          : mutationEnabled
-            ? [path]
-            : [];
-      const targetPaths = mutationEnabled
-        ? Array.from(
-            new Map(
-              selectedTargetPaths
-                .map((selectedPath) =>
-                  filesByNormalizedPath.get(normalizeDiffPath(selectedPath)),
-                )
-                .filter(
-                  (file): file is DiffFile =>
-                    file !== undefined && !isFileMutationDisabled(file),
-                )
-                .map((file) => [normalizeDiffPath(file.path), file.path]),
-            ).values(),
-          )
-        : [];
-
-      if (mutationEnabled && !isInSelection) {
-        setSelectedFiles(new Set([path]));
-        setLastClickedFile(path);
-      }
-
-      const fileHistoryTarget = onOpenFileHistory
-        ? resolveGitDiffFileHistoryTarget({
-            workspaceId,
-            workspacePath,
-            gitRoot,
-            path: clickedFile.path,
-          })
-        : null;
-      const items = buildGitDiffPanelFileContextMenuItems({
-        t,
-        unstageAction:
-          mutationEnabled
-          && section === "staged"
-          && (onUnstageFiles || onUnstageFile)
-            ? {
-                count: targetPaths.length,
-                onSelect: async () => {
-                  if (onUnstageFiles) {
-                    await onUnstageFiles(targetPaths);
-                    return;
-                  }
-                  for (const targetPath of targetPaths) {
-                    await onUnstageFile?.(targetPath);
-                  }
-                },
-              }
-            : undefined,
-        stageAction:
-          mutationEnabled && section === "unstaged" && onStageFile
-            ? {
-                count: targetPaths.length,
-                onSelect: async () => {
-                  for (const targetPath of targetPaths) {
-                    await onStageFile(targetPath);
-                  }
-                },
-              }
-            : undefined,
-        historyAction:
-          fileHistoryTarget && onOpenFileHistory
-            ? {
-                onSelect: () => onOpenFileHistory(fileHistoryTarget),
-              }
-            : undefined,
-        discardAction:
-          mutationEnabled && section === "unstaged" && onRevertFile
-            ? {
-                count: targetPaths.length,
-                onSelect: () => discardFiles(targetPaths),
-              }
-            : undefined,
-      });
-      if (items.length === 0) {
-        setGitContextMenu(null);
-        return;
-      }
-
-      const position = clampRendererContextMenuPosition(event.clientX, event.clientY, {
-        width: 260,
-        height: estimateRendererContextMenuHeight(items),
-      });
-      setGitContextMenu({
-        ...position,
-        label: t("git.fileActions"),
-        items,
-        source: "git-diff-file",
-      });
-    },
-    [
-      discardFiles,
-      onRevertFile,
-      onOpenFileHistory,
-      onStageFile,
-      onUnstageFile,
-      onUnstageFiles,
-      selectedFiles,
-      stagedFiles,
-      t,
-      unstagedFiles,
-      workspaceId,
-      workspacePath,
-      gitRoot,
-    ],
-  );
-
-  const showRepositoryFileMenu = useCallback(
-    (
-      event: ReactMouseEvent<HTMLDivElement>,
-      repositoryRoot: string,
-      path: string,
-      section: GitDiffSectionKey,
-    ) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const repositoryStatus = repositoryStatuses.find(
-        (status) => status.repositoryRoot === repositoryRoot,
-      );
-      const sectionFiles =
-        section === "staged"
-          ? repositoryStatus?.stagedFiles
-          : repositoryStatus?.unstagedFiles;
-      const targetFile = sectionFiles?.find(
-        (file) => normalizeDiffPath(file.path) === normalizeDiffPath(path),
-      );
-      if (repositoryStatus?.error || !targetFile) {
-        setGitContextMenu(null);
-        return;
-      }
-
-      const mutationEnabled = !isFileMutationDisabled(targetFile);
-      const fileHistoryTarget = onOpenFileHistory
-        ? resolveGitDiffFileHistoryTarget({
-            workspaceId,
-            workspacePath,
-            repositoryRoot,
-            path: targetFile.path,
-          })
-        : null;
-      const items = buildGitDiffPanelFileContextMenuItems({
-        t,
-        unstageAction:
-          mutationEnabled && section === "staged" && onUnstageRepositoryFile
-            ? {
-                count: 1,
-                onSelect: async () => {
-                  await onUnstageRepositoryFile(repositoryRoot, targetFile.path);
-                  await onRefreshRepositoryStatuses?.();
-                },
-              }
-            : undefined,
-        stageAction:
-          mutationEnabled && section === "unstaged" && onStageRepositoryFile
-            ? {
-                count: 1,
-                onSelect: async () => {
-                  await onStageRepositoryFile(repositoryRoot, targetFile.path);
-                  await onRefreshRepositoryStatuses?.();
-                },
-              }
-            : undefined,
-        historyAction:
-          fileHistoryTarget && onOpenFileHistory
-            ? {
-                onSelect: () => onOpenFileHistory(fileHistoryTarget),
-              }
-            : undefined,
-        discardAction:
-          mutationEnabled && section === "unstaged" && onRevertRepositoryFile
-            ? {
-                count: 1,
-                onSelect: () =>
-                  discardRepositoryFile(repositoryRoot, targetFile.path),
-              }
-            : undefined,
-      });
-      if (items.length === 0) {
-        setGitContextMenu(null);
-        return;
-      }
-
-      const position = clampRendererContextMenuPosition(event.clientX, event.clientY, {
-        width: 260,
-        height: estimateRendererContextMenuHeight(items),
-      });
-      setGitContextMenu({
-        ...position,
-        label: t("git.fileActions"),
-        items,
-        source: "git-diff-file",
-      });
-    },
-    [
-      discardRepositoryFile,
-      onRefreshRepositoryStatuses,
-      onRevertRepositoryFile,
-      onOpenFileHistory,
-      onStageRepositoryFile,
-      onUnstageRepositoryFile,
-      repositoryStatuses,
-      t,
-      workspaceId,
-      workspacePath,
-    ],
-  );
+  const {
+    showLogMenu,
+    showPullRequestMenu,
+    showFileMenu,
+    showRepositoryFileMenu,
+  } = useGitDiffContextMenus({
+    t,
+    gitRemoteUrl,
+    setGitContextMenu,
+    stagedFiles,
+    unstagedFiles,
+    selectedFiles,
+    setSelectedFiles,
+    setLastClickedFile,
+    discardFiles,
+    discardRepositoryFile,
+    workspaceId,
+    workspacePath,
+    gitRoot,
+    repositoryStatuses,
+    onRevertFile,
+    onOpenFileHistory,
+    onStageFile,
+    onUnstageFile,
+    onUnstageFiles,
+    onRefreshRepositoryStatuses,
+    onRevertRepositoryFile,
+    onStageRepositoryFile,
+    onUnstageRepositoryFile,
+  });
   const logCountLabel = logTotal
     ? `${logTotal} commit${logTotal === 1 ? "" : "s"}`
     : logEntries.length
