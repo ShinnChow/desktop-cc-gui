@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T17:36:17.909Z",
+  "generatedAt": "2026-08-30T17:37:32.294Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -54,16 +54,6 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src-tauri/src/engine/commands.rs",
-      "lines": 4287,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
-      "thresholdSource": "policy"
-    },
-    {
       "path": "src/features/composer/components/Composer.tsx",
       "lines": 4127,
       "type": "ts/tsx",
@@ -96,6 +86,16 @@
     {
       "path": "src-tauri/src/session_management.rs",
       "lines": 4008,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
+      "failThreshold": 2600,
+      "thresholdSource": "policy"
+    },
+    {
+      "path": "src-tauri/src/engine/commands.rs",
+      "lines": 3923,
       "type": "rust",
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
