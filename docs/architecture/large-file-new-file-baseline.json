@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T20:35:22.036Z",
+  "generatedAt": "2026-08-30T20:42:23.333Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -345,7 +345,7 @@
     },
     {
       "path": "src/features/layout/hooks/useLayoutNodes.tsx",
-      "lines": 2943,
+      "lines": 2935,
       "type": "ts/tsx",
       "policyId": "default-source",
       "priority": "P1",

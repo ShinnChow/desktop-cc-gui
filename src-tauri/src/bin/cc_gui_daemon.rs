@@ -29,7 +29,7 @@ mod codex_provider_env;
 mod codex_rewind;
 #[path = "../codex/thread_mode_state.rs"]
 mod codex_thread_mode_state;
-#[path = "cc_gui_daemon/daemon_state.rs"]
+#[path = "cc_gui_daemon/daemon_state/mod.rs"]
 mod daemon_state;
 #[path = "cc_gui_daemon/engine_bridge.rs"]
 mod engine;
