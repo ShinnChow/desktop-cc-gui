@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T17:24:12.514Z",
+  "generatedAt": "2026-08-30T17:36:18.868Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -20,16 +20,6 @@
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src-tauri/src/engine/commands.rs",
-      "lines": 5047,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -60,6 +50,16 @@
       "policyId": "test-files",
       "priority": "P2",
       "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/engine/commands.rs",
+      "lines": 4287,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -230,16 +230,6 @@
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
       "warnThreshold": 2200,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/git/components/GitDiffPanel.tsx",
-      "lines": 3279,
-      "type": "ts/tsx",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -509,6 +499,16 @@
       "type": "ts/tsx",
       "policyId": "test-files",
       "priority": "P2",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/git/components/GitDiffPanel.tsx",
+      "lines": 2711,
+      "type": "ts/tsx",
+      "policyId": "default-source",
+      "priority": "P1",
       "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
@@ -2390,6 +2390,16 @@
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/engine/commands_send_sync.rs",
+      "lines": 1180,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T17:24:11.581Z",
+  "generatedAt": "2026-08-30T17:36:17.909Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -21,16 +21,6 @@
       "priority": "P1",
       "warnThreshold": 2600,
       "failThreshold": 3000,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src-tauri/src/engine/commands.rs",
-      "lines": 5047,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
       "thresholdSource": "policy"
     },
     {
@@ -61,6 +51,16 @@
       "priority": "P2",
       "warnThreshold": 2600,
       "failThreshold": 3000,
+      "thresholdSource": "policy"
+    },
+    {
+      "path": "src-tauri/src/engine/commands.rs",
+      "lines": 4287,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
+      "failThreshold": 2600,
       "thresholdSource": "policy"
     },
     {
@@ -231,16 +231,6 @@
       "priority": "P0",
       "warnThreshold": 2200,
       "failThreshold": 2600,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/git/components/GitDiffPanel.tsx",
-      "lines": 3279,
-      "type": "ts/tsx",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 3000,
       "thresholdSource": "policy"
     },
     {
