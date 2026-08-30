@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T14:56:33.671Z",
+  "generatedAt": "2026-08-30T14:57:46.720Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -60,16 +60,6 @@
       "policyId": "test-files",
       "priority": "P2",
       "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src-tauri/src/engine/pi.rs",
-      "lines": 4318,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -290,6 +280,16 @@
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/engine/pi.rs",
+      "lines": 3201,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -2526,6 +2526,16 @@
     {
       "path": "src-tauri/src/engine/dsh/supervisor.rs",
       "lines": 1123,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/engine/pi_tests.rs",
+      "lines": 1118,
       "type": "rust",
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
