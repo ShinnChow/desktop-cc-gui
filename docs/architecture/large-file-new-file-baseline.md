@@ -8,7 +8,7 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T19:15:51.817Z
+- Generated at: 2026-08-30T19:24:48.127Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
 - Count: 395
@@ -111,7 +111,7 @@ status: generated
 | `src/i18n/locales/pt-BR/settings.ts` | 2143 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/i18n/locales/ru/settings.ts` | 2143 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/components/GitHistoryPanelDialogs.tsx` | 2076 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
-| `src/features/composer/components/Composer.tsx` | 2070 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
+| `src/features/composer/components/Composer.tsx` | 2066 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/shared_sessions.rs` | 2061 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/shared/codex_core.rs` | 2059 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/shared/workspaces_core.rs` | 2054 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |

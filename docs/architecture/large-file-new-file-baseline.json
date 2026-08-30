@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T19:15:51.818Z",
+  "generatedAt": "2026-08-30T19:24:48.128Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -965,7 +965,7 @@
     },
     {
       "path": "src/features/composer/components/Composer.tsx",
-      "lines": 2070,
+      "lines": 2066,
       "type": "ts/tsx",
       "policyId": "feature-hotpath",
       "priority": "P1",
