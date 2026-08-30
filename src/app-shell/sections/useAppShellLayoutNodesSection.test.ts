@@ -68,6 +68,71 @@ function getPropertyNameText(
   return name.getText(sourceFile);
 }
 
+function collectGroupKeys(
+  objectLiteral: ts.ObjectLiteralExpression,
+  sourceFile: ts.SourceFile,
+): string[] {
+  const keys: string[] = [];
+  for (const groupProperty of objectLiteral.properties) {
+    if (ts.isShorthandPropertyAssignment(groupProperty)) {
+      keys.push(groupProperty.name.text);
+      continue;
+    }
+
+    if (
+      ts.isPropertyAssignment(groupProperty) ||
+      ts.isMethodDeclaration(groupProperty)
+    ) {
+      keys.push(getPropertyNameText(groupProperty.name, sourceFile));
+    }
+  }
+
+  return keys;
+}
+
+// B4 三期：options 组逐字外移为 buildLayoutNodesXxxOptions builder；
+// 组键改从同目录 builder 文件的 return 对象字面量读取。
+function getLayoutNodesBuilderGroupKeys(builderName: string): string[] | null {
+  const match = /^buildLayoutNodes(\w+)Options$/.exec(builderName);
+  if (!match) {
+    return null;
+  }
+
+  const builderPath = join(
+    currentDir,
+    `layoutNodes/layoutNodesOptions${match[1]}.ts`,
+  );
+  const builderSource = readFileSync(builderPath, "utf8");
+  const builderSourceFile = ts.createSourceFile(
+    builderPath,
+    builderSource,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  let keys: string[] | null = null;
+
+  const visit = (node: ts.Node): void => {
+    if (keys) {
+      return;
+    }
+
+    if (
+      ts.isReturnStatement(node) &&
+      node.expression &&
+      ts.isObjectLiteralExpression(node.expression)
+    ) {
+      keys = collectGroupKeys(node.expression, builderSourceFile);
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(builderSourceFile);
+  return keys;
+}
+
 function getUseLayoutNodesGroupKeys(): Map<string, string[]> {
   const filePath = join(currentDir, "layoutNodes/useAppShellLayoutNodesSection.tsx");
   const source = readFileSync(filePath, "utf8");
@@ -97,27 +162,22 @@ function getUseLayoutNodesGroupKeys(): Map<string, string[]> {
 
     const groups = new Map<string, string[]>();
     for (const property of argument.properties) {
-      if (
-        !ts.isPropertyAssignment(property) ||
-        !ts.isObjectLiteralExpression(property.initializer)
-      ) {
+      if (!ts.isPropertyAssignment(property)) {
         continue;
       }
 
       const groupName = getPropertyNameText(property.name, sourceFile);
-      const keys: string[] = [];
-      for (const groupProperty of property.initializer.properties) {
-        if (ts.isShorthandPropertyAssignment(groupProperty)) {
-          keys.push(groupProperty.name.text);
-          continue;
-        }
+      let keys: string[] | null = null;
+      if (ts.isObjectLiteralExpression(property.initializer)) {
+        keys = collectGroupKeys(property.initializer, sourceFile);
+      } else if (ts.isCallExpression(property.initializer)) {
+        keys = getLayoutNodesBuilderGroupKeys(
+          property.initializer.expression.getText(sourceFile),
+        );
+      }
 
-        if (
-          ts.isPropertyAssignment(groupProperty) ||
-          ts.isMethodDeclaration(groupProperty)
-        ) {
-          keys.push(getPropertyNameText(groupProperty.name, sourceFile));
-        }
+      if (!keys) {
+        continue;
       }
 
       groups.set(groupName, keys);
@@ -264,11 +324,19 @@ describe("useAppShellLayoutNodesSection adapter contract", () => {
       "utf8",
     );
 
-    expect(source).toContain("useExitedSessionVisibility");
-    expect(source).toContain("isExitedSessionsHidden,");
-    expect(source).toContain("onToggleExitedSessionsHidden:");
-    expect(source).toContain("rootSessionFolderDraftRequestByWorkspaceId");
-    expect(source).toContain("onRequestRootSessionFolderDraft,");
+    // B4 三期：chrome options 组外移至 layoutNodesOptionsChrome.ts，
+    // 随键随迁的断言改为读主文件 + builder 文件拼接文本。
+    const chromeOptionsSource = readFileSync(
+      join(currentDir, "layoutNodes/layoutNodesOptionsChrome.ts"),
+      "utf8",
+    );
+    const combinedSource = source + chromeOptionsSource;
+
+    expect(combinedSource).toContain("useExitedSessionVisibility");
+    expect(combinedSource).toContain("isExitedSessionsHidden,");
+    expect(combinedSource).toContain("onToggleExitedSessionsHidden:");
+    expect(combinedSource).toContain("rootSessionFolderDraftRequestByWorkspaceId");
+    expect(combinedSource).toContain("onRequestRootSessionFolderDraft,");
   });
 
   it("forwards file compare panel node from useLayoutNodes to the renderer context", () => {
