@@ -1,29 +1,14 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { WorkspaceScopedMap } from "./workspaceScopedMap";
 import { useOrphanTurnWatchdog } from "./useOrphanTurnWatchdog";
 import {
   workspaceScopedDelete,
   workspaceScopedHas,
 } from "./workspaceScopedMap";
-import type { Dispatch, MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
 import type {
-  AccessMode,
   ConversationItem,
-  MemoryContextInjectionMode,
-  RateLimitSnapshot,
-  ThreadTokenUsage,
-  CustomPromptOption,
-  DebugEntry,
   WorkspaceInfo,
-  BrowserContextSendAttachment,
-  IntentCanvasContextSendAttachment,
-  SelectedAgentOption,
-  SharedQueuedExecutionTarget,
-  ExecutionTargetSnapshot,
-  SkillInvocation,
 } from "../../../types";
-import type { AutoSessionMetadata } from "../../../services/tauri";
 import {
   extractClaudeForkParentSessionId,
   isClaudeForkThreadId,
@@ -101,7 +86,6 @@ import {
 } from "../../project-memory/utils/memoryScout";
 import {
   normalizeMemoryPickComposerMode,
-  type LegacyMemoryReferenceMode,
   type MemoryPickComposerMode,
 } from "../../project-memory/memoryPick/memoryPickTypes";
 import { decideMemoryPickGateEntry } from "../../project-memory/memoryPick/memoryPickPolicy";
@@ -113,99 +97,13 @@ import {
 } from "../../project-memory/memoryPick/memoryPickSessionStore";
 import { openMemoryPickGate } from "../../project-memory/memoryPick/memoryPickGateStore";
 import { injectMemoryPickContext } from "../../project-memory/memoryPick/injectMemoryPickContext";
-import { retrieveMemoryPickCandidates } from "../../project-memory/memoryPick/memoryPickRetrieval";
-import { emitMemoryPickComposerMode } from "../../project-memory/memoryPick/memoryPickEvents";
+import { emitMemoryPickTelemetry } from "../../project-memory/memoryPick/memoryPickTelemetry";
 import {
-  emitMemoryPickTelemetry,
-  hashQueryForTelemetry,
-} from "../../project-memory/memoryPick/memoryPickTelemetry";
-import { formatMemoryPickEmptyTimelineItemText } from "../../project-memory/memoryPick/memoryEmptyReasonToast";
-import type { MemoryRetrieveEmptyReason } from "../../project-memory/memoryPick/memoryPickTypes";
-
-function emitMemoryPickComposerModeSync(
-  workspaceId: string,
-  threadId: string,
-  mode: MemoryPickComposerMode,
-) {
-  emitMemoryPickComposerMode({ mode, workspaceId, threadId });
-}
-
-/**
- * Pick 检索 + telemetry。
- * 空结果可感改走主幕时间线（见 dispatchMemoryPickEmptyTimelineNotice），不用全局 toast。
- * 仅消费侧；不碰 capture 时序。
- */
-async function resolvePickSemanticContext(workspaceId: string) {
-  const [{ resolveSemanticProviderForRetrieve }, { loadPersistedEmbeddingIndex }] =
-    await Promise.all([
-      import("../../project-memory/utils/resolveSemanticProviderForRetrieve"),
-      import("../../project-memory/utils/projectMemoryEmbeddingIndexWorker"),
-    ]);
-  const semanticProvider = await resolveSemanticProviderForRetrieve();
-  const indexRecords = semanticProvider
-    ? await loadPersistedEmbeddingIndex(workspaceId)
-    : undefined;
-  return {
-    semanticProvider,
-    indexRecords:
-      indexRecords && indexRecords.length > 0 ? indexRecords : undefined,
-  };
-}
-
-async function retrieveMemoryPickWithObservability(params: {
-  workspaceId: string;
-  query: string;
-}) {
-  const { semanticProvider, indexRecords } = await resolvePickSemanticContext(
-    params.workspaceId,
-  );
-  const result = await retrieveMemoryPickCandidates({
-    workspaceId: params.workspaceId,
-    query: params.query,
-    listFn: projectMemoryFacade.listSummary,
-    semanticProvider,
-    indexRecords,
-  });
-  const d = result.diagnostics;
-  emitMemoryPickTelemetry("memory_pick_retrieve", {
-    emptyReason: d.emptyReason,
-    retrievalMode: d.retrievalMode,
-    providerStatus: d.providerStatus,
-    ms: d.elapsedMs,
-    candidateCount: d.candidateCount,
-    scannedCount: d.scannedCount,
-    queryLength: params.query.length,
-    queryHash: hashQueryForTelemetry(params.query),
-    error: result.error,
-    fallbackReason: d.fallbackReason ?? null,
-  });
-  return result;
-}
-
-/** 空/超时/失败：主幕时间线轻量 status（非旧摘要卡） */
-function buildMemoryPickEmptyTimelineText(
-  emptyReason: MemoryRetrieveEmptyReason,
-  t: (key: string, options?: Record<string, unknown>) => string,
-): string | null {
-  return formatMemoryPickEmptyTimelineItemText(emptyReason, {
-    includeNoQueryTerms: true,
-    copy: {
-      title: t("memoryPick.toast.title", { defaultValue: "记忆参考" }),
-      timeout: t("memoryPick.toast.timeout", {
-        defaultValue: "记忆检索超时，已按原文发送（未注入记忆）",
-      }),
-      no_match: t("memoryPick.toast.noMatch", {
-        defaultValue: "未找到相关记忆，已按原文发送",
-      }),
-      error: t("memoryPick.toast.error", {
-        defaultValue: "记忆检索失败，已按原文发送",
-      }),
-      no_query_terms: t("memoryPick.toast.noQueryTerms", {
-        defaultValue: "当前输入缺少可检索关键词，已按原文发送",
-      }),
-    },
-  });
-}
+  buildMemoryPickEmptyTimelineText,
+  emitMemoryPickComposerModeSync,
+  resolvePickSemanticContext,
+  retrieveMemoryPickWithObservability,
+} from "./threadMessagingMemoryPick";
 import { noteCardsFacade } from "../../note-cards/services/noteCardsFacade";
 import {
   injectSelectedNoteCardsContext,
@@ -218,7 +116,6 @@ import {
   asString,
   extractRpcErrorMessage,
 } from "../utils/threadNormalize";
-import type { ThreadAction, ThreadState } from "./useThreadsReducer";
 import { pushErrorToast } from "../../../services/toasts";
 import { pushThreadFailureRuntimeNotice } from "../../../services/globalRuntimeNotices";
 import { resolveAgentIconForAgent } from "../../../utils/agentIcons";
@@ -299,69 +196,14 @@ import {
   cancelSharedProviderRetry,
 } from "../../shared-session/provider-retry/noteSharedProviderRetryTurn";
 
-type SendMessageOptions = {
-  skillInvocations?: SkillInvocation[];
-  skipPromptExpansion?: boolean;
-  skipOptimisticUserBubble?: boolean;
-  suppressUserMessageRender?: boolean;
-  model?: string | null;
-  effort?: string | null;
-  collaborationMode?: Record<string, unknown> | null;
-  accessMode?: AccessMode;
-  resumeSource?: "queue-fusion-cutover" | null;
-  resumeTurnId?: string | null;
-  selectedMemoryIds?: string[];
-  selectedMemoryInjectionMode?: MemoryContextInjectionMode;
-  /** @deprecated 使用 memoryReferenceMode；true 视为 always 静默兼容 */
-  memoryReferenceEnabled?: boolean;
-  /**
-   * 记忆参考三态：off | pick | always（single 读入时归一为 pick）。
-   * Shared / Native 同一语义。
-   */
-  memoryReferenceMode?: LegacyMemoryReferenceMode;
-  selectedNoteCardIds?: string[];
-  selectedAgent?: SelectedAgentOption | null;
-  dshAgentPreset?: string | null;
-  browserContextAttachment?: BrowserContextSendAttachment | null;
-  intentCanvasContextAttachments?: IntentCanvasContextSendAttachment[];
-  codexInvalidThreadRetryAttempted?: boolean;
-  autoSession?: AutoSessionMetadata | null;
-  sharedExecutionTarget?: SharedQueuedExecutionTarget;
-  /** Native 发送边界冻结的执行目标快照（Composer 传入；缺失时按 resolved 值兜底）。 */
-  nativeExecutionTarget?: ExecutionTargetSnapshot;
-  squadRequest?: true;
-  originKind?: "shared-provider-retry";
-  providerRetryAttempt?: number;
-  providerRetryAtMs?: number;
-};
-
-export type ThreadMessageDispatchResult =
-  | SendSharedSessionTurnV2Result
-  | {
-      status: "ambiguous-error";
-      reason: string;
-    }
-  | undefined;
-
-type SendMessageToThreadFn = (
-  workspace: WorkspaceInfo,
-  threadId: string,
-  text: string,
-  images?: string[],
-  options?: SendMessageOptions,
-) => Promise<ThreadMessageDispatchResult>;
-
-type HandleFusionStalledOptions = {
-  message?: string | null;
-};
-
-type RunWithCreateSessionLoading = <T>(
-  params: {
-    workspace: WorkspaceInfo;
-    engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
-  },
-  action: () => Promise<T>,
-) => Promise<T>;
+import type {
+  HandleFusionStalledOptions,
+  SendMessageOptions,
+  SendMessageToThreadFn,
+  UseThreadMessagingOptions,
+  ThreadMessageDispatchResult,
+} from "./threadMessagingTypes";
+export type { ThreadMessageDispatchResult } from "./threadMessagingTypes";
 
 const AGENT_PROMPT_HEADER = "## Agent Role and Instructions";
 const AGENT_PROMPT_NAME_PREFIX = "Agent Name:";
@@ -381,117 +223,6 @@ const shouldEmitThreadMessagingDevLogs = (() => {
     return false;
   }
 })();
-type UseThreadMessagingOptions = {
-  activeWorkspace: WorkspaceInfo | null;
-  activeThreadId: string | null;
-  accessMode?: "default" | "read-only" | "current" | "full-access";
-  model?: string | null;
-  effort?: string | null;
-  collaborationMode?: Record<string, unknown> | null;
-  resolveComposerSelection?: (threadId?: string | null) => {
-    threadId?: string | null;
-    id?: string | null;
-    model: string | null;
-    source?: string | null;
-    providerProfileId?: string | null;
-    effort: string | null;
-    collaborationMode: Record<string, unknown> | null;
-  };
-  claudeThinkingVisible?: boolean;
-  steerEnabled: boolean;
-  customPrompts: CustomPromptOption[];
-  activeEngine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
-  threadStatusById: ThreadState["threadStatusById"];
-  itemsByThread: ThreadState["itemsByThread"];
-  activeTurnIdByThread: ThreadState["activeTurnIdByThread"];
-  codexAcceptedTurnByThread: ThreadState["codexAcceptedTurnByThread"];
-  tokenUsageByThread: Record<string, ThreadTokenUsage>;
-  rateLimitsByWorkspace: Record<string, RateLimitSnapshot | null>;
-  codexCompactionInFlightByThreadRef?: MutableRefObject<
-    Record<string, boolean>
-  >;
-  pendingInterruptsRef: MutableRefObject<WorkspaceScopedMap<true>>;
-  interruptedThreadsRef: MutableRefObject<WorkspaceScopedMap<true>>;
-  dispatch: Dispatch<ThreadAction>;
-  getCustomName: (workspaceId: string, threadId: string) => string | undefined;
-  getThreadEngine: (
-    workspaceId: string,
-    threadId: string,
-  ) => "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | undefined;
-  getThreadKind?: (
-    workspaceId: string,
-    threadId: string,
-  ) => "native" | "shared";
-  getThreadProviderProfileId?: (
-    workspaceId: string,
-    threadId: string,
-  ) => string | null | undefined;
-  getThreadDshAgentPreset?: (
-    workspaceId: string,
-    threadId: string,
-  ) => string | null | undefined;
-  markProcessing: (threadId: string, isProcessing: boolean) => void;
-  markReviewing: (threadId: string, isReviewing: boolean) => void;
-  setActiveTurnId: (threadId: string, turnId: string | null) => void;
-  recordThreadActivity: (
-    workspaceId: string,
-    threadId: string,
-    timestamp?: number,
-  ) => void;
-  safeMessageActivity: () => void;
-  onDebug?: (entry: DebugEntry) => void;
-  pushThreadErrorMessage: (
-    workspaceId: string,
-    threadId: string,
-    message: string,
-  ) => void;
-  ensureThreadForActiveWorkspace: () => Promise<string | null>;
-  ensureThreadForWorkspace: (workspaceId: string) => Promise<string | null>;
-  refreshThread: (
-    workspaceId: string,
-    threadId: string,
-  ) => Promise<string | null>;
-  forkThreadForWorkspace: (
-    workspaceId: string,
-    threadId: string,
-    options?: { activate?: boolean; providerProfileId?: string | null },
-  ) => Promise<string | null>;
-  updateThreadParent: (parentId: string, childIds: string[]) => void;
-  startThreadForWorkspace: (
-    workspaceId: string,
-    options?: {
-      activate?: boolean;
-      engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
-      folderId?: string | null;
-      autoSession?: AutoSessionMetadata | null;
-      providerProfileId?: string | null;
-    },
-  ) => Promise<string | null>;
-  finalizeCodexPendingThread?: (
-    workspaceId: string,
-    pendingThreadId: string,
-  ) => Promise<string | null>;
-  resolveOpenCodeAgent?: (threadId: string | null) => string | null;
-  resolveOpenCodeVariant?: (threadId: string | null) => string | null;
-  onInputMemoryCaptured?: (payload: {
-    workspaceId: string;
-    threadId: string;
-    turnId: string;
-    inputText: string;
-    memoryId: string | null;
-    workspaceName: string | null;
-    workspacePath: string | null;
-    engine: string | null;
-  }) => void;
-  resolveCollaborationRuntimeMode?: (
-    threadId: string,
-  ) => "plan" | "code" | null;
-  runWithCreateSessionLoading?: RunWithCreateSessionLoading;
-  onSharedDurableTurnCommitted?: (
-    threadId: string,
-    runtimeTurnId: string,
-  ) => void;
-};
 
 export function useThreadMessaging({
   activeWorkspace,
