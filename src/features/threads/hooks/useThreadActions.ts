@@ -18,6 +18,7 @@ import {
   getOpenCodeSessionList as getOpenCodeSessionListService,
   listSessionIndexForWorkspace as listSessionIndexForWorkspaceService,
   rememberSessionIndexWorkspacePath,
+  scheduleTombstoneClaudeForkIndexRow,
 } from "../../../services/tauri";
 import {
   buildNativeIndexEarlyPaintSummaries,
@@ -420,6 +421,8 @@ export function useThreadActions({
          * first-paint). Default false so warm SQLite answers in ms.
          */
         forceSessionIndexSync?: boolean;
+        /** Explicit sidebar reload consumes only the authoritative Session Index page. */
+        sessionIndexOnly?: boolean;
         /** Orchestrator cancel/stale flag — skip late setThreads after soft-ignore cancel. */
         isStale?: () => boolean;
         /** Importer refresh: merge SQLite rows onto the current list. */
@@ -707,6 +710,60 @@ export function useThreadActions({
           }
         } else if (sessionIndexPage === null) {
           rememberPartialSource("session-index-timeout");
+        }
+
+        if (options?.sessionIndexOnly) {
+          if (sessionIndexPage === null || !Array.isArray(sessionIndexPage.data)) {
+            return { applied: false, visibleCount: 0, authoritativeEmpty: false };
+          }
+          const hiddenSharedBindingIds = unionHideSets(
+            visibilityHideSet,
+            verifiedHideSet,
+            expandHiddenSharedBindingIds([...getCollabWorkerNativeHideIds()]),
+          );
+          reconcilePiDerivedHideWithAuthoritativeRows(sessionIndexPage.data);
+          const indexSummaries = projectNativeIndexRowsToSummaries(
+            sessionIndexPage.data,
+            {
+              workspaceId: workspace.id,
+              mappedTitles: {},
+              getCustomName,
+              hiddenSharedBindingIds,
+            },
+          );
+          if (isLatestThreadListRequest()) {
+            dispatch({
+              type: "setThreads",
+              workspaceId: workspace.id,
+              threads: indexSummaries,
+              unionMembership: sessionIndexPage.hasMore === true,
+            });
+            const oldest = sessionIndexPage.data.at(-1);
+            dispatch({
+              type: "setThreadListCursor",
+              workspaceId: workspace.id,
+              cursor: resolveThreadListCursorForDisplay({
+                catalogCursor: null,
+                catalogPartialSource: null,
+                runtimeCursor: null,
+                sessionIndexHasMore: sessionIndexPage.hasMore === true,
+                sessionIndexOldestKey: oldest
+                  ? {
+                      updatedAt: Number(oldest.updatedAt) || 0,
+                      sessionId: String(oldest.sessionId ?? "").trim(),
+                    }
+                  : null,
+              }),
+            });
+            appliedThreadListUpdate = true;
+            visibleThreadCount = indexSummaries.length;
+            authoritativeEmpty = sessionIndexPage.data.length === 0;
+          }
+          return {
+            applied: appliedThreadListUpdate,
+            visibleCount: visibleThreadCount,
+            authoritativeEmpty,
+          };
         }
 
         let mappedTitles: Record<string, string> = {};
@@ -1382,17 +1439,24 @@ export function useThreadActions({
           claudeResult.value.length === 0;
         if (claudeResult.status === "fulfilled") {
           if (shouldMergeNativeClaudeSessions && claudeResult.value === null) {
-            rememberPartialSource("claude-session-timeout");
-            onDebug?.({
-              id: `${Date.now()}-client-claude-session-timeout`,
-              timestamp: Date.now(),
-              source: "client",
-              label: "thread/list claude timeout",
-              payload: {
-                workspaceId: workspace.id,
-                timeoutMs: NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
-              },
-            });
+            // focus-refresh merge / first-paint 的 null 是 by-design skip
+            // （Promise.resolve(null)），不是 30s 超时：不打假 timeout 日志、
+            // 不记 timeout partialSource，否则下游会把整个可见列表误标
+            // partial-thread-list degraded（2026-08-27 用户数据实锤：
+            // 129 条假 30s 超时/49min）。
+            if (!isFocusRefreshMerge && !isFirstPaintHydration) {
+              rememberPartialSource("claude-session-timeout");
+              onDebug?.({
+                id: `${Date.now()}-client-claude-session-timeout`,
+                timestamp: Date.now(),
+                source: "client",
+                label: "thread/list claude timeout",
+                payload: {
+                  workspaceId: workspace.id,
+                  timeoutMs: NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
+                },
+              });
+            }
             // 在 partial-source merge 之前先 seed last-good Claude 条目，
             // 避免下游 catalog merge / archive merge 因看到空 Claude 子源而形成残缺基底。
             // 即便下游 partial-source 路径被绕过或将来重构，最终列表也不会丢失 Claude 历史。
@@ -1628,7 +1692,13 @@ export function useThreadActions({
           );
         }
         if (projectCatalogResult.status === "fulfilled") {
-          if (projectCatalogValue === null) {
+          if (
+            projectCatalogValue === null &&
+            !isFocusRefreshMerge &&
+            !isFirstPaintHydration
+          ) {
+            // null 只可能是真 timeout（focus-refresh merge / first-paint 的
+            // by-design 占位 null 已被门控排除，不再伪造 codex-catalog-timeout）。
             rememberPartialSource("codex-catalog-timeout");
             onDebug?.({
               id: `${Date.now()}-client-codex-catalog-timeout`,
@@ -2964,6 +3034,9 @@ export function useThreadActions({
       for (const result of results) {
         if (result.ok || isSessionDeleteSuccessCode(result.code)) {
           removeThreadFromCachedSummaries(workspaceId, result.sessionId);
+          // 合成 fork ID 的 mangled 孪生键后端点查/占位都够不到，前端补一刀
+          // tombstone，清掉存量僵尸行（新写入已在 sessionIndex 层禁止）。
+          scheduleTombstoneClaudeForkIndexRow(result.sessionId);
         }
       }
       return results;

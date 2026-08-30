@@ -331,6 +331,11 @@ export interface ModelInfo {
   description?: string;
   source?: string;
   /**
+   * 后端探测来源（PI: `cli:pi-available-models` = RPC 快照 / `cli:pi-list-models`
+   * = 表格降级，后者拿不到 thinkingLevelMap）。菜单打开的自愈判定依赖此字段。
+   */
+  provenance?: string | null;
+  /**
    * Vendor id used to section slash-catalog CLIs.
    * DSH: host catalog `llm.models` group.id.
    * PI: `pi --list-models` provider column.
@@ -691,6 +696,8 @@ export interface ChatInputBoxProps {
 
   /** Send shortcut setting: 'enter' = Enter sends | 'cmdEnter' = Cmd/Ctrl+Enter sends */
   sendShortcut?: 'enter' | 'cmdEnter';
+  /** 停止按钮悬停提示里展示的中断快捷键（formatShortcutForPlatform 后的展示值；空则不展示） */
+  interruptShortcutLabel?: string | null;
 
   /** Currently selected agent */
   selectedAgent?: SelectedAgent | null;
@@ -888,6 +895,8 @@ export interface ButtonAreaProps {
   onStreamingEnabledChange?: (enabled: boolean) => void;
   /** Send shortcut setting */
   sendShortcut?: 'enter' | 'cmdEnter';
+  /** 停止按钮悬停提示里展示的中断快捷键（展示值；空则不展示） */
+  interruptShortcutLabel?: string | null;
   /** Currently selected agent */
   selectedAgent?: SelectedAgent | null;
   /** Agent selection callback */

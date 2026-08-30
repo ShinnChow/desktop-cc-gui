@@ -121,6 +121,7 @@ export function withThreadStatusDefaults(
     hasUnread: status?.hasUnread ?? false,
     isReviewing: status?.isReviewing ?? false,
     isContextCompacting: status?.isContextCompacting ?? false,
+    backgroundTaskRunningCount: status?.backgroundTaskRunningCount ?? 0,
     processingStartedAt: status?.processingStartedAt ?? null,
     lastDurationMs: status?.lastDurationMs ?? null,
     heartbeatPulse: status?.heartbeatPulse ?? 0,

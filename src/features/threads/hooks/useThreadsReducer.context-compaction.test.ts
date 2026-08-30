@@ -107,25 +107,95 @@ describe("threadReducer context compaction lifecycle", () => {
     expect(cleared.tokenUsageByThread["dsh:session-1"]?.dshTodos).toEqual([]);
   });
 
-  it("appends a deduped context compacted message", () => {
+  it("appends a deduped context-event marker, not an assistant message", () => {
     const withCompacted = threadReducer(initialState, {
       type: "appendContextCompacted",
-      threadId: "thread-1",
+      threadId: "thread-marker-1",
       turnId: "turn-1",
+      reason: "threshold",
+      tokensBefore: 236_505,
+      estimatedTokensAfter: 41_200,
+      timestampMs: 1_000,
     });
     const withDuplicate = threadReducer(withCompacted, {
       type: "appendContextCompacted",
-      threadId: "thread-1",
+      threadId: "thread-marker-1",
       turnId: "turn-1",
     });
 
-    const items = withDuplicate.itemsByThread["thread-1"] ?? [];
+    const items = withDuplicate.itemsByThread["thread-marker-1"] ?? [];
     expect(items).toHaveLength(1);
-    expect(items[0]?.kind).toBe("message");
-    if (items[0]?.kind === "message") {
-      expect(items[0].text).toBe("Context compacted.");
+    expect(items[0]?.kind).toBe("context-event");
+    if (items[0]?.kind === "context-event") {
+      expect(items[0].eventType).toBe("compacted");
       expect(items[0].id).toBe("context-compacted-turn-1");
+      expect(items[0].reason).toBe("threshold");
+      expect(items[0].tokensBefore).toBe(236_505);
+      expect(items[0].estimatedTokensAfter).toBe(41_200);
+      expect(items[0].timestampMs).toBe(1_000);
+      expect(items[0].turnId).toBe("turn-1");
     }
+  });
+
+  it("allows a second distinct turn marker alongside the first", () => {
+    const first = threadReducer(initialState, {
+      type: "appendContextCompacted",
+      threadId: "thread-marker-1",
+      turnId: "turn-1",
+      reason: "threshold",
+      timestampMs: 1_000,
+    });
+    const second = threadReducer(first, {
+      type: "appendContextCompacted",
+      threadId: "thread-marker-1",
+      turnId: "turn-2",
+      reason: "overflow",
+      timestampMs: 2_000,
+    });
+
+    const items = second.itemsByThread["thread-marker-1"] ?? [];
+    expect(items.map((item) => item.id)).toEqual([
+      "context-compacted-turn-1",
+      "context-compacted-turn-2",
+    ]);
+  });
+
+  it("turn settlement marks the real assistant answer final, never the compaction marker", () => {
+    // 复刻线上时序：留痕先于 settle 入库（pi compaction_end 先于 agent_settled），
+    // 结算 markLatestAssistantMessageFinal 必须把 isFinal 打在真实回答上。
+    const base = threadReducer(initialState, {
+      type: "setThreadItems",
+      threadId: "thread-marker-1",
+      items: [
+        {
+          id: "assistant-final-1",
+          kind: "message",
+          role: "assistant",
+          text: "真实回答",
+        },
+      ],
+    });
+    const withMarker = threadReducer(base, {
+      type: "appendContextCompacted",
+      threadId: "thread-marker-1",
+      turnId: "turn-1",
+      reason: "threshold",
+      timestampMs: 1_000,
+    });
+    const settled = threadReducer(withMarker, {
+      type: "markLatestAssistantMessageFinal",
+      threadId: "thread-marker-1",
+    });
+
+    const items = settled.itemsByThread["thread-marker-1"] ?? [];
+    const marker = items.find((item) => item.id === "context-compacted-turn-1");
+    const answer = items.find(
+      (item) => item.id === "assistant-final-1" && item.kind === "message",
+    );
+    expect(answer && answer.kind === "message" && answer.isFinal).toBe(true);
+    expect(
+      marker && marker.kind === "context-event" && "isFinal" in marker,
+    ).toBe(false);
   });
 
   it("tracks compaction timing for context compaction status", () => {

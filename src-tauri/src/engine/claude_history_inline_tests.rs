@@ -1352,6 +1352,19 @@ fn slash_command_user_prompt_with_args_stays_visible() {
 }
 
 #[test]
+fn command_prompt_text_leaves_mid_text_command_tag_quotes_alone() {
+    // 开发者粘贴 transcript 排查问题：普通消息正文里引用 <command-args> 片段，
+    // 不是 slash-command 信封，标题必须保持原文（收紧提取触发条件为信封开头，
+    // 避免标题被替换成引用内容）。
+    let quoted = "请看这段 <command-args>deploy prod</command-args> 是什么含义？我本地复现不出来";
+    assert_eq!(extract_command_prompt_text(quoted), quoted);
+
+    // 前导空白后的真信封仍要提取（与 control-plane guard 同用 trimmed 前缀谓词）。
+    let indented = "  <command-message>aimax:code-review</command-message>\n<command-name>/aimax:code-review</command-name>\n<command-args>真 prompt</command-args>";
+    assert_eq!(extract_command_prompt_text(indented), "真 prompt");
+}
+
+#[test]
 fn command_prompt_text_unwraps_slash_command_tags_for_session_titles() {
     let wrapped = "<command-message>aimax:code-review</command-message>\n<command-name>/aimax:code-review</command-name>\n<command-args>审查PR802，并告诉我他解决了什么问题</command-args>";
     assert_eq!(

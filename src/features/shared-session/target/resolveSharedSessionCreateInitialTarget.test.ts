@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -153,6 +154,93 @@ describe("resolveSharedSessionCreateInitialTarget", () => {
     getEngineModelsMock.mockReset();
     syncClaudeModelMappingForProfileMock.mockReset();
     syncClaudeModelMappingForProfileMock.mockResolvedValue(undefined);
+  });
+
+  it("prefers the remembered provider over the first ordered entry", async () => {
+    // Shared 创建与原生菜单同源：优先 last-selected 供应商（managed，无 forceRefresh）。
+    window.localStorage.setItem("claudeLastProviderProfileId", "minimax-m3");
+    try {
+      getClaudeProvidersMock.mockResolvedValue([
+        {
+          id: "__local_settings_json__",
+          name: "Local",
+          isLocalProvider: true,
+        },
+        {
+          id: "minimax-m3",
+          name: "MiniMax-M3",
+          isLocalProvider: false,
+        },
+      ] as never);
+      getEngineModelsMock.mockResolvedValue([
+        {
+          id: "claude-sonnet-5",
+          model: "MiniMax-M3",
+          displayName: "MiniMax-M3",
+          description: "",
+          isDefault: true,
+        },
+      ]);
+
+      const target = await resolveSharedSessionCreateInitialTarget({
+        engine: "claude",
+        localProviderName: "本地配置",
+        unavailableModelMessage: "Claude 没有可用 Model。",
+      });
+
+      expect(syncClaudeModelMappingForProfileMock).toHaveBeenCalledWith(
+        "minimax-m3",
+      );
+      expect(getEngineModelsMock).toHaveBeenCalledWith("claude", {
+        providerProfileId: "minimax-m3",
+      });
+      expect(target).toEqual(
+        expect.objectContaining({
+          providerProfileId: "minimax-m3",
+          providerProfileNameSnapshot: "MiniMax-M3",
+          providerProfileSource: "managed",
+        }),
+      );
+    } finally {
+      window.localStorage.removeItem("claudeLastProviderProfileId");
+    }
+  });
+
+  it("falls back to the first provider when the remembered id is missing", async () => {
+    window.localStorage.setItem("claudeLastProviderProfileId", "deleted-provider");
+    try {
+      getClaudeProvidersMock.mockResolvedValue([
+        {
+          id: "__local_settings_json__",
+          name: "Local",
+          isLocalProvider: true,
+        },
+      ] as never);
+      getEngineModelsMock.mockResolvedValue([
+        {
+          id: "claude-opus-5",
+          model: "real-local-opus",
+          displayName: "real-local-opus",
+          description: "",
+          isDefault: true,
+        },
+      ]);
+
+      const target = await resolveSharedSessionCreateInitialTarget({
+        engine: "claude",
+        localProviderName: "本地配置",
+        unavailableModelMessage: "Claude 没有可用 Model。",
+      });
+
+      expect(getEngineModelsMock).toHaveBeenCalledWith("claude", {
+        providerProfileId: "__local_settings_json__",
+        forceRefresh: true,
+      });
+      expect(target.providerProfileId).toBeNull();
+      expect(target.providerProfileSource).toBe("disk");
+    } finally {
+      window.localStorage.removeItem("claudeLastProviderProfileId");
+    }
   });
 
   it("uses first claude provider with authoritative models and syncs mapping", async () => {
@@ -334,6 +422,64 @@ describe("resolveSharedSessionCreateInitialTarget", () => {
         providerProfileId: "__qoder_global__",
         providerProfileNameSnapshot: "Qoder Global",
         providerProfileSource: "managed",
+      }),
+    );
+  });
+
+  it("resolves Qoder to the explicitly requested CN distribution", async () => {
+    getEngineModelsMock.mockResolvedValue([
+      {
+        id: "qoder-cn-model",
+        model: "qoder-cn-model",
+        displayName: "Qoder CN model",
+        description: "",
+        isDefault: true,
+        providerProfileId: "__qoder_cn__",
+      },
+    ]);
+
+    const target = await resolveSharedSessionCreateInitialTarget({
+      engine: "qoder",
+      localProviderName: "本地配置",
+      unavailableModelMessage: "Qoder 没有可用 Model。",
+      preferredProviderId: "__qoder_cn__",
+    });
+
+    expect(getEngineModelsMock).toHaveBeenCalledWith("qoder", {
+      providerProfileId: "__qoder_cn__",
+    });
+    expect(target).toEqual(
+      expect.objectContaining({
+        engine: "qoder",
+        providerProfileId: "__qoder_cn__",
+        providerProfileNameSnapshot: "Qoder CN",
+        providerProfileSource: "managed",
+      }),
+    );
+  });
+
+  it("keeps the Global default when the preferred Qoder distribution id is unknown", async () => {
+    getEngineModelsMock.mockResolvedValue([
+      {
+        id: "qoder-global-model",
+        model: "qoder-global-model",
+        displayName: "Qoder Global model",
+        description: "",
+        isDefault: true,
+        providerProfileId: "__qoder_global__",
+      },
+    ]);
+
+    const target = await resolveSharedSessionCreateInitialTarget({
+      engine: "qoder",
+      localProviderName: "本地配置",
+      unavailableModelMessage: "Qoder 没有可用 Model。",
+      preferredProviderId: "__qoder_stale__",
+    });
+
+    expect(target).toEqual(
+      expect.objectContaining({
+        providerProfileId: "__qoder_global__",
       }),
     );
   });

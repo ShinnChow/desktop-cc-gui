@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import type { ConversationItem, WorkspaceInfo } from "../../../types";
 import { setComposerDraft } from "../../composer/hooks/composerDraftStore";
 import { useLayoutNodes } from "./useLayoutNodes";
+import { getActiveCanvasSnapshot } from "./activeCanvasStore";
 import type {
   LayoutNodesFlatOptions,
   LayoutNodesOptions,
@@ -1085,6 +1086,49 @@ async function renderUseLayoutNodes(
 }
 
 describe("useLayoutNodes client UI visibility", () => {
+  it("pushes a background-task count change through the active canvas conversation state", async () => {
+    const status = (backgroundTaskRunningCount: number) => ({
+      isProcessing: false,
+      hasUnread: false,
+      isReviewing: false,
+      backgroundTaskRunningCount,
+      processingStartedAt: null,
+      lastDurationMs: null,
+    });
+    const { rerender } = renderHook(
+      ({ options }) => useLayoutNodes(options),
+      {
+        initialProps: {
+          options: createLayoutOptions({
+            threadStatusById: { "thread-1": status(0) },
+          }),
+        },
+      },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(
+      getActiveCanvasSnapshot().conversationState?.meta
+        .backgroundTaskRunningCount,
+    ).toBe(0);
+
+    await act(async () => {
+      rerender({
+        options: createLayoutOptions({
+          threadStatusById: { "thread-1": status(1) },
+        }),
+      });
+      await Promise.resolve();
+    });
+
+    expect(
+      getActiveCanvasSnapshot().conversationState?.meta
+        .backgroundTaskRunningCount,
+    ).toBe(1);
+  });
+
   afterEach(() => {
     resetSharedSendStateStoreForTests();
     capturedGitDiffPanelProps = null;

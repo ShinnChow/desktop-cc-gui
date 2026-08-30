@@ -55,7 +55,7 @@ import { useAtomicProviderTargetCatalog } from './hooks/useProviderTargetCatalog
 import {
   buildProviderExecutionTarget,
   resolveActiveProviderProfileId,
-} from './selectors/ModelSelect';
+} from './selectors/model-select/executionTarget';
 import { LOCAL_PROVIDER_PROFILE_DISPLAY_NAME } from '../../../threads/constants/codexProviderProfiles';
 import type { EngineType } from '../../../../types';
 import {
@@ -240,6 +240,7 @@ export const ChatInputBox = memo(forwardRef<ChatInputBoxHandle, ChatInputBoxProp
       streamingEnabled,
       onStreamingEnabledChange,
       sendShortcut = 'enter',
+      interruptShortcutLabel,
       selectedAgent,
       selectedContextChips = [],
       selectedManualMemoryIds = [],
@@ -1947,6 +1948,7 @@ export const ChatInputBox = memo(forwardRef<ChatInputBoxHandle, ChatInputBoxProp
               streamingEnabled={streamingEnabled}
               onStreamingEnabledChange={onStreamingEnabledChange}
               sendShortcut={sendShortcut}
+              interruptShortcutLabel={interruptShortcutLabel}
               selectedAgent={selectedAgent}
               onAgentSelect={(agent) => onAgentSelect?.(agent)}
               onOpenAgentSettings={onOpenAgentSettings}

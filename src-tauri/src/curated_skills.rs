@@ -727,12 +727,11 @@ pub(crate) async fn set_curated_skill_enabled(
     new_settings
         .enabled_curated_skill_ids
         .retain(|id| id != &skill_id);
-    if enabled
-        && !new_settings.enabled_curated_skill_ids.contains(&skill_id) {
-            new_settings
-                .enabled_curated_skill_ids
-                .push(skill_id.clone());
-        }
+    if enabled && !new_settings.enabled_curated_skill_ids.contains(&skill_id) {
+        new_settings
+            .enabled_curated_skill_ids
+            .push(skill_id.clone());
+    }
 
     let updated = crate::shared::settings_core::update_app_settings_core(
         new_settings,

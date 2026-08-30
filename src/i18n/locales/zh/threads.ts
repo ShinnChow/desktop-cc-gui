@@ -7,6 +7,7 @@ const threads = {
     runtimeProcessing: "运行中",
     runtimeReviewing: "复核中",
     runtimeCompleted: "已完成",
+    runtimeBackgroundTasks: "后台任务运行中",
     archive: "归档",
     delete: "删除",
     openSessionManagement: "在会话管理中批量删除…",
@@ -146,6 +147,9 @@ const threads = {
     completionEmailFailedTitle: "完成提醒邮件发送失败",
     codexCompactionStarted: "Codex 正在压缩背景信息，完成后会继续生成响应。",
     codexCompactionCompleted: "Codex 已完成背景信息压缩。",
+    contextCompactedAuto: "已自动压缩上下文",
+    contextCompactedManual: "已手动压缩上下文",
+    contextCompactedNeutral: "上下文已压缩",
     contextCompactionFailed: "上下文压缩失败。",
     contextCompactionFailedWithMessage: "上下文压缩失败：{{message}}",
     claudeManualCompactUnavailable:

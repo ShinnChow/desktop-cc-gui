@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { EngineFeatures, EngineStatus } from "../../../types";
 import {
   buildAvailableEngines,
   ENABLED_ENGINE_TYPES,
@@ -59,5 +60,42 @@ describe("engineControllerAvailability", () => {
         shortName: "Qoder",
       }),
     ]);
+  });
+});
+
+describe("engineControllerAvailability auth state (B6)", () => {
+  const baseStatus: EngineStatus = {
+    engineType: "qoder",
+    features: {} as EngineFeatures,
+    installed: true,
+    version: "1.1.28",
+    binPath: null,
+    models: [],
+    error: null,
+  };
+
+  it("projects requires-login when phase 2 reports requires_login", () => {
+    const engines = buildAvailableEngines(
+      [{ ...baseStatus, authState: "requires_login" }],
+      true,
+    );
+    const qoder = engines.find((engine) => engine.type === "qoder");
+    expect(qoder?.availabilityState).toBe("requires-login");
+    expect(qoder?.availabilityLabelKey).toBe("workspace.engineStatusRequiresLogin");
+  });
+
+  it("keeps ready when authenticated or unknown", () => {
+    const engines = buildAvailableEngines(
+      [
+        { ...baseStatus, authState: "authenticated" as const },
+        baseStatus,
+      ].map((status, index): EngineStatus => ({
+        ...status,
+        engineType: index === 0 ? "qoder" : "kimi",
+      })),
+      true,
+    );
+    expect(engines.find((engine) => engine.type === "qoder")?.availabilityState).toBe("ready");
+    expect(engines.find((engine) => engine.type === "kimi")?.availabilityState).toBe("ready");
   });
 });

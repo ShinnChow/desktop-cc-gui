@@ -31,6 +31,7 @@ const APP_SHELL_DOMAIN_CONTEXT_NAMES = new Set([
   "layoutContext",
   "fileEditorContext",
   "settingsContext",
+  "threadDataContext",
   "runtimeContext",
   "modelSelectionContext",
   "collaborationModeContext",

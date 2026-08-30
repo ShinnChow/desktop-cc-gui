@@ -937,4 +937,150 @@ describe("useThreadActions native session bridges", () => {
     // 非 focus-refresh 的 merge(如显式 reload)仍走全量探测
     expect(listThreads).toHaveBeenCalled();
   });
+
+  it("focus-refresh merge does not fake engine timeouts or degrade the visible list", async () => {
+    vi.mocked(listThreads).mockResolvedValue({
+      result: {
+        data: [],
+        nextCursor: null,
+      },
+    } as never);
+    vi.mocked(listClaudeSessions).mockResolvedValue([]);
+    vi.mocked(listSessionIndexForWorkspace).mockResolvedValue({
+      data: [
+        {
+          engine: "claude",
+          sessionId: "session-real-1",
+          title: "帮我看一下这段代码",
+          updatedAt: 1_730_000_000_000,
+        },
+      ],
+      source: "session-index",
+      synced: true,
+      engines: ["claude"],
+      visibility: {
+        available: true,
+        freshness: "verified",
+        hiddenNativeIds: [],
+      },
+    });
+    const onDebug = vi.fn();
+    const { dispatch, result } = renderActions({ onDebug });
+
+    await act(async () => {
+      await result.current.listThreadsForWorkspace(workspace, {
+        preserveState: true,
+        mergeExistingThreads: true,
+        recoverySource: "focus-refresh",
+        includeOpenCodeSessions: false,
+      });
+    });
+
+    // by-design skip(Promise.resolve(null))不得伪造 30s 超时日志
+    const debugLabels = onDebug.mock.calls.map(
+      (call) => (call[0] as { label?: string } | undefined)?.label,
+    );
+    expect(debugLabels).not.toContain("thread/list claude timeout");
+    expect(debugLabels).not.toContain("thread/list codex catalog timeout");
+
+    // 可见列表不得被误标 partial-thread-list degraded
+    const setThreadsActions = dispatch.mock.calls
+      .map((call) => call[0])
+      .filter(
+        (action: { type?: string; workspaceId?: string } | undefined) =>
+          action?.type === "setThreads" && action?.workspaceId === workspace.id,
+      );
+    expect(setThreadsActions.length).toBeGreaterThan(0);
+    const finalThreads = (
+      setThreadsActions[setThreadsActions.length - 1] as {
+        threads: Array<{
+          id: string;
+          partialSource?: string;
+          degradedReason?: string;
+          isDegraded?: boolean;
+        }>;
+      }
+    ).threads;
+    // last-good / index 行仍在(seed 兜底不回归)
+    expect(finalThreads.map((thread) => thread.id)).toContain(
+      "claude:session-real-1",
+    );
+    for (const thread of finalThreads) {
+      expect(thread.partialSource ?? null).not.toBe("claude-session-timeout");
+      expect(thread.partialSource ?? null).not.toBe("codex-catalog-timeout");
+      expect(thread.degradedReason ?? null).not.toBe("partial-thread-list");
+    }
+  });
+
+  it("first-paint hydration does not fake engine timeouts or degrade the visible list", async () => {
+    vi.mocked(listThreads).mockResolvedValue({
+      result: {
+        data: [],
+        nextCursor: null,
+      },
+    } as never);
+    vi.mocked(listClaudeSessions).mockResolvedValue([]);
+    vi.mocked(listSessionIndexForWorkspace).mockResolvedValue({
+      data: [
+        {
+          engine: "claude",
+          sessionId: "session-real-1",
+          title: "帮我看一下这段代码",
+          updatedAt: 1_730_000_000_000,
+        },
+      ],
+      source: "session-index",
+      synced: true,
+      engines: ["claude"],
+      visibility: {
+        available: true,
+        freshness: "verified",
+        hiddenNativeIds: [],
+      },
+    });
+    const onDebug = vi.fn();
+    const { dispatch, result } = renderActions({ onDebug });
+
+    await act(async () => {
+      await result.current.listThreadsForWorkspace(workspace, {
+        preserveState: true,
+        mergeExistingThreads: true,
+        startupHydrationMode: "first-paint",
+        includeOpenCodeSessions: false,
+      });
+    });
+
+    // first-paint 的 by-design skip(Promise.resolve(null))同样不得伪造
+    // 30s 超时日志（与 focus-refresh merge 同构，0.9.3 起冷启动每次触发）
+    const debugLabels = onDebug.mock.calls.map(
+      (call) => (call[0] as { label?: string } | undefined)?.label,
+    );
+    expect(debugLabels).not.toContain("thread/list claude timeout");
+    expect(debugLabels).not.toContain("thread/list codex catalog timeout");
+
+    const setThreadsActions = dispatch.mock.calls
+      .map((call) => call[0])
+      .filter(
+        (action: { type?: string; workspaceId?: string } | undefined) =>
+          action?.type === "setThreads" && action?.workspaceId === workspace.id,
+      );
+    expect(setThreadsActions.length).toBeGreaterThan(0);
+    const finalThreads = (
+      setThreadsActions[setThreadsActions.length - 1] as {
+        threads: Array<{
+          id: string;
+          partialSource?: string;
+          degradedReason?: string;
+        }>;
+      }
+    ).threads;
+    expect(finalThreads.map((thread) => thread.id)).toContain(
+      "claude:session-real-1",
+    );
+    for (const thread of finalThreads) {
+      expect(thread.partialSource ?? null).not.toBe("claude-session-timeout");
+      expect(thread.partialSource ?? null).not.toBe("codex-catalog-timeout");
+      expect(thread.degradedReason ?? null).not.toBe("partial-thread-list");
+    }
+  });
 });

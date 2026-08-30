@@ -32,6 +32,111 @@ static CODEX_APP_SERVER_PROBE_CACHE: LazyLock<
     StdMutex<HashMap<CodexAppServerProbeCacheKey, CodexAppServerProbeCacheEntry>>,
 > = LazyLock::new(|| StdMutex::new(HashMap::new()));
 
+/// refactor-engine-detection-pipeline D4：环境解析进程级缓存。
+/// `npm config get prefix` 搜索路径与 `$SHELL -lic` 登录 shell 解析都是阻塞
+/// spawn，一轮检测里每引擎重复构建浪费最多 ~18 次子进程；进程级缓存（30s
+/// TTL）后每进程至多 1 次。全引擎 not_installed 时由检测层主动失效重试。
+const ENV_RESOLUTION_CACHE_TTL: Duration = Duration::from_secs(30);
+
+static EXTRA_SEARCH_PATHS_CACHE: LazyLock<StdMutex<Option<(Vec<PathBuf>, Instant)>>> =
+    LazyLock::new(|| StdMutex::new(None));
+static CLAUDE_LOGIN_SHELL_CACHE: LazyLock<StdMutex<Option<(Option<PathBuf>, Instant)>>> =
+    LazyLock::new(|| StdMutex::new(None));
+static CLAUDE_VERSION_MEMO: LazyLock<StdMutex<Option<(PathBuf, String, Instant)>>> =
+    LazyLock::new(|| StdMutex::new(None));
+
+#[cfg(test)]
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering as AtomicOrdering};
+#[cfg(test)]
+pub(crate) static NPM_PREFIX_PROBE_SPAWN_COUNT: AtomicUsize = AtomicUsize::new(0);
+#[cfg(test)]
+pub(crate) static CLAUDE_LOGIN_SHELL_SPAWN_COUNT: AtomicUsize = AtomicUsize::new(0);
+#[cfg(test)]
+static ENV_CACHE_TTL_OVERRIDE_MS: AtomicU64 = AtomicU64::new(0);
+/// 环境缓存计数测试的进程级互斥锁：invalidate / TTL 覆盖会改变全局缓存状态，
+/// 持锁窗口内保证全进程 cache-hit 零 spawn，使 spawn 计数断言确定性成立。
+#[cfg(test)]
+static ENV_CACHE_TEST_LOCK: StdMutex<()> = StdMutex::new(());
+
+#[cfg(test)]
+fn env_resolution_cache_ttl() -> Duration {
+    let override_ms = ENV_CACHE_TTL_OVERRIDE_MS.load(AtomicOrdering::SeqCst);
+    if override_ms > 0 {
+        Duration::from_millis(override_ms)
+    } else {
+        ENV_RESOLUTION_CACHE_TTL
+    }
+}
+
+#[cfg(not(test))]
+fn env_resolution_cache_ttl() -> Duration {
+    ENV_RESOLUTION_CACHE_TTL
+}
+
+/// 进程级缓存的额外搜索路径（含 `npm config get prefix` 阻塞探测结果）。
+fn cached_extra_search_paths() -> Vec<PathBuf> {
+    if let Ok(guard) = EXTRA_SEARCH_PATHS_CACHE.try_lock() {
+        if let Some((paths, cached_at)) = guard.as_ref() {
+            if cached_at.elapsed() <= env_resolution_cache_ttl() {
+                return paths.clone();
+            }
+        }
+    }
+    let paths = get_extra_search_paths();
+    if let Ok(mut guard) = EXTRA_SEARCH_PATHS_CACHE.lock() {
+        *guard = Some((paths.clone(), Instant::now()));
+    }
+    paths
+}
+
+/// 登录 shell 解析结果缓存（含负缓存；`$SHELL -lic` 在 zsh 插件多的机器上
+/// 可达秒级，每轮 Claude 检测重复 spawn 纯浪费）。
+fn cached_claude_login_shell_resolution() -> Option<PathBuf> {
+    if let Ok(guard) = CLAUDE_LOGIN_SHELL_CACHE.try_lock() {
+        if let Some((resolved, cached_at)) = guard.as_ref() {
+            if cached_at.elapsed() <= env_resolution_cache_ttl() {
+                return resolved.clone();
+            }
+        }
+    }
+    let resolved = resolve_claude_via_login_shell_uncached();
+    if let Ok(mut guard) = CLAUDE_LOGIN_SHELL_CACHE.lock() {
+        *guard = Some((resolved.clone(), Instant::now()));
+    }
+    resolved
+}
+
+/// Claude 候选验证出的版本备忘（TTL 内同路径复用，消除同轮重复
+/// `claude --version` spawn）。
+pub(crate) fn claude_cached_version_text(path: &Path) -> Option<String> {
+    let guard = CLAUDE_VERSION_MEMO.lock().ok()?;
+    let (memo_path, version, cached_at) = guard.as_ref()?;
+    if memo_path == path && cached_at.elapsed() <= env_resolution_cache_ttl() {
+        return Some(version.clone());
+    }
+    None
+}
+
+fn remember_claude_version_text(path: &Path, version: &str) {
+    if let Ok(mut guard) = CLAUDE_VERSION_MEMO.lock() {
+        *guard = Some((path.to_path_buf(), version.to_string(), Instant::now()));
+    }
+}
+
+/// 本轮检测全部 not_installed 时调用：清空环境解析缓存，让下一轮检测重新
+/// 解析环境（覆盖「用户刚在本机装好 CLI」的场景）。
+pub(crate) fn invalidate_environment_resolution_caches() {
+    if let Ok(mut guard) = EXTRA_SEARCH_PATHS_CACHE.lock() {
+        *guard = None;
+    }
+    if let Ok(mut guard) = CLAUDE_LOGIN_SHELL_CACHE.lock() {
+        *guard = None;
+    }
+    if let Ok(mut guard) = CLAUDE_VERSION_MEMO.lock() {
+        *guard = None;
+    }
+}
+
 fn push_unique_path(paths: &mut Vec<PathBuf>, candidate: PathBuf) {
     if !paths
         .iter()
@@ -117,6 +222,10 @@ fn discover_npm_global_bin_dir_from_npm(
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::null());
 
+    #[cfg(test)]
+    {
+        NPM_PREFIX_PROBE_SPAWN_COUNT.fetch_add(1, AtomicOrdering::SeqCst);
+    }
     let output = command.output().ok()?;
     if !output.status.success() {
         return None;
@@ -414,7 +523,7 @@ fn get_extra_search_paths() -> Vec<PathBuf> {
 
 /// Build combined search paths (system PATH + extra paths)
 fn build_search_paths(custom_bin: Option<&str>) -> OsString {
-    let all_paths = build_seed_search_paths(custom_bin, &get_extra_search_paths());
+    let all_paths = build_seed_search_paths(custom_bin, &cached_extra_search_paths());
     env::join_paths(all_paths).unwrap_or_else(|_| OsString::from(""))
 }
 
@@ -454,7 +563,7 @@ pub fn find_cli_binary(name: &str, custom_bin: Option<&str>) -> Option<PathBuf> 
     #[cfg(windows)]
     {
         let extensions = ["cmd", "exe", "bat", "com", "ps1"];
-        for search_path in get_extra_search_paths() {
+        for search_path in cached_extra_search_paths() {
             // Try with various extensions
             for ext in &extensions {
                 let cmd_path = search_path.join(format!("{}.{}", name, ext));
@@ -511,6 +620,10 @@ fn push_unique_claude_candidate(candidates: &mut Vec<PathBuf>, path: PathBuf) {
 
 /// Resolve `claude` the same way an interactive terminal does (login + interactive shell PATH / nvm).
 fn resolve_claude_via_login_shell() -> Option<PathBuf> {
+    cached_claude_login_shell_resolution()
+}
+
+fn resolve_claude_via_login_shell_uncached() -> Option<PathBuf> {
     #[cfg(windows)]
     {
         return None;
@@ -527,6 +640,10 @@ fn resolve_claude_via_login_shell() -> Option<PathBuf> {
         command.stdin(std::process::Stdio::null());
         command.stdout(std::process::Stdio::piped());
         command.stderr(std::process::Stdio::null());
+        #[cfg(test)]
+        {
+            CLAUDE_LOGIN_SHELL_SPAWN_COUNT.fetch_add(1, AtomicOrdering::SeqCst);
+        }
         let output = command.output().ok()?;
         if !output.status.success() {
             return None;
@@ -589,6 +706,7 @@ fn probe_claude_version_text(path: &Path) -> Option<String> {
         }
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         if !stdout.is_empty() {
+            remember_claude_version_text(path, &stdout);
             return Some(stdout);
         }
     }
@@ -1017,7 +1135,9 @@ pub(crate) fn extract_existing_developer_instructions(args: &[String]) -> Option
         let value_after_flag = |next: Option<&&String>| -> Option<String> {
             let v = next?.as_str();
             if v.starts_with("developer_instructions=") || v.starts_with("instructions=") {
-                Some(decode_toml_string(v.split_once('=').map(|x| x.1).unwrap_or("")))
+                Some(decode_toml_string(
+                    v.split_once('=').map(|x| x.1).unwrap_or(""),
+                ))
             } else {
                 None
             }
@@ -2799,6 +2919,116 @@ mod tests {
         permissions.set_mode(0o755);
         fs::set_permissions(&script_path, permissions).expect("chmod temp cli script");
         script_path
+    }
+
+    /// refactor-engine-detection-pipeline B2：TTL 内重复获取额外搜索路径
+    /// MUST 复用缓存（`npm config get prefix` 每进程至多 1 次）。
+    #[test]
+    fn extra_search_paths_cache_reuses_result_within_ttl() {
+        let _guard = ENV_CACHE_TEST_LOCK.lock().expect("env cache test lock");
+        ENV_CACHE_TTL_OVERRIDE_MS.store(600_000, AtomicOrdering::SeqCst);
+        invalidate_environment_resolution_caches();
+        // warm up：持锁窗口内全进程进入确定的热缓存态（此后任何测试的
+        // cached 调用都是 cache-hit，零 spawn）。
+        let _ = cached_extra_search_paths();
+
+        let before = NPM_PREFIX_PROBE_SPAWN_COUNT.load(AtomicOrdering::SeqCst);
+        let first = cached_extra_search_paths();
+        let middle = NPM_PREFIX_PROBE_SPAWN_COUNT.load(AtomicOrdering::SeqCst);
+        let second = cached_extra_search_paths();
+        let after = NPM_PREFIX_PROBE_SPAWN_COUNT.load(AtomicOrdering::SeqCst);
+
+        assert_eq!(first, second, "cached result must be identical");
+        assert_eq!(
+            middle, before,
+            "call within TTL must not spawn `npm config get prefix`"
+        );
+        assert_eq!(
+            after, middle,
+            "repeated calls within TTL must not spawn again"
+        );
+
+        invalidate_environment_resolution_caches();
+        ENV_CACHE_TTL_OVERRIDE_MS.store(0, AtomicOrdering::SeqCst);
+    }
+
+    /// refactor-engine-detection-pipeline B2：失效后允许重新解析（覆盖用户刚
+    /// 装好 CLI 的场景）。
+    #[test]
+    fn invalidate_environment_resolution_caches_clears_hot_entries() {
+        let _guard = ENV_CACHE_TEST_LOCK.lock().expect("env cache test lock");
+        ENV_CACHE_TTL_OVERRIDE_MS.store(600_000, AtomicOrdering::SeqCst);
+        let _ = cached_extra_search_paths();
+        invalidate_environment_resolution_caches();
+
+        let before = NPM_PREFIX_PROBE_SPAWN_COUNT.load(AtomicOrdering::SeqCst);
+        let _ = cached_extra_search_paths();
+        let after = NPM_PREFIX_PROBE_SPAWN_COUNT.load(AtomicOrdering::SeqCst);
+        assert!(
+            after > before,
+            "after invalidation the next resolution must re-resolve (re-probe npm prefix)"
+        );
+        invalidate_environment_resolution_caches();
+        ENV_CACHE_TTL_OVERRIDE_MS.store(0, AtomicOrdering::SeqCst);
+    }
+
+    /// refactor-engine-detection-pipeline B2：登录 shell 解析结果 TTL 内复用
+    /// （`$SHELL -lic` 每进程至多 1 次）。
+    #[cfg(unix)]
+    #[test]
+    fn claude_login_shell_resolution_is_cached_within_ttl() {
+        let _guard = ENV_CACHE_TEST_LOCK.lock().expect("env cache test lock");
+        ENV_CACHE_TTL_OVERRIDE_MS.store(600_000, AtomicOrdering::SeqCst);
+        invalidate_environment_resolution_caches();
+        let _ = resolve_claude_via_login_shell();
+
+        let before = CLAUDE_LOGIN_SHELL_SPAWN_COUNT.load(AtomicOrdering::SeqCst);
+        let first = resolve_claude_via_login_shell();
+        let middle = CLAUDE_LOGIN_SHELL_SPAWN_COUNT.load(AtomicOrdering::SeqCst);
+        let second = resolve_claude_via_login_shell();
+        let after = CLAUDE_LOGIN_SHELL_SPAWN_COUNT.load(AtomicOrdering::SeqCst);
+
+        assert_eq!(first, second);
+        assert_eq!(
+            middle, before,
+            "resolution within TTL must not spawn `$SHELL -lic`"
+        );
+        assert_eq!(
+            after, middle,
+            "repeated resolutions within TTL must not spawn again"
+        );
+        invalidate_environment_resolution_caches();
+        ENV_CACHE_TTL_OVERRIDE_MS.store(0, AtomicOrdering::SeqCst);
+    }
+
+    /// refactor-engine-detection-pipeline B2：Claude 候选验证出的版本在 TTL 内
+    /// 经 memo 复用（消费端契约；同轮 detect 不再二次 `claude --version`）。
+    #[cfg(unix)]
+    #[test]
+    fn claude_version_memo_reuses_recent_probe_result() {
+        ENV_CACHE_TTL_OVERRIDE_MS.store(600_000, AtomicOrdering::SeqCst);
+        let fake = write_unix_test_cli("#!/bin/sh\necho '1.2.3 (Claude Code)'\n");
+        invalidate_environment_resolution_caches();
+
+        let probed = probe_claude_version_text(&fake);
+        assert_eq!(probed.as_deref(), Some("1.2.3 (Claude Code)"));
+
+        let cached = claude_cached_version_text(&fake);
+        assert_eq!(
+            cached.as_deref(),
+            Some("1.2.3 (Claude Code)"),
+            "recent probe result must be readable from the memo"
+        );
+
+        invalidate_environment_resolution_caches();
+        assert_eq!(
+            claude_cached_version_text(&fake),
+            None,
+            "invalidation must clear the memo"
+        );
+        ENV_CACHE_TTL_OVERRIDE_MS.store(0, AtomicOrdering::SeqCst);
+        let _ = fs::remove_file(&fake);
+        let _ = fs::remove_dir_all(fake.parent().unwrap_or(Path::new("")));
     }
 
     #[cfg(unix)]

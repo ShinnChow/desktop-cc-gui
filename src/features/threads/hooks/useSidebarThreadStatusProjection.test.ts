@@ -11,7 +11,12 @@ describe("projectSidebarThreadStatus", () => {
       },
     });
     expect(projected).toEqual({
-      "t-1": { isProcessing: true, hasUnread: false, isReviewing: false },
+      "t-1": {
+        isProcessing: true,
+        hasUnread: false,
+        isReviewing: false,
+        backgroundTaskRunningCount: 0,
+      },
     });
   });
 
@@ -38,6 +43,7 @@ describe("projectSidebarThreadStatus", () => {
       isProcessing: false,
       hasUnread: true,
       isReviewing: false,
+      backgroundTaskRunningCount: 0,
     });
   });
 
@@ -66,6 +72,46 @@ describe("projectSidebarThreadStatus", () => {
       isProcessing: false,
       hasUnread: false,
       isReviewing: false,
+      backgroundTaskRunningCount: 0,
     });
+  });
+
+  it("tracks the background task running count as the fourth projected field", () => {
+    const first = projectSidebarThreadStatus(null, {
+      "t-1": { isProcessing: false, hasUnread: false, isReviewing: false },
+    });
+    const withTasks = projectSidebarThreadStatus(first, {
+      "t-1": {
+        isProcessing: false,
+        hasUnread: false,
+        isReviewing: false,
+        backgroundTaskRunningCount: 2,
+      },
+    });
+    expect(withTasks).not.toBe(first);
+    expect(withTasks["t-1"]?.backgroundTaskRunningCount).toBe(2);
+
+    // 计数不变时行级引用稳定（三布尔同、count 同 → 复用）。
+    const unchanged = projectSidebarThreadStatus(withTasks, {
+      "t-1": {
+        isProcessing: false,
+        hasUnread: false,
+        isReviewing: false,
+        backgroundTaskRunningCount: 2,
+      },
+    });
+    expect(unchanged["t-1"]).toBe(withTasks["t-1"]);
+
+    // 计数变化（即使三布尔不变）必须换行级引用，否则行内徽标不更新。
+    const drained = projectSidebarThreadStatus(unchanged, {
+      "t-1": {
+        isProcessing: false,
+        hasUnread: false,
+        isReviewing: false,
+        backgroundTaskRunningCount: 0,
+      },
+    });
+    expect(drained["t-1"]).not.toBe(unchanged["t-1"]);
+    expect(drained["t-1"]?.backgroundTaskRunningCount).toBe(0);
   });
 });

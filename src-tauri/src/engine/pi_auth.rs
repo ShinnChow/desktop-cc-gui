@@ -20,8 +20,12 @@ use crate::state::AppState;
 
 use super::EngineType;
 
-/// Provider catalog aligned with pi v0.84.1 `packages/ai/src/env-api-keys.ts`
-/// (`envMap`). `env_var: None` marks OAuth-only providers (GitHub Copilot).
+/// Provider catalog aligned with pi v0.84.3 env map（bundle 内 `envVar` 对象 +
+/// anthropic 特例分支）。2026-08-27 对齐审计：0.84.1 → 0.84.3 provider/env-key
+/// 零漂移（providers.md 与 env help 逐项 diff），本次补录两版都存在但
+/// providers.md 未收录、此前按文档对齐时漏掉的 `moonshotai` / `moonshotai-cn`
+/// （MOONSHOT_API_KEY）。`google-vertex` 走 ADC/service account（非贴 key 型），
+/// 不进本目录。`env_var: None` marks OAuth-only providers (GitHub Copilot).
 struct PiAuthProviderDef {
     id: &'static str,
     env_var: Option<&'static str>,
@@ -133,6 +137,14 @@ const PI_AUTH_PROVIDER_CATALOG: &[PiAuthProviderDef] = &[
         env_var: Some("KIMI_API_KEY"),
     },
     PiAuthProviderDef {
+        id: "moonshotai",
+        env_var: Some("MOONSHOT_API_KEY"),
+    },
+    PiAuthProviderDef {
+        id: "moonshotai-cn",
+        env_var: Some("MOONSHOT_API_KEY"),
+    },
+    PiAuthProviderDef {
         id: "minimax",
         env_var: Some("MINIMAX_API_KEY"),
     },
@@ -181,6 +193,21 @@ fn catalog_entry(provider_id: &str) -> Option<&'static PiAuthProviderDef> {
         .find(|item| item.id == provider_id)
 }
 
+/// pi 订阅型 OAuth 的 auth.json key 与 API-key provider id 不同名的唯一分叉点：
+/// `/login openai` 走 ChatGPT 订阅流，pi 0.84.x 以订阅 provider id
+/// `openai-codex`（createProvider id，见 pi bundle）落盘 auth.json；
+/// `openai` 仅承载 OPENAI_API_KEY。对齐审计 2026-08-28（pi 0.84.3 本体）。
+const OAUTH_ENTRY_ID_ALIASES: &[(&str, &str)] = &[("openai", "openai-codex")];
+
+/// 订阅判定要看的 auth.json key 集合：本 id + 可能的 OAuth 别名 id。
+fn oauth_entry_ids(provider_id: &str) -> impl Iterator<Item = &str> {
+    let alias = OAUTH_ENTRY_ID_ALIASES
+        .iter()
+        .find(|(id, _)| *id == provider_id)
+        .map(|(_, alias)| *alias);
+    [Some(provider_id), alias].into_iter().flatten()
+}
+
 pub(crate) fn pi_catalog_env_var(provider_id: &str) -> Option<&'static str> {
     catalog_entry(provider_id).and_then(|item| item.env_var)
 }
@@ -209,7 +236,7 @@ pub fn resolve_pi_auth_file(home_override: Option<&str>) -> PathBuf {
 pub struct PiAuthProviderSnapshot {
     pub id: String,
     pub env_var: Option<String>,
-    /// configured | env | none
+    /// configured | none
     pub state: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub masked_key: Option<String>,
@@ -336,29 +363,27 @@ pub async fn list_pi_auth_providers(
         .iter()
         .map(|def| {
             let entry = map.get(def.id);
-            let oauth_subscribed = entry
-                .and_then(|item| item.get("type"))
-                .and_then(Value::as_str)
-                == Some("oauth");
+            let oauth_subscribed = oauth_entry_ids(def.id).any(|key| {
+                map.get(key)
+                    .and_then(|item| item.get("type"))
+                    .and_then(Value::as_str)
+                    == Some("oauth")
+            });
             let api_key = entry
                 .filter(|item| item.get("type").and_then(Value::as_str) == Some("api_key"))
                 .and_then(|item| item.get("key"))
                 .and_then(Value::as_str);
 
-            // pi resolution order: auth.json entry wins over environment.
+            // pi resolution order: --api-key → auth.json → 环境变量 → models.json。
+            // 本区块只管 auth.json：应用进程 env ≠ pi 终端（登录 shell）实际继承的
+            // env，按进程 env 报「env 生效中」不可靠，还会把行锁死在「覆盖设置」态
+            // （无编辑/删除路径），2026-08-28 摘除——未落 auth.json 一律视为未配置。
             let (state, masked_key, src) = if let Some(key) = api_key {
                 (
                     "configured".to_string(),
                     Some(mask_key(key)),
                     Some(key_source(key).to_string()),
                 )
-            } else if def
-                .env_var
-                .and_then(|name| std::env::var(name).ok())
-                .map(|value| !value.trim().is_empty())
-                .unwrap_or(false)
-            {
-                ("env".to_string(), None, None)
             } else {
                 ("none".to_string(), None, None)
             };
@@ -482,7 +507,16 @@ pub async fn pi_auth_set_api_key(
         &key,
         config.as_ref().and_then(|item| item.home_dir.as_deref()),
     )
-    .await
+    .await?;
+    // 凭证写入改变 pi 的可用模型目录（pi 每次实时按 auth.json 过滤），
+    // 必须清掉内存态目录缓存，否则模型选择器继续展示已变更 provider 的模型。
+    // 只清 models 保留状态条目：detect TTL 命中路径透出全量 statuses，
+    // 缺条目会让引擎菜单在窗口期漏掉 PI。
+    state
+        .engine_manager
+        .invalidate_engine_models(EngineType::Pi)
+        .await;
+    Ok(())
 }
 
 /// Delete an api_key credential from auth.json (OAuth entries are refused).
@@ -507,7 +541,13 @@ pub async fn pi_auth_delete_credential(
         &provider_id,
         config.as_ref().and_then(|item| item.home_dir.as_deref()),
     )
-    .await
+    .await?;
+    // 同 set：删除后目录按实时探测收敛，防 picker 继续展示已删 provider 的模型。
+    state
+        .engine_manager
+        .invalidate_engine_models(EngineType::Pi)
+        .await;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -551,7 +591,7 @@ mod tests {
         let agent = dir.to_string_lossy().to_string();
         let result = list_pi_auth_providers(Some(&agent)).await.unwrap();
         assert!(!result.auth_file.exists);
-        assert!(result.providers.len() >= 35);
+        assert!(result.providers.len() >= 37);
         assert!(result.providers.iter().all(|item| item.state == "none"));
     }
 
@@ -615,6 +655,29 @@ mod tests {
             .unwrap();
         assert!(anthropic.oauth_subscribed);
         assert_eq!(anthropic.state, "none"); // oauth entry is not an api_key state
+    }
+
+    #[tokio::test]
+    async fn oauth_alias_marks_openai_subscribed_via_openai_codex_entry() {
+        // pi 0.84.x `/login openai`（ChatGPT 订阅）以 provider id `openai-codex`
+        // 落盘 auth.json；UI 的 `openai` 行（ChatGPT Plus / Pro）必须读出已订阅。
+        let dir = temp_agent_dir("oauth-alias");
+        let agent = dir.to_string_lossy().to_string();
+        std::fs::write(
+            dir.join("auth.json"),
+            r#"{"openai-codex":{"type":"oauth","access":"tok","refresh":"r","expires":9999999999}}"#,
+        )
+        .unwrap();
+
+        let list = list_pi_auth_providers(Some(&agent)).await.unwrap();
+        let openai = list
+            .providers
+            .iter()
+            .find(|item| item.id == "openai")
+            .unwrap();
+        assert!(openai.oauth_subscribed);
+        // 无 OPENAI_API_KEY：api_key 状态仍是 none，订阅与 API Key 两组互不污染。
+        assert_eq!(openai.state, "none");
     }
 
     #[tokio::test]

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   enrichModelInfoWithAtomicReasoning,
+  enrichModelReasoningForEngine,
   reconcileAtomicReasoningEffort,
   resolveAtomicDefaultReasoningEffort,
   resolveAtomicReasoningEffort,
@@ -274,6 +275,25 @@ describe("atomicModelReasoning", () => {
     expect(resolveAtomicDefaultReasoningEffort("pi", model)).toBe("high");
   });
 
+  it("enrichModelReasoningForEngine passes non-PI models through untouched", () => {
+    const claudeModel = { id: "claude-sonnet-4-5", model: "claude-sonnet-4-5" };
+    expect(enrichModelReasoningForEngine("claude", claudeModel)).toBe(
+      claudeModel,
+    );
+    const codexModel = { id: "gpt-5.6-sol", model: "gpt-5.6-sol" };
+    expect(enrichModelReasoningForEngine("codex", codexModel)).toBe(codexModel);
+    expect(enrichModelReasoningForEngine(null, codexModel)).toBe(codexModel);
+    // PI 分支同样恒等直返：capability 已在 catalog 投影阶段填到 ModelOption，
+    // 本函数不做 catalog lookup、不发明元数据。
+    const piModel = {
+      id: "google/gemini-2.5-pro",
+      model: "google/gemini-2.5-pro",
+      supportedReasoningEfforts: ["low", "medium", "high"],
+      defaultReasoningEffort: "high",
+    };
+    expect(enrichModelReasoningForEngine("pi", piModel)).toBe(piModel);
+  });
+
   it("PI inherited effort that is still in allowlist is preserved", () => {
     expect(
       resolveAtomicReasoningEffort({
@@ -436,8 +456,10 @@ describe("atomicModelReasoning", () => {
     ).toBe("high");
   });
 
-  it("PI non-supported engines (kimi/opencode/dsh/qoder) stay null", () => {
-    // 本 change 严格只接 PI；其它引擎的 Shared atomic 联动留待各自 change
+  it("generic engines reconcile via catalog metadata (P0 统一：首页/会话同源)", () => {
+    // 用户裁定：首页创建框与会话内 ButtonArea 必须共用同一投影——
+    // 目录条目带思考档元数据的引擎一律联动，不再按引擎白名单特判。
+    // 有元数据 + 合法 effort → 保留
     expect(
       reconcileAtomicReasoningEffort({
         engine: "kimi",
@@ -449,7 +471,8 @@ describe("atomicModelReasoning", () => {
         },
         effort: "low",
       }),
-    ).toBeNull();
+    ).toBe("low");
+    // 有元数据 + 非法 effort → 收敛 null（host 默认语义）
     expect(
       reconcileAtomicReasoningEffort({
         engine: "dsh",
@@ -459,32 +482,30 @@ describe("atomicModelReasoning", () => {
           supportedReasoningEfforts: [{ reasoningEffort: "low" }],
           defaultReasoningEffort: "low",
         },
-        effort: "low",
+        effort: "ultra",
       }),
     ).toBeNull();
-    expect(
-      reconcileAtomicReasoningEffort({
-        engine: "qoder",
-        model: {
-          id: "qoder-x",
-          model: "qoder-x",
-          supportedReasoningEfforts: [{ reasoningEffort: "low" }],
-          defaultReasoningEffort: "low",
-        },
-        effort: "low",
-      }),
-    ).toBeNull();
+    // 无元数据 → capability-neutral（effort 原样保留，不发明）
     expect(
       reconcileAtomicReasoningEffort({
         engine: "opencode",
-        model: {
-          id: "opencode-x",
-          model: "opencode-x",
-          supportedReasoningEfforts: [{ reasoningEffort: "low" }],
-          defaultReasoningEffort: "low",
-        },
-        effort: "low",
+        model: { id: "oc-x", model: "oc-x" },
+        effort: "medium",
       }),
-    ).toBeNull();
+    ).toBe("medium");
+    // options 投影：dsh 目录元数据 → 档位列表（首页缺失场景的根修复）
+    expect(
+      resolveAtomicReasoningOptions("dsh", {
+        id: "deepseek-official/deepseek-v4-flash",
+        model: "deepseek-official/deepseek-v4-flash",
+        supportedReasoningEfforts: [
+          { reasoningEffort: "off" },
+          { reasoningEffort: "low" },
+          { reasoningEffort: "high" },
+          { reasoningEffort: "max" },
+        ],
+        defaultReasoningEffort: "low",
+      }),
+    ).toEqual(["off", "low", "high", "max"]);
   });
 });

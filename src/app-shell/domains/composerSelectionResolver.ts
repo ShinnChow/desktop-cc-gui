@@ -12,11 +12,17 @@ export type ComposerSelectionSnapshot = {
   providerProfileId: string | null;
   effort: string | null;
   collaborationMode: Record<string, unknown> | null;
+  /** Native send may consume this snapshot only for its owning thread. */
+  threadId: string | null;
+  /** Monotonic publication marker for debugging and future stale-write guards. */
+  revision: number;
 };
 
 export type ComposerSelectionResolver = {
   composerSelectionResolverRef: RefObject<ComposerSelectionSnapshot>;
-  resolveComposerSelection: () => ComposerSelectionSnapshot;
+  resolveComposerSelection: (
+    threadId?: string | null,
+  ) => ComposerSelectionSnapshot | null;
 };
 
 /**
@@ -33,10 +39,12 @@ export function useComposerSelectionResolver(): ComposerSelectionResolver {
     providerProfileId: null,
     effort: null,
     collaborationMode: null,
+    threadId: null,
+    revision: 0,
   });
-  const resolveComposerSelection = useCallback(
-    () => composerSelectionResolverRef.current,
-    [],
-  );
+  const resolveComposerSelection = useCallback((threadId?: string | null) => {
+    const snapshot = composerSelectionResolverRef.current;
+    return threadId && snapshot.threadId !== threadId ? null : snapshot;
+  }, []);
   return { composerSelectionResolverRef, resolveComposerSelection };
 }

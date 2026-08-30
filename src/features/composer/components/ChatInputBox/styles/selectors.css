@@ -1324,24 +1324,6 @@
   color: var(--text-muted, var(--text-secondary, #888));
 }
 
-.composer-session-hud-spark {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 36px;
-  margin-top: 4px;
-}
-
-.composer-session-hud-spark > i {
-  flex: 1 1 0;
-  min-width: 3px;
-  border-radius: 2px 2px 0 0;
-  background: color-mix(in srgb, var(--text-primary, #fff) 16%, transparent);
-}
-
-.composer-session-hud-spark > i.is-tip {
-  background: var(--accent-strong, var(--composer-tool-selected-color, #3b82f6));
-}
 
 .composer-session-hud-footer {
   /* Surface row lives at the top of the HUD; separator faces the main pane. */

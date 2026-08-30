@@ -107,6 +107,12 @@ export function useThreadRealtimeHistoryReconcile({
         canonicalThreadId.startsWith("opencode-pending-") ||
         canonicalThreadId.startsWith("dsh:") ||
         canonicalThreadId.startsWith("dsh-pending-") ||
+        // harden-pi-session-curtain-fidelity：pi 无 window 加载、无 cursor
+        // 语义，codex refresh 分支对其是错误分支；列表 miss / rename 未落地
+        // 时误入会触发 refreshThread，merge 锚点 miss 回退整体替换可能裁掉
+        // 磁盘 flush 前的 live 尾部。
+        canonicalThreadId.startsWith("pi:") ||
+        canonicalThreadId.startsWith("pi-pending-") ||
         canonicalThreadId.startsWith("shared:")
       ) {
         return false;

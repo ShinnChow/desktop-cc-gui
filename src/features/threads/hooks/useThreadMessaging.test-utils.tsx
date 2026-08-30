@@ -68,6 +68,7 @@ vi.mock("../../../services/tauri", () => ({
 
 vi.mock("../../../services/clientStorage", () => ({
   getClientStoreSync: vi.fn(),
+  isClientStoreReady: () => true,
   writeClientStoreValue: vi.fn(),
 }));
 

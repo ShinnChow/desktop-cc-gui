@@ -50,6 +50,24 @@ export default defineConfig(({ command }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // fix-session-load-bridge-freeze（Phase C 根因修复）：该包 exports 的
+      // browser 条件指向 index.dom.js（模块顶层 document.createElement），
+      // 在 worker 里必炸（实测 ReferenceError: Can't find variable: document，
+      // 45 字符 / hash 1wt84ny，worker 每次实例化必崩 → markdown 全量回退主线程）。
+      // 强制走离线构建（纯 JS 字符表，无 DOM），主线程/worker/dev/build 全栈一致；
+      // 与 workerSafeConditionalEntries 互补（那里覆盖 rollup resolveId，
+      // 这里覆盖 optimizeDeps 预打包——dev worker 实际加载的是后者产物）。
+      "decode-named-character-reference": path.resolve(
+        __dirname,
+        "node_modules/decode-named-character-reference/index.js",
+      ),
+      // F6 后续：同款问题第二处——lib/browser.js 顶层 new DOMParser()
+      // （真机 rehype-katex.js:119 ReferenceError）。worker 条件入口 index.js
+      // 走 parse5 路径（纯 JS），主线程/worker/dev/build 全栈一致。
+      "hast-util-from-html-isomorphic": path.resolve(
+        __dirname,
+        "node_modules/hast-util-from-html-isomorphic/index.js",
+      ),
     },
     dedupe: [
       "@codemirror/state",
@@ -62,6 +80,17 @@ export default defineConfig(({ command }) => ({
     ],
   },
   optimizeDeps: {
+    esbuildOptions: {
+      alias: {
+        // fix-session-load-bridge-freeze（Phase C）：worker 不安全条件包在
+        // 预打包层强制离线/worker 入口（browser 条件的 dom.js/browser.js
+        // 顶层访问 document/DOMParser，worker 求值即崩）。
+        "decode-named-character-reference":
+          "./node_modules/decode-named-character-reference/index.js",
+        "hast-util-from-html-isomorphic":
+          "./node_modules/hast-util-from-html-isomorphic/index.js",
+      },
+    },
     include: [
       // vendored TokenTracker 页面（usage / skills）全部经 React.lazy 异步
       // 加载，vite 的 entry 扫描发现不了这些只出现在 lazy chunk 里的依赖；

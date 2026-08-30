@@ -10,6 +10,7 @@ const threads = {
     "runtimeProcessing": "실행 중",
     "runtimeReviewing": "검토 중",
     "runtimeCompleted": "완료",
+    "runtimeBackgroundTasks": "백그라운드 작업 실행 중",
     "archive": "보관",
     "delete": "삭제",
     "openSessionManagement": "세션 관리에서 일괄 삭제…",

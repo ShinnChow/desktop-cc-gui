@@ -17,6 +17,8 @@ import type {
 } from "../../../types";
 import { useThreadApprovalEvents } from "./useThreadApprovalEvents";
 import { useThreadItemEvents } from "./useThreadItemEvents";
+import { useThreadBackgroundTaskStatusSync } from "../utils/threadBackgroundTaskStatusSync";
+import { useBackgroundTaskRegistryWatcherForRunningThreads } from "../../messages/utils/useBackgroundTaskRegistryWatcher";
 import { isSalvageableTerminalAssistantComplete } from "../contracts/realtimeEventContract";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
 import { queryTurnReconciliationStatusWithTimeout } from "./threadReconciliationStatusQuery";
@@ -116,6 +118,13 @@ export function useThreadEventHandlers({
   onExitPlanModeToolCompleted,
   domainEventController = null,
 }: ThreadEventHandlersOptions) {
+  // 后台任务 running 计数 → threadStatusById 单订阅 sync（app 级单例挂载，
+  // 见 threadBackgroundTaskStatusSync 头注释）。
+  useThreadBackgroundTaskStatusSync(dispatch);
+  // App 级 registry watcher：枚举所有 running>0 会话探测终态 metadata，
+  // 经 sink 全路径回写（store + 时间线卡片 + pill + 会话行）。切走会话
+  // 依然兜底（strip 上的旧挂载只探活跃会话，已移除）。
+  useBackgroundTaskRegistryWatcherForRunningThreads();
   const threadLifecycleSnapshotRef = useRef<Map<string, ThreadLifecycleSnapshot>>(new Map());
   const turnDiagnosticsRef = useRef<Map<string, TurnDiagnosticState>>(new Map());
   const turnFirstDeltaTimerRef = useRef<Map<string, number>>(new Map());
@@ -1275,6 +1284,7 @@ export function useThreadEventHandlers({
     onFileChangeOutputDelta,
     flushPendingRealtimeEvents,
     isRealtimeTurnTerminalExact,
+    isRealtimeTurnInFlight,
     noteRealtimeTurnStarted,
     markRealtimeTurnTerminal,
     drainLiveItemDeltasForThread,
@@ -1367,6 +1377,7 @@ export function useThreadEventHandlers({
     resolvePendingThreadForSession,
     resolvePendingThreadForTurn,
     getActiveTurnIdForThread,
+    isTurnInFlightForThread: isRealtimeTurnInFlight,
     getThreadProviderProfileId,
     hasEstablishedThreadItems,
     renamePendingMemoryCaptureKey,

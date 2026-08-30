@@ -3,6 +3,7 @@ import { act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConversationItem } from "../../../types";
 import { resetUseThreadActionsTestMocks } from "./useThreadActions.test-mocks";
+import { appendRendererDiagnosticMock } from "./useThreadActions.test-mocks";
 import {
   connectWorkspace,
   getOpenCodeSessionList,
@@ -12,6 +13,7 @@ import {
   loadCodexSession,
   renameThreadTitleKey,
   listThreads,
+  listSessionIndexForWorkspace,
   resumeThread,
 } from "../../../services/tauri";
 import {
@@ -222,31 +224,65 @@ describe("useThreadActions", () => {
 
     expect(resumeThread).toHaveBeenCalledWith("ws-1", "thread-unified");
     expect(loadCodexSession).toHaveBeenCalledWith("ws-1", "thread-unified");
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "ensureThread",
-      workspaceId: "ws-1",
-      threadId: "thread-unified",
-      engine: "codex",
-    });
+    // F4 合批契约：ensure/plan/restoredAt/window/tokenUsage 经
+    // hydrateThreadHistorySnapshot 单次 dispatch 落库（与 items 同 commit）。
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "hydrateThreadHistorySnapshot",
+        workspaceId: "ws-1",
+        threadId: "thread-unified",
+        engine: "codex",
+        plan: {
+          turnId: "turn-1",
+          explanation: "Plan first",
+          steps: [{ step: "Inspect", status: "pending" }],
+        },
+      }),
+    );
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "setThreadItems",
         threadId: "thread-unified",
       }),
     );
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "setThreadPlan",
-      threadId: "thread-unified",
-      plan: {
-        turnId: "turn-1",
-        explanation: "Plan first",
-        steps: [{ step: "Inspect", status: "pending" }],
-      },
+  });
+
+  it("leaves perf.thread-switch timing evidence after a unified hydrate", async () => {
+    // F4（enhance-perf-diagnostics-evidence）：切会话 hydrate 必须留下计时证据，
+    // 供真机对照「慢在加载还是渲染」；threadId 以短哈希落盘（隐私口径）。
+    const assistantItem: ConversationItem = {
+      id: "assistant-switch-1",
+      kind: "message",
+      role: "assistant",
+      text: "switch evidence",
+    };
+    vi.mocked(resumeThread).mockResolvedValue({
+      result: { thread: { turns: [] } },
     });
-    expect(dispatch).toHaveBeenCalledWith(
+    vi.mocked(loadCodexSession).mockResolvedValue({ entries: [] });
+    vi.mocked(buildItemsFromThread).mockReturnValue([assistantItem]);
+
+    const { result } = renderActions({
+      useUnifiedHistoryLoader: true,
+    });
+
+    await act(async () => {
+      await result.current.resumeThreadForWorkspace("ws-1", "thread-switch-probe");
+    });
+
+    expect(appendRendererDiagnosticMock).toHaveBeenCalledWith(
+      "perf.thread-switch",
       expect.objectContaining({
-        type: "setThreadHistoryRestoredAt",
-        threadId: "thread-unified",
+        durationMs: expect.any(Number),
+        // 分段计时：区分「resolve+load+桥」与「前端组装」两段成本
+        loadMs: expect.any(Number),
+        assembleMs: expect.any(Number),
+        itemCount: 1,
+        displayedCount: 1,
+        mode: "tail-first",
+        engineSource: "codex",
+        threadIdHash: expect.stringMatching(/^[a-z0-9]{1,16}$/i),
+        fallbackWarningCount: 0,
       }),
     );
   });
@@ -444,12 +480,14 @@ describe("useThreadActions", () => {
       await result.current.resumeThreadForWorkspace("ws-1", "thread-empty");
     });
 
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "ensureThread",
-      workspaceId: "ws-1",
-      threadId: "thread-empty",
-      engine: "codex",
-    });
+    // F4 合批契约：空快照走 markHistoryRecoveryFailure，不再先 ensureThread，
+    // 也不应有 hydrateThreadHistorySnapshot / restoredAt 落库。
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "hydrateThreadHistorySnapshot",
+        threadId: "thread-empty",
+      }),
+    );
     expect(dispatch).not.toHaveBeenCalledWith(
       expect.objectContaining({
         type: "setThreadHistoryRestoredAt",
@@ -1656,6 +1694,44 @@ describe("useThreadActions", () => {
       workspaceId: "ws-1",
       threads: [],
     });
+  });
+
+  it("reloads from the forced Session Index without legacy engine fan-out", async () => {
+    vi.mocked(listSessionIndexForWorkspace).mockResolvedValue({
+      data: [
+        {
+          engine: "codex",
+          sessionId: "session-index-1",
+          title: "Indexed session",
+          updatedAt: 123,
+          workspacePath: workspace.path,
+        },
+      ],
+      source: "session-index",
+      synced: true,
+      engines: ["codex"],
+      hasMore: false,
+      visibility: { available: true, freshness: "verified", hiddenNativeIds: [] },
+    });
+    const { result, dispatch } = renderActions();
+
+    await act(async () => {
+      await result.current.listThreadsForWorkspace(workspace, {
+        forceSessionIndexSync: true,
+        sessionIndexOnly: true,
+      });
+    });
+
+    expect(listSessionIndexForWorkspace).toHaveBeenCalledWith("ws-1", {
+      limit: expect.any(Number),
+      syncIfNeeded: true,
+      forceSync: true,
+    });
+    expect(getOpenCodeSessionList).not.toHaveBeenCalled();
+    expect(listClaudeSessions).not.toHaveBeenCalled();
+    expectSetThreadsDispatched(dispatch, "ws-1", [
+      { id: "session-index-1", name: "Indexed session" },
+    ]);
   });
 
   it("ignores stale thread list responses that finish after a newer refresh", async () => {

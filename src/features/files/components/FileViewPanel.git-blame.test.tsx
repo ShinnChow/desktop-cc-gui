@@ -698,4 +698,73 @@ describe("FileViewPanel Git Blame", () => {
       null,
     );
   });
+
+  it("offers a footer git blame toggle for eligible files", async () => {
+    vi.mocked(readWorkspaceFile).mockResolvedValue({
+      content: "one",
+      truncated: false,
+    });
+    vi.mocked(getGitFileBlame).mockResolvedValue(blameResponse);
+    vi.mocked(getGitFileFullDiff).mockResolvedValue("");
+
+    render(
+      <FileViewPanel
+        workspaceId="ws-footer-blame"
+        workspacePath="/repo"
+        filePath="src/value.ts"
+        gitStatusFiles={[
+          { path: "src/value.ts", status: "M", additions: 1, deletions: 0 },
+        ]}
+        openTargets={[]}
+        openAppIconById={{}}
+        selectedOpenAppId=""
+        onSelectOpenAppId={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const toggle = await screen.findByRole("button", {
+      name: "files.gitBlameEnable",
+    });
+    expect(getGitFileBlame).not.toHaveBeenCalled();
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(getGitFileBlame).toHaveBeenCalledWith(
+        "ws-footer-blame",
+        "src/value.ts",
+        null,
+      );
+    });
+    expect(
+      screen.getByRole("button", { name: "files.gitBlameDisable" }),
+    ).toBeTruthy();
+  });
+
+  it("hides the footer git blame toggle when no repository owns the file", async () => {
+    vi.mocked(readWorkspaceFile).mockResolvedValue({
+      content: "one",
+      truncated: false,
+    });
+
+    render(
+      <FileViewPanel
+        workspaceId="ws-footer-blame-hidden"
+        workspacePath="/repo"
+        gitRoot="repo-a"
+        gitRepositories={[repository("repo-a"), repository("repo-b")]}
+        filePath="outside/value.ts"
+        openTargets={[]}
+        openAppIconById={{}}
+        selectedOpenAppId=""
+        onSelectOpenAppId={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await screen.findByTestId("mock-codemirror");
+    expect(
+      screen.queryByRole("button", { name: "files.gitBlameEnable" }),
+    ).toBeNull();
+  });
 });

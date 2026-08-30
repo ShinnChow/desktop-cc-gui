@@ -4,7 +4,11 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { useTranslation } from "react-i18next";
 import { useNewAgentShortcut } from "./useNewAgentShortcut";
 import type { LoadingProgressDialogConfig } from "./useLoadingProgressDialogState";
-import { runWithLoadingProgress } from "../utils/loadingProgressActions";
+import {
+  CREATE_SESSION_LOADING_TIMEOUT_MS,
+  runWithLoadingProgress,
+} from "../utils/loadingProgressActions";
+import { appendRendererDiagnosticImmediate } from "../../../services/rendererDiagnostics";
 import { pushGlobalRuntimeNotice } from "../../../services/globalRuntimeNotices";
 import {
   ensureRuntimeReady,
@@ -242,55 +246,90 @@ export function useWorkspaceActions({
         });
         return null;
       }
-      return await runWithLoadingProgress(
-        { showLoadingProgressDialog, hideLoadingProgressDialog },
-        {
-          title: t("workspace.loadingProgressCreateSessionTitle"),
-          message: t("workspace.loadingProgressCreateSessionMessage", {
-            engine: resolveEngineLabel(targetEngine),
-            workspace: resolveWorkspaceLabel(workspace),
-          }),
-        },
-        async () => {
-          exitDiffView();
-          selectWorkspace(workspace.id);
-          if (!workspace.connected) {
-            await connectWorkspace(workspace);
-          }
-          if (targetEngine !== activeEngine) {
-            try {
-              await setActiveEngine?.(targetEngine);
-            } catch (error) {
-              onDebug({
-                id: `${Date.now()}-client-switch-engine-before-new-thread-error`,
-                timestamp: Date.now(),
-                source: "error",
-                label: "workspace/switch engine before new thread error",
-                payload: error instanceof Error ? error.message : String(error),
+      try {
+        return await runWithLoadingProgress(
+          { showLoadingProgressDialog, hideLoadingProgressDialog },
+          {
+            title: t("workspace.loadingProgressCreateSessionTitle"),
+            message: t("workspace.loadingProgressCreateSessionMessage", {
+              engine: resolveEngineLabel(targetEngine),
+              workspace: resolveWorkspaceLabel(workspace),
+            }),
+          },
+          async () => {
+            // 分阶段性能日志：卡死/慢创建直接读 diagnostics.rendererLifecycleLog
+            // 的 perf.create-session 时间线定位挂在哪一段。
+            const createStartedAt = Date.now();
+            const traceStage = (
+              stage: string,
+              extra?: Record<string, unknown>,
+            ) => {
+              appendRendererDiagnosticImmediate("perf.create-session", {
+                stage,
+                engine: targetEngine,
+                workspaceId: workspace.id,
+                elapsedMs: Date.now() - createStartedAt,
+                ...extra,
               });
+            };
+            traceStage("start");
+            exitDiffView();
+            selectWorkspace(workspace.id);
+            if (!workspace.connected) {
+              await connectWorkspace(workspace);
+              traceStage("workspace-connected");
             }
-          }
-          const creationOptions = {
-            engine: targetEngine,
-            ...(options?.folderId ? { folderId: options.folderId } : {}),
-            ...(options?.providerProfileId
-              ? { providerProfileId: options.providerProfileId }
-              : {}),
-            ...(options?.providerProfile
-              ? { providerProfile: options.providerProfile }
-              : {}),
-          };
-          const threadId = await startThreadForWorkspace(workspace.id, creationOptions);
-          if (!threadId) {
-            throw new Error(SESSION_CREATION_EMPTY_THREAD_ID);
-          }
-          if (isCompact) {
-            setActiveTab("codex");
-          }
-          setTimeout(() => composerInputRef.current?.focus(), 0);
-          return threadId;
-        },
-      );
+            if (targetEngine !== activeEngine) {
+              try {
+                await setActiveEngine?.(targetEngine);
+                traceStage("engine-switched");
+              } catch (error) {
+                onDebug({
+                  id: `${Date.now()}-client-switch-engine-before-new-thread-error`,
+                  timestamp: Date.now(),
+                  source: "error",
+                  label: "workspace/switch engine before new thread error",
+                  payload: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+            const creationOptions = {
+              engine: targetEngine,
+              ...(options?.folderId ? { folderId: options.folderId } : {}),
+              ...(options?.providerProfileId
+                ? { providerProfileId: options.providerProfileId }
+                : {}),
+              ...(options?.providerProfile
+                ? { providerProfile: options.providerProfile }
+                : {}),
+            };
+            const threadId = await startThreadForWorkspace(workspace.id, creationOptions);
+            traceStage("thread-started", { threadId: Boolean(threadId) });
+            if (!threadId) {
+              throw new Error(SESSION_CREATION_EMPTY_THREAD_ID);
+            }
+            if (isCompact) {
+              setActiveTab("codex");
+            }
+            setTimeout(() => composerInputRef.current?.focus(), 0);
+            traceStage("done");
+            return threadId;
+          },
+          { timeoutMs: CREATE_SESSION_LOADING_TIMEOUT_MS },
+        );
+      } catch (error) {
+        appendRendererDiagnosticImmediate("perf.create-session", {
+          stage:
+            error instanceof Error &&
+            error.message.includes("loading timeout")
+              ? "timeout"
+              : "error",
+          engine: targetEngine,
+          workspaceId: workspace.id,
+          detail: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
     },
     [
       activeEngine,

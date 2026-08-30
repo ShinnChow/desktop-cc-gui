@@ -1066,6 +1066,37 @@
   color: inherit;
 }
 
+/* 引擎侧上下文事件留痕（压缩完成）：居中弱化分隔行，独立于消息气泡与折叠 chip。 */
+.context-event-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(860px, 100%);
+  margin: 6px auto;
+  padding: 0;
+  color: var(--text-muted, color-mix(in srgb, var(--text-primary) 55%, transparent));
+  user-select: none;
+}
+
+.context-event-row .context-event-rule {
+  flex: 1 1 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--border-subtle, var(--border)) 88%, transparent);
+}
+
+.context-event-row .context-event-label {
+  flex: 0 0 auto;
+  font-size: var(--message-caption-font-size, 12px);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.context-event-row .context-event-tokens {
+  font-style: normal;
+  color: var(--text-muted, inherit);
+  opacity: 0.85;
+}
+
 .intent-canvas-context-summary-card {
   width: min(860px, 100%);
   padding: 11px 12px;

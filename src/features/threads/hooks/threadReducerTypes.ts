@@ -3,8 +3,10 @@ import type {
   ApprovalRequest,
   AutoSessionMetadata,
   ConversationItem,
+  ExecutionTargetSnapshot,
   RateLimitSnapshot,
   RequestUserInputRequest,
+  RuntimeModelReceipt,
   SharedRuntimeControlOwner,
   ThreadSummary,
   ThreadTokenUsage,
@@ -24,6 +26,8 @@ export type ThreadActivityStatus = {
   hasUnread: boolean;
   isReviewing: boolean;
   isContextCompacting?: boolean;
+  /** 后台任务运行中计数（0/undefined = 无）；驱动会话行第四态呼吸灯与计数徽标。 */
+  backgroundTaskRunningCount?: number;
   processingStartedAt: number | null;
   lastDurationMs: number | null;
   heartbeatPulse?: number;
@@ -155,6 +159,13 @@ export type ThreadAction =
   | { type: "markReviewing"; threadId: string; isReviewing: boolean }
   | { type: "markUnread"; threadId: string; hasUnread: boolean }
   | {
+      /** 后台任务 running 计数同步（单订阅 sync diff 后 dispatch）；0 跨越且非活跃线程时收口 hasUnread。 */
+      type: "markBackgroundTaskActivity";
+      workspaceId: string;
+      threadId: string;
+      runningCount: number;
+    }
+  | {
       type: "addAssistantMessage";
       threadId: string;
       text: string;
@@ -197,6 +208,10 @@ export type ThreadAction =
       itemId: string;
       delta: string;
       hasCustomName: boolean;
+      /** Native turn-target 显示条：建壳落地、existing 缺失补；绝不覆盖既有值。 */
+      executionTargetSnapshot?: ExecutionTargetSnapshot;
+      /** 同上：pi 等无回执事件的引擎靠发送时 send.request 记账补 Ⓡ 尾巴。 */
+      runtimeReceipt?: RuntimeModelReceipt;
     }
   | {
       type: "completeAgentMessage";
@@ -206,6 +221,8 @@ export type ThreadAction =
       text: string;
       hasCustomName: boolean;
       timestamp?: number;
+      executionTargetSnapshot?: ExecutionTargetSnapshot;
+      runtimeReceipt?: RuntimeModelReceipt;
     }
   | {
       /**
@@ -223,6 +240,9 @@ export type ThreadAction =
       hasCustomName: boolean;
       timestamp: number;
       isActiveThread: boolean;
+      /** Native turn-target 显示条：终稿合并保留已有值，仅缺失时落地。 */
+      executionTargetSnapshot?: ExecutionTargetSnapshot;
+      runtimeReceipt?: RuntimeModelReceipt;
     }
   | {
       type: "upsertItem";
@@ -267,6 +287,11 @@ export type ThreadAction =
       type: "appendContextCompacted";
       threadId: string;
       turnId: string;
+      /** pi compaction_end 的触发原因；缺失（未知 payload）为 undefined → 落库 null。 */
+      reason?: "threshold" | "overflow" | "manual" | null;
+      tokensBefore?: number | null;
+      estimatedTokensAfter?: number | null;
+      timestampMs?: number;
     }
   | { type: "appendReasoningContent"; threadId: string; itemId: string; delta: string }
   | { type: "dropReasoningItems"; threadId: string }
@@ -313,6 +338,29 @@ export type ThreadAction =
       threadId: string;
     }
   | { type: "setThreadTokenUsage"; threadId: string; tokenUsage: ThreadTokenUsage }
+  | {
+      /** F4（fix-session-switch-jank-red-lines）：hydrate 元数据合批。依序递归应用
+       *  ensureThread → setThreadPlan → setThreadHistoryRestoredAt → setThreadHistoryWindow
+       *  → setThreadTokenUsage（可选），单次状态转移 = 单次根级 commit。 */
+      type: "hydrateThreadHistorySnapshot";
+      workspaceId: string;
+      threadId: string;
+      engine?:
+        | "codex"
+        | "claude"
+        | "gemini"
+        | "grok"
+        | "kimi"
+        | "opencode"
+        | "pi"
+        | "dsh"
+        | "qoder";
+      plan?: TurnPlan | null;
+      historyRestoredAtMs: number | null;
+      historyHasMore: boolean;
+      historyNextCursor: string | null;
+      tokenUsage?: ThreadTokenUsage;
+    }
   | { type: "setThreadSessionStats"; threadId: string; sessionStats: ThreadTokenUsage["sessionStats"] }
   | { type: "setThreadDshTodos"; threadId: string; todos: ThreadTokenUsage["dshTodos"] }
   | {

@@ -46,7 +46,7 @@ export interface PiAuthUiProvider {
   featured: boolean;
 }
 
-/** API Key 组：34 项（github-copilot 仅 OAuth，不在此组） */
+/** API Key 组：36 项（github-copilot 仅 OAuth，不在此组；moonshotai 双区随 pi 0.84.x env map 补录） */
 export const PI_AUTH_APIKEY_PROVIDERS: readonly PiAuthUiProvider[] = [
   { id: "anthropic", name: "Anthropic", iconSrc: anthropicIcon, featured: true },
   { id: "openai", name: "OpenAI", iconSrc: openaiIcon, featured: true },
@@ -58,6 +58,8 @@ export const PI_AUTH_APIKEY_PROVIDERS: readonly PiAuthUiProvider[] = [
   { id: "mistral", name: "Mistral", iconSrc: mistralIcon, featured: true },
   { id: "zai", name: "ZAI Coding Plan", iconSrc: zhipuIcon, featured: true },
   { id: "kimi-coding", name: "Kimi For Coding", iconSrc: kimiIcon, featured: true },
+  { id: "moonshotai", name: "Moonshot AI", iconSrc: null, featured: false },
+  { id: "moonshotai-cn", name: "Moonshot AI (China)", iconSrc: null, featured: false },
   { id: "qwen-token-plan", name: "Qwen Token Plan", iconSrc: qwenIcon, featured: true },
   { id: "minimax", name: "MiniMax", iconSrc: minimaxIcon, featured: true },
   { id: "together", name: "Together AI", iconSrc: togetherIcon, featured: true },

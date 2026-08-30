@@ -1,12 +1,11 @@
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import CheckIcon from 'lucide-react/dist/esm/icons/check';
 import { REASONING_LEVELS, type ReasoningEffort } from '../types';
+import { SelectorOptionRow } from './SelectorOptionRow';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
@@ -94,47 +93,41 @@ export const ReasoningSelect = memo(({
         </DropdownMenuSubTrigger>
         <DropdownMenuSubContent className="composer-tool-menu-sub-content">
           {showDefaultOption && (
-            <button
-              type="button"
-              className={`composer-tool-menu-option${value === null ? ' is-selected' : ''}`}
-              onClick={() => handleSelect(null)}
+            <SelectorOptionRow
+              variant="tool-menu"
+              icon={
+                <span
+                  className="codicon codicon-circle-outline composer-tool-menu-option-icon"
+                  aria-hidden="true"
+                />
+              }
+              label={resolvedDefaultLabel}
+              description={t('reasoning.defaultDescription', {
+                defaultValue: 'Use the engine default reasoning behavior',
+              })}
+              selected={value === null}
               title={t('reasoning.defaultDescription', {
                 defaultValue: 'Use the engine default reasoning behavior',
               })}
-            >
-              <span className="codicon codicon-circle-outline composer-tool-menu-option-icon" aria-hidden="true" />
-              <span className="composer-tool-menu-option-body">
-                <span className="composer-tool-menu-option-label">{resolvedDefaultLabel}</span>
-                <span className="composer-tool-menu-option-description">
-                  {t('reasoning.defaultDescription', {
-                    defaultValue: 'Use the engine default reasoning behavior',
-                  })}
-                </span>
-              </span>
-              {value === null && (
-                <span className="codicon codicon-check composer-tool-menu-option-check" aria-hidden="true" />
-              )}
-            </button>
+              onSelect={() => handleSelect(null)}
+            />
           )}
           {visibleLevels.map((level) => (
-            <button
+            <SelectorOptionRow
               key={level.id}
-              type="button"
-              className={`composer-tool-menu-option${level.id === value ? ' is-selected' : ''}`}
-              onClick={() => handleSelect(level.id)}
+              variant="tool-menu"
+              icon={
+                <span
+                  className={`codicon ${level.icon} composer-tool-menu-option-icon`}
+                  aria-hidden="true"
+                />
+              }
+              label={getReasoningText(level.id, 'label')}
+              description={getReasoningText(level.id, 'description')}
+              selected={level.id === value}
               title={getReasoningText(level.id, 'description')}
-            >
-              <span className={`codicon ${level.icon} composer-tool-menu-option-icon`} aria-hidden="true" />
-              <span className="composer-tool-menu-option-body">
-                <span className="composer-tool-menu-option-label">{getReasoningText(level.id, 'label')}</span>
-                <span className="composer-tool-menu-option-description">
-                  {getReasoningText(level.id, 'description')}
-                </span>
-              </span>
-              {level.id === value && (
-                <span className="codicon codicon-check composer-tool-menu-option-check" aria-hidden="true" />
-              )}
-            </button>
+              onSelect={() => handleSelect(level.id)}
+            />
           ))}
         </DropdownMenuSubContent>
       </DropdownMenuSub>
@@ -167,51 +160,43 @@ export const ReasoningSelect = memo(({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="top" sideOffset={4} className="w-64">
           {showDefaultOption && (
-            <DropdownMenuItem
-              data-reasoning-id="default"
-              data-selected={value === null ? 'true' : undefined}
-              onSelect={(event) => {
-                event.preventDefault();
-                handleSelect(null);
-              }}
+            <SelectorOptionRow
+              variant="dropdown"
+              dataAttrs={{ 'data-reasoning-id': 'default' }}
+              icon={
+                <span
+                  className="codicon codicon-circle-outline mt-0.5 shrink-0"
+                  aria-hidden="true"
+                />
+              }
+              label={resolvedDefaultLabel}
+              description={t('reasoning.defaultDescription', {
+                defaultValue: 'Use the engine default reasoning behavior',
+              })}
+              selected={value === null}
               title={t('reasoning.defaultDescription', {
                 defaultValue: 'Use the engine default reasoning behavior',
               })}
-              className="items-start gap-2"
-            >
-              <span className="codicon codicon-circle-outline mt-0.5 shrink-0" aria-hidden="true" />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm font-medium">{resolvedDefaultLabel}</span>
-                <span className="text-xs text-muted-foreground whitespace-normal">
-                  {t('reasoning.defaultDescription', {
-                    defaultValue: 'Use the engine default reasoning behavior',
-                  })}
-                </span>
-              </div>
-              {value === null && <CheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden />}
-            </DropdownMenuItem>
+              onSelect={() => handleSelect(null)}
+            />
           )}
           {visibleLevels.map((level) => (
-            <DropdownMenuItem
+            <SelectorOptionRow
               key={level.id}
-              data-reasoning-id={level.id}
-              data-selected={level.id === value ? 'true' : undefined}
-              onSelect={(event) => {
-                event.preventDefault();
-                handleSelect(level.id);
-              }}
+              variant="dropdown"
+              dataAttrs={{ 'data-reasoning-id': level.id }}
+              icon={
+                <span
+                  className={`codicon ${level.icon} mt-0.5 shrink-0`}
+                  aria-hidden="true"
+                />
+              }
+              label={getReasoningText(level.id, 'label')}
+              description={getReasoningText(level.id, 'description')}
+              selected={level.id === value}
               title={getReasoningText(level.id, 'description')}
-              className="items-start gap-2"
-            >
-              <span className={`codicon ${level.icon} mt-0.5 shrink-0`} aria-hidden="true" />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm font-medium">{getReasoningText(level.id, 'label')}</span>
-                <span className="text-xs text-muted-foreground whitespace-normal">
-                  {getReasoningText(level.id, 'description')}
-                </span>
-              </div>
-              {level.id === value && <CheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden />}
-            </DropdownMenuItem>
+              onSelect={() => handleSelect(level.id)}
+            />
           ))}
         </DropdownMenuContent>
       </DropdownMenu>

@@ -457,7 +457,10 @@ describe("toSharedConversationItems", () => {
       }),
     ]);
     expect(result[0]).toMatchObject({ kind: "message", role: "assistant" });
-    expect(result[0]?.engineSource).toBeUndefined();
+    const first = result[0];
+    expect(
+      first && first.kind === "message" ? (first.engineSource ?? null) : null,
+    ).toBeNull();
   });
 
   it("does not mutate input and preserves order", () => {

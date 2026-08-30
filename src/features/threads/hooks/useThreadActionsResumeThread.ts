@@ -43,10 +43,16 @@ import { hydrateBackgroundTasksFromHistory } from "../../messages/utils/backgrou
 import { parseQoderHistoryMessages } from "../loaders/qoderHistoryParser";
 import { parseQoderSessionIdentity } from "../utils/qoderSessionIdentity";
 import {
+  createHydrateHistoryWorkingSet,
   hydrateHistory,
+  hydrateItemsIntoWorkingSet,
   mergeHistoryProjectionItems,
 } from "../assembly/conversationAssembler";
 import { asString } from "../utils/threadNormalize";
+import {
+  appendRendererDiagnostic,
+  hashDiagnosticText,
+} from "../../../services/rendererDiagnostics";
 import { mergeHydratedItemsPreservePrefix } from "../utils/mergeHydratedItemsPreservePrefix";
 import {
   collectKnownCodexThreadIds,
@@ -83,6 +89,7 @@ import {
 } from "../utils/stabilityDiagnostics";
 import { isClaudeForkThreadId } from "../utils/claudeForkThread";
 import { createThreadHistoryLoaderForThread } from "./useThreadActions.historyLoaderFactory";
+import { parseDshHostDownError } from "../../vendors/utils/dshHostStatus";
 import {
   RELATED_THREAD_LOAD_CONCURRENCY,
   THREAD_LIST_LOAD_OLDER_PAGE_SIZE,
@@ -133,6 +140,10 @@ export type ResumeThreadForWorkspaceOptions = {
    */
   mergeHydratedPrefix?: boolean;
 };
+
+// harden-pi-session-curtain-fidelity：pi load 连续失败达上限后置 loaded
+// 停止自动重试，防止会话文件永久缺失时每次切回都全量扫盘。
+const PI_HISTORY_LOAD_MAX_ATTEMPTS = 3;
 
 type ResumeThreadForWorkspaceContext = UseThreadActionsOptions & {
   reconcileMissingClaudeThread: (
@@ -196,6 +207,10 @@ export function useThreadActionsResumeThreadForWorkspace(
   } = deps;
   const resumeRequestGenerationByScopeRef = useRef<Record<string, number>>({});
   const automaticRecoveryFailedByScopeRef = useRef<Record<string, true>>({});
+  // harden-pi-session-curtain-fidelity：pi load 失败重试计数（按线程）。
+  const piHistoryLoadFailureCountByThreadRef = useRef<Record<string, number>>(
+    {},
+  );
   // Late Shared projection merge must read the live canvas, not resume-start snapshot.
   const itemsByThreadRef = useRef(itemsByThread);
   itemsByThreadRef.current = itemsByThread;
@@ -360,9 +375,28 @@ export function useThreadActionsResumeThreadForWorkspace(
         // fix-claude-history-window-message-loss：post-turn reconcile（force+replace）
         // 的 hydrated window 只覆盖尾部，整体替换会裁掉窗口之外已展示的旧消息。
         // preserve-prefix merge：锚点对齐保留前缀；无法对齐时回退信任磁盘。
-        const effectiveItems = mergeHydratedPrefix
-          ? mergeHydratedItemsPreservePrefix(localItems, items)
-          : items;
+        let effectiveItems = items;
+        if (mergeHydratedPrefix) {
+          const merged = mergeHydratedItemsPreservePrefix(localItems, items);
+          // harden-pi-session-curtain-fidelity：锚点 miss 时 merge 返回
+          // hydrated 原引用（回退信任磁盘整体替换）。这是「吞」感知的
+          // 高危路径，打点留痕供 debug 面板归因；纯观测，不改合并结果。
+          if (localItems.length > 0 && merged === items) {
+            onDebug?.({
+              id: `${Date.now()}-client-hydrated-anchor-miss-fallback`,
+              timestamp: Date.now(),
+              source: "client",
+              label: "thread/hydrated merge anchor-miss fallback-to-disk",
+              payload: {
+                workspaceId,
+                threadId: targetThreadId,
+                itemCountBefore: localItems.length,
+                itemCountAfter: merged.length,
+              },
+            });
+          }
+          effectiveItems = merged;
+        }
         const result = await dispatchThreadItemsProgressively(
           dispatch,
           targetThreadId,
@@ -373,7 +407,7 @@ export function useThreadActionsResumeThreadForWorkspace(
           },
         );
         if (!isCurrentResumeRequest()) {
-          return false;
+          return null;
         }
         if (result.remainingOlderCount > 0) {
           rememberFullHistoryForWindow(
@@ -384,7 +418,9 @@ export function useThreadActionsResumeThreadForWorkspace(
         } else {
           clearPendingOlderHistory(targetThreadId);
         }
-        return true;
+        // F4（enhance-perf-diagnostics-evidence）：返回 dispatch 结果供
+        // perf.thread-switch 计时证据使用（null = 请求失效）。
+        return result;
       };
       const localItems = itemsByThread[threadId] ?? [];
       if (isPendingThreadId(threadId) || isClaudeForkThreadId(threadId)) {
@@ -517,8 +553,12 @@ export function useThreadActionsResumeThreadForWorkspace(
           options?: { mode?: "tail-first" | "atomic" },
         ) => Promise<boolean> = async () => false;
 
-        const createHistoryLoader = (targetThreadId: string) =>
-          createThreadHistoryLoaderForThread({
+        // F4（enhance-perf-diagnostics-evidence）：loader 发起时刻，供
+        // perf.thread-switch 计时（loader 发起 → items 落库）。首份证据消费后清除。
+        const loaderStartedAtMsByThread: Record<string, number> = {};
+
+        const createHistoryLoader = (targetThreadId: string) => {
+          const loader = createThreadHistoryLoaderForThread({
             targetThreadId,
             workspaceId,
             workspacePath:
@@ -619,6 +659,18 @@ export function useThreadActionsResumeThreadForWorkspace(
               );
             },
           });
+          return {
+            load: async (
+              ...loadArgs: Parameters<typeof loader.load>
+            ) => {
+              loaderStartedAtMsByThread[targetThreadId] =
+                typeof performance !== "undefined"
+                  ? performance.now()
+                  : Date.now();
+              return loader.load(...loadArgs);
+            },
+          };
+        };
         hydrateHistorySnapshot = async (
           effectiveThreadId: string,
           snapshot: Awaited<
@@ -629,18 +681,47 @@ export function useThreadActionsResumeThreadForWorkspace(
           if (!isCurrentResumeRequest()) {
             return false;
           }
-          const assembledSnapshot = hydrateHistory(snapshot);
+          // F4 分段计时（enhance 续）：区分「resolve+load+桥转换」与「前端组装」。
+          const ipcCompletedAtMs =
+            typeof performance !== "undefined"
+              ? performance.now()
+              : Date.now();
+          // 组装段（fix-session-load-bridge-freeze）：只同步组装尾部窗口
+          // （首屏 shown=300 + 预备 prepend 余量），2140 条大会话的首屏组装从
+          // ~3s 降到数百 ms；窗口外的更早消息在首屏上屏后分片渐进组装，
+          // 完成后并入 pendingOlderHistory（「更早/All」语义不变）。
+          const TAIL_ASSEMBLE_WINDOW = 400;
+          const rawHistoryItems = snapshot.items;
+          const tailRaw =
+            rawHistoryItems.length > TAIL_ASSEMBLE_WINDOW
+              ? rawHistoryItems.slice(
+                  rawHistoryItems.length - TAIL_ASSEMBLE_WINDOW,
+                )
+              : rawHistoryItems;
+          const remainderRaw =
+            rawHistoryItems.length > TAIL_ASSEMBLE_WINDOW
+              ? rawHistoryItems.slice(
+                  0,
+                  rawHistoryItems.length - TAIL_ASSEMBLE_WINDOW,
+                )
+              : [];
+          const assembledSnapshot = hydrateHistory({
+            ...snapshot,
+            items: tailRaw,
+          });
+          const assembledAtMs =
+            typeof performance !== "undefined"
+              ? performance.now()
+              : Date.now();
           const snapshotItems = assembledSnapshot.items;
           const effectiveLocalItems =
             effectiveThreadId === threadId
               ? localItems
               : (itemsByThread[effectiveThreadId] ?? []);
-          dispatch({
-            type: "ensureThread",
-            workspaceId,
-            threadId: effectiveThreadId,
-            engine: assembledSnapshot.meta.engine,
-          });
+          // F4（fix-session-switch-jank-red-lines）：ensureThread 不再在 curtain
+          // yield 前单独 dispatch（那会让侧栏/全树为 curtain 多付一次根级 commit），
+          // 改为合入 applyHydratedItems 之后的 hydrateThreadHistorySnapshot 组合
+          // action，与 items/元数据同 commit 上屏。
           if (snapshot.fallbackWarnings.length > 0) {
             const partialHistoryDiagnostic = buildPartialHistoryDiagnostic(
               snapshot.fallbackWarnings
@@ -710,27 +791,81 @@ export function useThreadActionsResumeThreadForWorkspace(
           if (!applied) {
             return false;
           }
+          // F4：ensure + plan + restoredAt + window + tokenUsage 单次状态转移，
+          // 与上面的 items dispatch 同宏任务 → 同一次根级 commit。
           dispatch({
-            type: "setThreadPlan",
+            type: "hydrateThreadHistorySnapshot",
+            workspaceId,
             threadId: effectiveThreadId,
+            engine: assembledSnapshot.meta.engine,
             plan: assembledSnapshot.plan,
+            historyRestoredAtMs: assembledSnapshot.meta.historyRestoredAtMs,
+            historyHasMore: assembledSnapshot.meta.historyHasMore === true,
+            historyNextCursor: assembledSnapshot.meta.historyNextCursor ?? null,
+            tokenUsage: snapshot.tokenUsage ?? undefined,
           });
-          dispatch({
-            type: "setThreadHistoryRestoredAt",
-            threadId: effectiveThreadId,
-            timestamp: assembledSnapshot.meta.historyRestoredAtMs,
-          });
-          dispatch({
-            type: "setThreadHistoryWindow",
-            threadId: effectiveThreadId,
-            hasMore: assembledSnapshot.meta.historyHasMore === true,
-            nextCursor: assembledSnapshot.meta.historyNextCursor ?? null,
-          });
-          if (snapshot.tokenUsage) {
-            dispatch({
-              type: "setThreadTokenUsage",
-              threadId: effectiveThreadId,
-              tokenUsage: snapshot.tokenUsage,
+          // F4（enhance-perf-diagnostics-evidence）：切会话计时证据。loader 发起 →
+          // items 落库（本组合 action）耗时；threadId 以短哈希落盘（隐私口径）。
+          // 首份证据消费后清掉起点，同一 resume 的后续 merge 不重复计时。
+          if (remainderRaw.length > 0) {
+            const remainderForBackground = remainderRaw;
+            const backgroundThreadId = effectiveThreadId;
+            const backgroundEngine = assembledSnapshot.meta.engine;
+            const tailItems = snapshotItems;
+            const displayedCount = applied?.displayedCount ?? tailItems.length;
+            void (async () => {
+              const workingSet = createHydrateHistoryWorkingSet();
+              const chunkSize = 150;
+              for (
+                let offset = 0;
+                offset < remainderForBackground.length;
+                offset += chunkSize
+              ) {
+                if (!isCurrentResumeRequest()) {
+                  return;
+                }
+                hydrateItemsIntoWorkingSet(
+                  workingSet,
+                  remainderForBackground.slice(offset, offset + chunkSize),
+                  {
+                    engine: backgroundEngine,
+                    threadId: backgroundThreadId,
+                  },
+                );
+                // 每片之间让出主线程（setTimeout 全栈可用，Win WebView2 / WKWebView 一致）
+                await new Promise((resolve) => {
+                  setTimeout(resolve, 0);
+                });
+              }
+              if (!isCurrentResumeRequest()) {
+                return;
+              }
+              // 已组装余量并入 pendingOlderHistory：「更早/All」消费语义不变
+              rememberFullHistoryForWindow(
+                backgroundThreadId,
+                [...workingSet.items, ...tailItems],
+                displayedCount,
+              );
+            })();
+          }
+          const loaderStartedAtMs = loaderStartedAtMsByThread[effectiveThreadId];
+          if (typeof loaderStartedAtMs === "number") {
+            delete loaderStartedAtMsByThread[effectiveThreadId];
+            const completedAtMs =
+              typeof performance !== "undefined"
+                ? performance.now()
+                : Date.now();
+            const durationMs = completedAtMs - loaderStartedAtMs;
+            appendRendererDiagnostic("perf.thread-switch", {
+              durationMs: Math.round(durationMs),
+              loadMs: Math.round(ipcCompletedAtMs - loaderStartedAtMs),
+              assembleMs: Math.round(assembledAtMs - ipcCompletedAtMs),
+              itemCount: snapshotItems.length,
+              displayedCount: applied?.displayedCount ?? snapshotItems.length,
+              mode: options?.mode ?? "tail-first",
+              engineSource: assembledSnapshot.meta.engine ?? null,
+              threadIdHash: hashDiagnosticText(effectiveThreadId),
+              fallbackWarningCount: snapshot.fallbackWarnings.length,
             });
           }
           onDebug?.(
@@ -1227,6 +1362,26 @@ export function useThreadActionsResumeThreadForWorkspace(
             return threadId;
           }
           if (threadId.startsWith("shared:")) {
+            // F4（perf-cold-start-click-storm-convergence）：宿主熔断 Down 是
+            // 不可重试信号——记单条 down 状态事件，不计入 loader error 刷屏。
+            const downSignal = parseDshHostDownError(error);
+            if (downSignal) {
+              onDebug?.({
+                id: `${Date.now()}-dsh-host-down`,
+                timestamp: Date.now(),
+                source: "client",
+                label: "thread/dsh host down",
+                payload: {
+                  workspaceId,
+                  threadId,
+                  reason: downSignal.reason,
+                  retryAfterMs: downSignal.retryAfterMs,
+                },
+              });
+              setThreadLoaded(threadId, false);
+              setThreadHistoryRecoveryFailed(threadId, false);
+              return threadId;
+            }
             const diagnostic =
               error instanceof Error
                 ? resolveThreadStabilityDiagnostic(error.message)
@@ -1347,6 +1502,24 @@ export function useThreadActionsResumeThreadForWorkspace(
                 },
               });
             }
+          }
+          // F4：宿主熔断 Down 不可重试，也不落 legacy fallback（同宿主注定再败）。
+          const downSignal = parseDshHostDownError(error);
+          if (downSignal) {
+            onDebug?.({
+              id: `${Date.now()}-dsh-host-down`,
+              timestamp: Date.now(),
+              source: "client",
+              label: "thread/dsh host down",
+              payload: {
+                workspaceId,
+                threadId,
+                reason: downSignal.reason,
+                retryAfterMs: downSignal.retryAfterMs,
+              },
+            });
+            setThreadLoaded(threadId, false);
+            return threadId;
           }
           const stabilityDiagnostic =
             error instanceof Error
@@ -1810,11 +1983,44 @@ export function useThreadActionsResumeThreadForWorkspace(
               threadId,
               timestamp: Date.now(),
             });
+            delete piHistoryLoadFailureCountByThreadRef.current[threadId];
           } catch {
-            // Failed to load PI session history — not fatal
+            // harden-pi-session-curtain-fidelity：load 失败不再无条件置
+            // loaded——置位会阻止 20s 切回 refresh 与下次选中重试，形成
+            // 「吞了刷新也回不来」的 sticky 丢失。降级记录只打 debug entry
+            //（不走 markHistoryRecoveryFailure：那会置 automatic-recovery-
+            // failed 拦截后续 resume，关死重试通道）；连续失败达上限后置
+            // loaded 防风暴。
+            const failureCount =
+              (piHistoryLoadFailureCountByThreadRef.current[threadId] ?? 0) + 1;
+            piHistoryLoadFailureCountByThreadRef.current[threadId] =
+              failureCount;
+            onDebug?.(
+              createThreadHistoryReadableSurfaceDebugEntry({
+                workspaceId,
+                threadId,
+                sourceThreadId: threadId,
+                reopenOutcome:
+                  (itemsByThread[threadId]?.length ?? 0) > 0
+                    ? "degraded-readable"
+                    : "failed",
+                reasonCode:
+                  (itemsByThread[threadId]?.length ?? 0) > 0
+                    ? "last-good-local-items-preserved"
+                    : "pi-history-load-failed",
+                localItemCount: itemsByThread[threadId]?.length ?? 0,
+                snapshotItemCount: 0,
+                fallbackWarningCount: failureCount,
+              }),
+            );
+            if (failureCount >= PI_HISTORY_LOAD_MAX_ATTEMPTS) {
+              setThreadLoaded(threadId, true);
+            }
           }
         }
-        loadedThreadsRef.current[threadId] = true;
+        if (!piHistoryLoadFailureCountByThreadRef.current[threadId]) {
+          loadedThreadsRef.current[threadId] = true;
+        }
         return threadId;
       }
       if (threadId.startsWith("qoder:")) {

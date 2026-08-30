@@ -385,6 +385,108 @@ function clipDiagnosticString(value: string, maxLength: number): string {
   return `${withoutControls.slice(0, maxLength)}…`;
 }
 
+// 与 features/files/utils/fileMarkdownDocument 的 hashStableString 同算法
+// （31 乘子 + base36），保证 fast-markdown-worker 崩溃指纹与这里同指纹空间。
+// 本地实现避免 services → features 的反向依赖。
+export function hashDiagnosticText(text: string): string {
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+export type DiagnosticErrorAttribution = {
+  errorName: string;
+  messageHash: string;
+  messageLength: number;
+};
+
+/**
+ * F1/F2（enhance-perf-diagnostics-evidence）：错误的结构化归因字段。
+ * 字段名刻意避开 isSensitiveDiagnosticField 的内容 token（message/error/reason…），
+ * 使「错误构造名 + 文本指纹」能过持久化 sanitize 存活；错误文本本体仍脱敏、
+ * 完整文本只进 console。
+ */
+export function buildDiagnosticErrorAttribution(
+  error: unknown,
+): DiagnosticErrorAttribution {
+  if (error instanceof Error) {
+    const message = error.message || error.name || "Error";
+    return {
+      errorName: error.name || "Error",
+      messageHash: hashDiagnosticText(message),
+      messageLength: message.length,
+    };
+  }
+  const text = error == null ? "unknown" : String(error);
+  return {
+    errorName: "Error",
+    messageHash: hashDiagnosticText(text),
+    messageLength: text.length,
+  };
+}
+
+const MAX_DIAGNOSTIC_COMPONENT_FRAMES = 12;
+
+/** fix-diagnostics-forensics-hardening：stack 行数计数（区分 stack 为空与格式不匹配）。 */
+/** 抛错位置证据：模块 basename + 行列（filename 本体仍脱敏，不落完整 URL）。 */
+export function buildDiagnosticSourceLocation(
+  filename: string | null | undefined,
+  line: number | null | undefined,
+  column: number | null | undefined,
+): { sourceModule: string | null; sourceLine: number | null; sourceCol: number | null } {
+  let sourceModule: string | null = null;
+  if (typeof filename === "string" && filename.trim().length > 0) {
+    const withoutQuery = filename.split("?")[0] ?? "";
+    const segments = withoutQuery.split("/").filter(Boolean);
+    sourceModule = clipDiagnosticString(segments[segments.length - 1] ?? "", 64) || null;
+  }
+  return {
+    sourceModule,
+    sourceLine: typeof line === "number" && Number.isFinite(line) ? line : null,
+    sourceCol:
+      typeof column === "number" && Number.isFinite(column) ? column : null,
+  };
+}
+
+export function countDiagnosticStackLines(
+  componentStack: string | null | undefined,
+): number {
+  if (!componentStack || typeof componentStack !== "string") {
+    return 0;
+  }
+  return componentStack
+    .split("\n")
+    .filter((line) => line.trim().length > 0).length;
+}
+
+/**
+ * componentStack → 组件名数组（≤12 帧、每帧 clip 32）。组件名是代码标识符、
+ * 不含用户内容，字段名 `componentFrames` 避开内容 token，sanitize 后存活。
+ */
+export function buildDiagnosticComponentFrames(
+  componentStack: string | null | undefined,
+): string[] {
+  if (!componentStack || typeof componentStack !== "string") {
+    return [];
+  }
+  const frames: string[] = [];
+  // fix-diagnostics-forensics-hardening：无 displayName 组件输出 `at <anonymous>`
+  // （尖括号 token），旧正则整帧丢弃——真机 7/7 次 error-boundary frames=[] 即此。
+  // 命名帧与匿名帧都收，匿名统一记 "anonymous"。
+  const framePattern = /\bat\s+(?:<([A-Za-z0-9_$-]+)>|([A-Za-z0-9_$]+))/g;
+  let match: RegExpExecArray | null;
+  while ((match = framePattern.exec(componentStack)) !== null) {
+    const frameName = match[1] !== undefined ? "anonymous" : match[2];
+    frames.push(clipDiagnosticString(frameName ?? "", 32));
+    if (frames.length >= MAX_DIAGNOSTIC_COMPONENT_FRAMES) {
+      break;
+    }
+  }
+  return frames;
+}
+
 function sanitizeDiagnosticValue(
   value: unknown,
   fieldName: string,
@@ -867,6 +969,53 @@ export function appendRendererDiagnostic(
   payload: Record<string, unknown> = {},
 ) {
   appendRendererDiagnosticEntry(label, payload, false);
+}
+
+/**
+ * 关键路径标记（创建会话/抽屉开关/卡死 watchdog）走 immediate：绕过 30s 节流
+ * 立即落盘。节流窗口内的条目在「冻结后强退」时全部丢失，恰恰丢的是最需要
+ * 的现场（2026-08-29 创建会话卡死排查教训）。
+ */
+export function appendRendererDiagnosticImmediate(
+  label: string,
+  payload: Record<string, unknown> = {},
+) {
+  appendRendererDiagnosticEntry(label, payload, true);
+}
+
+/**
+ * JS 主线程停摆看门狗：1s 心跳，发现心跳间隔超过阈值即记录 stall 长度。
+ * 冻结期间写不进日志没关系——恢复后的第一条 stall 记录会带上冻结时长，
+ * 并触发一次 immediate 持久化，把「卡了多久、卡在什么之后」留档。
+ */
+export function installMainThreadStallWatchdog(
+  stallThresholdMs = 2_000,
+): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const w = window as typeof window & {
+    __ccguiStallWatchdogInstalled?: boolean;
+    __ccguiStallLastBeatMs?: number;
+  };
+  if (w.__ccguiStallWatchdogInstalled) {
+    return;
+  }
+  w.__ccguiStallWatchdogInstalled = true;
+  w.__ccguiStallLastBeatMs = Date.now();
+  window.setInterval(() => {
+    const now = Date.now();
+    const last = w.__ccguiStallLastBeatMs ?? now;
+    w.__ccguiStallLastBeatMs = now;
+    const gapMs = now - last;
+    if (gapMs >= stallThresholdMs) {
+      appendRendererDiagnosticEntry(
+        "perf.main-thread-stall",
+        { gapMs },
+        true,
+      );
+    }
+  }, 1_000);
 }
 
 /**
@@ -1736,15 +1885,22 @@ export function installRendererLifecycleDiagnostics() {
         lineno: event.lineno,
         colno: event.colno,
         error: formatUnknown(event.error),
+        // F2（enhance-perf-diagnostics-evidence）：结构化归因（文本本体仍脱敏）
+        ...buildDiagnosticErrorAttribution(event.error ?? event.message),
+        // fix-diagnostics-forensics-hardening：抛错模块定位（basename 无用户内容）
+        ...buildDiagnosticSourceLocation(event.filename, event.lineno, event.colno),
       }),
     );
-  });
-
-  window.addEventListener("unhandledrejection", (event) => {
+  });  window.addEventListener("unhandledrejection", (event) => {
+    const attribution = buildDiagnosticErrorAttribution(event.reason);
     appendRendererDiagnostic(
       "window/unhandledrejection",
       collectWindowSnapshot({
         reason: formatUnknown(event.reason),
+        // F2：结构化归因（reason 文本本体仍脱敏）
+        reasonName: attribution.errorName,
+        reasonHash: attribution.messageHash,
+        reasonLength: attribution.messageLength,
       }),
     );
   });

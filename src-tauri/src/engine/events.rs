@@ -1100,6 +1100,12 @@ pub fn engine_event_to_app_server_event_with_turn_context(
                                 "method": "thread/compacted",
                                 "params": {
                                     "threadId": thread_id,
+                                    // 透传 pi 的触发原因（threshold/overflow/manual）供留痕区分
+                                    // 自动/手动；缺失时置 null，不伪造取值。
+                                    "reason": payload
+                                        .get("reason")
+                                        .cloned()
+                                        .unwrap_or(Value::Null),
                                     "tokensBefore": result.get("tokensBefore").cloned().unwrap_or(Value::Null),
                                     "estimatedTokensAfter": result.get("estimatedTokensAfter").cloned().unwrap_or(Value::Null),
                                     "firstKeptEntryId": result.get("firstKeptEntryId").cloned().unwrap_or(Value::Null),
@@ -1126,6 +1132,23 @@ pub fn engine_event_to_app_server_event_with_turn_context(
                     }
                 }
             } else {
+                // pi：agent_settled 生命周期标记 → thread/runSettled 信号。
+                // pi 的 run 含多个原生 turn，每 turn 一次 turn/completed 会让
+                // 完成音等「整轮结束」语义连响；整轮粒度的消费者监听本信号。
+                if matches!(engine, EngineType::Pi)
+                    && data.get("kind").and_then(Value::as_str) == Some("agent_settled")
+                {
+                    return Some(AppServerEvent {
+                        workspace_id,
+                        message: json!({
+                            "method": "thread/runSettled",
+                            "params": {
+                                "threadId": thread_id,
+                                "turnId": turn_id_context.unwrap_or(""),
+                            }
+                        }),
+                    });
+                }
                 let mut params = match data {
                     Value::Object(map) => map.clone(),
                     _ => {
@@ -1291,7 +1314,60 @@ mod tests {
         )
         .expect("compaction_end should map");
         assert_eq!(event.message["method"], "thread/compacted");
+        assert_eq!(event.message["params"]["reason"], "manual");
         assert_eq!(event.message["params"]["tokensBefore"], 150000);
+        assert_eq!(event.message["params"]["estimatedTokensAfter"], 32000);
+
+        // auto-compaction（threshold）必须透传 reason，前端留痕才能区分自动/手动
+        let auto_end = EngineEvent::Raw {
+            workspace_id: "ws".to_string(),
+            engine: EngineType::Pi,
+            data: json!({
+                "source": "pi_rpc",
+                "kind": "compaction_end",
+                "payload": {
+                    "type": "compaction_end",
+                    "reason": "threshold",
+                    "aborted": false,
+                    "result": {"tokensBefore": 236505, "estimatedTokensAfter": 41200},
+                },
+            }),
+        };
+        let event = engine_event_to_app_server_event_with_turn_context(
+            &auto_end,
+            "pi:s1",
+            "item-1",
+            Some("turn-1"),
+        )
+        .expect("auto compaction_end should map");
+        assert_eq!(event.message["method"], "thread/compacted");
+        assert_eq!(event.message["params"]["reason"], "threshold");
+        assert_eq!(event.message["params"]["tokensBefore"], 236505);
+        assert_eq!(event.message["params"]["estimatedTokensAfter"], 41200);
+
+        // payload 缺 reason 时必须为 null，不伪造 "manual"
+        let reasonless_end = EngineEvent::Raw {
+            workspace_id: "ws".to_string(),
+            engine: EngineType::Pi,
+            data: json!({
+                "source": "pi_rpc",
+                "kind": "compaction_end",
+                "payload": {
+                    "type": "compaction_end",
+                    "aborted": false,
+                    "result": {"tokensBefore": 1000, "estimatedTokensAfter": 200},
+                },
+            }),
+        };
+        let event = engine_event_to_app_server_event_with_turn_context(
+            &reasonless_end,
+            "pi:s1",
+            "item-1",
+            Some("turn-1"),
+        )
+        .expect("reasonless compaction_end should map");
+        assert_eq!(event.message["method"], "thread/compacted");
+        assert_eq!(event.message["params"]["reason"], Value::Null);
 
         let failed = EngineEvent::Raw {
             workspace_id: "ws".to_string(),

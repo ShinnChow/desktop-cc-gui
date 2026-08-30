@@ -84,16 +84,27 @@ vi.mock("../../../services/tauri", () => ({
   writeWorkspaceFile: vi.fn(),
 }));
 
-vi.mock("../../../utils/threadItems", () => ({
-  buildItemsFromThread: vi.fn(),
-  extractClaudeApprovalResumeEntries: vi.fn(() => []),
-  getThreadTimestamp: vi.fn(),
-  isReviewingFromThread: vi.fn(),
-  mergeThreadItems: vi.fn(),
-  normalizeItem: vi.fn((item: ConversationItem) => item),
-  previewThreadName: vi.fn(),
-  stripClaudeApprovalResumeArtifacts: vi.fn((text: string) => text),
-}));
+vi.mock("../../../utils/threadItems", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("../../../utils/threadItems")
+  >();
+  return {
+    buildItemsFromThread: vi.fn(),
+    extractClaudeApprovalResumeEntries: vi.fn(() => []),
+    getThreadTimestamp: vi.fn(),
+    isReviewingFromThread: vi.fn(),
+    mergeThreadItems: vi.fn(),
+    normalizeItem: vi.fn((item: ConversationItem) => item),
+    previewThreadName: vi.fn(),
+    stripClaudeApprovalResumeArtifacts: vi.fn((text: string) => text),
+    // harden-pi-session-curtain-fidelity：原生历史 parse（pi/qoder 等）
+    // 依赖真实 item builder；此前 mock 缺失导致 parse 在测试环境必抛，
+    // pi 成功路径永远走 catch、被旧 catch 的无条件置 loaded 掩盖。
+    buildConversationItem: actual.buildConversationItem,
+    buildConversationItemFromThreadItem:
+      actual.buildConversationItemFromThreadItem,
+  };
+});
 
 vi.mock("../utils/threadStorage", () => ({
   makeCustomNameKey: (workspaceId: string, threadId: string) =>
@@ -110,6 +121,18 @@ vi.mock("../../../services/globalRuntimeNotices", async () => {
     "../../../services/globalRuntimeNotices",
   );
   return actual;
+});
+
+// F4（enhance-perf-diagnostics-evidence）：perf.thread-switch 证据走
+// appendRendererDiagnostic；spy 掉避免真实落盘，同时供断言。
+export const appendRendererDiagnosticMock = vi.fn();
+vi.mock("../../../services/rendererDiagnostics", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../services/rendererDiagnostics")>();
+  return {
+    ...actual,
+    appendRendererDiagnostic: appendRendererDiagnosticMock,
+  };
 });
 
 export function resetUseThreadActionsTestMocks() {

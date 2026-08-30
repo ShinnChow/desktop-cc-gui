@@ -24,13 +24,13 @@
 
 ## What Changes
 
-- **F1 orphan run 承接外部 turn（pump 层）**：`agent_start` 到达且本 resident 无 run 时创建 orphan run（合成 main turn id、`orphan: true` 标记、dropped-rx waiter），承接事件流并累积 `response_text`；`agent_settled` 按既有逻辑结算（含 `get_last_assistant_text` 回填）。orphan run 的事件发往合成 turn id，被 daemon forwarder 按 turn_id 过滤天然丢弃，不污染任何真实会话 UI。
-- **F2 发送判据放宽 + 收养（send 层）**：steer/prompt 判据从 `run.is_some()` 放宽为 `run.is_some() || client.is_streaming()`；发送前置检查同步放宽（streaming 时跳过 align/reconcile，防止 mid-turn 切会话/换模型）。steer attach 时 run 缺失则补 orphan run；首个 attach 到 orphan run 的真实 turn **收养主流**：成为 main turn、即时回放已缓冲文本、settle 取得完整 `response_text`（`settle_rpc_run` 的 main 判定从 `index == 0` 改为 `turn_id == main_turn_id`）。
+- **F1 orphan run 承接外部 turn（pump 层）**：`agent_start` 到达且本 resident 无 run 时创建 orphan run（合成 main turn id、`orphan: true` 标记、dropped-rx waiter），承接事件流并累积 `response_text`；`agent_settled` 按既有逻辑结算（含 `get_last_assistant_text` 回填）。daemon 仅放行与待处理后台任务对应的外部 turn，并按 native turn ID 投影，陌生外部 turn 仍丢弃。
+- **F2 发送判据放宽 + 原生 turn 绑定（send 层）**：steer/prompt 判据从 `run.is_some()` 放宽为 `run.is_some() || client.is_streaming()`；发送前置检查同步放宽（streaming 时跳过 align/reconcile，防止 mid-turn 切会话/换模型）。steer attach 时 run 缺失则补 orphan run；真实 turn ID 进入 pending 队列，在下一个原生 `turn_start` 到达时绑定，外部 turn 的正文不得跨 turn 收养或回放。
 - **F3 busy 错误自动转 steer（兜底）**：idle 判定后发出的 `prompt` 被 pi 以「already processing」拒绝时（判定与到达之间的残余竞态），自动改用 `steer` 重投同一条消息一次并按 F2 attach 结算，不再向用户暴露「pi rpc prompt failed: Agent is already processing」。非 busy 类 prompt 错误维持原样报错不重试。
 - **F4 守卫同步**：`align_rpc_session` 的拒绝切会话条件与 `rpc_has_active_run_for` 增加 `|| client.is_streaming()`。
 
 ## Impact
 
 - Affected specs: `pi-rpc-session-runtime`（MODIFIED「发送语义 MUST 区分 idle prompt 与 streaming steer」）。
-- Affected code: `src-tauri/src/engine/pi.rs`（pump / send / settle / 守卫 + 单测）。不动 daemon、不动前端、不动 `pi_rpc.rs`（steer 命令已存在）。
-- 行为变化：外部 turn 期间用户发送从「硬失败」变为「steer 融合进当前 turn 并拿到完整回复」；纯外部 turn（无用户插话）的流式内容仍不实时上屏（daemon turn_id 过滤），历史刷新后可见——与今天一致，无回归。
+- Affected code: `src-tauri/src/engine/pi.rs`（pump / send / settle / 守卫 + 单测）、`src-tauri/src/bin/cc_gui_daemon/daemon_state.rs`（PI turn 过滤与路由）和 PI curtain 的前端卡片投影。其它 engine 继续走原有公共路径。
+- 行为变化：外部 turn 期间用户发送从「硬失败」变为按 native `turn_start` 绑定的 `steer`；后台通知对应的外部 turn 可实时投影，陌生外部 turn 仍不可见；每个 turn 的 delta、snapshot、completion 使用同一 ID，历史刷新后保持同一锚点。

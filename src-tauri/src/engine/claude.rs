@@ -2468,10 +2468,9 @@ impl ClaudeSession {
                         Self::push_stream_diagnostic_sample(&mut sample, &line);
                         Self::push_stream_diagnostic_sample(&mut sample, "\n");
                     }
-                    if stream_runtime_error.is_none()
-                        && looks_like_claude_runtime_error(trimmed) {
-                            stream_runtime_error = Some(trimmed.to_string());
-                        }
+                    if stream_runtime_error.is_none() && looks_like_claude_runtime_error(trimmed) {
+                        stream_runtime_error = Some(trimmed.to_string());
+                    }
                 }
             }
         }

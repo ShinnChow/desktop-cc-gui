@@ -506,10 +506,12 @@ async fn update_non_current_local_branch(
     }
 
     let target_ref = format!("refs/heads/{}", refreshed_state.branch_name);
-    let args_owned = ["update-ref".to_string(),
+    let args_owned = [
+        "update-ref".to_string(),
         target_ref,
         upstream_oid.to_string(),
-        refreshed_state.local_oid.to_string()];
+        refreshed_state.local_oid.to_string(),
+    ];
     let arg_refs = args_owned.iter().map(String::as_str).collect::<Vec<_>>();
     if let Err(error) = git_core::run_git_command(&repo_root.to_path_buf(), &arg_refs).await {
         if load_local_branch_update_state(repo_root, refreshed_state.branch_name.as_str())

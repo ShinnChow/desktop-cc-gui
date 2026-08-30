@@ -423,6 +423,8 @@ const messages = {
     builtInAgentUnavailableTitle: "Built-in agent unavailable",
     builtInAgentUnavailableMessage:
       "This agent is disabled or unavailable, so its prompt will not be used for this message.",
+    backgroundTaskAwaitingRunning: "Waiting for {{count}} background task(s) to finish",
+    backgroundTaskAwaitingContinuation: "The main conversation will continue automatically once tasks finish",
     backgroundTaskFoldCompleted: "Background task completed",
     backgroundTaskFoldFailed: "Background task failed",
     backgroundTaskFoldRunning: "Background task running",

@@ -4,16 +4,22 @@ import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { createPortal } from "react-dom";
+import type { WorkspaceInfo } from "../../../types";
 import type {
   WorkspaceMenuAction,
   WorkspaceMenuGroup,
 } from "../hooks/useSidebarMenus";
+import {
+  readSidebarWorkspaceMenuCollapsedSectionIds,
+  toggleSidebarWorkspaceMenuCollapsedSectionId,
+} from "../hooks/useSidebarWorkspaceMenuSectionCollapse";
 
 type SidebarWorkspaceMenuOverlayProps = {
   menu: {
     x: number;
     y: number;
     groups: WorkspaceMenuGroup[];
+    workspace?: WorkspaceInfo;
   };
   t: (key: string) => string;
   onClose: () => void;
@@ -27,7 +33,7 @@ type SidebarWorkspaceSubmenuPosition = {
 };
 
 const SUBMENU_WIDTH = 260;
-const SUBMENU_MAX_HEIGHT = 360;
+const SUBMENU_MAX_HEIGHT = 640;
 const SUBMENU_GAP = 0;
 const SUBMENU_PADDING_Y = 12;
 const SUBMENU_ITEM_HEIGHT = 34;
@@ -83,13 +89,47 @@ export function SidebarWorkspaceMenuOverlay({
   const [submenuPosition, setSubmenuPosition] =
     useState<SidebarWorkspaceSubmenuPosition | null>(null);
   const [showSelectionHint, setShowSelectionHint] = useState(false);
+  // 「?」长说明走 portal 浮层：fixed 定位靠 ? 右侧弹出，不被抽屉/弹窗 overflow 裁剪。
+  const [floatingHelpTip, setFloatingHelpTip] = useState<{
+    text: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const openFloatingHelpTip = useCallback(
+    (text: string, anchor: HTMLElement) => {
+      const rect = anchor.getBoundingClientRect();
+      const tipWidth = 264;
+      const margin = 8;
+      let x = rect.right + margin;
+      if (
+        typeof window !== "undefined" &&
+        x + tipWidth > window.innerWidth - 8
+      ) {
+        x = Math.max(8, rect.left - margin - tipWidth);
+      }
+      const y =
+        typeof window !== "undefined"
+          ? Math.min(Math.max(rect.top - 6, 8), window.innerHeight - 140)
+          : rect.top;
+      setFloatingHelpTip({ text, x, y });
+    },
+    [],
+  );
+  // 折叠态本地持久化：初始 = 用户上次折起 ∩ 本菜单可折叠分组（默认全部展开）。
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
-    () =>
-      new Set(
+    () => {
+      const collapsedIds = new Set(readSidebarWorkspaceMenuCollapsedSectionIds());
+      return new Set(
         menu.groups
-          .filter((group) => group.collapsible && group.defaultCollapsed)
+          .filter(
+            (group) =>
+              group.collapsible &&
+              (group.defaultCollapsed || collapsedIds.has(group.id)),
+          )
           .map((group) => group.id),
-      ),
+      );
+    },
   );
 
   const openSubmenuAction = useMemo(
@@ -145,18 +185,32 @@ export function SidebarWorkspaceMenuOverlay({
   const toggleGroup = useCallback(
     (groupId: string) => {
       closeSubmenu();
-      setCollapsedGroupIds((currentGroupIds) => {
-        const nextGroupIds = new Set(currentGroupIds);
-        if (nextGroupIds.has(groupId)) {
-          nextGroupIds.delete(groupId);
-        } else {
-          nextGroupIds.add(groupId);
-        }
-        return nextGroupIds;
-      });
+      // 持久化先于 setState 且在 updater 外执行：updater 必须保持纯函数，
+      // 否则 StrictMode/concurrent 重放 updater 会把存储来回翻转两次。
+      const nextCollapsedIds = toggleSidebarWorkspaceMenuCollapsedSectionId(
+        groupId,
+      );
+      setCollapsedGroupIds(new Set(nextCollapsedIds));
     },
     [closeSubmenu],
   );
+
+  const hasSessionActions = useMemo(
+    () =>
+      menu.groups.some(
+        (group) =>
+          group.id === "new-session" || group.id === "new-session-shared",
+      ),
+    [menu.groups],
+  );
+  const baseTitle = hasSessionActions
+    ? t("sidebar.sessionActionsGroup")
+    : t("sidebar.workspaceActionsGroup");
+  // 标题点明所属工作区，避免多项目时不知道这次新建落在哪里。
+  const workspaceName = menu.workspace?.name?.trim() || null;
+  const menuTitle = workspaceName
+    ? `${baseTitle} · ${workspaceName}`
+    : baseTitle;
 
   const overlay = (
     <div
@@ -171,16 +225,8 @@ export function SidebarWorkspaceMenuOverlay({
         ref={menuRef}
         className="sidebar-workspace-menu"
         role="menu"
-        aria-label={
-          menu.groups.length === 1 &&
-          menu.groups[0]?.id === "new-session"
-            ? t("sidebar.sessionActionsGroup")
-            : t("sidebar.workspaceActionsGroup")
-        }
-        style={{
-          left: menu.x,
-          top: menu.y,
-        }}
+        aria-label={menuTitle}
+        style={{ left: menu.x, top: menu.y }}
         onMouseDown={(event) => event.stopPropagation()}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
@@ -201,7 +247,31 @@ export function SidebarWorkspaceMenuOverlay({
                   aria-controls={groupContentId}
                   onClick={() => toggleGroup(group.id)}
                 >
-                  <span>{group.label}</span>
+                  <span>
+                    {group.label}
+                    {group.hint ? (
+                      <span className="sidebar-workspace-menu-group-hint">
+                        {group.hint}
+                      </span>
+                    ) : null}
+                    {group.helpTip ? (
+                      <span
+                        className="sidebar-workspace-menu-group-help"
+                        role="img"
+                        aria-label={group.helpTip}
+                        onMouseEnter={(event) =>
+                          openFloatingHelpTip(
+                            group.helpTip!,
+                            event.currentTarget,
+                          )
+                        }
+                        onMouseLeave={() => setFloatingHelpTip(null)}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        ?
+                      </span>
+                    ) : null}
+                  </span>
                   <ChevronRight
                     className={`sidebar-workspace-menu-group-chevron${
                       isCollapsed ? "" : " is-expanded"
@@ -213,6 +283,24 @@ export function SidebarWorkspaceMenuOverlay({
               ) : (
                 <div className="sidebar-workspace-menu-group-title">
                   {group.label}
+                  {group.hint ? (
+                    <span className="sidebar-workspace-menu-group-hint">
+                      {group.hint}
+                    </span>
+                  ) : null}
+                  {group.helpTip ? (
+                    <span
+                      className="sidebar-workspace-menu-group-help"
+                      role="img"
+                      aria-label={group.helpTip}
+                      onMouseEnter={(event) =>
+                        openFloatingHelpTip(group.helpTip!, event.currentTarget)
+                      }
+                      onMouseLeave={() => setFloatingHelpTip(null)}
+                    >
+                      ?
+                    </span>
+                  ) : null}
                 </div>
               )}
               <div id={groupContentId} hidden={isCollapsed}>
@@ -229,10 +317,12 @@ export function SidebarWorkspaceMenuOverlay({
                           action.tone === "danger" ? " is-danger" : ""
                         }${action.deprecated ? " is-deprecated" : ""}${
                           action.unavailable ? " is-unavailable" : ""
-                        }`}
+                        }${action.refreshing ? " is-refreshing" : ""}`}
                         disabled={
-                          action.unavailable && !action.children?.length
+                          (action.unavailable && !action.children?.length) ||
+                          action.refreshing === true
                         }
+                        aria-busy={action.refreshing || undefined}
                         aria-haspopup={
                           action.children?.length ? "menu" : undefined
                         }
@@ -282,6 +372,14 @@ export function SidebarWorkspaceMenuOverlay({
                         {action.unavailable ? (
                           <span className="sidebar-workspace-menu-item-unavailable">
                             ({action.statusLabel ?? t("sidebar.unavailableTag")})
+                          </span>
+                        ) : null}
+                        {action.selectedChildLabel ? (
+                          <span
+                            className="sidebar-workspace-menu-item-provider"
+                            aria-hidden
+                          >
+                            {action.selectedChildLabel}
                           </span>
                         ) : null}
                         {action.children?.length ? (
@@ -356,6 +454,18 @@ export function SidebarWorkspaceMenuOverlay({
           );
         })}
       </div>
+      {floatingHelpTip ? (
+        <div
+          className="sidebar-floating-help-tip"
+          role="tooltip"
+          style={{
+            left: floatingHelpTip.x,
+            top: floatingHelpTip.y,
+          }}
+        >
+          {floatingHelpTip.text}
+        </div>
+      ) : null}
       {openSubmenuAction?.children?.length && submenuPosition ? (
         <div
           className="sidebar-workspace-submenu"
@@ -373,6 +483,22 @@ export function SidebarWorkspaceMenuOverlay({
           {openSubmenuAction.submenuTitle ? (
             <div className="sidebar-workspace-submenu-title">
               {openSubmenuAction.submenuTitle}
+              {openSubmenuAction.submenuHelpTip ? (
+                <span
+                  className="sidebar-workspace-menu-group-help"
+                  role="img"
+                  aria-label={openSubmenuAction.submenuHelpTip}
+                  onMouseEnter={(event) =>
+                    openFloatingHelpTip(
+                      openSubmenuAction.submenuHelpTip!,
+                      event.currentTarget,
+                    )
+                  }
+                  onMouseLeave={() => setFloatingHelpTip(null)}
+                >
+                  ?
+                </span>
+              ) : null}
             </div>
           ) : null}
           {openSubmenuAction.children.map((child) => (

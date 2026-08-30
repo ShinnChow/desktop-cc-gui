@@ -370,6 +370,14 @@
   white-space: nowrap;
 }
 
+.fvp-git-blame-toggle.is-active {
+  color: var(--border-accent, #6bb3f0);
+}
+
+.fvp-git-blame-toggle.is-error {
+  color: var(--text-danger, #f87171);
+}
+
 /* ── Body ── */
 
 .fvp-body {

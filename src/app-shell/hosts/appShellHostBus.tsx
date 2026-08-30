@@ -224,6 +224,24 @@ export function useOptionalHostSlice<K extends AppShellHostSliceName>(
   );
 }
 
+/**
+ * useHostFields 的容错变体：AppShellHostBusProvider 之外（独立测试挂载、
+ * 非 app-shell 宿主的渲染树）返回全 undefined 字段而非抛错——消费方按
+ * 「数据未就绪」降级，不得阻断渲染（B7 联动投影使用）。
+ */
+export function useHostFieldsSafe<
+  K extends AppShellHostSliceName,
+  F extends readonly string[],
+>(key: K, fields: F): Record<F[number], unknown> {
+  const bus = useContext(AppShellHostBusContext);
+  if (!bus) {
+    const empty = {} as Record<string, unknown>;
+    const stable = useRef(empty);
+    return stable.current as Record<F[number], unknown>;
+  }
+  return useHostFields(key, fields);
+}
+
 export function useHostFields<
   K extends AppShellHostSliceName,
   F extends readonly string[],

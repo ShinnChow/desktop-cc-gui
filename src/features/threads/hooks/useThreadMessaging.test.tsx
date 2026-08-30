@@ -49,6 +49,19 @@ import {
   resetSharedTargetStoreForTests,
   selectNextTarget,
 } from "../../shared-session/target/targetStore";
+import { renameTurnTargetBadgeThread } from "../utils/turnTargetBadgeStorage";
+import {
+  getRuntimeReceipt,
+  rememberRuntimeReceipt,
+  resetRuntimeReceiptsForTests,
+} from "../utils/runtimeModelReceipt";
+
+// 该文件把 getClientStoreSync 桩成恒 undefined，真实侧车迁移读不到缓存；
+// 只替换 rename 为 spy 断言接线（迁移逻辑由 turnTargetBadgeStorage.test 覆盖）。
+vi.mock("../utils/turnTargetBadgeStorage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../utils/turnTargetBadgeStorage")>()),
+  renameTurnTargetBadgeThread: vi.fn(),
+}));
 
 const CLAUDE_PENDING_NATIVE_SESSION_WAIT_MESSAGE =
   "Claude session is still initializing. Wait for the session to finish binding, then send again.";
@@ -754,6 +767,94 @@ describe("useThreadMessaging", () => {
       }),
     );
     expect(response).toEqual(committedResponse);
+  });
+
+  it("keeps Shared PI reasoning effort at the send boundary (capability-neutral passthrough)", async () => {
+    // send 边界的 PI model ref 只有字符串（无 supportedReasoningEfforts），
+    // reconcile 走 capability-neutral 直通：不发明、不清档（allowlist reconcile
+    // 由 Composer 层带 catalog metadata 完成）。合法档位 high 原样送达。
+    const threadId = "shared:thread-pi-effort-high";
+    const piTarget = {
+      engine: "pi" as const,
+      providerProfileId: "provider-pi",
+      modelCatalogEntryId: "provider-pi:google/gemini-2.5-pro",
+      providerProfileNameSnapshot: "PI Provider",
+      providerProfileSource: "managed" as const,
+      model: "google/gemini-2.5-pro",
+      reasoning: { effort: "high" },
+    };
+    vi.mocked(sendSharedSessionTurnRouted).mockResolvedValueOnce({
+      status: "accepted",
+      runtimeTurnId: "runtime-turn-pi-high",
+      v2: {
+        attemptId: "attempt-pi-high",
+        logicalTurnId: "logical-turn-pi-high",
+        committed: true,
+        duplicate: false,
+      },
+    });
+    const { result } = makeThreadMessagingHook("pi", {
+      activeThreadId: threadId,
+    });
+
+    await act(async () => {
+      await result.current.sendUserMessageToThread(workspace, threadId, "pi boundary high", [], {
+        sharedExecutionTarget: piTarget,
+      });
+    });
+
+    expect(sendSharedSessionTurnRouted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        engine: "pi",
+        model: "google/gemini-2.5-pro",
+        effort: "high",
+        target: piTarget,
+      }),
+    );
+  });
+
+  it("keeps an out-of-band Shared PI effort value at the send boundary instead of inventing a level", async () => {
+    // 边界无 capability metadata 时禁止发明档位：ultra 直通（既不映射 default
+    // 也不清空）；「非法档位收敛到模型 default」由带 metadata 的
+    // reconcileAtomicReasoningEffort 路径负责（atomicModelReasoning.test 覆盖）。
+    const threadId = "shared:thread-pi-effort-ultra";
+    const piTarget = {
+      engine: "pi" as const,
+      providerProfileId: "provider-pi",
+      modelCatalogEntryId: "provider-pi:google/gemini-2.5-pro",
+      providerProfileNameSnapshot: "PI Provider",
+      providerProfileSource: "managed" as const,
+      model: "google/gemini-2.5-pro",
+      reasoning: { effort: "ultra" },
+    };
+    vi.mocked(sendSharedSessionTurnRouted).mockResolvedValueOnce({
+      status: "accepted",
+      runtimeTurnId: "runtime-turn-pi-ultra",
+      v2: {
+        attemptId: "attempt-pi-ultra",
+        logicalTurnId: "logical-turn-pi-ultra",
+        committed: true,
+        duplicate: false,
+      },
+    });
+    const { result } = makeThreadMessagingHook("pi", {
+      activeThreadId: threadId,
+    });
+
+    await act(async () => {
+      await result.current.sendUserMessageToThread(workspace, threadId, "pi boundary ultra", [], {
+        sharedExecutionTarget: piTarget,
+      });
+    });
+
+    expect(sendSharedSessionTurnRouted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        engine: "pi",
+        model: "google/gemini-2.5-pro",
+        effort: "ultra",
+        target: piTarget,
+      }),
+    );
   });
 
   it("fails closed for a stale unsupported Shared Target", async () => {
@@ -1674,6 +1775,7 @@ describe("useThreadMessaging", () => {
   });
 
   it("rebinds claude pending follow-up after candidate transcript validates", async () => {
+    resetRuntimeReceiptsForTests();
     const workspaceWithTrailingSpace = { ...workspace, path: "/tmp/mossx " };
     vi.mocked(engineSendMessage)
       .mockResolvedValueOnce({
@@ -1715,6 +1817,14 @@ describe("useThreadMessaging", () => {
       );
     });
 
+    // runtime 回执账本同迁：发送边界在 pending id 下记 send.request 回执
+    //（pi 等无回执事件的引擎靠它出实时 Ⓡ 尾巴），candidate reconcile 改名
+    // 后实时链路按正式 id 取 ingest meta，不迁则实时丢尾巴、历史反而有。
+    rememberRuntimeReceipt("ws-1", "claude-pending-abc", {
+      model: "claude-sonnet-4-6",
+      modelSource: "send.request",
+    });
+
     await act(async () => {
       await result.current.sendUserMessageToThread(
         workspaceWithTrailingSpace,
@@ -1730,6 +1840,17 @@ describe("useThreadMessaging", () => {
       oldThreadId: "claude-pending-abc",
       newThreadId: "claude:session-xyz",
     });
+    // candidate reconcile 改名必须随迁 badge 侧车，否则首轮 badge 冷加载丢失。
+    expect(renameTurnTargetBadgeThread).toHaveBeenCalledWith(
+      "claude-pending-abc",
+      "claude:session-xyz",
+    );
+    expect(getRuntimeReceipt("ws-1", "claude:session-xyz")?.model).toBe(
+      "claude-sonnet-4-6",
+    );
+    expect(getRuntimeReceipt("ws-1", "claude:session-xyz")?.modelSource).toBe(
+      "send.request",
+    );
     expect(engineSendMessage).toHaveBeenNthCalledWith(
       2,
       "ws-1",
@@ -1897,6 +2018,54 @@ describe("useThreadMessaging", () => {
       workspace.id,
       "claude-pending-snake",
       CLAUDE_PENDING_NATIVE_SESSION_WAIT_MESSAGE,
+    );
+  });
+
+  it("does not send a stale native resolver target after switching PI sessions", async () => {
+    const threadId = "pi:session-b";
+    const { result } = makeThreadMessagingHook("pi", {
+      activeThreadId: threadId,
+      ensuredThreadId: threadId,
+      threadEngineById: { [threadId]: "pi" },
+      providerProfileByThread: { [threadId]: "provider-b" },
+      model: "kimi-coding/k3",
+      resolveComposerSelection: () => ({
+        id: "openai-codex/gpt-5.6-terra",
+        model: "openai-codex/gpt-5.6-terra",
+        source: "managed",
+        providerProfileId: "provider-a",
+        effort: "high",
+        collaborationMode: null,
+        threadId: "pi:session-a",
+      }),
+    });
+
+    await act(async () => {
+      await result.current.sendUserMessageToThread(
+        workspace,
+        threadId,
+        "use the current PI session target",
+        [],
+        {
+          nativeExecutionTarget: {
+            engine: "pi",
+            providerProfileId: "provider-b",
+            modelCatalogEntryId: "kimi-coding/k3",
+            model: "kimi-coding/k3",
+            reasoning: { effort: "low" },
+          },
+        },
+      );
+    });
+
+    expect(engineSendMessage).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        engine: "pi",
+        model: "kimi-coding/k3",
+        effort: "low",
+        providerProfileId: "provider-b",
+      }),
     );
   });
 

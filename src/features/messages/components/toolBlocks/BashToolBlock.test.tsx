@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  __resetRealtimePerfFlagCacheForTests,
+  LIVE_TOOL_RENDER_BUDGET_FLAG_KEY,
+  resetRealtimePerfFlags,
+} from "../../../threads/utils/realtimePerfFlags";
 import type { ConversationItem } from "../../../../types";
 import { BashToolBlock } from "./BashToolBlock";
 
@@ -14,9 +19,40 @@ const failedCommandItem: Extract<ConversationItem, { kind: "tool" }> = {
   output: "Error: test failed",
 };
 
+// Prism bash 一定产生 token class 的命令行（string/builtin token）。
+const highlightableOutput = 'echo "hello" && ls -la\n';
+
+const runningHighlightItem: Extract<ConversationItem, { kind: "tool" }> = {
+  id: "bash-live-highlight",
+  kind: "tool",
+  toolType: "commandExecution",
+  title: "Command: echo hello",
+  detail: '{"command":"echo hello"}',
+  status: "processing",
+  output: highlightableOutput,
+};
+
+// 长跑命令（durationMs ≥ 1200ms → isLongRunning 硬展开）。
+const longRunningItem: Extract<ConversationItem, { kind: "tool" }> = {
+  id: "bash-live-collapse",
+  kind: "tool",
+  toolType: "commandExecution",
+  title: "Command: npm run scan",
+  detail: '{"command":"npm run scan"}',
+  status: "processing",
+  output: "scanning ./node_modules ...\n",
+  durationMs: 5000,
+};
+
+function queryHeader() {
+  return screen.getByRole("button", { name: /npm run scan/ });
+}
+
 describe("BashToolBlock", () => {
   afterEach(() => {
     cleanup();
+    resetRealtimePerfFlags();
+    __resetRealtimePerfFlagCacheForTests();
   });
 
   it("shows short terminal-command header without embedding full command", () => {
@@ -121,5 +157,90 @@ describe("BashToolBlock", () => {
     );
     expect(screen.getByText("## Title")).toBeTruthy();
     expect(screen.getByText("| A | B |")).toBeTruthy();
+  });
+
+  it("renders live output as plain text and re-highlights after settle", () => {
+    const onToggle = vi.fn();
+    const { rerender, container } = render(
+      <BashToolBlock item={runningHighlightItem} isExpanded onToggle={onToggle} />,
+    );
+
+    // live 流式期：文本可见，但不做逐行 Prism tokenize。
+    expect(screen.getByText('echo "hello" && ls -la')).toBeTruthy();
+    expect(container.querySelectorAll(".token")).toHaveLength(0);
+
+    // settle 后恢复带高亮渲染。
+    rerender(
+      <BashToolBlock
+        item={{ ...runningHighlightItem, status: "completed", durationMs: 500 }}
+        isExpanded
+        onToggle={onToggle}
+      />,
+    );
+    expect(container.querySelectorAll(".token").length).toBeGreaterThan(0);
+  });
+
+  it("keeps live highlighting when the render budget flag is off", () => {
+    window.localStorage.setItem(LIVE_TOOL_RENDER_BUDGET_FLAG_KEY, "off");
+    __resetRealtimePerfFlagCacheForTests();
+    const { container } = render(
+      <BashToolBlock item={runningHighlightItem} isExpanded onToggle={vi.fn()} />,
+    );
+    expect(container.querySelectorAll(".token").length).toBeGreaterThan(0);
+  });
+
+  it("auto-expands long-running output and lets the user collapse it without touching the parent toggle", () => {
+    const onToggle = vi.fn();
+    render(
+      <BashToolBlock item={longRunningItem} isExpanded={false} onToggle={onToggle} />,
+    );
+
+    // isLongRunning 自动展开。
+    expect(screen.getByText("scanning ./node_modules ...")).toBeTruthy();
+
+    // 用户点击 header → 折叠 live 输出，且不污染父层展开状态机。
+    fireEvent.click(queryHeader());
+    expect(screen.queryByText("scanning ./node_modules ...")).toBeNull();
+    expect(onToggle).not.toHaveBeenCalled();
+
+    // 再次点击 → 恢复自动展开。
+    fireEvent.click(queryHeader());
+    expect(screen.getByText("scanning ./node_modules ...")).toBeTruthy();
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("keeps the user collapse intent across settle", () => {
+    const onToggle = vi.fn();
+    const { rerender } = render(
+      <BashToolBlock item={longRunningItem} isExpanded={false} onToggle={onToggle} />,
+    );
+    fireEvent.click(queryHeader());
+    expect(screen.queryByText("scanning ./node_modules ...")).toBeNull();
+
+    // settle（completed + durationMs 仍 ≥1200）后不因长跑条件弹回展开。
+    rerender(
+      <BashToolBlock
+        item={{ ...longRunningItem, status: "completed" }}
+        isExpanded={false}
+        onToggle={onToggle}
+      />,
+    );
+    expect(screen.queryByText("scanning ./node_modules ...")).toBeNull();
+
+    // 用户再次点击恢复展开（settle 后 Prism 会把文本 tokenize 打碎，
+    // 用 textContent 断言完整输出）。
+    fireEvent.click(queryHeader());
+    const outputBlock = document.querySelector(".bash-output-block");
+    expect(outputBlock?.textContent).toContain("scanning ./node_modules ...");
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("does not hijack the parent toggle while externally expanded", () => {
+    const onToggle = vi.fn();
+    render(
+      <BashToolBlock item={longRunningItem} isExpanded onToggle={onToggle} />,
+    );
+    fireEvent.click(queryHeader());
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 });

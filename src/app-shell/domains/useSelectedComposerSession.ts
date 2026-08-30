@@ -9,16 +9,16 @@ import {
 import type { DebugEntry } from "../../types";
 import {
   extractClaudeForkParentThreadId,
-  fillPendingComposerSelectionEffortFromEnginePref,
   getThreadComposerSelectionStorageKey,
   normalizeComposerSessionSelection,
   normalizeComposerSessionSelectionForThread,
-  shouldApplyDraftComposerSelectionToThread,
-  shouldInheritComposerSelectionFromClaudeForkParent,
   shouldMigrateComposerSelectionBetweenThreadIds,
   subscribeDshComposerSelectionSeeded,
   type ComposerSessionSelection,
 } from "./selectedComposerSession";
+import { resolveThreadSelectionOnSwitch } from "./composer-selection/resolveThreadSelectionOnSwitch";
+import { resolveThreadEngine } from "./selectedComposerSession";
+import { getComposerEnginePrefForEngine } from "../../features/composer/hooks/composerEnginePrefsStore";
 
 function selectionsEqual(
   left: ComposerSessionSelection | null,
@@ -55,6 +55,11 @@ type UseSelectedComposerSessionOptions = {
   resolveCanonicalThreadId: (threadId: string) => string;
   engineDefaultSelectionReady?: boolean;
   /**
+   * D6 闸2：解析线程所属引擎的 catalog 成员资格 key 集（id+model 双通道）。
+   * 返回 null = catalog 不可得（放行语义）。
+   */
+  resolveEngineModelKeys?: (threadId: string) => readonly string[] | null;
+  /**
    * Supplies the durable per-engine "last used" selection so a brand-new
    * conversation opens with the model/effort the user last chose for that engine.
    * Return null to keep the engine catalog default (e.g. codex, which persists
@@ -68,6 +73,8 @@ type UseSelectedComposerSessionOptions = {
 
 type UseSelectedComposerSessionResult = {
   selectedComposerSelection: ComposerSessionSelection | null;
+  /** D1 防竞态：最近一次 commit 对应的线程 id（切换窗口内与 activeThreadId 不一致） */
+  selectedComposerSelectionThreadId: string | null;
   selectedComposerSelectionRef: MutableRefObject<ComposerSessionSelection | null>;
   handleSelectComposerSelection: (selection: ComposerSessionSelection | null) => void;
   persistComposerSelectionForThread: (
@@ -88,6 +95,7 @@ export function useSelectedComposerSession({
   resolveCanonicalThreadId,
   engineDefaultSelectionReady = true,
   resolveEngineDefaultComposerSelection,
+  resolveEngineModelKeys,
 }: UseSelectedComposerSessionOptions): UseSelectedComposerSessionResult {
   const [selectedComposerSelectionBySessionKey, setSelectedComposerSelectionBySessionKey] =
     useState<Record<string, ComposerSessionSelection | null>>({});
@@ -96,8 +104,15 @@ export function useSelectedComposerSession({
   >({});
   const [draftComposerSelection, setDraftComposerSelection] =
     useState<ComposerSessionSelection | null>(null);
+  // composer-session-selection-isolation：carry 时记下来源线程 id，
+  // apply 点据此拒绝把 draft 落进异引擎 pending。同步 ref，不进 state。
+  const draftComposerSelectionSourceThreadIdRef = useRef<string | null>(null);
   const [selectedComposerSelection, setSelectedComposerSelection] =
     useState<ComposerSessionSelection | null>(null);
+  // D1 防竞态：记录最近一次 commit 对应的线程 id；切换窗口内它与 activeThreadId
+  // 不一致，repair 等回写方据此拒绝把 stale 账本固化进目标线程。
+  const [selectedComposerSelectionThreadId, setSelectedComposerSelectionThreadId] =
+    useState<string | null>(null);
   const selectedComposerSelectionRef = useRef<ComposerSessionSelection | null>(null);
   const draftComposerSelectionWorkspaceIdRef = useRef<string | null>(null);
   const shouldApplyDraftToNextThreadRef = useRef(false);
@@ -105,6 +120,8 @@ export function useSelectedComposerSession({
   const resolveEngineDefaultComposerSelectionRef = useRef(
     resolveEngineDefaultComposerSelection,
   );
+  const resolveEngineModelKeysRef = useRef(resolveEngineModelKeys);
+  resolveEngineModelKeysRef.current = resolveEngineModelKeys;
   resolveEngineDefaultComposerSelectionRef.current =
     resolveEngineDefaultComposerSelection;
 
@@ -207,10 +224,13 @@ export function useSelectedComposerSession({
           selectionsEqual(current, normalized) ? current : normalized,
         );
         draftComposerSelectionWorkspaceIdRef.current = activeWorkspaceId ?? null;
+        // 无线程来源（Home 点选）：引擎身份未知，门禁按放行语义处理。
+        draftComposerSelectionSourceThreadIdRef.current = null;
         shouldApplyDraftToNextThreadRef.current = Boolean(normalized);
         return;
       }
       shouldApplyDraftToNextThreadRef.current = false;
+      draftComposerSelectionSourceThreadIdRef.current = null;
       persistComposerSelectionForThread(activeWorkspaceId, activeThreadId, normalized);
     },
     [activeThreadId, activeWorkspaceId, persistComposerSelectionForThread],
@@ -247,124 +267,91 @@ export function useSelectedComposerSession({
   );
 
   const reloadSelectedComposerSelection = useCallback(() => {
-    if (!activeThreadId) {
-      const draftForActiveWorkspace =
-        draftComposerSelectionWorkspaceIdRef.current === (activeWorkspaceId ?? null)
-          ? draftComposerSelection
-          : null;
-      commitSelectedComposerSelection(draftForActiveWorkspace);
-      return;
-    }
-
-    const sessionKey = resolveSelectedComposerSessionKey(activeWorkspaceId, activeThreadId);
-    if (!sessionKey) {
-      commitSelectedComposerSelection(null);
-      return;
-    }
-
-    let candidate: ComposerSessionSelection | null = null;
-    let hasCandidate = false;
-    const stored = readStoredThreadComposerSelectionEntryBySessionKey(sessionKey);
-    const storedSelection = normalizeComposerSessionSelectionForThread(
-      activeThreadId,
-      stored.value,
-    );
-    const selectionCache = selectedComposerSelectionBySessionKeyRef.current;
-    if (stored.exists) {
-      // Host DSH seed writes the composer store directly. Prefer store over a
-      // stale in-memory cache so returning to a cold/polluted ledger rebinds.
-      candidate = storedSelection;
-      hasCandidate = true;
-      if (
-        !selectionsEqual(selectionCache[sessionKey] ?? null, storedSelection)
-      ) {
-        cacheSelectionForSessionKey(sessionKey, storedSelection);
-      }
-    } else if (Object.prototype.hasOwnProperty.call(selectionCache, sessionKey)) {
-      candidate = normalizeComposerSessionSelectionForThread(
-        activeThreadId,
-        selectionCache[sessionKey] ?? null,
-      );
-      hasCandidate = true;
-    } else {
-      candidate = storedSelection;
-      hasCandidate = stored.exists;
-      const parentThreadId = extractClaudeForkParentThreadId(activeThreadId);
-      const parentSessionKey = parentThreadId
-        ? resolveSelectedComposerSessionKey(activeWorkspaceId, parentThreadId)
+    // Phase 1 决策核心化：取值规则单源于 resolveThreadSelectionOnSwitch，
+    // hook 只负责组装输入（读 store/cache/pref）与应用 writes（落盘 + cache 同步）。
+    const activeSessionKey = activeThreadId
+      ? resolveSelectedComposerSessionKey(activeWorkspaceId, activeThreadId)
+      : null;
+    const storedEntry =
+      activeSessionKey && activeThreadId
+        ? readStoredThreadComposerSelectionEntryBySessionKey(activeSessionKey)
         : null;
-      const parentStored = parentSessionKey
-        ? readStoredThreadComposerSelectionEntryBySessionKey(parentSessionKey)
-        : { exists: false, value: null };
-      const parentSelection = normalizeComposerSessionSelectionForThread(
-        parentThreadId,
-        parentStored.value,
-      );
-      const shouldInheritClaudeForkSelection =
-        shouldInheritComposerSelectionFromClaudeForkParent({
-          activeThreadId,
-          hasCandidate,
-          hasParentSelection: Boolean(parentSelection),
-        });
-      if (shouldInheritClaudeForkSelection) {
-        candidate = normalizeComposerSessionSelectionForThread(activeThreadId, parentSelection);
-        hasCandidate = true;
-        writeSelectionForSessionKey(sessionKey, candidate);
-      }
-      const draftSelectionForActiveThread = normalizeComposerSessionSelectionForThread(
-        activeThreadId,
-        draftComposerSelection,
-      );
-      const shouldApplyDraftSelection =
-        draftComposerSelectionWorkspaceIdRef.current === (activeWorkspaceId ?? null) &&
-        shouldApplyDraftComposerSelectionToThread({
-          candidate,
-          shouldApplyDraftToNextThread: shouldApplyDraftToNextThreadRef.current,
-          draftComposerSelection: draftSelectionForActiveThread,
-          activeThreadId,
-        });
-      if (shouldApplyDraftSelection) {
-        candidate = draftSelectionForActiveThread;
-        hasCandidate = true;
-        shouldApplyDraftToNextThreadRef.current = false;
-        writeSelectionForSessionKey(sessionKey, candidate);
-      }
-      if (
-        !hasCandidate &&
-        engineDefaultSelectionReady &&
-        activeThreadId.includes("-pending-")
-      ) {
-        const engineDefault = normalizeComposerSessionSelectionForThread(
-          activeThreadId,
-          resolveEngineDefaultComposerSelectionRef.current?.(activeThreadId) ??
-            null,
+    const selectionCache = selectedComposerSelectionBySessionKeyRef.current;
+    const hasCacheEntry = Boolean(
+      activeSessionKey &&
+        Object.prototype.hasOwnProperty.call(selectionCache, activeSessionKey),
+    );
+    const cachedSelection =
+      hasCacheEntry && activeSessionKey
+        ? selectionCache[activeSessionKey] ?? null
+        : null;
+    // fork parent 读取仅在有需要时进行（stored/cache 均未命中）
+    let forkParentThreadId: string | null = null;
+    let forkParentStoredSelection: ComposerSessionSelection | null = null;
+    if (!storedEntry?.exists && !hasCacheEntry && activeThreadId) {
+      forkParentThreadId = extractClaudeForkParentThreadId(activeThreadId);
+      if (forkParentThreadId) {
+        const parentSessionKey = resolveSelectedComposerSessionKey(
+          activeWorkspaceId,
+          forkParentThreadId,
         );
-        if (engineDefault) {
-          candidate = engineDefault;
-          hasCandidate = true;
-          writeSelectionForSessionKey(sessionKey, candidate);
-        }
-      }
-      if (hasCandidate) {
-        cacheSelectionForSessionKey(sessionKey, candidate);
+        forkParentStoredSelection = parentSessionKey
+          ? readStoredThreadComposerSelectionEntryBySessionKey(parentSessionKey)
+              .value
+          : null;
       }
     }
 
-    // Draft / partial seed can leave effort:null on pending threads even when the
-    // engine pref still remembers high — fill only null, never clobber explicit effort.
-    if (candidate && activeThreadId.includes("-pending-")) {
-      const filled = fillPendingComposerSelectionEffortFromEnginePref(
-        candidate,
-        activeThreadId,
-      );
-      if (filled && filled.effort !== candidate.effort) {
-        candidate = filled;
-        writeSelectionForSessionKey(sessionKey, candidate);
-        cacheSelectionForSessionKey(sessionKey, candidate);
-      }
-    }
+    // L4 回填取数与原 fillPendingComposerSelectionEffortFromEnginePref 同源：
+    // 直接读 composerEnginePrefsStore（不经注入 resolver），codex 置 null。
+    const threadEngine = activeThreadId
+      ? resolveThreadEngine(activeThreadId)
+      : null;
+    const enginePrefEffort =
+      threadEngine && threadEngine !== "codex"
+        ? getComposerEnginePrefForEngine(threadEngine).effort
+        : null;
 
-    commitSelectedComposerSelection(candidate);
+    const decision = resolveThreadSelectionOnSwitch({
+      workspaceId: activeWorkspaceId ?? null,
+      threadId: activeThreadId,
+      storedSelection: storedEntry ?? { exists: false, value: null },
+      cachedSelection,
+      hasCacheEntry,
+      forkParentThreadId,
+      forkParentStoredSelection,
+      draft: draftComposerSelection
+        ? {
+            value: draftComposerSelection,
+            workspaceId: draftComposerSelectionWorkspaceIdRef.current,
+            sourceThreadId: draftComposerSelectionSourceThreadIdRef.current,
+            applyToNextThread: shouldApplyDraftToNextThreadRef.current,
+          }
+        : null,
+      engineDefaultSelection:
+        (activeThreadId
+          ? resolveEngineDefaultComposerSelectionRef.current?.(activeThreadId)
+          : null) ?? null,
+      engineDefaultSelectionReady: engineDefaultSelectionReady,
+      enginePrefEffort,
+      targetEngineModelKeys: activeThreadId
+        ? resolveEngineModelKeysRef.current?.(activeThreadId) ?? null
+        : null,
+    });
+
+    for (const write of decision.writes) {
+      if (write.kind === "clear-draft-apply-flag") {
+        shouldApplyDraftToNextThreadRef.current = false;
+        continue;
+      }
+      writeSelectionForSessionKey(write.sessionKey, write.value);
+    }
+    // L1/L2 的 store→cache 同步（幂等；writeSelectionForSessionKey 已含 L3 的同步）
+    if (activeSessionKey) {
+      cacheSelectionForSessionKey(activeSessionKey, decision.display);
+    }
+    commitSelectedComposerSelection(decision.display);
+    setSelectedComposerSelectionThreadId(activeThreadId);
   }, [
     activeThreadId,
     activeWorkspaceId,
@@ -383,6 +370,8 @@ export function useSelectedComposerSession({
       const latestSelection = selectedComposerSelectionRef.current;
       setDraftComposerSelection(latestSelection ?? null);
       draftComposerSelectionWorkspaceIdRef.current = activeWorkspaceId ?? null;
+      // 记录草稿来源线程，apply 点用它做引擎一致性判定。
+      draftComposerSelectionSourceThreadIdRef.current = previousThreadId;
       shouldApplyDraftToNextThreadRef.current = Boolean(latestSelection);
     }
     previousThreadIdForDraftCarryRef.current = activeThreadId ?? null;
@@ -500,6 +489,7 @@ export function useSelectedComposerSession({
 
   return {
     selectedComposerSelection,
+    selectedComposerSelectionThreadId,
     selectedComposerSelectionRef,
     handleSelectComposerSelection,
     persistComposerSelectionForThread,

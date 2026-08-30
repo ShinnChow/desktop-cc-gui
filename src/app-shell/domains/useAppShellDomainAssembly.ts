@@ -5,6 +5,7 @@ import {
   buildCollaborationModeDomainContextSlice,
   buildModelSelectionDomainContextSlice,
   buildRuntimeDomainContextSlice,
+  buildThreadDataDomainContextSlice,
   buildRuntimeThreadDomainContextSlice,
   buildSessionIdentityDomainContextSlice,
   buildWorkspaceCatalogDomainContextSlice,
@@ -619,10 +620,6 @@ export function assembleAppShellDomainContexts(
       terminalPanelHeight: source.terminalPanelHeight,
       terminalState: source.terminalState,
       terminalTabs: source.terminalTabs,
-      threadItemsByThread: source.threadItemsByThread,
-      threadListLoadingByWorkspace: source.threadListLoadingByWorkspace,
-      threadStatusById: source.threadStatusById,
-      threadsByWorkspace: source.threadsByWorkspace,
       updaterState: source.updaterState,
       workspaceActivity: source.workspaceActivity,
       workspaceDropTargetRef: source.workspaceDropTargetRef,
@@ -636,6 +633,13 @@ export function assembleAppShellDomainContexts(
       // S4 PR-E：归位 keys（口径见 APP_SHELL_DOMAIN_CONTEXT_OWNED_KEYS）
       openSettings: source.openSettings,
     },
+    // F5（fix-session-switch-jank-red-lines）：threads 全量 map 独立域。
+    threadDataContext: buildThreadDataDomainContextSlice({
+      threadItemsByThread: source.threadItemsByThread,
+      threadListLoadingByWorkspace: source.threadListLoadingByWorkspace,
+      threadStatusById: source.threadStatusById,
+      threadsByWorkspace: source.threadsByWorkspace,
+    }),
     runtimeContext: buildRuntimeDomainContextSlice({
       runtimeRunState: source.runtimeRunState,
     }),

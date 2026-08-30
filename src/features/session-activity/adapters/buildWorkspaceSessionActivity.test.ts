@@ -106,6 +106,22 @@ describe("buildWorkspaceSessionActivity", () => {
     expect(result.isProcessing).toBe(true);
   });
 
+  it("counts background-task-only threads as processing (turn settled, bg tasks in flight)", () => {
+    const threads: ThreadSummary[] = [{ id: "root", name: "Root", updatedAt: 1000 }];
+
+    const result = buildWorkspaceSessionActivity({
+      activeThreadId: "root",
+      threads,
+      itemsByThread: { root: [] },
+      threadParentById: {},
+      threadStatusById: {
+        root: { isProcessing: false, backgroundTaskRunningCount: 2 },
+      },
+    });
+
+    expect(result.isProcessing).toBe(true);
+  });
+
   it("uses fallback linking when direct parent is missing and marks provenance", () => {
     const threads: ThreadSummary[] = [
       { id: "root", name: "Root", updatedAt: 1000 },

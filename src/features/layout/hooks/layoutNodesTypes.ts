@@ -90,6 +90,7 @@ export type ThreadActivityStatus = {
   hasUnread: boolean;
   isReviewing: boolean;
   isContextCompacting?: boolean;
+  backgroundTaskRunningCount?: number;
   processingStartedAt?: number | null;
   lastDurationMs?: number | null;
   heartbeatPulse?: number;
@@ -159,6 +160,10 @@ export type LayoutNodesFlatOptions = {
   activeTurnId?: string | null;
   systemProxyEnabled?: boolean;
   systemProxyUrl?: string | null;
+  onUpdateSystemProxy?: (patch: {
+    systemProxyEnabled: boolean;
+    systemProxyUrl: string | null;
+  }) => Promise<unknown>;
   activeItems: ConversationItem[];
   activeQueuedHandoffBubble: QueuedHandoffBubble | null;
   threadItemsByThread: Record<string, ConversationItem[]>;
@@ -248,6 +253,7 @@ export type LayoutNodesFlatOptions = {
   onAddSharedAgent: (
     workspace: WorkspaceInfo,
     engine: SharedSessionSupportedEngine,
+    options?: { providerProfileId?: string },
   ) => Promise<string | null>;
   onAddWorktreeAgent: (workspace: WorkspaceInfo) => Promise<void>;
   onAddCloneAgent: (workspace: WorkspaceInfo) => Promise<void>;
@@ -343,6 +349,7 @@ export type LayoutNodesFlatOptions = {
   onCollapseSidebar?: () => void;
   globalSearchShortcut: string | null;
   openChatShortcut: string | null;
+  openSettingsShortcut?: string | null;
   showLoadingProgressDialog?: (config: LoadingProgressDialogConfig) => string;
   hideLoadingProgressDialog?: (requestId: string) => void;
   cycleOpenSessionPrevShortcut: string | null;
@@ -753,6 +760,8 @@ export type LayoutNodesFlatOptions = {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   composerEditorSettings: ComposerEditorSettings;
   composerSendShortcut: "enter" | "cmdEnter";
+  /** 停止按钮悬停提示里展示的中断快捷键（展示值；空则不展示） */
+  composerInterruptShortcutLabel?: string | null;
   textareaHeight: number;
   onTextareaHeightChange: (height: number) => void;
   showComposer: boolean;
@@ -813,6 +822,7 @@ export type WorkspaceLayoutNodesOptions = Pick<
   | "isTablet"
   | "systemProxyEnabled"
   | "systemProxyUrl"
+  | "onUpdateSystemProxy"
 >;
 
 export type RuntimeLayoutNodesOptions = Pick<
@@ -1230,6 +1240,7 @@ export type ComposerLayoutNodesOptions = Pick<
   | "textareaRef"
   | "composerEditorSettings"
   | "composerSendShortcut"
+  | "composerInterruptShortcutLabel"
   | "textareaHeight"
   | "onTextareaHeightChange"
   | "onOpenExperimentalSettings"
@@ -1289,6 +1300,7 @@ export type PanelsLayoutNodesOptions = Pick<
   | "onCollapseSidebar"
   | "globalSearchShortcut"
   | "openChatShortcut"
+  | "openSettingsShortcut"
   | "cycleOpenSessionPrevShortcut"
   | "cycleOpenSessionNextShortcut"
   | "closeCurrentSessionShortcut"

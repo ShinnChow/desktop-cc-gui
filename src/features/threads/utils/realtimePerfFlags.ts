@@ -274,6 +274,18 @@ const TOOL_OUTPUT_TAIL_GATE_TEST_DEFAULT = true;
 export const TOOL_OUTPUT_BUDGET_FLAG_KEY = "ccgui.perf.toolOutputBudget";
 const TOOL_OUTPUT_BUDGET_DEFAULT = true;
 const TOOL_OUTPUT_BUDGET_TEST_DEFAULT = true;
+// live 工具输出渲染预算（openspec/changes/perf-live-tool-output-render-budget）：
+// published 快照 live 流式期行数帽降档（200 → 100），settle 后恢复 200。
+// 异常时 localStorage 置 ccgui.perf.liveToolOutputStreamingTail=0 回退旧帽。
+export const LIVE_TOOL_OUTPUT_STREAMING_TAIL_FLAG_KEY =
+  "ccgui.perf.liveToolOutputStreamingTail";
+const LIVE_TOOL_OUTPUT_STREAMING_TAIL_DEFAULT = true;
+const LIVE_TOOL_OUTPUT_STREAMING_TAIL_TEST_DEFAULT = true;
+// live 期渲染降级（跳过逐行 Prism、用户折叠意图优先、read markdown 大小上限）。
+// 异常时 localStorage 置 ccgui.perf.liveToolRenderBudget=0 回退旧渲染语义。
+export const LIVE_TOOL_RENDER_BUDGET_FLAG_KEY = "ccgui.perf.liveToolRenderBudget";
+const LIVE_TOOL_RENDER_BUDGET_DEFAULT = true;
+const LIVE_TOOL_RENDER_BUDGET_TEST_DEFAULT = true;
 
 function readStringFlag(key: string): string | null {
   if (typeof window === "undefined") {
@@ -325,6 +337,30 @@ export function isToolOutputTailGateEnabled(): boolean {
   return fallback;
 }
 
+export function isLiveToolOutputStreamingTailEnabled(): boolean {
+  const fallback = isTestMode
+    ? LIVE_TOOL_OUTPUT_STREAMING_TAIL_TEST_DEFAULT
+    : LIVE_TOOL_OUTPUT_STREAMING_TAIL_DEFAULT;
+  const stored = readStringFlag(LIVE_TOOL_OUTPUT_STREAMING_TAIL_FLAG_KEY);
+  const parsed = parseBooleanFlag(stored);
+  if (parsed !== null) {
+    return parsed;
+  }
+  return fallback;
+}
+
+export function isLiveToolRenderBudgetEnabled(): boolean {
+  const fallback = isTestMode
+    ? LIVE_TOOL_RENDER_BUDGET_TEST_DEFAULT
+    : LIVE_TOOL_RENDER_BUDGET_DEFAULT;
+  const stored = readStringFlag(LIVE_TOOL_RENDER_BUDGET_FLAG_KEY);
+  const parsed = parseBooleanFlag(stored);
+  if (parsed !== null) {
+    return parsed;
+  }
+  return fallback;
+}
+
 export function resetRealtimePerfFlags(): string[] {
   const removedKeys: string[] = [];
   if (typeof window !== "undefined") {
@@ -344,6 +380,8 @@ export function resetRealtimePerfFlags(): string[] {
     removeKey(RENDER_TIER_FLAG_KEY);
     removeKey(TOOL_OUTPUT_TAIL_GATE_FLAG_KEY);
     removeKey(TOOL_OUTPUT_BUDGET_FLAG_KEY);
+    removeKey(LIVE_TOOL_OUTPUT_STREAMING_TAIL_FLAG_KEY);
+    removeKey(LIVE_TOOL_RENDER_BUDGET_FLAG_KEY);
   }
   __resetRealtimePerfFlagCacheForTests();
   return removedKeys;

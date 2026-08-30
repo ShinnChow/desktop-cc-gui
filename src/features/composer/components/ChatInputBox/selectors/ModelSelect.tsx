@@ -13,48 +13,39 @@ import ChevronDownIcon from "lucide-react/dist/esm/icons/chevron-down";
 import SearchIcon from "lucide-react/dist/esm/icons/search";
 import Settings2Icon from "lucide-react/dist/esm/icons/settings-2";
 import type { ModelInfo, ProviderId } from "../types";
-import { resolveAtomicReasoningEffort } from "../../../../models/atomicModelReasoning";
 import {
   formatDshModelDisplayLabel,
-  groupDshModelsByVendor,
   isSlashCatalogEngine,
 } from "./dshModelDisplayLabel";
+import {
+  buildProviderExecutionTarget,
+  resolveActiveProviderProfileId,
+} from "./model-select/executionTarget";
+import {
+  isAtomicEmptyModelSelection,
+  isSelectedExecutionModel,
+  resolveAtomicSelectedModelDisplay,
+  resolveClaudeCatalogModelLabel,
+  resolveRuntimeModel,
+} from "./model-select/display";
+import {
+  pickerRowsForGroup,
+  type PickerModelGroup,
+  type PickerModelRow,
+  type PickerProfileOption,
+} from "./model-select/pickerGroups";
+import { ModelIcon, resolveModelIdForIcon } from "./model-select/icon";
 import type { ProviderModelGroup } from "../modelOptions";
 import type { ProviderTargetGroup } from "../hooks/useProviderTargetCatalogOwners";
 import type { ExecutionTarget } from "../../../../shared-session/target/types";
 import type { QoderSettingsHighlightTarget } from "../../../../app/hooks/useSettingsModalState";
 import { PROVIDER_CONTINUATION_UI_ROLLBACK_EVENT } from "../../../../threads/services/providerContinuationRequests";
-import {
-  CLAUDE_LOCAL_PROVIDER_PROFILE_ID,
-  CODEX_DISK_PROVIDER_PROFILE_ID,
-  DSH_LOCAL_PROVIDER_PROFILE_ID,
-  GROK_LOCAL_PROVIDER_PROFILE_ID,
-  KIMI_LOCAL_PROVIDER_PROFILE_ID,
-  OPENCODE_LOCAL_PROVIDER_PROFILE_ID,
-  PI_LOCAL_PROVIDER_PROFILE_ID,
-  QODER_CN_PROVIDER_PROFILE_ID,
-  QODER_GLOBAL_PROVIDER_PROFILE_ID,
-  QODER_LOCAL_PROVIDER_PROFILE_ID,
-} from "../../../../threads/constants/codexProviderProfiles";
-import { EngineIcon } from "../../../../engine/components/EngineIcon";
-import { ProviderBrandIconImg } from "../../../../vendors/components/ProviderBrandIconImg";
-import {
-  PROVIDER_BRAND_ICON_SRC,
-  resolveProviderBrandIcon,
-} from "../../../../vendors/providerBrandIcon";
+import { QODER_CN_PROVIDER_PROFILE_ID } from "../../../../threads/constants/codexProviderProfiles";
 import {
   STORAGE_KEYS as MODEL_MAPPING_STORAGE_KEYS,
   getModelMapping,
-  resolveModelMappingValue,
-  type ModelMapping,
 } from "../../../../models/constants";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ChannelPickerDialog } from "./model-select/ChannelPickerDialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -69,6 +60,13 @@ import {
 
 const SUBMENU_FOOTER_BUTTON_CLASS =
   "flex min-h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-md border border-border/70 bg-muted/45 px-2 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50";
+
+/**
+ * PI `--list-models` 表格降级源：解析固定宽度表格、拿不到 thinkingLevelMap，
+ * 推理模型只会投影 off~high 五档。RPC 快照（cli:pi-available-models）不受影响。
+ * 见 openspec/changes/fix-pi-degraded-thinking-catalog-self-heal。
+ */
+const PI_LIST_MODELS_PROVENANCE = "cli:pi-list-models";
 
 interface ModelSelectProps {
   value: string;
@@ -134,455 +132,6 @@ const MODEL_DESCRIPTION_KEYS: Record<string, string> = {
   "gpt-5.5": "models.codex.gpt55.description",
 };
 
-const LOCAL_PROVIDER_PROFILE_IDS: Partial<Record<ProviderId, string>> = {
-  claude: CLAUDE_LOCAL_PROVIDER_PROFILE_ID,
-  codex: CODEX_DISK_PROVIDER_PROFILE_ID,
-  kimi: KIMI_LOCAL_PROVIDER_PROFILE_ID,
-  grok: GROK_LOCAL_PROVIDER_PROFILE_ID,
-  opencode: OPENCODE_LOCAL_PROVIDER_PROFILE_ID,
-  pi: PI_LOCAL_PROVIDER_PROFILE_ID,
-  dsh: DSH_LOCAL_PROVIDER_PROFILE_ID,
-  qoder: QODER_LOCAL_PROVIDER_PROFILE_ID,
-};
-
-export function normalizeExecutionProviderProfileId(
-  providerId: ProviderId,
-  providerProfileId: string | null | undefined,
-): string | null {
-  const normalizedProviderProfileId = providerProfileId?.trim();
-  // Qoder Global/CN are fixed distribution identities, not ordinary local
-  // provider profiles. Preserve them through target selection and dispatch.
-  if (providerId === "qoder") {
-    return !normalizedProviderProfileId ||
-      normalizedProviderProfileId === QODER_LOCAL_PROVIDER_PROFILE_ID
-      ? null
-      : normalizedProviderProfileId;
-  }
-  return !normalizedProviderProfileId ||
-    LOCAL_PROVIDER_PROFILE_IDS[providerId] === normalizedProviderProfileId
-    ? null
-    : normalizedProviderProfileId;
-}
-
-/**
- * 每个 CLI 只投影一个活跃渠道:当前 CLI 取 executionTarget 所选渠道
- * (空 = 本地默认),其余 CLI 一律取本地默认渠道。
- */
-export function resolveActiveProviderProfileId(
-  providerId: ProviderId,
-  executionTarget:
-    | Pick<ExecutionTarget, "engine" | "providerProfileId">
-    | null
-    | undefined,
-): string | null {
-  const targetProfileId =
-    executionTarget?.engine === providerId
-      ? normalizeExecutionProviderProfileId(
-          providerId,
-          executionTarget.providerProfileId,
-        )
-      : null;
-  if (targetProfileId) {
-    return targetProfileId;
-  }
-  return providerId === "qoder"
-    ? QODER_GLOBAL_PROVIDER_PROFILE_ID
-    : (LOCAL_PROVIDER_PROFILE_IDS[providerId] ?? null);
-}
-
-/**
- * Claude 列表行展示名：catalog runtime 优先于全局 localStorage mapping。
- * Shared 打开历史会话时 mapping 常滞后于 selectedNextTarget 渠道。
- */
-export function resolveClaudeCatalogModelLabel(
-  model: Pick<ModelInfo, "id" | "model" | "label" | "providerProfileId">,
-  modelMapping: ModelMapping,
-): string {
-  const runtime = model.model?.trim() || "";
-  const catalogId = model.id.trim();
-  if (runtime) {
-    if (model.providerProfileId?.trim() || runtime !== catalogId) {
-      return runtime;
-    }
-  } else if (
-    model.providerProfileId?.trim() &&
-    model.label &&
-    model.label.trim() !== catalogId
-  ) {
-    return model.label.trim();
-  }
-
-  const mappedName = resolveModelMappingValue(model.id, modelMapping);
-  if (mappedName) {
-    return mappedName;
-  }
-
-  const parentLabel = model.label?.trim() || "";
-  if (parentLabel) {
-    return parentLabel;
-  }
-  return catalogId || model.id;
-}
-
-export function isSameProviderExecutionProfile(
-  currentProvider: ProviderId,
-  currentProviderProfileId: string | null | undefined,
-  target: Pick<ExecutionTarget, "engine" | "providerProfileId">,
-): boolean {
-  return (
-    target.engine === currentProvider &&
-    normalizeExecutionProviderProfileId(
-      currentProvider,
-      target.providerProfileId,
-    ) ===
-      normalizeExecutionProviderProfileId(
-        currentProvider,
-        currentProviderProfileId,
-      )
-  );
-}
-
-export type BuildProviderExecutionTargetModelMeta = {
-  source?: string | null;
-  supportedReasoningEfforts?: ModelInfo["supportedReasoningEfforts"];
-  defaultReasoningEffort?: string | null;
-};
-
-export function buildProviderExecutionTarget(
-  current: ExecutionTarget | null | undefined,
-  providerId: ProviderId,
-  providerProfileId: string,
-  modelCatalogEntryId: string,
-  providerProfileNameSnapshot?: string,
-  providerProfileSource?: "disk" | "managed",
-  normalizeProviderProfile = true,
-  runtimeModel?: string,
-  /**
-   * @deprecated 兼容旧调用：仅当 modelMeta 未提供 default 时作为 fallback。
-   * 新代码请走 modelMeta（含 supported + default + source）。
-   */
-  defaultReasoningEffort?: string | null,
-  /** 目标模型 capability；Shared/Atomic 据此 seed/校验 reasoning effort。 */
-  modelMeta?: BuildProviderExecutionTargetModelMeta | null,
-): ExecutionTarget {
-  const normalizedProviderProfileId = normalizeProviderProfile
-    ? normalizeExecutionProviderProfileId(providerId, providerProfileId)
-    : providerProfileId;
-  const normalizedRuntimeModel = runtimeModel?.trim() || null;
-  const sameProfile =
-    current?.engine === providerId &&
-    current.providerProfileId === normalizedProviderProfileId;
-  const modelRef: ModelInfo = {
-    id: modelCatalogEntryId,
-    model: normalizedRuntimeModel ?? modelCatalogEntryId,
-    label: modelCatalogEntryId,
-    source: modelMeta?.source ?? undefined,
-    supportedReasoningEfforts: modelMeta?.supportedReasoningEfforts,
-    defaultReasoningEffort:
-      modelMeta?.defaultReasoningEffort ??
-      (defaultReasoningEffort?.trim() || null),
-  };
-  const nextEffort = resolveAtomicReasoningEffort({
-    engine: providerId,
-    model: modelRef,
-    previousEffort: current?.reasoning?.effort ?? null,
-    inherit: sameProfile,
-  });
-  return {
-    engine: providerId,
-    providerProfileId: normalizedProviderProfileId,
-    modelCatalogEntryId,
-    model: normalizedRuntimeModel,
-    providerProfileNameSnapshot: providerProfileNameSnapshot?.trim() || null,
-    providerProfileSource: providerProfileSource ?? null,
-    reasoning: nextEffort ? { effort: nextEffort } : null,
-  };
-}
-
-function resolveRuntimeModel(model: ModelInfo): string | undefined {
-  return model.model?.trim() || model.id.trim() || undefined;
-}
-
-/**
- * Atomic 闭合态选中展示解析（Shared / create-session Atomic 共用）。
- *
- * catalog 命中时用 catalog 行做友好标签；未命中时用 executionTarget 快照合成展示行。
- * Atomic 路径 MUST NOT 依赖父层 activeEngine `models` 判定“是否已选”。
- */
-export function resolveAtomicSelectedModelDisplay(
-  executionTarget: ExecutionTarget | null | undefined,
-  selectedModelValue: string,
-  catalogModels: readonly ModelInfo[] | null | undefined,
-): ModelInfo | null {
-  if (!executionTarget) {
-    return null;
-  }
-  const catalogEntryId =
-    executionTarget.modelCatalogEntryId?.trim() || selectedModelValue.trim();
-  const runtimeModel = executionTarget.model?.trim() || "";
-  if (!catalogEntryId && !runtimeModel) {
-    return null;
-  }
-
-  const matchedCatalog =
-    catalogModels?.find((model) => {
-      if (catalogEntryId && model.id === catalogEntryId) {
-        return true;
-      }
-      if (selectedModelValue && model.id === selectedModelValue) {
-        return true;
-      }
-      const catalogRuntime = resolveRuntimeModel(model);
-      return Boolean(
-        runtimeModel && catalogRuntime && catalogRuntime === runtimeModel,
-      );
-    }) ?? null;
-  if (matchedCatalog) {
-    return matchedCatalog;
-  }
-
-  const snapshotId = catalogEntryId || runtimeModel;
-  return {
-    id: snapshotId,
-    model: runtimeModel || snapshotId,
-    label: runtimeModel || snapshotId,
-    providerProfileId: executionTarget.providerProfileId?.trim() || undefined,
-    source: "provider-config",
-  };
-}
-
-/**
- * Atomic 空选：有引擎、无 model identity。
- * 这是模板编辑器的合法未配齐态，不是 Composer 冷启 loading。
- */
-export function isAtomicEmptyModelSelection(
-  executionTarget: ExecutionTarget | null | undefined,
-  selectedModelValue: string,
-): boolean {
-  if (!executionTarget?.engine) {
-    return false;
-  }
-  return (
-    !executionTarget.modelCatalogEntryId?.trim() &&
-    !executionTarget.model?.trim() &&
-    !selectedModelValue.trim()
-  );
-}
-
-/**
- * Resolve the model id used for brand-icon matching.
- * Claude：与列表文案同源（{@link resolveClaudeCatalogModelLabel}）——
- * catalog runtime 优先，禁止陈旧 localStorage mapping 把「k3」行画成 DeepSeek 鲸。
- * 其它 CLI：runtime / id。
- */
-export function resolveModelIdForIcon(
-  model: ModelInfo | null | undefined,
-  mapping: ModelMapping,
-  providerId?: string | null,
-): string | null {
-  if (!model) {
-    return null;
-  }
-  if (!providerId || providerId === "claude") {
-    // 与 getModelLabel 一致：catalog 改写后的 runtime 优先于全局 mapping
-    const runtime = model.model?.trim() || "";
-    const catalogId = model.id.trim();
-    if (runtime && (model.providerProfileId?.trim() || runtime !== catalogId)) {
-      return runtime;
-    }
-    const mapped = resolveModelMappingValue(model.id, mapping);
-    if (mapped) {
-      return mapped;
-    }
-  }
-  return resolveRuntimeModel(model) ?? model.id;
-}
-
-function isSelectedExecutionModel(
-  executionTarget: ExecutionTarget | null | undefined,
-  model: ModelInfo,
-): boolean {
-  const selectedCatalogEntryId = executionTarget?.modelCatalogEntryId?.trim();
-  if (selectedCatalogEntryId) {
-    return selectedCatalogEntryId === model.id;
-  }
-  const selectedRuntimeModel = executionTarget?.model?.trim();
-  return Boolean(
-    selectedRuntimeModel && selectedRuntimeModel === resolveRuntimeModel(model),
-  );
-}
-
-/**
- * 分组子菜单的统一投影:legacy(modelGroups)与 atomic(targetGroups)
- * 共用同一套「引擎子菜单 → 平铺模型」渲染,差异只在选择/刷新行为。
- */
-type PickerProfileOption = {
-  id: string;
-  label: string;
-  source: "disk" | "managed";
-  models: ModelInfo[];
-  loading: boolean;
-  reloading: boolean;
-  error: string | null;
-};
-
-type PickerModelGroup = {
-  providerId: ProviderId;
-  providerLabel: string;
-  models: ModelInfo[];
-  enabled: boolean;
-  disabledReason?: string;
-  loading: boolean;
-  reloading: boolean;
-  error: string | null;
-  targetProfileId: string | null;
-  targetProfileLabel?: string;
-  targetProfileSource?: "disk" | "managed";
-  /** Atomic 目标组的全部渠道,用于子菜单底栏渠道选择弹窗 */
-  profiles: PickerProfileOption[];
-};
-
-type PickerModelRow =
-  | { kind: "heading"; key: string; sectionKey: string; label: string }
-  | { kind: "model"; key: string; model: ModelInfo; disambiguate?: boolean };
-
-function pickerRowsForGroup(group: PickerModelGroup): PickerModelRow[] {
-  if (!isSlashCatalogEngine(group.providerId)) {
-    return group.models.map((model) => ({
-      kind: "model" as const,
-      key: `${group.providerId}:${model.id}`,
-      model,
-    }));
-  }
-
-  return groupDshModelsByVendor(group.models).flatMap((section) => {
-    // PI 自定义供应商常把多个上游路由进同一 provider（cpa/cline/x 与
-    // cpa/fb2api/x），last-segment 相同的行需保留中段路径才能区分。
-    const labelCounts = new Map<string, number>();
-    for (const model of section.models) {
-      const label = formatDshModelDisplayLabel(model);
-      labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
-    }
-    return [
-      {
-        kind: "heading" as const,
-        key: `${group.providerId}-vendor:${section.key}`,
-        sectionKey: section.key,
-        label: section.label,
-      },
-      ...section.models.map((model) => ({
-        kind: "model" as const,
-        key: `${group.providerId}:${section.key}:${model.id}`,
-        model,
-        disambiguate:
-          (labelCounts.get(formatDshModelDisplayLabel(model)) ?? 0) > 1,
-      })),
-    ];
-  });
-}
-
-/**
- * Each CLI's native brand mark (when it has a lobehub SVG). Used to detect
- * true cross-vendor remaps (e.g. Claude tier → kimi-k3) vs native models that
- * should keep the engine-canonical icon for visual consistency.
- */
-const ENGINE_NATIVE_BRAND_SRC: Partial<Record<string, string>> = {
-  claude: PROVIDER_BRAND_ICON_SRC.claude,
-  codex: PROVIDER_BRAND_ICON_SRC.openai,
-  kimi: PROVIDER_BRAND_ICON_SRC.kimi,
-  opencode: PROVIDER_BRAND_ICON_SRC.opencode,
-  dsh: PROVIDER_BRAND_ICON_SRC.deepseek,
-};
-
-function renderBrandIcon(src: string, size: number) {
-  const imgStyle = { width: size, height: size, flexShrink: 0 } as const;
-  return (
-    <span style={imgStyle} className="selector-model-brand-icon" aria-hidden>
-      <ProviderBrandIconImg src={src} />
-    </span>
-  );
-}
-
-/**
- * Model icon: keep provider row / model rows / composer trigger consistent per CLI.
- *
- * - Kimi → lobehub brand tile (dark pad + white K + blue dot)
- * - Codex / Grok / Claude / … → EngineIcon monochrome / asset
- * - Only show a foreign brand when a mapped runtime model points at another
- *   vendor (e.g. Claude slot remapped to kimi-k3)
- */
-const ModelIcon = ({
-  provider,
-  model,
-  modelIdForIcon,
-  size = 16,
-}: {
-  provider?: string;
-  model?: ModelInfo | null;
-  /** Pre-resolved id for brand matching (mapped runtime name preferred). */
-  modelIdForIcon?: string | null;
-  size?: number;
-}) => {
-  const imgStyle = { width: size, height: size, flexShrink: 0 } as const;
-  const resolvedModelId =
-    modelIdForIcon?.trim() ||
-    (model ? (resolveRuntimeModel(model) ?? model.id) : null);
-
-  // DSH host catalog (and remapped slots) can expose Grok models. Those
-  // must use the same theme-aware Grok glyph as Grok CLI, not the host
-  // CLI's DeepSeek whale. Match only the resolved runtime id so a later
-  // remap away from Grok still follows the brand-icon path.
-  if (resolvedModelId && /grok/i.test(resolvedModelId)) {
-    return <EngineIcon engine="grok" size={size} style={imgStyle} />;
-  }
-
-  // Cross-vendor remap only — do not pass presetId, otherwise every Kimi model
-  // without "kimi" in its id would short-circuit through brand while the
-  // provider row still used EngineIcon (or vice versa).
-  if (resolvedModelId) {
-    const brandIconSrc = resolveProviderBrandIcon({
-      modelId: resolvedModelId,
-    });
-    const nativeBrandSrc = provider
-      ? ENGINE_NATIVE_BRAND_SRC[provider]
-      : undefined;
-    if (brandIconSrc && brandIconSrc !== nativeBrandSrc) {
-      return renderBrandIcon(brandIconSrc, size);
-    }
-  }
-
-  // Kimi's product mark is the brand tile; monochrome EngineIcon is the wrong
-  // glyph for this CLI (provider row + model list + trigger must match).
-  if (provider === "kimi") {
-    return renderBrandIcon(PROVIDER_BRAND_ICON_SRC.kimi, size);
-  }
-  if (provider === "dsh") {
-    return renderBrandIcon(PROVIDER_BRAND_ICON_SRC.deepseek, size);
-  }
-
-  switch (provider) {
-    case "codex":
-      return <EngineIcon engine="codex" size={size} style={imgStyle} />;
-    case "gemini":
-      return <EngineIcon engine="gemini" size={size} style={imgStyle} />;
-    case "grok":
-      return <EngineIcon engine="grok" size={size} style={imgStyle} />;
-    case "opencode":
-      return <EngineIcon engine="opencode" size={size} style={imgStyle} />;
-    case "pi":
-      return <EngineIcon engine="pi" size={size} style={imgStyle} />;
-    case "qoder":
-      return <EngineIcon engine="qoder" size={size} style={imgStyle} />;
-    case "claude":
-    default:
-      return <EngineIcon engine="claude" size={size} style={imgStyle} />;
-  }
-};
-
-/**
- * ModelSelect - Model selector component
- * Supports switching between Sonnet 4.5, Opus 4.5, and other models, including Codex models
- */
 export const ModelSelect = memo(
   ({
     value,
@@ -1212,7 +761,19 @@ export const ModelSelect = memo(
           const isFallbackOnly =
             groupModels.length > 0 &&
             groupModels.every((model) => (model.source ?? "") === "fallback");
-          if (isFallbackOnly) {
+          // PI `--list-models` 降级目录（source=detected 但缺 thinkingLevelMap）
+          // 是「健康可缓存」数据，cache-first 不会自愈，只能在这里补拉一次；
+          // RPC 探测成功后整组 provenance 变为 cli:pi-available-models，判定失效。
+          const isCapabilityDegradedPi =
+            currentProvider === "pi" &&
+            !isFallbackOnly &&
+            groupModels.length > 0 &&
+            groupModels.every(
+              (model) =>
+                (model.source ?? "") === "detected" &&
+                model.provenance === PI_LIST_MODELS_PROVENANCE,
+            );
+          if (isFallbackOnly || isCapabilityDegradedPi) {
             handleRefreshConfig();
           }
           return;
@@ -1934,59 +1495,11 @@ export const ModelSelect = memo(
     );
 
     const channelDialog = (
-      <Dialog
-        open={channelPickerGroup != null}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeChannelPicker();
-          }
-        }}
-      >
-        <DialogContent
-          className="flex max-h-[min(80vh,32rem)] w-[min(100vw-2rem,24rem)] flex-col gap-3 sm:max-w-md"
-          data-channel-picker-dialog={
-            channelPickerGroup?.providerId ?? undefined
-          }
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {t("models.switchChannel", { defaultValue: "切换渠道" })}
-            </DialogTitle>
-            <DialogDescription>
-              {t("models.selectChannelForEngine", {
-                name: channelPickerGroup?.providerLabel ?? "",
-                defaultValue: `选择 ${channelPickerGroup?.providerLabel ?? ""} 的配置渠道`,
-              })}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-            {channelPickerGroup?.profiles.map((profile) => {
-              const isActive =
-                profile.id === channelPickerGroup.targetProfileId;
-              return (
-                <button
-                  key={profile.id}
-                  type="button"
-                  data-provider-profile-id={profile.id}
-                  data-channel-option={channelPickerGroup.providerId}
-                  data-selected={isActive ? "true" : undefined}
-                  className="flex w-full items-center gap-2 rounded-md border border-transparent px-3 py-2.5 text-left text-sm hover:bg-accent hover:text-accent-foreground data-[selected=true]:border-border data-[selected=true]:bg-muted/60"
-                  onClick={() => {
-                    handleChannelPickerSelect(profile.id);
-                  }}
-                >
-                  <span className="min-w-0 flex-1 truncate font-medium">
-                    {profile.label}
-                  </span>
-                  {isActive && (
-                    <CheckIcon className="size-4 shrink-0" aria-hidden />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ChannelPickerDialog
+        group={channelPickerGroup}
+        onClose={closeChannelPicker}
+        onSelectProfile={handleChannelPickerSelect}
+      />
     );
 
     if (triggerVariant === "readiness") {

@@ -34,7 +34,6 @@ import {
   resetClientStorageForTests,
   writeClientStoreValue,
 } from "../../../services/clientStorage";
-import { pushErrorToast } from "../../../services/toasts";
 import {
   DEFAULT_CODE_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
@@ -2167,122 +2166,6 @@ describe("SettingsView Display", () => {
     });
   });
 
-  it("auto applies network proxy when toggled on", async () => {
-    const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
-    renderDisplaySection({
-      onUpdateAppSettings,
-      appSettings: { systemProxyEnabled: false, systemProxyUrl: null },
-    });
-    vi.mocked(pushErrorToast).mockClear();
-
-    fireEvent.click(screen.getByRole("button", { name: "Behavior" }));
-    const proxyCard = document.querySelector(
-      ".settings-basic-proxy-card",
-    ) as HTMLElement | null;
-    if (!proxyCard) {
-      throw new Error("Expected network proxy card");
-    }
-    fireEvent.change(screen.getByLabelText("settings.behaviorProxyAddress"), {
-      target: { value: "http://127.0.0.1:7890" },
-    });
-    fireEvent.click(within(proxyCard).getByRole("switch"));
-
-    await waitFor(() => {
-      expect(onUpdateAppSettings).toHaveBeenCalledWith(
-        expect.objectContaining({
-          systemProxyEnabled: true,
-          systemProxyUrl: "http://127.0.0.1:7890",
-        }),
-      );
-    });
-
-    expect(
-      document.querySelector(".settings-basic-proxy-card.is-enabled"),
-    ).toBeTruthy();
-    expect(document.querySelector(".settings-proxy-header-badge")).toBeTruthy();
-    expect(
-      document.querySelectorAll(
-        ".settings-basic-proxy-card .proxy-status-badge",
-      ),
-    ).toHaveLength(1);
-    expect((await screen.findByRole("status")).textContent ?? "").toContain(
-      "settings.behaviorProxyEnabledSuccess",
-    );
-  });
-
-  it("auto disables network proxy when toggled off", async () => {
-    const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
-    renderDisplaySection({
-      onUpdateAppSettings,
-      appSettings: {
-        systemProxyEnabled: true,
-        systemProxyUrl: "http://127.0.0.1:7890",
-      },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Behavior" }));
-    const proxyCard = document.querySelector(
-      ".settings-basic-proxy-card",
-    ) as HTMLElement | null;
-    if (!proxyCard) {
-      throw new Error("Expected network proxy card");
-    }
-
-    fireEvent.click(within(proxyCard).getByRole("switch"));
-
-    await waitFor(() => {
-      expect(onUpdateAppSettings).toHaveBeenCalledWith(
-        expect.objectContaining({
-          systemProxyEnabled: false,
-          systemProxyUrl: "http://127.0.0.1:7890",
-        }),
-      );
-    });
-
-    expect((await screen.findByRole("status")).textContent ?? "").toContain(
-      "settings.behaviorProxyDisabledSuccess",
-    );
-  });
-
-  it("rolls back proxy toggle and shows failure feedback when auto apply fails", async () => {
-    const onUpdateAppSettings = vi
-      .fn()
-      .mockRejectedValue(new Error("proxy apply failed"));
-    renderDisplaySection({
-      onUpdateAppSettings,
-      appSettings: { systemProxyEnabled: false, systemProxyUrl: null },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Behavior" }));
-    const proxyCard = document.querySelector(
-      ".settings-basic-proxy-card",
-    ) as HTMLElement | null;
-    if (!proxyCard) {
-      throw new Error("Expected network proxy card");
-    }
-
-    fireEvent.change(screen.getByLabelText("settings.behaviorProxyAddress"), {
-      target: { value: "http://127.0.0.1:7890" },
-    });
-    fireEvent.click(within(proxyCard).getByRole("switch"));
-
-    await waitFor(() => {
-      expect(screen.getByRole("alert").textContent ?? "").toContain(
-        "proxy apply failed",
-      );
-    });
-
-    expect(
-      within(proxyCard).getByRole("switch").getAttribute("aria-checked"),
-    ).toBe("false");
-    expect(pushErrorToast).toHaveBeenCalledWith({
-      title: "common.error",
-      message: "proxy apply failed",
-    });
-  });
-});
-
-describe("SettingsView Composer", () => {
   it("updates send shortcut mode", async () => {
     const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
     renderComposerSection({ onUpdateAppSettings });

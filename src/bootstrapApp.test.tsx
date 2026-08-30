@@ -62,7 +62,9 @@ vi.mock("./features/composer/hooks/useInputHistoryStore", () => ({
 
 vi.mock("./services/rendererDiagnostics", () => ({
   appendRendererDiagnostic: appendRendererDiagnosticMock,
+  appendRendererDiagnosticImmediate: vi.fn(),
   flushRendererDiagnosticsBuffer: flushRendererDiagnosticsBufferMock,
+  installMainThreadStallWatchdog: vi.fn(),
   startRendererBlankScreenWatchdog: startRendererBlankScreenWatchdogMock,
 }));
 

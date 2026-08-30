@@ -102,6 +102,8 @@ export async function invalidateSessionIndexForWorkspace(
 const LOCAL_PENDING_DRAFT_SESSION_ID =
   /^([a-z][a-z0-9]*)-pending-(\d{10,16})-([a-z0-9]{4,12})$/i;
 
+const CLAUDE_FORK_THREAD_PREFIX = "claude-fork:";
+
 const rememberedWorkspacePathById = new Map<string, string>();
 
 export function rememberSessionIndexWorkspacePath(
@@ -167,6 +169,21 @@ export function scheduleTombstoneLocalPendingDraftIndexRow(
   void tombstoneSessionIndexRows([sessionId]).catch(() => 0);
 }
 
+/**
+ * Synthetic fork bootstrap payload: the `claude-fork:` prefix stripped. This is
+ * the exact key a legacy mangled Index row was stored under (bareSessionId used
+ * to split synthetic fork ids at the first colon), so it is the only reliable
+ * tombstone target when such a row is deleted.
+ */
+export function claudeForkIndexTwinSessionId(threadId: string): string | null {
+  const raw = threadId.trim();
+  if (!raw.startsWith(CLAUDE_FORK_THREAD_PREFIX)) {
+    return null;
+  }
+  const payload = raw.slice(CLAUDE_FORK_THREAD_PREFIX.length).trim();
+  return payload.length > 0 ? payload : null;
+}
+
 /** Hide Index rows so sidebar hydrate cannot resurrect a deleted session. */
 export function writeClientCreatedSessionIndex(input: {
   engine: string;
@@ -180,6 +197,12 @@ export function writeClientCreatedSessionIndex(input: {
   const rawId = input.sessionId.trim();
   const workspacePath = input.workspacePath.trim();
   if (!engine || engine === "shared" || !rawId || !workspacePath) {
+    return;
+  }
+  // Synthetic fork bootstraps are runtime-only rows (claude-fork-session-support
+  // spec). bareSessionId would split them at the first colon into a mangled key
+  // that no delete lookup / tombstone can ever reach — i.e. an undeletable row.
+  if (rawId.startsWith(CLAUDE_FORK_THREAD_PREFIX)) {
     return;
   }
   // Qoder canonical id embeds its distribution. Keep it intact so Rust can
@@ -205,6 +228,15 @@ export function writeClientCreatedSessionIndex(input: {
       ...(providerProfileName ? { providerProfileName } : {}),
     },
   ]).catch(() => 0);
+}
+
+/** Tombstone the mangled companion Index row of a synthetic fork id (best-effort). */
+export function scheduleTombstoneClaudeForkIndexRow(threadId: string): void {
+  const twin = claudeForkIndexTwinSessionId(threadId);
+  if (!twin) {
+    return;
+  }
+  void tombstoneSessionIndexRows([twin]).catch(() => 0);
 }
 
 export async function upsertSessionIndexRows(

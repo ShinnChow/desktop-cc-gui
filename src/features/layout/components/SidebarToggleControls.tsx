@@ -22,6 +22,9 @@ export type SidebarToggleProps = {
   isLayoutSwapped?: boolean;
   rightPanelAvailable?: boolean;
   showSidebarTitlebarToggle?: boolean;
+  /** 悬停提示里展示的快捷键（formatShortcutForPlatform 后的用户实际绑定值；空则不展示） */
+  sidebarShortcutLabel?: string | null;
+  rightPanelShortcutLabel?: string | null;
   onCollapseSidebar: () => void;
   onExpandSidebar: () => void;
   onCollapseRightPanel: () => void;
@@ -32,6 +35,7 @@ export function SidebarCollapseButton({
   isCompact,
   sidebarCollapsed,
   isLayoutSwapped = false,
+  sidebarShortcutLabel,
   onExpandSidebar,
   onCollapseSidebar,
 }: SidebarToggleProps) {
@@ -41,12 +45,16 @@ export function SidebarCollapseButton({
   }
   const isCollapsed = sidebarCollapsed;
   const labelKey = isCollapsed ? "sidebar.showThreadsSidebar" : "sidebar.hideThreadsSidebar";
+  const label = t(labelKey);
+  const tooltip = sidebarShortcutLabel
+    ? `${label} (${sidebarShortcutLabel})`
+    : label;
   return (
     <TooltipIconButton
       className="ghost main-header-action"
       onClick={isCollapsed ? onExpandSidebar : onCollapseSidebar}
       data-tauri-drag-region="false"
-      label={t(labelKey)}
+      label={tooltip}
     >
       {isCollapsed ? (
         isLayoutSwapped ? <PanelRightOpen size={14} aria-hidden /> : <PanelLeftOpen size={14} aria-hidden />
@@ -104,20 +112,25 @@ export function RightPanelCollapseButton({
   isCompact,
   rightPanelCollapsed,
   rightPanelAvailable = true,
+  rightPanelShortcutLabel,
   onCollapseRightPanel,
 }: SidebarToggleProps) {
   const { t } = useTranslation();
   if (isCompact || rightPanelCollapsed || !rightPanelAvailable) {
     return null;
   }
+  const label = t("sidebar.hideGitSidebar");
+  const tooltip = rightPanelShortcutLabel
+    ? `${label} (${rightPanelShortcutLabel})`
+    : label;
   return (
     <button
       type="button"
       className="ghost main-header-action"
       onClick={onCollapseRightPanel}
       data-tauri-drag-region="false"
-      aria-label={t("sidebar.hideGitSidebar")}
-      title={t("sidebar.hideGitSidebar")}
+      aria-label={tooltip}
+      title={tooltip}
     >
       <PanelRightClose size={14} aria-hidden />
     </button>

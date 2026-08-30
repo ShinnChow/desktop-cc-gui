@@ -242,10 +242,11 @@ const ThreadRowItem = memo(function ThreadRowItem({
     renameInputRef.current?.select();
   }, [isRenaming]);
   const status = useThreadRowStatus(thread.id);
+  const backgroundTaskRunningCount = status?.backgroundTaskRunningCount ?? 0;
   const rowProjection = getThreadRowProjection({
     workspaceId: nestedWorkspaceId,
     threadId: thread.id,
-    statusVersion: `${status?.isProcessing ? "1" : "0"}:${status?.hasUnread ? "1" : "0"}:${status?.isReviewing ? "1" : "0"}`,
+    statusVersion: `${status?.isProcessing ? "1" : "0"}:${status?.hasUnread ? "1" : "0"}:${status?.isReviewing ? "1" : "0"}:${backgroundTaskRunningCount}`,
     isProcessing: Boolean(status?.isProcessing),
     hasUnread: Boolean(status?.hasUnread),
     backgroundActivityLabel: status?.isReviewing
@@ -264,7 +265,9 @@ const ThreadRowItem = memo(function ThreadRowItem({
   // Live / completion status uses a compact meta-area dot (not a text pill):
   // - processing: blue breathe
   // - reviewing: static light blue
+  // - bg-running (pi durable background tasks in flight): purple breathe + count badge
   // - unread (finished while away): green; cleared on select via setActiveThreadId
+  // 左侧 thread-status 保持原有四态；后台任务第四态只表达在右侧 meta 区。
   const runtimeIndicator = status?.isReviewing
     ? { label: t("threads.runtimeReviewing"), severity: "reviewing" as const }
     : status?.isProcessing
@@ -272,14 +275,21 @@ const ThreadRowItem = memo(function ThreadRowItem({
           label: t("threads.runtimeProcessing"),
           severity: "processing" as const,
         }
-      : status?.hasUnread
+      : backgroundTaskRunningCount > 0
         ? {
-            label: t("threads.runtimeCompleted", {
-              defaultValue: "Completed",
+            label: t("threads.runtimeBackgroundTasks", {
+              defaultValue: "Background tasks running",
             }),
-            severity: "completed" as const,
+            severity: "bg-running" as const,
           }
-        : null;
+        : status?.hasUnread
+          ? {
+              label: t("threads.runtimeCompleted", {
+                defaultValue: "Completed",
+              }),
+              severity: "completed" as const,
+            }
+          : null;
   const isProcessing = rowProjection.isProcessing;
   const showProxyBadge = systemProxyEnabled && isProcessing;
   const indentStyle =
@@ -488,6 +498,19 @@ const ThreadRowItem = memo(function ThreadRowItem({
             {providerLabel}
           </span>
         ) : null}
+        {backgroundTaskRunningCount > 0 ? (
+          <span
+            className="thread-bg-task-count"
+            title={t("threads.runtimeBackgroundTasks", {
+              defaultValue: "Background tasks running",
+            })}
+            aria-label={t("threads.runtimeBackgroundTasks", {
+              defaultValue: "Background tasks running",
+            })}
+          >
+            {backgroundTaskRunningCount}
+          </span>
+        ) : null}
         {runtimeIndicator ? (
           <span
             className={`thread-runtime-dot thread-runtime-dot--${runtimeIndicator.severity}`}
@@ -634,7 +657,13 @@ export function ThreadList({
         return false;
       }
       const status = threadStatusById[thread.id];
-      return !status?.isProcessing && !status?.isReviewing;
+      // 后台任务运行中的会话不算「已退出」：hideExitedSessions 过滤下仍需
+      // 可见（紫灯是「未完成」信号，行被过滤掉信号就没了）。
+      return (
+        !status?.isProcessing &&
+        !status?.isReviewing &&
+        (status?.backgroundTaskRunningCount ?? 0) === 0
+      );
     },
     [threadStatusById],
   );
@@ -1013,6 +1042,18 @@ export function ThreadList({
         ) : null}
       </>
     ) : null;
+  const threadListFooter = showHiddenExitedSummary || pagingControls ? (
+    <div className="thread-list-footer">
+      {showHiddenExitedSummary && (
+        <div className="thread-list-hidden-summary">
+          {t("threads.exitedSessionsHidden", {
+            count: hiddenExitedCount,
+          })}
+        </div>
+      )}
+      {pagingControls}
+    </div>
+  ) : null;
 
   return (
     <ThreadRowStatusProvider threadStatusById={threadStatusById}>
@@ -1055,14 +1096,7 @@ export function ThreadList({
                 );
               })}
             </div>
-            {showHiddenExitedSummary && (
-              <div className="thread-list-hidden-summary">
-                {t("threads.exitedSessionsHidden", {
-                  count: hiddenExitedCount,
-                })}
-              </div>
-            )}
-            {pagingControls}
+            {threadListFooter}
           </>
         ) : (
           <>
@@ -1072,14 +1106,7 @@ export function ThreadList({
                 <div className="thread-list-separator" aria-hidden="true" />
               )}
             {displayedUnpinnedRows.map((row) => renderThreadRow(row))}
-            {showHiddenExitedSummary && (
-              <div className="thread-list-hidden-summary">
-                {t("threads.exitedSessionsHidden", {
-                  count: hiddenExitedCount,
-                })}
-              </div>
-            )}
-            {pagingControls}
+            {threadListFooter}
           </>
         )}
       </div>

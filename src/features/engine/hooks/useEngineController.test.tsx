@@ -41,6 +41,36 @@ vi.mock("../../../services/clientStorage", () => ({
   getClientStoreSync: vi.fn(),
   writeClientStoreValue: vi.fn(),
 }));
+const engineStatusEventListeners = new Set<
+  (event: {
+    detectRunId: number;
+    status: EngineStatus;
+  }) => void
+>();
+const requestEngineDetectionMock = vi.fn();
+vi.mock("./engineDetectionCoordinator", () => ({
+  requestEngineDetection: (options: unknown) =>
+    requestEngineDetectionMock(options),
+}));
+vi.mock("../../../services/tauri/appServer", () => ({
+  subscribeEngineStatusEvents: vi.fn(
+    (
+      listener: (event: { detectRunId: number; status: EngineStatus }) => void,
+    ) => {
+      engineStatusEventListeners.add(listener);
+      return () => {
+        engineStatusEventListeners.delete(listener);
+      };
+    },
+  ),
+}));
+
+function emitEngineStatusEvent(event: {
+  detectRunId: number;
+  status: EngineStatus;
+}): void {
+  engineStatusEventListeners.forEach((listener) => listener(event));
+}
 
 const detectEnginesMock = vi.mocked(detectEngines);
 const getActiveEngineMock = vi.mocked(getActiveEngine);
@@ -75,7 +105,13 @@ function createEngineStatus(
 
 describe("useEngineController", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+  engineStatusEventListeners.clear();
+  requestEngineDetectionMock.mockImplementation(
+    (options: { force?: boolean } | undefined) => {
+      void options;
+      return detectEnginesMock();
+    },
+  );    vi.clearAllMocks();
     window.localStorage.clear();
     isWebServiceRuntimeMock.mockReturnValue(false);
     switchEngineMock.mockResolvedValue(undefined);
@@ -1616,7 +1652,7 @@ describe("useEngineController", () => {
     expect(refreshResult?.availableEngines.find((engine) => engine.type === "claude")?.installed).toBe(true);
   });
 
-  it("refreshes stale engine status before switching", async () => {
+  it("switches optimistically and refreshes stale status in background", async () => {
     const codexModels: EngineStatus["models"] = [
       {
         id: "gpt-5",
@@ -1647,10 +1683,11 @@ describe("useEngineController", () => {
       await result.current.setActiveEngine("codex");
     });
 
-    expect(detectEnginesMock).toHaveBeenCalledTimes(2);
+    // 新契约：点击路径不 await 检测（后台 per-engine 刷新），switch 乐观执行。
     expect(switchEngineMock).toHaveBeenCalledWith("codex");
-    expect(runCodexDoctorMock).not.toHaveBeenCalled();
     expect(result.current.activeEngine).toBe("codex");
+    await act(async () => {});
+    expect(detectEnginesMock).toHaveBeenCalledTimes(2);
   });
 
   it("optimistically switches activeEngine before switchEngine settles", async () => {
@@ -1841,10 +1878,13 @@ describe("useEngineController", () => {
       await result.current.setActiveEngine("codex");
     });
 
-    expect(switchEngineMock).not.toHaveBeenCalled();
+    // doctor 证据后台收集，不阻塞乐观切换。
+    expect(switchEngineMock).toHaveBeenCalledWith("codex");
+    expect(result.current.activeEngine).toBe("codex");
+    await act(async () => {});
     expect(runCodexDoctorMock).toHaveBeenCalledWith(null, null);
     const switchError = debugEntries.find(
-      (entry) => entry.label === "engine/switch error",
+      (entry) => entry.label === "engine/switch codex doctor evidence",
     );
     expect(switchError?.payload).toMatchObject({
       message: "Engine codex is not installed",
@@ -1869,12 +1909,15 @@ describe("useEngineController", () => {
       );
       await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
+      // B-fix：pi 是解耦目录引擎，detect 后的默认加载升级为 on-demand 22s
+      // （覆盖后端 RPC+list-models 最坏链；旧 idle-prewarm 8s 冷启动必超时，
+      // providerModelCatalogs[pi] 为空导致思考档联动滞后/缺失）。
       const prewarmCall = runSpy.mock.calls
         .map(([descriptor]) => descriptor)
         .find((descriptor) =>
           String(descriptor.id).startsWith("engine-models:pi:"),
         );
-      expect(prewarmCall?.timeoutMs).toBe(8_000);
+      expect(prewarmCall?.timeoutMs).toBe(22_000);
 
       runSpy.mockClear();
       await act(async () => {
@@ -1889,5 +1932,299 @@ describe("useEngineController", () => {
     } finally {
       runSpy.mockRestore();
     }
+  });});
+
+// ==================== B4 逐引擎事件 ====================
+
+describe("useEngineController per-engine status events", () => {
+  it("merges per-engine events into engineStatuses (progressive reveal)", async () => {
+    detectEnginesMock.mockResolvedValue([
+      createEngineStatus("kimi", false),
+      createEngineStatus("grok", false),
+    ]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+    expect(
+      result.current.engineStatuses.find((status) => status.engineType === "kimi")
+        ?.installed,
+    ).toBe(false);
+
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 1,
+        status: createEngineStatus("kimi", true, []),
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "kimi")
+          ?.installed,
+      ).toBe(true);
+    });
+    // 其他引擎不受影响（逐项 merge，非整体替换）
+    expect(
+      result.current.engineStatuses.find((status) => status.engineType === "grok")
+        ?.installed,
+    ).toBe(false);
+  });
+
+  it("drops late events from older detection runs", async () => {
+    detectEnginesMock.mockResolvedValue([createEngineStatus("kimi", false)]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 5,
+        status: createEngineStatus("kimi", true, []),
+      });
+    });
+    await waitFor(() => {
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "kimi")
+          ?.installed,
+      ).toBe(true);
+    });
+
+    // 旧 run 的迟到事件 MUST 被丢弃（detectRunId 单调守卫）
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 3,
+        status: createEngineStatus("kimi", false, []),
+      });
+    });
+    expect(
+      result.current.engineStatuses.find((status) => status.engineType === "kimi")
+        ?.installed,
+    ).toBe(true);
+  });
+});
+
+describe("useEngineController status flip invalidation (P0 修正)", () => {
+  it("authState arrival does NOT invalidate catalogs (only installed flips do)", async () => {
+    const invalidated = vi.fn();
+    window.addEventListener(
+      "ccgui:provider-target-catalog-invalidated",
+      invalidated,
+    );
+    // 初始：已安装 + auth Unknown（phase1 形态）
+    detectEnginesMock.mockResolvedValue([
+      { ...createEngineStatus("qoder", true, []), authState: "unknown" },
+    ]);
+    getActiveEngineMock.mockResolvedValue("qoder");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+    invalidated.mockClear();
+
+    // phase2 正常到达：installed 不变 + authState Unknown→Authenticated
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 2,
+        status: {
+          ...createEngineStatus("qoder", true, []),
+          authState: "authenticated",
+        },
+      });
+    });
+    await waitFor(() => {
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "qoder")
+          ?.authState,
+      ).toBe("authenticated");
+    });
+    expect(invalidated).not.toHaveBeenCalled();
+
+    // installed 翻转（真状态变化）→ 恰好一次失效
+    act(() => {
+      emitEngineStatusEvent({
+        detectRunId: 3,
+        status: createEngineStatus("qoder", false, []),
+      });
+    });
+    await waitFor(() => {
+      expect(invalidated).toHaveBeenCalledTimes(1);
+    });
+    window.removeEventListener(
+      "ccgui:provider-target-catalog-invalidated",
+      invalidated,
+    );
+  });
+});
+
+describe("useEngineController post-switch catalog load (P0)", () => {
+  it("loads target engine catalog after switching to a detached engine", async () => {
+    const runSpy = vi.spyOn(startupOrchestrator, "run");
+    detectEnginesMock.mockResolvedValue([
+      createEngineStatus("pi", true, []),
+      createEngineStatus("kimi", true, []),
+    ]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+    switchEngineMock.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useEngineController({ activeWorkspace: null }),
+    );
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+    runSpy.mockClear();
+
+    await act(async () => {
+      await result.current.setActiveEngine("pi");
+    });
+
+    // 切换后 MUST 触发 pi 目录加载（解耦引擎 on-demand 22s 预算）
+    const piCall = runSpy.mock.calls
+      .map(([descriptor]) => descriptor)
+      .find((descriptor) =>
+        String(descriptor.id).startsWith("engine-models:pi:"),
+      );
+    expect(piCall).toBeDefined();
+    expect(piCall?.timeoutMs).toBe(22_000);
+    expect(getEngineModelsMock).toHaveBeenCalledWith("pi");
+  });
+});
+
+describe("useEngineController detect failure state", () => {
+  it("marks failed on detect rejection and never stays loading forever", async () => {
+    detectEnginesMock.mockRejectedValue(new Error("ipc down"));
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isInitialized).toBe(true);
+    });
+    expect(result.current.detectFailed).toBe(true);
+    expect(
+      result.current.availableEngines.every(
+        (engine) => engine.availabilityState === "failed",
+      ),
+    ).toBe(true);
+  });
+
+  it("routes detection through the coordinator (shared single-flight)", async () => {
+    detectEnginesMock.mockResolvedValue([
+      createEngineStatus("kimi", true, []),
+    ]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+
+    await waitFor(() => {
+      expect(requestEngineDetectionMock).toHaveBeenCalled();
+    });
+    expect(requestEngineDetectionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "controller" }),
+    );
+  });
+
+  it("clears stale pi models and force-reloads catalog on pi auth change", async () => {
+    // 初载：PI 目录带「已删 provider」的旧模型（凭证删除前探测的残留）
+    const stalePiModels: EngineStatus["models"] = [
+      { id: "deepseek-v4-pro", displayName: "DeepSeek V4 Pro", description: "", isDefault: true },
+    ];
+    detectEnginesMock.mockResolvedValue([
+      createEngineStatus("kimi", true, []),
+      createEngineStatus("pi", true, stalePiModels),
+    ]);
+    getActiveEngineMock.mockResolvedValue("kimi");
+    isWebServiceRuntimeMock.mockReturnValue(false);
+    getEngineModelsMock.mockResolvedValue([]);
+    getClientStoreSyncMock.mockReturnValue(null);
+
+    const { result } = renderHook(() =>
+      useEngineController({
+        activeWorkspace: null,
+        onDebug: () => {},
+      }),
+    );
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+    await waitFor(() =>
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "pi")
+          ?.models.length,
+      ).toBeGreaterThan(0),
+    );
+    const callsBeforeDispatch = getEngineModelsMock.mock.calls.length;
+
+    // 删除/保存凭证成功后组件广播本事件：FE 必须清 stale models 并 force 重载
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("ccgui:pi-auth-catalog-changed"));
+    });
+
+    await waitFor(() => {
+      expect(
+        result.current.engineStatuses.find((status) => status.engineType === "pi")
+          ?.models,
+      ).toHaveLength(0);
+    });
+    // 状态条目本身保留（installed/version 不动，等价轻量检测态）
+    expect(
+      result.current.engineStatuses.find((status) => status.engineType === "pi")
+        ?.installed,
+    ).toBe(true);
+    // force 重载发生（get_engine_models 带 forceRefresh，空目录也被采信）
+    const piForceCall = getEngineModelsMock.mock.calls
+      .slice(callsBeforeDispatch)
+      .find(([engine, options]) => engine === "pi" && options?.forceRefresh);
+    expect(piForceCall).toBeDefined();
   });
 });

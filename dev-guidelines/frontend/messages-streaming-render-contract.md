@@ -26,6 +26,16 @@
 - `Claude Code` 与 `Codex` live row 收敛 MUST 先走 realtime path；history replay / reconcile 只能用于校验、补账或最终一致性，不得成为 live assistant text、reasoning、tool output 可见的唯一路径。
 - backend diagnostics、runtime ledger persistence、Windows process diagnostics、first-token timing、context ledger 或 runtime pool refresh MAY 提供 observability，但 MUST NOT 成为每个 delta 的前置门槛。
 
+## Live Tool Output Render Budget（2026-08-29，openspec/changes/perf-live-tool-output-render-budget）
+
+工具输出 live 流式渲染对全部引擎共通（都经 `ToolBlockRenderer` → Bash/Generic/Read 块），任何引擎接入或新增工具块类型 MUST 继承以下三原则，禁止为某个 engine 开绕过渲染预算的旁路：
+
+1. **published 行数帽**：toolOutput lane 的 published 快照 live 流式期只发尾部 `LIVE_TOOL_OUTPUT_DISPLAY_LINES_STREAMING`（100）行；settle 后 durable 文本按 `LIVE_TOOL_OUTPUT_DISPLAY_LINES`（200）行展示。字节级尾帽（`COMMAND_EXECUTION_OUTPUT_HEAD`）语义不变。
+2. **live 降级渲染、settle 升级**：工具项 `processing` 期输出行 MUST NOT 逐行跑 Prism tokenize——扫描/构建类输出行行不同，LRU cache 全 miss，每 48ms 一轮 200 次 tokenize 是渲染主线程大头；settle 后一次性恢复高亮。read 类块对超过 `READ_OUTPUT_MARKDOWN_BUDGET`（64KiB）的 markdown 形态输出 MUST 降级纯文本容器，不进 `<Markdown>` 同步编译。
+3. **用户折叠意图最高优先**：live/长跑自动展开（`(isRunning && showLiveOutput) || isLongRunning`）的 body，用户点击 header MUST 先折叠且不翻转父层 `isExpanded`；再次点击恢复；折叠意图跨 settle 保持（不得被长跑条件自动弹开）。`isError` 硬展开与父层 toggle 协议不变。
+
+回退开关（localStorage，翻转需刷新页面）：`ccgui.perf.liveToolRenderBudget`（原则 2/3）、`ccgui.perf.liveToolOutputStreamingTail`（原则 1）。背景与实测证据见 `openspec/changes/perf-live-tool-output-render-budget/`（2026-08-29 codex app-server 0.150.1 三轮事件流实测：协议层无快照风暴，爆卡源在 live 渲染层，Windows WebView2 放大）。
+
 ## Shared Session Runtime / Projection Contract
 
 - Shared Runtime event 的 canonical lifecycle owner 是 Rust

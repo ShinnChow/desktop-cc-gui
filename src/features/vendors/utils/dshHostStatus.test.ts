@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { CodexDoctorResult } from "../../../types";
-import { buildDshOrigin, classifyDshHostError, mapDshDoctorToHostView } from "./dshHostStatus";
+import {
+  buildDshOrigin,
+  classifyDshHostError,
+  mapDshDoctorToHostView,
+  parseDshHostDownError,
+} from "./dshHostStatus";
 
 function doctor(partial: Partial<CodexDoctorResult>): CodexDoctorResult {
   return {
@@ -105,5 +110,48 @@ describe("classifyDshHostError", () => {
 describe("buildDshOrigin", () => {
   it("falls back to the local default endpoint", () => {
     expect(buildDshOrigin("  ", 0)).toBe("http://127.0.0.1:3080");
+  });
+});
+
+describe("parseDshHostDownError", () => {
+  it("parses the structured breaker-open payload", () => {
+    expect(
+      parseDshHostDownError(
+        'dsh host.down {"reason":"breaker-open","retryAfterMs":59500}',
+      ),
+    ).toEqual({ reason: "breaker-open", retryAfterMs: 59500 });
+  });
+
+  it("parses the same payload wrapped in an Error object", () => {
+    expect(
+      parseDshHostDownError(
+        new Error('dsh host.down {"reason":"breaker-open","retryAfterMs":0}'),
+      ),
+    ).toEqual({ reason: "breaker-open", retryAfterMs: 0 });
+  });
+
+  it("returns null for ordinary transport errors and non-strings", () => {
+    expect(
+      parseDshHostDownError(
+        "dsh host.describe transport: error sending request for url (http://127.0.0.1:3080/api/host.describe)",
+      ),
+    ).toBeNull();
+    expect(parseDshHostDownError(null)).toBeNull();
+    expect(parseDshHostDownError(undefined)).toBeNull();
+    expect(parseDshHostDownError(42)).toBeNull();
+  });
+
+  it("returns null when the payload after the prefix is not valid JSON", () => {
+    expect(parseDshHostDownError("dsh host.down not-json")).toBeNull();
+  });
+
+  it("defaults retryAfterMs when missing or invalid", () => {
+    expect(parseDshHostDownError('dsh host.down {"reason":"breaker-open"}')).toEqual({
+      reason: "breaker-open",
+      retryAfterMs: 0,
+    });
+    expect(
+      parseDshHostDownError('dsh host.down {"reason":"breaker-open","retryAfterMs":"x"}'),
+    ).toEqual({ reason: "breaker-open", retryAfterMs: 0 });
   });
 });

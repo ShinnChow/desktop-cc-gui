@@ -2,7 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  claudeForkIndexTwinSessionId,
   isLocalPendingDraftSessionId,
+  scheduleTombstoneClaudeForkIndexRow,
   scheduleTombstoneLocalPendingDraftIndexRow,
   writeClientCreatedSessionIndex,
 } from "./sessionIndex";
@@ -98,5 +100,74 @@ describe("sessionIndex pending drafts", () => {
     expect(invoke).toHaveBeenCalledWith("tombstone_session_index_rows", {
       sessionIds: ["claude-pending-1787016153035-0bittx"],
     });
+  });
+});
+
+describe("sessionIndex synthetic claude-fork bootstrap rows", () => {
+  beforeEach(() => {
+    vi.mocked(invoke).mockReset();
+    vi.mocked(invoke).mockResolvedValue(1);
+  });
+
+  it("does not upsert a synthetic claude-fork bootstrap row into Session Index", async () => {
+    writeClientCreatedSessionIndex({
+      engine: "claude",
+      sessionId: "claude-fork:0f4a6b7c-1111-2222-3333-444455556666:1787016153035-ab12cd",
+      workspacePath: "/tmp/ws",
+    });
+    await flushIndexWrite();
+    // 僵尸行根源：bareSessionId 截断会落出任何链路都还原不出来的 mangled 键
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("still upserts a renamed canonical claude child session id", async () => {
+    writeClientCreatedSessionIndex({
+      engine: "claude",
+      sessionId: "claude:0f4a6b7c-1111-2222-3333-444455556666",
+      workspacePath: "/tmp/ws",
+    });
+    await flushIndexWrite();
+    expect(invoke).toHaveBeenCalledWith("upsert_session_index_rows", {
+      rows: [
+        expect.objectContaining({
+          engine: "claude",
+          sessionId: "0f4a6b7c-1111-2222-3333-444455556666",
+        }),
+      ],
+    });
+  });
+
+  it("extracts the companion key payload from synthetic fork ids only", () => {
+    expect(
+      claudeForkIndexTwinSessionId(
+        "claude-fork:0f4a6b7c-1111-2222-3333-444455556666:1787016153035-ab12cd",
+      ),
+    ).toBe(
+      "0f4a6b7c-1111-2222-3333-444455556666:1787016153035-ab12cd",
+    );
+    expect(claudeForkIndexTwinSessionId("claude:session-real-1")).toBeNull();
+    expect(claudeForkIndexTwinSessionId("  ")).toBeNull();
+  });
+
+  it("purges the mangled companion Index row when deleting a synthetic fork thread", async () => {
+    scheduleTombstoneClaudeForkIndexRow(
+      "claude-fork:0f4a6b7c-1111-2222-3333-444455556666:1787016153035-ab12cd",
+    );
+    await flushIndexWrite();
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith("tombstone_session_index_rows", {
+      sessionIds: [
+        "0f4a6b7c-1111-2222-3333-444455556666:1787016153035-ab12cd",
+      ],
+    });
+  });
+
+  it("ignores non-fork ids and empty payloads in companion purge", async () => {
+    scheduleTombstoneClaudeForkIndexRow("claude:session-real-1");
+    scheduleTombstoneClaudeForkIndexRow("codex-thread-id");
+    scheduleTombstoneClaudeForkIndexRow("claude-fork:");
+    scheduleTombstoneClaudeForkIndexRow("   ");
+    await flushIndexWrite();
+    expect(invoke).not.toHaveBeenCalled();
   });
 });

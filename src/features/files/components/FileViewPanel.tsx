@@ -592,6 +592,16 @@ export function FileViewPanel({
     eligible: gitBlameEligible,
     isDirty: effectiveIsDirty,
   });
+  const gitBlameActionLabel =
+    gitBlame.status === "loading"
+      ? t("files.gitBlameLoading")
+      : gitBlame.status === "stale"
+        ? t("files.gitBlameStale")
+        : gitBlame.status === "error"
+          ? t("files.gitBlameError")
+          : gitBlame.enabled
+            ? t("files.gitBlameDisable")
+            : t("files.gitBlameEnable");
   const typingDiagnosticsRef = useRef<FileEditorTypingDiagnosticsSession>(
     createFileEditorTypingDiagnosticsSession({
       workspaceId,
@@ -1563,16 +1573,7 @@ export function FileViewPanel({
               {
                 type: "item" as const,
                 id: "toggle-file-git-blame",
-                label:
-                  gitBlame.status === "loading"
-                    ? t("files.gitBlameLoading")
-                    : gitBlame.status === "stale"
-                      ? t("files.gitBlameStale")
-                      : gitBlame.status === "error"
-                        ? t("files.gitBlameError")
-                        : gitBlame.enabled
-                          ? t("files.gitBlameDisable")
-                          : t("files.gitBlameEnable"),
+                label: gitBlameActionLabel,
                 icon: <GitCommitHorizontal size={15} />,
                 shortcut: formatShortcutForPlatform(
                   FILE_CONTEXT_MENU_SHORTCUTS.toggleGitBlame,
@@ -2977,6 +2978,21 @@ export function FileViewPanel({
               </button>
             ) : null}
           </div>
+        ) : null}
+        {mode === "edit" && (gitBlameEligible || gitBlame.enabled) ? (
+          <button
+            type="button"
+            className={`ghost fvp-action-btn fvp-git-blame-toggle${
+              gitBlame.enabled ? " is-active" : ""
+            }${gitBlame.status === "error" ? " is-error" : ""}`}
+            aria-label={gitBlameActionLabel}
+            aria-pressed={gitBlame.enabled}
+            title={gitBlameActionLabel}
+            onClick={gitBlame.toggle}
+            disabled={!gitBlameEligible && !gitBlame.enabled}
+          >
+            <GitCommitHorizontal size={12} aria-hidden />
+          </button>
         ) : null}
         {canEditDocument ? (
           mode === "preview" ? (

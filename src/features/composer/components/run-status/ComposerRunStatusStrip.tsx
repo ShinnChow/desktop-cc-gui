@@ -29,7 +29,6 @@ import {
   type BackgroundTaskPillScope,
   type BackgroundTaskPillModel,
 } from "./useBackgroundTaskPill";
-import { useBackgroundTaskRegistryWatcher } from "../../../messages/utils/useBackgroundTaskRegistryWatcher";
 import type { RunStatusSection } from "./types";
 import { readWorkspaceFileTail } from "../../../../services/tauri/workspaceFiles";
 
@@ -164,11 +163,9 @@ export const ComposerRunStatusStrip = memo(function ComposerRunStatusStrip(
   const backgroundTasks = useBackgroundTaskPill(
     backgroundTasksScope ?? { workspaceId: null, threadId: null },
   );
-  // P2 registry watcher：strip 在有任务时挂载，正好在需要时探测 registry
-  // 终态 metadata（post-settle 兜底）与断链判定。
-  useBackgroundTaskRegistryWatcher(
-    backgroundTasksScope ?? { workspaceId: null, threadId: null },
-  );
+  // registry watcher 已上收 useThreadEventHandlers（app 级、枚举全部 running
+  // 会话）——strip 挂载只探活跃会话，切走即失守，导致终态只进 store、
+  // 时间线卡片不折叠（真机 2026-08-27 事故）。此处仅保留 pill 读副本。
 
   // 任务 / Plan 复用 .sp-todo-* / .sp-plan-*；Status dock 已退役，必须自己拉切片。
   const needsListStyles = model.showTodoSection || model.showPlanSection;

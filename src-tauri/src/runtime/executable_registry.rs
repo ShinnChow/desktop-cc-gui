@@ -69,12 +69,15 @@ impl ExecutableSessionRegistry {
         let interrupted_sessions = state
             .entries
             .iter()
-            .filter(|&(_session_id, entry)| matches!(
+            .filter(|&(_session_id, entry)| {
+                matches!(
                     entry.state,
                     ExecutableSessionState::Acquiring
                         | ExecutableSessionState::Active
                         | ExecutableSessionState::Stopping
-                )).map(|(session_id, _entry)| session_id.clone())
+                )
+            })
+            .map(|(session_id, _entry)| session_id.clone())
             .collect::<Vec<_>>();
         let recovered_interrupted_state = !interrupted_sessions.is_empty();
         for session_id in interrupted_sessions {

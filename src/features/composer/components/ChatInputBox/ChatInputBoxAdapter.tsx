@@ -92,6 +92,7 @@ type AdapterModelOption = {
   description?: string;
   source?: string;
   provider?: string | null;
+  provenance?: string | null;
 };
 
 function normalizeAdapterModelOptions(
@@ -112,6 +113,11 @@ function normalizeAdapterModelOptions(
         (runtimeModel && runtimeModel !== label ? runtimeModel : undefined),
       source: modelOption.source,
       provider: modelOption.provider?.trim() || undefined,
+      // 菜单打开的 PI 降级自愈判定（cli:pi-list-models）依赖该字段；仅有
+      // provenance 时才带键，保持无来源行与历史形状一致。
+      ...(modelOption.provenance?.trim()
+        ? { provenance: modelOption.provenance.trim() }
+        : {}),
     };
   });
 }
@@ -147,7 +153,7 @@ type AdapterEngineInfo = {
   type: EngineType;
   installed: boolean;
   version: string | null;
-  availabilityState?: 'loading' | 'ready' | 'requires-login' | 'unavailable';
+  availabilityState?: 'loading' | 'ready' | 'requires-login' | 'unavailable' | 'failed';
   availabilityLabelKey?: string | null;
 };
 
@@ -690,6 +696,8 @@ export interface ChatInputBoxAdapterProps {
   // Header/context bar
   placeholder?: string;
   sendShortcut?: 'enter' | 'cmdEnter';
+  /** 停止按钮悬停提示里展示的中断快捷键（展示值；空则不展示） */
+  interruptShortcutLabel?: string | null;
   activeFile?: string;
   selectedLines?: string;
   onClearContext?: () => void;
@@ -1242,6 +1250,7 @@ export const ChatInputBoxAdapter = memo(forwardRef<ChatInputBoxHandle, ChatInput
       onSelectSkill,
       placeholder,
       sendShortcut = 'enter',
+      interruptShortcutLabel,
       activeFile,
       selectedLines,
       onClearContext,
@@ -2291,6 +2300,7 @@ export const ChatInputBoxAdapter = memo(forwardRef<ChatInputBoxHandle, ChatInput
         workspaceId={workspaceId}
         placeholder={placeholder ?? t('chat.inputPlaceholder')}
         sendShortcut={sendShortcut}
+        interruptShortcutLabel={interruptShortcutLabel}
         selectedModel={resolvedSelectedModelId}
         models={normalizedModels}
         providerModelCatalogs={normalizedProviderModelCatalogs}

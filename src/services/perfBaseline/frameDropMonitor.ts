@@ -22,6 +22,11 @@ const SEVERE_FRAME_MS = 100; // 约掉 6 帧
 const MIN_REPORT_INTERVAL_MS = 500; // 节流:相邻掉帧上报最短间隔,避免日志雪崩
 const MAX_FRAME_DROP_REPORTS = 200; // 单次会话上报上限
 const DURABLE_SEVERE_FRAME_REPORT_INTERVAL_MS = 60_000;
+// F3（enhance-perf-diagnostics-evidence）：worst-K 持久环。volatile 环（200 条内存）
+// 重启即失，severe 持久又受 1/min 节流 + diagnostics-owned 降级——最重现场可能留不下。
+// top-10 内的新掉帧以 perf.frame-drop-worst 持久化（60s 节流），重启不丢。
+const WORST_FRAME_DROPS_LIMIT = 10;
+const WORST_FRAME_DROPS_PERSIST_INTERVAL_MS = 60_000;
 // rAF 间隔超过该值视为挂起(睡眠/后台)恢复而非渲染掉帧:WKWebView 在页面不可见或系统
 // 睡眠时会暂停 rAF,恢复后第一帧的 delta 等于整段停摆时长(实测可达几十分钟),曾把
 // worstFrameMs 污染成无意义的天文数字。diagnosticsReport 统计时用同一阈值剔除历史脏数据。
@@ -34,6 +39,59 @@ let lastDurableSevereReportAt = Number.NEGATIVE_INFINITY;
 let frameDropReports = 0;
 let longTaskObserver: PerformanceObserver | null = null;
 let detachVisibilityListener: (() => void) | null = null;
+
+type WorstFrameDropEntry = {
+  deltaMs: number;
+  at: number;
+  hotspots: ReturnType<typeof getRecentHotspotSummary>;
+};
+
+let worstFrameDrops: WorstFrameDropEntry[] = [];
+let lastWorstPersistAt = Number.NEGATIVE_INFINITY;
+
+/**
+ * top-10 内的新掉帧进环；进环且距上次持久 ≥60s 时以 perf.frame-drop-worst
+ * 持久化降序全量列表。掉帧瞬间的 hotspot 归因随条目冻结（此后读到的聚合
+ * 与该帧无关，必须当场捕获）。
+ */
+function noteWorstFrameDrop(deltaMs: number, at: number): void {
+  const entry: WorstFrameDropEntry = {
+    deltaMs: Math.round(deltaMs),
+    // fix-diagnostics-forensics-hardening：epoch 毫秒（此前误用 performance.now
+    // 相对值，落盘后无法对钟点）。
+    at: Date.now(),
+    hotspots: getRecentHotspotSummary(Math.min(3_000, deltaMs + 600)),
+  };
+  const insertAt = worstFrameDrops.findIndex(
+    (candidate) => candidate.deltaMs < entry.deltaMs,
+  );
+  if (insertAt === -1) {
+    if (worstFrameDrops.length >= WORST_FRAME_DROPS_LIMIT) {
+      return;
+    }
+    worstFrameDrops.push(entry);
+  } else {
+    worstFrameDrops.splice(insertAt, 0, entry);
+    if (worstFrameDrops.length > WORST_FRAME_DROPS_LIMIT) {
+      worstFrameDrops.pop();
+    }
+  }
+  if (at - lastWorstPersistAt >= WORST_FRAME_DROPS_PERSIST_INTERVAL_MS) {
+    lastWorstPersistAt = at;
+    appendRendererDiagnostic("perf.frame-drop-worst", {
+      // hotspots 扁平化为字符串数组（depth 3）：嵌套对象在第 4 层会被
+      // MAX_DIAGNOSTIC_PAYLOAD_DEPTH 截成 "[truncated]"，磁盘版归因全丢。
+      entries: worstFrameDrops.map((worst) => ({
+        deltaMs: worst.deltaMs,
+        at: worst.at,
+        hotspots: worst.hotspots.map(
+          (row) =>
+            `${row.category}=${row.totalMs}ms(max ${row.maxMs}${row.maxDetail ? ` ${row.maxDetail}` : ""})x${row.count}`,
+        ),
+      })),
+    });
+  }
+}
 
 function nowMs(): number {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -148,6 +206,7 @@ export function startFrameDropMonitor(): void {
           ...readPerfContext(),
         });
       } else if (delta >= WARN_FRAME_MS) {
+        noteWorstFrameDrop(delta, now);
         reportFrameDrop(delta);
       }
     }
@@ -247,5 +306,7 @@ export function __resetFrameDropMonitorForTests(): void {
   stopLongTaskObserver();
   lastReportAt = Number.NEGATIVE_INFINITY;
   lastDurableSevereReportAt = Number.NEGATIVE_INFINITY;
+  lastWorstPersistAt = Number.NEGATIVE_INFINITY;
+  worstFrameDrops = [];
   frameDropReports = 0;
 }

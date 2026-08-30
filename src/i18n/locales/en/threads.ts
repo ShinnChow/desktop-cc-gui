@@ -7,6 +7,7 @@ const threads = {
     runtimeProcessing: "Running",
     runtimeReviewing: "Reviewing",
     runtimeCompleted: "Completed",
+    runtimeBackgroundTasks: "Background tasks running",
     archive: "Archive",
     delete: "Delete",
     openSessionManagement: "Bulk Delete in Session Management…",
@@ -162,6 +163,9 @@ const threads = {
       "Codex is compacting background information. The response will continue after it finishes.",
     codexCompactionCompleted:
       "Codex completed background information compaction.",
+    contextCompactedAuto: "Context compacted automatically",
+    contextCompactedManual: "Context compacted manually",
+    contextCompactedNeutral: "Context compacted",
     contextCompactionFailed: "Context compaction failed.",
     contextCompactionFailedWithMessage:
       "Context compaction failed: {{message}}",

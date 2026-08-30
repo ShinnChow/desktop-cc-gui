@@ -11,6 +11,13 @@ const assistantItem: ConversationItem = {
   text: "shared assistant text",
 };
 
+const userItem: ConversationItem = {
+  id: "shared-user",
+  kind: "message",
+  role: "user",
+  text: "hi",
+};
+
 function buildRuntimeInput(
   overrides: Partial<Parameters<typeof useMessagesRuntimeState>[0]> = {},
 ): Parameters<typeof useMessagesRuntimeState>[0] {
@@ -30,6 +37,7 @@ function buildRuntimeInput(
       codexSilentSuspected: "silent",
       waitingForFirstText: "waiting",
       contextCompacting: "compacting",
+      backgroundTasksRunning: "正在等待 2 个后台任务完成",
     },
     nativeRuntimeRecoveryEnabled: true,
     renderScopeKey: "workspace-a\u0000shared-thread",
@@ -39,10 +47,182 @@ function buildRuntimeInput(
     threadId: "shared-thread",
     threadStreamLatencyCategory: null,
     ...overrides,
+    backgroundTaskRunningCount: overrides.backgroundTaskRunningCount ?? 0,
   };
 }
 
 describe("useMessagesRuntimeState", () => {
+  it("enters background-awaiting after foreground streaming settles", () => {
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          isThinking: false,
+          backgroundTaskRunningCount: 2,
+        }),
+      ),
+    );
+
+    expect(result.current.isBackgroundTaskAwaiting).toBe(true);
+    expect(result.current.isWorking).toBe(true);
+    expect(result.current.primaryWorkingLabel).toBe(
+      "正在等待 2 个后台任务完成",
+    );
+  });
+
+  it("keeps the awaiting clock anchored while earlier tasks finish first", () => {
+    // 幕布秒表锚点在入期待锁定：先启动的任务先完成会让实时 earliest
+    // 往后跳，跟随它会让计时器倒退（2026-08-29 review）。
+    const { result, rerender } = renderHook(
+      (input: Parameters<typeof useMessagesRuntimeState>[0]) =>
+        useMessagesRuntimeState(input),
+      {
+        initialProps: buildRuntimeInput({
+          isThinking: false,
+          backgroundTaskRunningCount: 2,
+          backgroundTaskEarliestStartTime: 1_000,
+        }),
+      },
+    );
+    const anchoredAt = result.current.backgroundTaskAwaitingStartedAt;
+    expect(anchoredAt).toBe(1_000);
+
+    // 先启动的任务完成，earliest 跳到更晚的任务，锚点必须不动。
+    rerender(
+      buildRuntimeInput({
+        isThinking: false,
+        backgroundTaskRunningCount: 1,
+        backgroundTaskEarliestStartTime: 60_000,
+      }),
+    );
+    expect(result.current.backgroundTaskAwaitingStartedAt).toBe(anchoredAt);
+
+    // 全部终态退出等待，锚点清空；再次进入重新锁定。
+    rerender(
+      buildRuntimeInput({
+        isThinking: false,
+        backgroundTaskRunningCount: 0,
+      }),
+    );
+    expect(result.current.backgroundTaskAwaitingStartedAt).toBeNull();
+    expect(result.current.isBackgroundTaskAwaiting).toBe(false);
+  });
+
+  it("selects waiting-for-first-text label for pi while the first chunk is pending", () => {
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "pi",
+          deferredRenderSourceItems: [userItem],
+          renderSourceItems: [userItem],
+          items: [userItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(true);
+    expect(result.current.primaryWorkingLabel).toBe("waiting");
+  });
+
+  it("falls back to the default working label for pi once the first chunk lands", () => {
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "pi",
+          deferredRenderSourceItems: [userItem, assistantItem],
+          renderSourceItems: [userItem, assistantItem],
+          items: [userItem, assistantItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(false);
+    expect(result.current.primaryWorkingLabel).toBe(null);
+  });
+
+  it("stops showing the waiting label for pi as soon as reasoning streams", () => {
+    const reasoningItem: ConversationItem = {
+      id: "pi-reasoning-1",
+      kind: "reasoning",
+      summary: "thinking",
+      content: "thinking out loud",
+    };
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "pi",
+          deferredRenderSourceItems: [userItem, reasoningItem],
+          renderSourceItems: [userItem, reasoningItem],
+          items: [userItem, reasoningItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(false);
+    expect(result.current.primaryWorkingLabel).toBe(null);
+  });
+
+  it("stops showing the waiting label for pi once a tool row renders", () => {
+    const toolItem: ConversationItem = {
+      id: "pi-tool-1",
+      kind: "tool",
+      toolType: "ctxTree",
+      title: "Ctx Tree",
+      detail: ".",
+      status: "running",
+    };
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "pi",
+          deferredRenderSourceItems: [userItem, toolItem],
+          renderSourceItems: [userItem, toolItem],
+          items: [userItem, toolItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(false);
+    expect(result.current.primaryWorkingLabel).toBe(null);
+  });
+
+  it("keeps the assistant-message-only chunk semantics for codex reasoning", () => {
+    const reasoningItem: ConversationItem = {
+      id: "codex-reasoning-1",
+      kind: "reasoning",
+      summary: "thinking",
+      content: "codex thinking",
+    };
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "codex",
+          deferredRenderSourceItems: [userItem, reasoningItem],
+          renderSourceItems: [userItem, reasoningItem],
+          items: [userItem, reasoningItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(true);
+    expect(result.current.primaryWorkingLabel).toBe("waiting");
+  });
+
+  it("keeps the non-pi default working label for claude silence", () => {
+    const { result } = renderHook(() =>
+      useMessagesRuntimeState(
+        buildRuntimeInput({
+          activeEngine: "claude",
+          deferredRenderSourceItems: [userItem],
+          renderSourceItems: [userItem],
+          items: [userItem],
+        }),
+      ),
+    );
+
+    expect(result.current.waitingForFirstChunk).toBe(true);
+    expect(result.current.primaryWorkingLabel).toBe(null);
+  });
+
   it("does not re-enter finalizing state when isThinking stays true under thrash", () => {
     let renderCount = 0;
     const { result, rerender } = renderHook(

@@ -32,6 +32,8 @@ import { previewThreadName } from "../../../utils/threadItems";
 import { resolveThreadStabilityDiagnostic } from "../utils/stabilityDiagnostics";
 import type { TurnExecutionSnapshot } from "../../shared-session/target/types";
 import { renameRuntimeReceipt } from "../utils/runtimeModelReceipt";
+import { renameNativeTurnTarget } from "../utils/nativeTurnTargetLedger";
+import { renameTurnTargetBadgeThread } from "../utils/turnTargetBadgeStorage";
 import { noteSharedProviderRetryTurnSettled } from "../../shared-session/provider-retry/noteSharedProviderRetryTurn";
 import { getSharedTargetState } from "../../shared-session/target/targetStore";
 import { isSharedSessionThreadId } from "../../shared-session/utils/sharedSessionIdentity";
@@ -136,6 +138,10 @@ function settleLiveAssistantFullText(
 type ContextCompactionSourcePayload = {
   auto?: boolean | null;
   manual?: boolean | null;
+  /** pi compaction_end 透传的触发原因与 token 前后值；缺失为 null。 */
+  reason?: "threshold" | "overflow" | "manual" | null;
+  tokensBefore?: number | null;
+  estimatedTokensAfter?: number | null;
 };
 
 function resolveCompactionSource(
@@ -285,6 +291,16 @@ type UseThreadTurnEventsOptions = {
     turnId: string | null | undefined,
   ) => string | null;
   getActiveTurnIdForThread?: (threadId: string) => string | null;
+  /**
+   * turnId 是否为本线程当前在途（已 started、未 terminal）的 turn。
+   * 多 turn 交错（pi 双 send/后台唤醒）时，完成稿只要属于在途集合就 MUST
+   * 结算——单 activeTurnId 严格匹配会在交错时错配，永久丢结算导致
+   * 「响应中」卡死（2026-08-30 实证）。
+   */
+  isTurnInFlightForThread?: (
+    threadId: string,
+    turnId: string | null | undefined,
+  ) => boolean;
   getThreadProviderProfileId?: (
     workspaceId: string,
     threadId: string,
@@ -319,6 +335,7 @@ export function useThreadTurnEvents({
   resolvePendingThreadForSession,
   resolvePendingThreadForTurn,
   getActiveTurnIdForThread,
+  isTurnInFlightForThread,
   getThreadProviderProfileId,
   hasEstablishedThreadItems,
   renamePendingMemoryCaptureKey,
@@ -614,7 +631,11 @@ export function useThreadTurnEvents({
         (target) =>
           !turnId ||
           target.activeTurnId === null ||
-          target.activeTurnId === turnId,
+          target.activeTurnId === turnId ||
+          // 多 turn 交错：完成稿属于在途集合即结算，否则错配方永久丢结算
+          // （isProcessing 卡 true → 「响应中」卡死，2026-08-30 实证）。
+          // 旧 turn 的迟到完成稿不在在途集合内，仍按原逻辑拒绝。
+          (isTurnInFlightForThread?.(target.threadId, turnId) ?? false),
       );
       const rejectedTargets = targetSnapshots.filter(
         (target) => !safeTargets.some((safeTarget) => safeTarget.threadId === target.threadId),
@@ -636,6 +657,8 @@ export function useThreadTurnEvents({
         return false;
       }
       safeTargets.forEach(({ threadId: targetThreadId }) => {
+        const hasRemainingInFlight =
+          isTurnInFlightForThread?.(targetThreadId, null) ?? false;
         // A4 live-text 外部化：terminal settlement 必须把通道内「全文」一次写入
         // durable item。只 append shell 后尾段时，若 shell 首 delta 未进 reducer
         // 或 shellTextLength 失真，isStreaming 关闭后 UI 会只剩「已」「**」这类
@@ -645,30 +668,38 @@ export function useThreadTurnEvents({
           type: "clearProcessingGeneratedImages",
           threadId: targetThreadId,
         });
-        dispatch({ type: "markTerminalSettlement", threadId: targetThreadId });
-        dispatch({
-          type: "finalizePendingToolStatuses",
-          threadId: targetThreadId,
-          status: "completed",
-        });
-        dispatch({
-          type: "markContextCompacting",
-          threadId: targetThreadId,
-          isCompacting: false,
-          timestamp: Date.now(),
-        });
-        dispatch({
-          type: "settleThreadPlanInProgress",
-          threadId: targetThreadId,
-          targetStatus: "completed",
-        });
-        markProcessing(targetThreadId, false);
-        setActiveTurnId(targetThreadId, null);
+        if (!hasRemainingInFlight) {
+          dispatch({ type: "markTerminalSettlement", threadId: targetThreadId });
+        }
+        if (!hasRemainingInFlight) {
+          dispatch({
+            type: "finalizePendingToolStatuses",
+            threadId: targetThreadId,
+            status: "completed",
+          });
+          dispatch({
+            type: "markContextCompacting",
+            threadId: targetThreadId,
+            isCompacting: false,
+            timestamp: Date.now(),
+          });
+          dispatch({
+            type: "settleThreadPlanInProgress",
+            threadId: targetThreadId,
+            targetStatus: "completed",
+          });
+        }
+        if (!hasRemainingInFlight) {
+          markProcessing(targetThreadId, false);
+          setActiveTurnId(targetThreadId, null);
+        }
         workspaceScopedDelete(pendingInterruptsRef.current, workspaceId, targetThreadId);
         workspaceScopedDelete(interruptedThreadsRef.current, workspaceId, targetThreadId);
         // 重置分段计数，为下一个 turn 做准备
-        dispatch({ type: "resetAgentSegment", threadId: targetThreadId });
-        dispatch({ type: "markLatestAssistantMessageFinal", threadId: targetThreadId });
+        if (!hasRemainingInFlight) {
+          dispatch({ type: "resetAgentSegment", threadId: targetThreadId });
+          dispatch({ type: "markLatestAssistantMessageFinal", threadId: targetThreadId });
+        }
       });
       emitTurnSettlementAudit("settled", {
         workspaceId,
@@ -695,6 +726,7 @@ export function useThreadTurnEvents({
       emitTurnSettlementAudit,
       getActiveTurnIdForThread,
       interruptedThreadsRef,
+      isTurnInFlightForThread,
       markProcessing,
       pendingInterruptsRef,
       resolvePendingAliasThread,
@@ -1104,7 +1136,13 @@ export function useThreadTurnEvents({
       const timestamp = Date.now();
       const targetThreadIds = collectCompactionTargetThreadIds(threadId);
       const wasCodexCompacting = targetThreadIds.some(isCodexCompactionInFlight);
-      const isCodexCompaction = payload
+      // 引擎判定恢复「事件带 auto/manual flags 才按线程引擎判定」的旧语义：
+      // dispatch 层为透传 pi reason/token 恒传 payload 对象，Boolean(payload)
+      // 已不等价于「flags 存在」；codex 原生 compacted notification 无 flags，
+      // 不得触发 completed fallback 补挂（appendIfAlreadyCompleted 放宽）。
+      const payloadHasSourceFlags =
+        payload?.auto != null || payload?.manual != null;
+      const isCodexCompaction = payloadHasSourceFlags
         ? targetThreadIds.some((targetThreadId) => isCodexContextCompaction(targetThreadId))
         : wasCodexCompacting;
       setCodexCompactionInFlight(targetThreadIds, false);
@@ -1128,7 +1166,8 @@ export function useThreadTurnEvents({
       });
       const resolvedTurnId = turnId || `auto-${timestamp}`;
       if (isCodexCompaction) {
-        const shouldAppendCompletedFallback = Boolean(payload) && !wasCodexCompacting;
+        const shouldAppendCompletedFallback =
+          payloadHasSourceFlags && !wasCodexCompacting;
         targetThreadIds.forEach((targetThreadId) => {
           dispatch({
             type: "settleCodexCompactionMessage",
@@ -1147,6 +1186,10 @@ export function useThreadTurnEvents({
             type: "appendContextCompacted",
             threadId: targetThreadId,
             turnId: resolvedTurnId,
+            reason: payload?.reason ?? null,
+            tokensBefore: payload?.tokensBefore ?? null,
+            estimatedTokensAfter: payload?.estimatedTokensAfter ?? null,
+            timestampMs: timestamp,
           });
         });
       }
@@ -1640,12 +1683,14 @@ export function useThreadTurnEvents({
       // 才能继续读到累计文本。
       renameLiveAssistantTextThread(sourceThreadId, newThreadId);
       renameLiveItemDeltaThread(sourceThreadId, newThreadId);
-      if (
-        sourceThreadId.startsWith("shared:") ||
-        newThreadId.startsWith("shared:")
-      ) {
-        renameRuntimeReceipt(workspaceId, sourceThreadId, newThreadId);
-      }
+      // Native turn-target：内存账本（move-if-absent）与持久化侧车（按时间
+      // 合并）随 pending → 正式 id 迁移，否则历史冷加载读不到改名前的 badge。
+      // runtime 回执账本必须同迁：send.request 记账落在发送边的 pending id
+      // 上，只迁 shared 会漏 native 引擎——pi 等无回执事件的引擎在实时链路
+      // 查不到回执，Ⓡ 尾巴只剩历史冷加载（sidecar 派生）才有。
+      renameRuntimeReceipt(workspaceId, sourceThreadId, newThreadId);
+      renameNativeTurnTarget(workspaceId, sourceThreadId, newThreadId);
+      renameTurnTargetBadgeThread(sourceThreadId, newThreadId);
       renameCustomNameKey(workspaceId, sourceThreadId, newThreadId);
       renameAutoTitlePendingKey(workspaceId, sourceThreadId, newThreadId);
       renamePendingMemoryCaptureKey(sourceThreadId, newThreadId);

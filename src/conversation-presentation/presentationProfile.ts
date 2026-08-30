@@ -52,6 +52,20 @@ export function resolvePresentationProfile(
       useCodexStagedMarkdownThrottle: false,
     };
   }
+  // pi 的 RPC prefill 静默窗口可达 20-50s（零事件），开启 12s 安抚提示与
+  // heartbeat pulse（pi first-packet diagnosis 2026-08-28）；其余展示面保持默认。
+  if (engine === "pi") {
+    return {
+      engine,
+      preferCommandSummary: false,
+      codexCanvasMarkdown: false,
+      showReasoningLiveDot: false,
+      heartbeatWaitingHint: true,
+      assistantMarkdownStreamingThrottleMs: 80,
+      reasoningStreamingThrottleMs: 180,
+      useCodexStagedMarkdownThrottle: false,
+    };
+  }
   return {
     engine,
     preferCommandSummary: false,

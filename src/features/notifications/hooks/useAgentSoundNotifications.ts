@@ -48,6 +48,12 @@ function rememberCompletedTurn(
   return true;
 }
 
+function isPiConversationThread(threadId: string): boolean {
+  // pi 的 run 含多个原生 turn，每 turn 一次 turn/completed 会让完成音连响；
+  // pi 线程的完成音改听 thread/runSettled（run 粒度，一次发送一声）。
+  return /^pi(:|-pending)/.test(threadId);
+}
+
 export function useAgentSoundNotifications({
   enabled,
   soundId,
@@ -106,8 +112,27 @@ export function useAgentSoundNotifications({
 
   const handleTurnCompleted = useCallback(
     (workspaceId: string, threadId: string, turnId: string) => {
+      // pi 走 thread/runSettled（run 粒度）：pi 的 run 含多个原生 turn，
+      // 每 turn 一次 turn/completed 会让完成音连响。
+      if (isPiConversationThread(threadId)) {
+        return;
+      }
       const threadKey = buildThreadKey(workspaceId, threadId);
       if (!threadKey || !shouldPlaySound(threadKey, turnId)) {
+        return;
+      }
+      playSound();
+    },
+    [playSound, shouldPlaySound],
+  );
+
+  const handleThreadRunSettled = useCallback(
+    (workspaceId: string, threadId: string, turnId: string) => {
+      if (!isPiConversationThread(threadId)) {
+        return;
+      }
+      const threadKey = buildThreadKey(workspaceId, threadId);
+      if (!threadKey || !shouldPlaySound(threadKey, `run:${turnId}`)) {
         return;
       }
       playSound();
@@ -118,8 +143,9 @@ export function useAgentSoundNotifications({
   const handlers = useMemo(
     () => ({
       onTurnCompleted: handleTurnCompleted,
+      onThreadRunSettled: handleThreadRunSettled,
     }),
-    [handleTurnCompleted],
+    [handleTurnCompleted, handleThreadRunSettled],
   );
 
   useAppServerEvents(handlers);

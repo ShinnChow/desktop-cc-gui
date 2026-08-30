@@ -87,7 +87,7 @@ import {
 } from "../hooks/composerEnginePrefsStore";
 import { ComposerLight } from "./ComposerLight";
 import type { ChatInputBoxHandle } from "./ChatInputBox/ChatInputBoxAdapter";
-import { isSameProviderExecutionProfile } from "./ChatInputBox/selectors/ModelSelect";
+import { isSameProviderExecutionProfile } from "./ChatInputBox/selectors/model-select/executionTarget";
 import {
   accessModeToPermissionMode,
   permissionModeToAccessMode,
@@ -380,6 +380,8 @@ export type ComposerProps = {
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
   editorSettings?: ComposerEditorSettings;
   sendShortcut?: ComposerSendShortcut;
+  /** 停止按钮悬停提示里展示的中断快捷键（展示值；空则不展示） */
+  interruptShortcutLabel?: string | null;
   textareaHeight?: number;
   onTextareaHeightChange?: (height: number) => void;
   onOpenSkillsSettings?: () => void;
@@ -656,6 +658,7 @@ function ComposerImpl({
   textareaRef: externalTextareaRef,
   editorSettings: _editorSettingsProp,
   sendShortcut = "enter",
+  interruptShortcutLabel,
   textareaHeight = 80,
   onTextareaHeightChange,
   onOpenSkillsSettings: _onOpenSkillsSettings,
@@ -981,19 +984,10 @@ function ComposerImpl({
     }
     const catalogEntryId = target.modelCatalogEntryId?.trim() || null;
     const runtimeModel = target.model?.trim() || null;
-    if (target.engine !== "codex" && target.engine !== "pi") {
-      // DSH / Qoder / Kimi / Grok / OpenCode 等非 codex 非 pi 引擎：保持
-      // 现有「只填 id/model」行为；这些引擎的 Shared atomic 联动留待各自
-      // change 评估（DSH 已 native 接通 ButtonArea，Qoder / Kimi / Grok /
-      // OpenCode 待定）。PI 在下方分支接 atomic reasoning 联动。
-      return {
-        engine: target.engine,
-        model: {
-          id: catalogEntryId ?? runtimeModel,
-          model: runtimeModel ?? catalogEntryId,
-        },
-      };
-    }
+    // P0 后统一：所有引擎（含 dsh/qoder/kimi/grok/opencode）走同一份
+    // catalog 匹配投影——目录条目带 supportedReasoningEfforts 即联动思考
+    // 档（首页创建框与会话内 ButtonArea 共用数据源），缺 metadata 保持
+    // 「只填 id/model」capability-neutral，不再按引擎白名单特判。
     type ModelReasoningLike = {
       id: string;
       model?: string;
@@ -1019,21 +1013,25 @@ function ComposerImpl({
     const matchedCatalog = catalog.find(matchByIdentity) ?? null;
     const matchedParent = parentModels.find(matchByIdentity) ?? null;
     const preferred = matchedCatalog ?? matchedParent;
+    const reasoningEfforts =
+      preferred?.supportedReasoningEfforts &&
+      preferred.supportedReasoningEfforts.length > 0
+        ? preferred.supportedReasoningEfforts
+        : matchedParent?.supportedReasoningEfforts;
+    const reasoningDefault =
+      preferred?.defaultReasoningEffort ??
+      matchedParent?.defaultReasoningEffort ??
+      null;
     return {
       engine: target.engine,
       model: {
         id: catalogEntryId ?? preferred?.id ?? runtimeModel,
         model: runtimeModel ?? preferred?.model ?? catalogEntryId,
         source: preferred?.source ?? undefined,
-        supportedReasoningEfforts:
-          preferred?.supportedReasoningEfforts &&
-          preferred.supportedReasoningEfforts.length > 0
-            ? preferred.supportedReasoningEfforts
-            : matchedParent?.supportedReasoningEfforts,
-        defaultReasoningEffort:
-          preferred?.defaultReasoningEffort ??
-          matchedParent?.defaultReasoningEffort ??
-          null,
+        ...(reasoningEfforts && reasoningEfforts.length > 0
+          ? { supportedReasoningEfforts: reasoningEfforts }
+          : {}),
+        ...(reasoningDefault ? { defaultReasoningEffort: reasoningDefault } : {}),
       },
     };
   }, [models, providerModelCatalogs, selectedAtomicTarget]);
@@ -2757,6 +2755,13 @@ function ComposerImpl({
           model: null,
         },
       );
+      // Native 发送边界固化执行目标快照（Shared / create-picker 各有自己的冻结通道）。
+      const nativeExecutionTarget =
+        !isSharedSessionResolved &&
+        !createSessionTargetPicker &&
+        selectedAtomicTarget
+          ? freezeTurnSnapshot(selectedAtomicTarget)
+          : undefined;
       const sendOptions: MessageSendOptions | undefined =
         skillInvocations.length > 0 ||
         selectedMemoryIds.length > 0 ||
@@ -2765,6 +2770,7 @@ function ComposerImpl({
         hasBrowserContextAttachment ||
         createSessionTarget !== null ||
         isAgentSubmission ||
+        Boolean(nativeExecutionTarget) ||
         (selectedAtomicTarget?.engine ?? selectedEngine) === "dsh"
           ? {
               ...((selectedAtomicTarget?.engine ?? selectedEngine) === "dsh"
@@ -2791,6 +2797,7 @@ function ComposerImpl({
                 : {}),
               ...(browserContextAttachment ? { browserContextAttachment } : {}),
               ...(createSessionTarget ? { createSessionTarget } : {}),
+              ...(nativeExecutionTarget ? { nativeExecutionTarget } : {}),
               ...(isAgentSubmission &&
               isResolvedExecutionTarget(selectedAtomicTarget)
                 ? {
@@ -3812,6 +3819,7 @@ function ComposerImpl({
               onNoteCardSelect={handleSelectNoteCard}
               onSelectSkill={handleSelectSkill}
               sendShortcut={sendShortcut}
+              interruptShortcutLabel={interruptShortcutLabel}
               placeholder={
                 collabLocksComposer
                   ? t("multiAgent.entry.collabRunningLock")

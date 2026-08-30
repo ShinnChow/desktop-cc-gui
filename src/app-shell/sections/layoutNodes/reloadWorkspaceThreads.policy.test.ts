@@ -4,12 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * Source-policy guard for OpenSpec change fix-sidebar-reload-force-index-sync.
- *
- * 用户显式「重新加载」会话列表必须携带 forceSessionIndexSync: true——
- * first-paint 默认温读只翻 SQLite 快照，新会话进索引靠后端 importer 90s
- * 轮询，窗口内（或被 omit/导入失败时）点多少次重载都刷不出来
- * （0.9.3 测试版用户反馈「最近一条历史数据点重新加载也无法加载出来」）。
+ * Source-policy guard for the Session Index-only sidebar reload.
  */
 
 const source = readFileSync(
@@ -30,9 +25,10 @@ function extractHandler(name: string, endMarker: string): string {
 }
 
 describe("reload workspace threads force index sync policy", () => {
-  it("declares a shared user-reload options constant forcing session index sync", () => {
+  it("declares shared user-reload options for forced index-only sync", () => {
     expect(source).toContain("const USER_RELOAD_THREAD_LIST_OPTIONS = {");
     expect(source).toContain("forceSessionIndexSync: true,");
+    expect(source).toContain("sessionIndexOnly: true,");
   });
 
   it("quick reload passes the force-sync options to the tracked loader", () => {
@@ -49,7 +45,7 @@ describe("reload workspace threads force index sync policy", () => {
       "handleReloadWorkspaceThreads",
       "const handleToggleLiveEditPreview",
     );
-    expect(handler).toContain("listThreadsForWorkspaceTracked(");
-    expect(handler).toContain("USER_RELOAD_THREAD_LIST_OPTIONS");
+    expect(handler).toContain("handleQuickReloadWorkspaceThreads(workspaceId)");
+    expect(handler).not.toContain("ask(");
   });
 });

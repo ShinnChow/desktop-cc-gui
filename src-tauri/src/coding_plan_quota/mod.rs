@@ -11,6 +11,7 @@ mod providers;
 mod relay;
 mod credentials;
 mod host_cli;
+mod pi_usage;
 mod commands;
 
 pub(crate) use commands::*;

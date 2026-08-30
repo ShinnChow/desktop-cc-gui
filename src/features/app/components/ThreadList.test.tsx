@@ -42,6 +42,7 @@ vi.mock("react-i18next", () => ({
         "threads.runtimeProcessing": "Processing",
         "threads.runtimeReviewing": "Reviewing",
         "threads.runtimeCompleted": "Completed",
+        "threads.runtimeBackgroundTasks": "Background tasks running",
         "threads.deleteThreadTitle": "Delete conversation",
         "threads.deleteThreadMessage":
           "Are you sure you want to delete this thread?",
@@ -100,6 +101,81 @@ const baseProps = {
   onSelectThread: vi.fn(),
   onShowThreadMenu: vi.fn(),
 };
+
+describe("ThreadList background task row status", () => {
+  it("renders right-side bg-running breathe dot with count badge when bg tasks run and turn settled", () => {
+    const { container } = render(
+      <ThreadList
+        {...baseProps}
+        threadStatusById={{
+          "thread-1": {
+            isProcessing: false,
+            hasUnread: false,
+            isReviewing: false,
+            backgroundTaskRunningCount: 2,
+          },
+        }}
+      />,
+    );
+
+    const row = container.querySelector(".thread-row");
+    // 第四态只表达在右侧 meta 区 runtime dot；左侧 thread-status 回退原四态。
+    expect(
+      row?.querySelector(".thread-runtime-dot")?.className,
+    ).toContain("bg-running");
+    expect(
+      row?.querySelector(".thread-status")?.className,
+    ).not.toContain("bg-running");
+    expect(row?.querySelector(".thread-status")?.className).toContain("ready");
+    const badge = row?.querySelector(".thread-bg-task-count");
+    expect(badge?.textContent).toBe("2");
+  });
+
+  it("keeps processing priority while showing the count badge alongside", () => {
+    const { container } = render(
+      <ThreadList
+        {...baseProps}
+        threadStatusById={{
+          "thread-1": {
+            isProcessing: true,
+            hasUnread: false,
+            isReviewing: false,
+            backgroundTaskRunningCount: 1,
+          },
+        }}
+      />,
+    );
+
+    const row = container.querySelector(".thread-row");
+    expect(row?.querySelector(".thread-status")?.className).toContain(
+      "processing",
+    );
+    expect(
+      row?.querySelector(".thread-runtime-dot")?.className,
+    ).toContain("processing");
+    expect(row?.querySelector(".thread-bg-task-count")?.textContent).toBe("1");
+  });
+
+  it("falls back to unread after all bg tasks turn terminal (count 0)", () => {
+    const { container } = render(
+      <ThreadList
+        {...baseProps}
+        threadStatusById={{
+          "thread-1": {
+            isProcessing: false,
+            hasUnread: true,
+            isReviewing: false,
+            backgroundTaskRunningCount: 0,
+          },
+        }}
+      />,
+    );
+
+    const row = container.querySelector(".thread-row");
+    expect(row?.querySelector(".thread-status")?.className).toContain("unread");
+    expect(row?.querySelector(".thread-bg-task-count")).toBeNull();
+  });
+});
 
 describe("ThreadList", () => {
   it("hydrates multiple rows in StrictMode without mounting Radix row anchors", () => {
@@ -172,6 +248,8 @@ describe("ThreadList", () => {
     }
     expect(row.classList.contains("active")).toBe(true);
     expect(row.querySelector(".thread-status")?.className).toContain("unread");
+    // 无后台任务：不渲染计数徽标。
+    expect(row.querySelector(".thread-bg-task-count")).toBeNull();
 
     fireEvent.click(row);
     expect(onSelectThread).toHaveBeenCalledWith("ws-1", "thread-1");
@@ -1536,4 +1614,21 @@ it("does not virtualize a small thread list", () => {
   const listEl = container.querySelector(".thread-list");
   expect(listEl?.getAttribute("data-virtualized")).toBeNull();
   expect(container.querySelector(".thread-list-virtual-spacer")).toBeNull();
+});
+
+it("keeps pagination controls outside the workspace tree rows", () => {
+  const { container } = render(
+    <ThreadList
+      {...baseProps}
+      unpinnedRows={[{ thread, depth: 0 }]}
+      totalThreadRoots={2}
+      visibleThreadRootCount={1}
+      isExpanded={false}
+    />,
+  );
+
+  const footer = container.querySelector(".thread-list-footer");
+  expect(footer).toBeTruthy();
+  expect(footer?.querySelector(".thread-more")).toBeTruthy();
+  expect(footer?.querySelector(".thread-row")).toBeNull();
 });

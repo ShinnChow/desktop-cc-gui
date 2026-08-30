@@ -40,6 +40,9 @@ function toItemFingerprint(item: ConversationItem): string {
   if (item.kind === "review") {
     return `v:${item.id}:${item.state}:${item.text.length}:${hashTail(item.text)}`;
   }
+  if (item.kind === "context-event") {
+    return `c:${item.id}:${item.eventType}:${item.timestampMs}`;
+  }
   const promptText = item.promptText ?? "";
   return `g:${item.id}:${item.status}:${item.images.length}:${promptText.length}:${hashTail(promptText)}`;
 }

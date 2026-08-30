@@ -535,7 +535,6 @@ pub enum EngineType {
     Qoder,
 }
 
-
 impl EngineType {
     pub fn display_name(&self) -> &'static str {
         match self {
@@ -589,6 +588,31 @@ pub(crate) fn engine_enabled_in_settings(
     }
 }
 
+/// 检测范围黑名单（与 src/engine/mod.rs 的 detection_disabled_engines 对齐，
+/// refactor-engine-detection-pipeline D9）：daemon 侧 detect 路径同样跳过
+/// 供应商页面关闭的引擎。只作用于 detect，不改变 switch/send 语义。
+pub(crate) fn detection_disabled_engines(settings: &crate::types::AppSettings) -> Vec<EngineType> {
+    [
+        EngineType::Claude,
+        EngineType::Codex,
+        EngineType::Gemini,
+        EngineType::Grok,
+        EngineType::OpenCode,
+        EngineType::Kimi,
+        EngineType::Pi,
+        EngineType::Dsh,
+        EngineType::Qoder,
+    ]
+    .into_iter()
+    .filter(|engine_type| {
+        settings
+            .disabled_cli_engines
+            .iter()
+            .any(|id| id == engine_type.icon())
+    })
+    .collect()
+}
+
 pub(crate) fn engine_disabled_diagnostic(engine_type: EngineType) -> Option<&'static str> {
     match engine_type {
         EngineType::Gemini => Some(crate::engine_policy::GEMINI_DISABLED_DIAGNOSTIC),
@@ -615,10 +639,22 @@ pub(crate) fn ensure_engine_enabled(
         .to_string())
 }
 
+/// 登录态三态（与 src/engine/mod.rs 的 AuthState 对齐，B6/D6）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthState {
+    #[default]
+    Unknown,
+    Authenticated,
+    RequiresLogin,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineStatus {
     pub engine_type: EngineType,
+    #[serde(default)]
+    pub auth_state: AuthState,
     pub installed: bool,
     pub version: Option<String>,
     pub bin_path: Option<String>,
@@ -896,6 +932,7 @@ pub(crate) fn disabled_engine_status(engine_type: EngineType) -> EngineStatus {
     };
     EngineStatus {
         engine_type,
+        auth_state: AuthState::default(),
         installed: false,
         version: None,
         bin_path: None,
@@ -925,7 +962,6 @@ pub struct SendMessageParams {
     pub collaboration_mode: Option<Value>,
     pub custom_spec_root: Option<String>,
 }
-
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -1132,7 +1132,10 @@ describe("useWorkspaceThreadListHydration", () => {
       expect(softRefreshCalls[1]!.options!.isStale!()).toBe(false);
     });
 
-    it("forces one run after the defer ceiling, then resets the counter", async () => {
+    it("defer ceiling re-arms quiet-only instead of forcing a run mid-click", async () => {
+      // F1（perf-cold-start-click-storm-convergence）：defer 满上限不得「仍在
+      // 点击也强跑」——那会把秒级写者 rescan 正正砸进点击风暴（现场
+      // 2026-08-28 22:31:18 syncMs=3111）。上限只授权「等真实 quiet 窗口」。
       const { softRefreshCalls, listThreadsForWorkspace } =
         createSoftRefreshMock();
       renderActiveHydration(listThreadsForWorkspace, "ws-defer-ceiling");
@@ -1150,29 +1153,30 @@ describe("useWorkspaceThreadListHydration", () => {
         ).toBe(false);
       }
 
-      // Ceiling reached: the next click must NOT cancel the in-flight run —
-      // it is forced through even though the user is still clicking.
-      const forcedRunStale =
+      // Ceiling reached: the ceiling click is an ordinary defer — the
+      // in-flight run is soft-cancelled (stale), and no writer resync is
+      // forced synchronously the way the old mid-click force-run did.
+      const runAtCeiling =
         softRefreshCalls[POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_DEFERS]!.options!
           .isStale!;
       dispatchPointerDown();
-      expect(forcedRunStale()).toBe(false);
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-      expect(softRefreshCalls.length).toBe(
-        POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_DEFERS + 1,
-      );
+      expect(runAtCeiling()).toBe(true);
+      expect(
+        softRefreshCalls.length,
+        "defer ceiling must not force a run synchronously",
+      ).toBe(POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_DEFERS + 1);
 
-      // Counter reset: the following click may defer (soft-cancel) again.
-      dispatchPointerDown();
-      expect(forcedRunStale()).toBe(true);
+      // Convergence guarantee: the quiet-only re-arm still runs (once) via
+      // the schedule's quiet window instead of starving forever.
       await waitFor(() => {
         expect(softRefreshCalls.length).toBe(
           POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_DEFERS + 2,
         );
       });
+      expect(
+        softRefreshCalls[POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_DEFERS + 1]!
+          .options!.isStale!(),
+      ).toBe(false);
     });
   });
 

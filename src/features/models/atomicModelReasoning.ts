@@ -212,7 +212,13 @@ export function reconcileAtomicReasoningEffort(input: {
   }
 
   if (engine !== "codex" && engine !== "pi") {
-    return null;
+    // 通用引擎（dsh/qoder/kimi/opencode…）：options 来自 catalog 投影。
+    // 有 options 时非法值收敛为 null（host 侧默认语义）；无 options 维持
+    // capability-neutral（不发明档位也不清值）。
+    if (options.length === 0) {
+      return current;
+    }
+    return current && options.includes(current) ? current : null;
   }
 
   if (options.length === 0) {
@@ -240,22 +246,20 @@ export function resolveAtomicReasoningOptions(
   if (engine === "grok") {
     return [...GROK_REASONING_OPTIONS];
   }
-  if (engine === "pi") {
-    // PI allowlist 由 `providerModelCatalogs["pi"]` 投影提供（见
-    // `supported_thinking_levels_for_pi_model`），与 native composer 同源。
-    // 不发明档位：catalog 缺 metadata 时返 capability-neutral（空数组）。
-    const enriched = enrichModelReasoningForEngine("pi", model ?? {});
+  // 通用 catalog 驱动分支（P0 后统一，覆盖 pi/dsh/qoder/kimi/opencode 等）：
+  // 任何引擎的 target 只要 catalog 条目带 supportedReasoningEfforts（PI RPC /
+  // DSH host / 未来的 Qoder ACP 等），一律投影为 options——首页创建框与
+  // 会话内 ButtonArea 共用同一数据源，不再按引擎白名单特判。
+  // 不发明档位：catalog 缺 metadata 时返 capability-neutral（空数组）。
+  if (engine !== "codex") {
     const fromModel = normalizeSupportedEfforts(
-      enriched.supportedReasoningEfforts,
+      model?.supportedReasoningEfforts,
     );
     if (fromModel.length > 0) {
       return fromModel;
     }
-    const modelDefault = normalizeEffort(enriched.defaultReasoningEffort);
+    const modelDefault = normalizeEffort(model?.defaultReasoningEffort);
     return modelDefault ? [modelDefault] : [];
-  }
-  if (engine !== "codex") {
-    return [];
   }
 
   const enriched = enrichModelInfoWithAtomicReasoning("codex", model ?? {});
@@ -342,7 +346,12 @@ export function resolveAtomicReasoningEffort(input: {
   }
 
   if (engine !== "codex" && engine !== "pi") {
-    return null;
+    // 通用引擎：options 可用时合法 previous 允许继承（与 codex/pi 对齐）；
+    // 无 options 维持 null（capability-neutral）。
+    if (options.length === 0) {
+      return null;
+    }
+    return previous;
   }
 
   return resolveAtomicDefaultReasoningEffort(engine, input.model);

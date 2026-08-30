@@ -4,6 +4,7 @@ import { getWorkspaceFiles } from "../../../services/tauri/workspaceFiles";
 import { revealInFileManager } from "../../../services/tauri/workspaceRuntime";
 import { pushErrorToast } from "../../../services/toasts";
 import { useSoloMode } from "../../../features/layout/hooks/useSoloMode";
+import { formatShortcutLabelOrNull } from "../../../utils/shortcuts";
 import { useLiveEditPreview } from "../../../features/live-edit-preview/hooks/useLiveEditPreview";
 import { useArchiveShortcut } from "../../../features/app/hooks/useArchiveShortcut";
 import type { OpenFileOptions } from "../../../features/app/hooks/useGitPanelController";
@@ -13,7 +14,11 @@ import { useWorkspaceCycling } from "../../../features/app/hooks/useWorkspaceCyc
 import { useAppMenuEvents } from "../../../features/app/hooks/useAppMenuEvents";
 import { useMenuAcceleratorController } from "../../../features/app/hooks/useMenuAcceleratorController";
 import { useMenuLocalization } from "../../../features/app/hooks/useMenuLocalization";
-import { runWithLoadingProgress } from "../../../features/app/utils/loadingProgressActions";
+import {
+  CREATE_SESSION_LOADING_TIMEOUT_MS,
+  runWithLoadingProgress,
+} from "../../../features/app/utils/loadingProgressActions";
+import { appendRendererDiagnosticImmediate } from "../../../services/rendererDiagnostics";
 import { resolveSharedSessionCreateInitialTarget } from "../../../features/shared-session/target/resolveSharedSessionCreateInitialTarget";
 import type { SharedSessionSupportedEngine } from "../../../features/shared-session/utils/sharedSessionEngines";
 import type { WorkspaceHomeDeleteResult } from "../../../features/workspaces/types";
@@ -308,6 +313,7 @@ export function useAppShellSections(input: UseAppShellSectionsInput) {
     async (
       targetWorkspace: WorkspaceInfo,
       sharedEngine: SharedSessionSupportedEngine,
+      options?: { providerProfileId?: string },
     ) => {
       try {
         return await runWithLoadingProgress(
@@ -320,10 +326,28 @@ export function useAppShellSections(input: UseAppShellSectionsInput) {
             }),
           },
           async () => {
+            // 分阶段性能日志：shared 创建的 initial-target 解析含 provider 列表
+            // 与 profile-scoped catalog（可能 spawn CLI），是慢/卡高发段。
+            const createStartedAt = Date.now();
+            const traceStage = (
+              stage: string,
+              extra?: Record<string, unknown>,
+            ) => {
+              appendRendererDiagnosticImmediate("perf.create-session", {
+                stage,
+                engine: sharedEngine,
+                shared: true,
+                workspaceId: targetWorkspace.id,
+                elapsedMs: Date.now() - createStartedAt,
+                ...extra,
+              });
+            };
+            traceStage("start");
             setWorkspaceHomeWorkspaceId(null);
             selectWorkspace(targetWorkspace.id);
             if (!targetWorkspace.connected) {
               await connectWorkspace(targetWorkspace);
+              traceStage("workspace-connected");
             }
             const localProviderName = t("providers.localConfig", {
               defaultValue: "本地配置",
@@ -342,12 +366,16 @@ export function useAppShellSections(input: UseAppShellSectionsInput) {
             const initialTarget = await resolveSharedSessionCreateInitialTarget({
               engine: sharedEngine,
               localProviderName,
+              preferredProviderId: options?.providerProfileId,
               unavailableModelMessage: t(
                 "workspace.sharedSessionLocalModelUnavailable",
                 {
                   engine: t(engineLabelKey),
                 },
               ),
+            });
+            traceStage("initial-target-resolved", {
+              providerProfileId: initialTarget.providerProfileId,
             });
             const threadId = await startSharedSessionForWorkspace(
               targetWorkspace.id,
@@ -357,6 +385,7 @@ export function useAppShellSections(input: UseAppShellSectionsInput) {
                 initialTarget,
               },
             );
+            traceStage("thread-started", { threadId: Boolean(threadId) });
             if (!threadId) {
               return null;
             }
@@ -365,10 +394,22 @@ export function useAppShellSections(input: UseAppShellSectionsInput) {
             if (isCompact) {
               setActiveTab("codex");
             }
+            traceStage("done");
             return threadId;
           },
+          { timeoutMs: CREATE_SESSION_LOADING_TIMEOUT_MS },
         );
       } catch (error) {
+        appendRendererDiagnosticImmediate("perf.create-session", {
+          stage:
+            error instanceof Error && error.message.includes("loading timeout")
+              ? "timeout"
+              : "error",
+          engine: sharedEngine,
+          shared: true,
+          workspaceId: targetWorkspace.id,
+          detail: error instanceof Error ? error.message : String(error),
+        });
         alertError(error);
         return null;
       }
@@ -666,6 +707,12 @@ export function useAppShellSections(input: UseAppShellSectionsInput) {
     rightPanelCollapsed,
     isLayoutSwapped: !isCompact && appSettings.layoutMode === "swapped",
     rightPanelAvailable,
+    sidebarShortcutLabel: formatShortcutLabelOrNull(
+      appSettings.toggleLeftConversationSidebarShortcut,
+    ),
+    rightPanelShortcutLabel: formatShortcutLabelOrNull(
+      appSettings.toggleRightConversationSidebarShortcut,
+    ),
     onCollapseSidebar: collapseSidebar,
     onExpandSidebar: expandSidebar,
     onCollapseRightPanel: collapseRightPanel,

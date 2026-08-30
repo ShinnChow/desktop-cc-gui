@@ -45,6 +45,7 @@ import {
   getRuntimeReceipt,
   rememberRuntimeReceipt,
 } from "../../threads/utils/runtimeModelReceipt";
+import { getNativeTurnTarget } from "../../threads/utils/nativeTurnTargetLedger";
 import { updateSharedSessionNativeBinding as updateSharedSessionNativeBindingService } from "../../shared-session/services/sharedSessions";
 import { noteThreadAppServerEventReceived } from "../../threads/utils/streamLatencyDiagnostics";
 import {
@@ -149,6 +150,16 @@ export type AppServerEventHandlers = {
     threadId: string,
     turnId: string,
   ) => void;
+  /**
+   * pi 专属：一个 agent run 彻底 settle（pump `agent_settled` 生命周期标记）。
+   * pi 的 run 含多个原生 turn，完成音等「整轮结束」语义的消费者 MUST 监听
+   * 本信号而非 turn/completed（后者每原生 turn 一次，会连响）。
+   */
+  onThreadRunSettled?: (
+    workspaceId: string,
+    threadId: string,
+    turnId: string,
+  ) => void;
   onProcessingHeartbeat?: (
     workspaceId: string,
     threadId: string,
@@ -172,6 +183,10 @@ export type AppServerEventHandlers = {
     payload?: {
       auto?: boolean | null;
       manual?: boolean | null;
+      /** pi compaction_end 透传；缺失为 null。 */
+      reason?: "threshold" | "overflow" | "manual" | null;
+      tokensBefore?: number | null;
+      estimatedTokensAfter?: number | null;
     },
   ) => void;
   onContextCompactionFailed?: (
@@ -386,7 +401,13 @@ function maybeCaptureRuntimeReceipt(
     return;
   }
   const threadId = sharedThreadId || extractThreadIdFromParams(params);
-  if (!threadId || !threadId.startsWith("shared:")) {
+  if (
+    !threadId ||
+    // 排除式门：Shared canonical attribution 之外，协作画布与 shared-pending
+    // 别名不入账；其余（含 native 各引擎与 shared 本体）同吃 source-rank 回写链。
+    threadId.startsWith("agent-canvas:") ||
+    threadId.includes("-pending-shared-")
+  ) {
     return;
   }
   const result = asRecord(params.result);
@@ -447,6 +468,26 @@ function extractCompactionSourceFlags(params: Record<string, unknown>) {
     return null;
   }
   return { auto, manual };
+}
+
+/** pi compaction_end 的触发原因（threshold/overflow/manual）；缺失为 null。 */
+function parseCompactionReason(value: unknown): "threshold" | "overflow" | "manual" | null {
+  return value === "threshold" || value === "overflow" || value === "manual"
+    ? value
+    : null;
+}
+
+function parseNullableTokenCount(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
 function asStringArray(value: unknown): string[] {
@@ -1781,12 +1822,25 @@ function tryRouteNormalizedRealtimeEvent({
     return false;
   }
   const isSharedOwnerProjection = effectiveThreadId.startsWith("shared:");
-  const runtimeReceipt = isSharedOwnerProjection
-    ? getRuntimeReceipt(workspaceId, effectiveThreadId)
-    : null;
-  if (shouldInjectThreadId || isSharedOwnerProjection) {
+  const isAgentCanvasProjection = isAgentCanvasThreadId(effectiveThreadId);
+  // Shared 投影读同一 store；native 打开同款注入，Ⓡ 尾巴与展开面板随之可用。
+  const runtimeReceipt =
+    isSharedOwnerProjection || (!isAgentCanvasProjection && !sharedBinding)
+      ? getRuntimeReceipt(workspaceId, effectiveThreadId)
+      : null;
+  // Native turn-target：codex 等走 normalized 直达路由的引擎也按发送边界账本
+  // 标注本轮 provenance（shared canonical / attempt 注入优先级不变）。
+  const nativeExecutionTargetSnapshot =
+    !isSharedOwnerProjection && !isAgentCanvasProjection
+      ? getNativeTurnTarget(workspaceId, effectiveThreadId)
+      : null;
+  if (
+    shouldInjectThreadId ||
+    isSharedOwnerProjection ||
+    Boolean(nativeExecutionTargetSnapshot)
+  ) {
     // agent-canvas: 事件写到隔离 thread，但 activeTurn 挂在 shared: 上
-    const activeTurnThreadId = isAgentCanvasThreadId(effectiveThreadId)
+    const activeTurnThreadId = isAgentCanvasProjection
       ? parseAgentCanvasThreadId(effectiveThreadId)?.sharedThreadId ??
         effectiveThreadId
       : effectiveThreadId;
@@ -1798,21 +1852,25 @@ function tryRouteNormalizedRealtimeEvent({
             activeTurnThreadId,
             sharedBinding.attemptId,
           )
-        : null);
+        : null) ?? nativeExecutionTargetSnapshot;
     if (shouldInjectThreadId || isSharedOwnerProjection) {
       normalized.threadId = effectiveThreadId;
     }
-    normalized.item = {
-      ...normalized.item,
-      engineSource: engine,
-      ...(normalized.item.kind === "message" &&
-      normalized.item.role === "assistant"
-        ? {
-            ...(executionTargetSnapshot ? { executionTargetSnapshot } : {}),
-            ...(runtimeReceipt ? { runtimeReceipt } : {}),
-          }
-        : {}),
-    };
+    normalized.item =
+      // context-event 留痕不携带 engineSource（合成 item，非引擎产物）。
+      normalized.item.kind === "context-event"
+        ? normalized.item
+        : {
+            ...normalized.item,
+            engineSource: engine,
+            ...(normalized.item.kind === "message" &&
+            normalized.item.role === "assistant"
+              ? {
+                  ...(executionTargetSnapshot ? { executionTargetSnapshot } : {}),
+                  ...(runtimeReceipt ? { runtimeReceipt } : {}),
+                }
+              : {}),
+          };
     if (normalized.rawItem) {
       normalized.rawItem = {
         ...normalized.rawItem,
@@ -2753,6 +2811,21 @@ export function dispatchAppServerEvent(
     return;
   }
 
+  if (method === "thread/runSettled") {
+    // pi：run 彻底 settle 的生命周期信号（pump agent_settled → 转发器转换）。
+    // 供完成音等「整轮结束」语义消费；不进入 turn 状态机（turn/completed
+    // 已逐原生 turn 结算）。
+    const params = message.params as Record<string, unknown>;
+    const threadId = sharedBridge?.sharedThreadId ?? extractThreadIdFromParams(params);
+    const turnId = asString(
+      params.turnId ?? params.turn_id ?? "",
+    ).trim();
+    if (threadId) {
+      handlers.onThreadRunSettled?.(workspace_id, threadId, turnId);
+    }
+    return;
+  }
+
   if (method === "turn/completed") {
     const params = message.params as Record<string, unknown>;
     const turn = params.turn as Record<string, unknown> | undefined;
@@ -2957,16 +3030,20 @@ export function dispatchAppServerEvent(
     const turnId = extractTurnIdFromParams(params);
     if (threadId) {
       const sourceFlags = extractCompactionSourceFlags(params);
-      if (sourceFlags) {
-        handlers.onContextCompacted?.(
-          workspace_id,
-          threadId,
-          turnId,
-          sourceFlags,
-        );
-      } else {
-        handlers.onContextCompacted?.(workspace_id, threadId, turnId);
-      }
+      const compactionMarkerPayload = {
+        ...(sourceFlags ?? {}),
+        reason: parseCompactionReason(params.reason),
+        tokensBefore: parseNullableTokenCount(params.tokensBefore),
+        estimatedTokensAfter: parseNullableTokenCount(
+          params.estimatedTokensAfter,
+        ),
+      };
+      handlers.onContextCompacted?.(
+        workspace_id,
+        threadId,
+        turnId,
+        compactionMarkerPayload,
+      );
     }
     return;
   }

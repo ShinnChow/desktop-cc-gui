@@ -18,8 +18,21 @@ pub(crate) async fn call_remote_typed<T: DeserializeOwned>(
     serde_json::from_value(response).map_err(|error| error.to_string())
 }
 
-pub(crate) fn remote_detect_engines_request() -> (&'static str, Value) {
-    ("detect_engines", json!({}))
+pub(crate) fn remote_detect_engines_request(
+    force: bool,
+    engines: Option<&[EngineType]>,
+) -> (&'static str, Value) {
+    (
+        "detect_engines",
+        json!({
+            "force": force,
+            "engines": engines.map(|list| {
+                list.iter()
+                    .map(|engine_type| serde_json::to_value(engine_type).unwrap_or_default())
+                    .collect::<Vec<Value>>()
+            }),
+        }),
+    )
 }
 
 pub(crate) fn remote_engine_send_message_sync_request(
@@ -84,10 +97,14 @@ mod tests {
 
     #[test]
     fn remote_detect_engines_request_has_expected_shape() {
-        let (method, params) = remote_detect_engines_request();
+        let (method, params) = remote_detect_engines_request(false, None);
 
         assert_eq!(method, "detect_engines");
-        assert_eq!(params, json!({}));
+        assert_eq!(params, json!({ "force": false, "engines": null }));
+
+        let (method, params) = remote_detect_engines_request(true, Some(&[EngineType::Kimi]));
+        assert_eq!(method, "detect_engines");
+        assert_eq!(params, json!({ "force": true, "engines": ["kimi"] }));
     }
 
     #[test]

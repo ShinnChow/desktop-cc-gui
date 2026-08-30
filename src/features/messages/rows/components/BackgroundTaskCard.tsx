@@ -20,6 +20,8 @@ export type CanonicalBackgroundTask = {
   endTime?: number | null;
   pid?: number | null;
   error?: string | null;
+  /** 终态通知里的人类可读摘要（`<summary>`/`<result>` 清洗后），实时与历史同源。 */
+  completionText?: string | null;
 };
 
 export type BackgroundTaskCardProps = {
@@ -67,6 +69,8 @@ export function parseBackgroundTaskSnapshot(
       endTime: typeof parsed.endTime === "number" ? parsed.endTime : null,
       pid: typeof parsed.pid === "number" ? parsed.pid : null,
       error: typeof parsed.error === "string" ? parsed.error : null,
+      completionText:
+        typeof parsed.completionText === "string" ? parsed.completionText : null,
     };
   } catch {
     return null;
@@ -85,6 +89,33 @@ export function parseBackgroundTaskInput(
   } catch {
     return null;
   }
+}
+
+/**
+ * store 权威记录（四路合流的 live task）→ CanonicalBackgroundTask。
+ * 与 parseBackgroundTaskSnapshot 对称：卡片状态优先取 store 直读快照
+ * （时间线 upsert 丢失时自愈），output 快照仅作兜底。
+ */
+export function canonicalBackgroundTaskFromRecord(
+  task: Record<string, unknown> | null | undefined,
+): CanonicalBackgroundTask | null {
+  if (!task || typeof task !== "object") return null;
+  const id = typeof task.id === "string" ? task.id.trim() : "";
+  if (!id) return null;
+  return {
+    id,
+    name: typeof task.name === "string" ? task.name : null,
+    command: typeof task.command === "string" ? task.command : null,
+    status: typeof task.status === "string" ? task.status : null,
+    outputPath: typeof task.outputPath === "string" ? task.outputPath : null,
+    exitCode: typeof task.exitCode === "number" ? task.exitCode : null,
+    startTime: typeof task.startTime === "number" ? task.startTime : null,
+    endTime: typeof task.endTime === "number" ? task.endTime : null,
+    pid: typeof task.pid === "number" ? task.pid : null,
+    error: typeof task.error === "string" ? task.error : null,
+    completionText:
+      typeof task.completionText === "string" ? task.completionText : null,
+  };
 }
 
 function resolveTone(
@@ -210,6 +241,13 @@ export const BackgroundTaskCard = memo(function BackgroundTaskCard({
       t("messages.backgroundTaskCardFieldOutput"),
       task?.outputPath,
     );
+    if (task?.completionText) {
+      push(
+        "completion",
+        t("messages.backgroundTaskFoldFieldSummary"),
+        task.completionText,
+      );
+    }
     if (task?.error) {
       push("error", t("messages.backgroundTaskCardFieldError"), task.error);
     }

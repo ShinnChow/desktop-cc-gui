@@ -36,6 +36,7 @@ function createDomainContexts(): AppShellDomainContexts {
     layoutContext: { centerMode: "chat" },
     fileEditorContext: { activeEditorFilePath: "src/app-shell.tsx" },
     settingsContext: { appSettings: { theme: "system" } },
+    threadDataContext: { threadsByWorkspace: {} },
     runtimeContext: { runtimeRunState: { runtimeConsoleVisible: false } },
     modelSelectionContext: { effectiveSelectedModelId: "model-1" },
     collaborationModeContext: { selectedCollaborationModeId: "code" },
@@ -173,7 +174,7 @@ function findDuplicateRawContextKeys(
 }
 
 describe("appShellDomainContexts", () => {
-  it("defines the fourteen app shell domain contexts in migration order", () => {
+  it("defines the fifteen app shell domain contexts in migration order", () => {
     expect(listAppShellDomainContextNames()).toEqual([
       "runtimeThreadContext",
       "sessionIdentityContext",
@@ -186,6 +187,7 @@ describe("appShellDomainContexts", () => {
       "layoutContext",
       "fileEditorContext",
       "settingsContext",
+      "threadDataContext",
       "runtimeContext",
       "modelSelectionContext",
       "collaborationModeContext",
@@ -275,9 +277,13 @@ describe("appShellDomainContexts", () => {
     expect(APP_SHELL_DOMAIN_CONTEXT_OWNED_KEYS.settingsContext).toContain(
       "sidebarCollapsed",
     );
-    expect(APP_SHELL_DOMAIN_CONTEXT_OWNED_KEYS.settingsContext).toContain(
+    // F5：threads 全量 map 迁入 threadDataContext，settingsContext 不再持有。
+    expect(APP_SHELL_DOMAIN_CONTEXT_OWNED_KEYS.threadDataContext).toContain(
       "threadItemsByThread",
     );
+    expect(
+      APP_SHELL_DOMAIN_CONTEXT_OWNED_KEYS.settingsContext,
+    ).not.toContain("threadItemsByThread");
     expect(
       APP_SHELL_DOMAIN_CONTEXT_OWNED_KEYS.workspaceNavigationContext,
     ).toContain(
@@ -365,6 +371,7 @@ describe("appShellDomainContexts", () => {
 
   it("reuses all domain references when shallow values are stable", () => {
     const appSettings = { theme: "system" };
+    const threadData = { threadsByWorkspace: {} };
     const runtimeRunState = { runtimeConsoleVisible: false };
     const modelSelection = { effectiveSelectedModelId: "model-1" };
     const collaborationMode = { selectedCollaborationModeId: "code" };
@@ -380,6 +387,7 @@ describe("appShellDomainContexts", () => {
       layoutContext: { centerMode: "chat" },
       fileEditorContext: { activeEditorFilePath: "src/app-shell.tsx" },
       settingsContext: { appSettings },
+      threadDataContext: threadData,
       runtimeContext: { runtimeRunState },
       modelSelectionContext: modelSelection,
       collaborationModeContext: collaborationMode,
@@ -396,6 +404,7 @@ describe("appShellDomainContexts", () => {
       layoutContext: { centerMode: "chat" },
       fileEditorContext: { activeEditorFilePath: "src/app-shell.tsx" },
       settingsContext: { appSettings },
+      threadDataContext: threadData,
       runtimeContext: { runtimeRunState },
       modelSelectionContext: modelSelection,
       collaborationModeContext: collaborationMode,
@@ -444,6 +453,20 @@ describe("appShellDomainContexts", () => {
     expect(stableContexts.collaborationModeContext).toBe(
       previousContexts.collaborationModeContext,
     );
+  });
+
+  it("preserves the outer context bag when every domain is unchanged", () => {
+    const previousContexts = createDomainContexts();
+    const nextContexts = Object.fromEntries(
+      listAppShellDomainContextNames().map((domainName) => [
+        domainName,
+        { ...previousContexts[domainName] },
+      ]),
+    ) as AppShellDomainContexts;
+
+    expect(
+      reuseStableAppShellDomainContexts(previousContexts, nextContexts),
+    ).toBe(previousContexts);
   });
 
   it("keeps runtime updates isolated from file editor context", () => {
@@ -647,16 +670,18 @@ describe("appShellDomainContexts", () => {
   });
 });
 
+
 describe("APP_SHELL_CONSUMER_DOMAIN_SELECTION", () => {
   it("keeps sections/render smaller than layoutNodes (no full-domain flatten)", () => {
-    // 兼容全集仍为 13；真实 flatten 已拆成 canvas/chrome/git zone。
-    expect(APP_SHELL_CONSUMER_DOMAIN_SELECTION.layoutNodes).toHaveLength(13);
+    // F5 后全集 14；真实 flatten 已拆成 canvas/chrome/git zone。
+    expect(APP_SHELL_CONSUMER_DOMAIN_SELECTION.layoutNodes).toHaveLength(14);
     expect(APP_SHELL_CONSUMER_DOMAIN_SELECTION.layoutNodesCanvas).toEqual([
       "runtimeThreadContext",
       "sessionIdentityContext",
       "composerContext",
       "modelSelectionContext",
       "collaborationModeContext",
+      "threadDataContext",
     ]);
     expect(APP_SHELL_CONSUMER_DOMAIN_SELECTION.layoutNodesChrome).not.toContain(
       "runtimeThreadContext",
@@ -725,4 +750,3 @@ describe("APP_SHELL_CONSUMER_DOMAIN_SELECTION", () => {
     );
   });
 });
-

@@ -9,6 +9,7 @@ import {
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import { AgentIcon } from '../../../../../components/AgentIcon';
+import { SelectorOptionRow } from './SelectorOptionRow';
 import { agentProvider, CREATE_NEW_AGENT_ID, EMPTY_STATE_ID, type AgentItem } from '../providers/agentProvider';
 import type { CodexSpeedMode, ProviderId, SelectedAgent } from '../types';
 
@@ -364,12 +365,30 @@ export const ConfigSelect = ({
                     ? t('settings.agent.createAgentHint')
                     : null;
                 return (
-                  <DropdownMenuItem
+                  <SelectorOptionRow
                     key={agent.id}
-                    className={`composer-tool-menu-option${isSelected ? ' is-selected' : ''}${isInfo ? ' is-disabled' : ''}`}
+                    variant="tool-menu"
+                    host="menu-item"
+                    selected={isSelected}
                     disabled={isInfo}
+                    icon={
+                      isCreate ? (
+                        <span className="codicon codicon-add composer-tool-menu-option-icon" aria-hidden="true" />
+                      ) : isInfo ? (
+                        <span className="codicon codicon-info composer-tool-menu-option-icon" aria-hidden="true" />
+                      ) : (
+                        <AgentIcon
+                          icon={agent.icon}
+                          seed={agent.id || agent.name}
+                          fallback="codicon-robot"
+                          className="composer-tool-menu-option-icon"
+                          size={16}
+                        />
+                      )
+                    }
+                    label={agent.name}
+                    description={description}
                     onSelect={() => {
-                      if (isInfo) return;
                       if (isCreate) {
                         onOpenAgentSettings?.();
                         return;
@@ -386,30 +405,7 @@ export const ConfigSelect = ({
                       promptHash: agent.promptHash,
                     });
                     }}
-                  >
-                    {isCreate ? (
-                      <span className="codicon codicon-add composer-tool-menu-option-icon" aria-hidden="true" />
-                    ) : isInfo ? (
-                      <span className="codicon codicon-info composer-tool-menu-option-icon" aria-hidden="true" />
-                    ) : (
-                      <AgentIcon
-                        icon={agent.icon}
-                        seed={agent.id || agent.name}
-                        fallback="codicon-robot"
-                        className="composer-tool-menu-option-icon"
-                        size={16}
-                      />
-                    )}
-                    <span className="composer-tool-menu-option-body">
-                      <span className="composer-tool-menu-option-label">{agent.name}</span>
-                      {description ? (
-                        <span className="composer-tool-menu-option-description">{description}</span>
-                      ) : null}
-                    </span>
-                    {isSelected && (
-                      <span className="codicon codicon-check composer-tool-menu-option-check" aria-hidden="true" />
-                    )}
-                  </DropdownMenuItem>
+                  />
                 );
               })
             )}
@@ -493,28 +489,20 @@ export const ConfigSelect = ({
                 </span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="composer-tool-menu-sub-content">
-                <DropdownMenuItem
-                  className={`composer-tool-menu-option${codexSpeedMode === 'standard' ? ' is-selected' : ''}`}
+                <SelectorOptionRow
+                  variant="tool-menu"
+                  host="menu-item"
+                  label={t('composer.speedStandard')}
+                  selected={codexSpeedMode === 'standard'}
                   onSelect={() => handleCodexSpeedSelect('standard')}
-                >
-                  <span className="composer-tool-menu-option-body">
-                    <span className="composer-tool-menu-option-label">{t('composer.speedStandard')}</span>
-                  </span>
-                  {codexSpeedMode === 'standard' && (
-                    <span className="codicon codicon-check composer-tool-menu-option-check" aria-hidden="true" />
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className={`composer-tool-menu-option${codexSpeedMode === 'fast' ? ' is-selected' : ''}`}
+                />
+                <SelectorOptionRow
+                  variant="tool-menu"
+                  host="menu-item"
+                  label={t('composer.speedFast')}
+                  selected={codexSpeedMode === 'fast'}
                   onSelect={() => handleCodexSpeedSelect('fast')}
-                >
-                  <span className="composer-tool-menu-option-body">
-                    <span className="composer-tool-menu-option-label">{t('composer.speedFast')}</span>
-                  </span>
-                  {codexSpeedMode === 'fast' && (
-                    <span className="codicon codicon-check composer-tool-menu-option-check" aria-hidden="true" />
-                  )}
-                </DropdownMenuItem>
+                />
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           </>

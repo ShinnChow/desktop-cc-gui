@@ -63,6 +63,7 @@ import {
   buildDetachedSpecHubSession,
   openOrFocusDetachedSpecHub,
   readDetachedSpecHubSessionSnapshot,
+  writeDetachedSpecHubSessionSnapshot,
 } from "./detachedSpecHub";
 
 describe("detachedSpecHub", () => {
@@ -94,7 +95,14 @@ describe("detachedSpecHub", () => {
     expect(writeClientStoreValueMock).toHaveBeenCalledWith(
       "app",
       DETACHED_SPEC_HUB_SESSION_STORAGE_KEY,
-      session,
+      {
+        workspaceId: "ws-1",
+        workspaceName: "workspace",
+        changeId: "change-1",
+        artifactType: "proposal",
+        specSourcePath: null,
+        updatedAt: session.updatedAt,
+      },
       { immediate: true },
     );
     expect(webviewWindowCtorMock).toHaveBeenCalledTimes(1);
@@ -190,5 +198,31 @@ describe("detachedSpecHub", () => {
       specSourcePath: null,
       updatedAt: 123,
     });
+  });
+
+  it("persists pointer fields only (no files/directories tree)", () => {
+    writeDetachedSpecHubSessionSnapshot(
+      buildDetachedSpecHubSession({
+        workspaceId: "ws-4",
+        workspaceName: "project",
+        files: Array.from({ length: 500 }, (_, index) => `openspec/file-${index}.md`),
+        directories: ["openspec", "openspec/changes"],
+        changeId: "change-4",
+        artifactType: "proposal",
+      }),
+    );
+
+    expect(writeClientStoreValueMock).toHaveBeenCalledTimes(1);
+    const [, , persistedPayload] = writeClientStoreValueMock.mock.calls[0];
+    expect(persistedPayload).toEqual({
+      workspaceId: "ws-4",
+      workspaceName: "project",
+      changeId: "change-4",
+      artifactType: "proposal",
+      specSourcePath: null,
+      updatedAt: expect.any(Number),
+    });
+    expect(persistedPayload).not.toHaveProperty("files");
+    expect(persistedPayload).not.toHaveProperty("directories");
   });
 });

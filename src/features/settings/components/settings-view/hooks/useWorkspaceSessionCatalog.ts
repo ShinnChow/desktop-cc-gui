@@ -6,6 +6,7 @@ import {
   listGlobalCodexSessions,
   listProjectRelatedSessions,
   listWorkspaceSessions,
+  scheduleTombstoneClaudeForkIndexRow,
   unarchiveWorkspaceSessionsV2,
   type WorkspaceSessionBatchMutationResponse,
   type WorkspaceSessionCatalogEntry,
@@ -450,6 +451,10 @@ export function useWorkspaceSessionCatalog({
               v2Results.forEach((item) => {
                 respondedSessionIds.add(item.sessionId);
                 const ok = item.ok || isSessionDeleteSuccessCode(item.code);
+                if (ok) {
+                  // 合成 fork ID 的 mangled 孪生键后端够不到，删除成功顺带清理
+                  scheduleTombstoneClaudeForkIndexRow(item.sessionId);
+                }
                 mutationResults.push({
                   selectionKey:
                     selectionKeyBySessionId.get(item.sessionId) ??

@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+// 必须最先 import：注册作用域错误监听（先于所有重依赖求值）
+import "./workerScopeErrorBridge";
 import { compileFastMarkdownToUnsafeArtifact } from "./compileCore";
 import type {
   CompileFastMarkdownArgs,

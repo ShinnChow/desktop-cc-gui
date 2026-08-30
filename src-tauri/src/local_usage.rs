@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration as StdDuration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::State;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
@@ -45,6 +45,14 @@ struct UsageTotals {
 
 const MAX_ACTIVITY_GAP_MS: i64 = 2 * 60 * 1000;
 const LOCAL_SESSION_SCAN_TIMEOUT: StdDuration = StdDuration::from_secs(60);
+/// Codex 列表扫描内层硬截止：对齐前端 catalog 30s 超时 +2s 余量。
+/// 外层 `timeout(LOCAL_SESSION_SCAN_TIMEOUT, spawn_blocking)` 只放弃
+/// JoinHandle，扫描线程会继续 open/read 到自然结束（Windows Defender 下
+/// 单文件 open 可达数十 ms，≤200 候选/根 × 多根可拖数分钟），与后续扫描
+/// 叠加成 IO 风暴。内层 deadline 保证线程在 ~32s 内真正退出
+/// （fix-codex-scan-deadline-abort）。
+const CODEX_LIST_SCAN_DEADLINE: StdDuration = StdDuration::from_secs(32);
+const CODEX_SCAN_DEADLINE_EXCEEDED: &str = "codex session scan deadline exceeded";
 const CODEX_THREAD_PREVIEW_MAX_BYTES: u64 = 256 * 1024;
 const CODEX_BOUNDED_CANDIDATE_LOOKAHEAD: usize = 20;
 const CODEX_PROVIDER_PROFILE_SOURCE_MANAGED: &str = "managed";
@@ -199,11 +207,13 @@ async fn list_codex_session_summary_list_for_workspace_with_mode(
     let sessions = timeout(
         LOCAL_SESSION_SCAN_TIMEOUT,
         tokio::task::spawn_blocking(move || {
+            let scan_deadline = Some(Instant::now() + CODEX_LIST_SCAN_DEADLINE);
             let (summaries, _) = scan_codex_session_summaries_bounded_with_mode(
                 Some(workspace_path.as_path()),
                 &sessions_roots,
                 requested_limit,
                 parse_mode,
+                scan_deadline,
             )?;
             Ok::<Vec<LocalUsageSessionSummary>, String>(summaries)
         }),
@@ -259,11 +269,13 @@ async fn list_global_codex_session_summaries_with_mode(
     let sessions = timeout(
         LOCAL_SESSION_SCAN_TIMEOUT,
         tokio::task::spawn_blocking(move || {
+            let scan_deadline = Some(Instant::now() + CODEX_LIST_SCAN_DEADLINE);
             let (summaries, _) = scan_codex_session_summaries_bounded_with_mode(
                 None,
                 &sessions_roots,
                 requested_limit,
                 parse_mode,
+                scan_deadline,
             )?;
             Ok::<Vec<LocalUsageSessionSummary>, String>(summaries)
         }),
@@ -565,6 +577,7 @@ fn scan_codex_session_summaries(
         sessions_roots,
         usize::MAX,
         CodexSessionParseMode::Full,
+        None,
     )
     .map(|(sessions, _)| sessions)
 }
@@ -586,6 +599,7 @@ fn scan_codex_session_summaries_bounded(
         sessions_roots,
         unique_session_limit,
         CodexSessionParseMode::Full,
+        None,
     )
 }
 
@@ -608,6 +622,7 @@ pub(crate) fn scan_codex_session_summaries_for_index(
         sessions_roots,
         unique_session_limit,
         CodexSessionParseMode::ThreadPreview,
+        None,
     )
 }
 
@@ -616,6 +631,7 @@ fn scan_codex_session_summaries_bounded_with_mode(
     sessions_roots: &[PathBuf],
     unique_session_limit: usize,
     parse_mode: CodexSessionParseMode,
+    scan_deadline: Option<Instant>,
 ) -> Result<(Vec<LocalUsageSessionSummary>, usize), String> {
     let unique_session_limit = unique_session_limit.max(1);
     let candidate_scan_limit = match parse_mode {
@@ -671,6 +687,7 @@ fn scan_codex_session_summaries_bounded_with_mode(
         parse_mode,
         candidate_scan_limit,
         unique_session_limit,
+        scan_deadline,
     )
 }
 
@@ -680,12 +697,20 @@ fn parse_codex_candidates_into_summaries(
     parse_mode: CodexSessionParseMode,
     candidate_scan_limit: usize,
     unique_session_limit: usize,
+    scan_deadline: Option<Instant>,
 ) -> Result<(Vec<LocalUsageSessionSummary>, usize), String> {
     let unique_session_limit = unique_session_limit.max(1);
     let mut native_titles_by_home = HashMap::<PathBuf, HashMap<String, String>>::new();
     let mut sessions_by_id = HashMap::<String, LocalUsageSessionSummary>::new();
     let mut scanned_file_count = 0;
     for candidate in candidates.into_iter().take(candidate_scan_limit) {
+        // 内层 deadline：超期立即终止，禁止放弃的扫描继续读盘
+        // （fix-codex-scan-deadline-abort）。Err 语义与外层 timeout 一致。
+        if let Some(deadline) = scan_deadline {
+            if Instant::now() >= deadline {
+                return Err(CODEX_SCAN_DEADLINE_EXCEEDED.to_string());
+            }
+        }
         scanned_file_count += 1;
         let Some(mut summary) =
             parse_codex_session_summary_with_mode(&candidate.path, workspace_path, parse_mode)?
@@ -1117,6 +1142,7 @@ pub(crate) fn scan_codex_session_summaries_for_day_dirs(
         CodexSessionParseMode::ThreadPreview,
         usize::MAX,
         usize::MAX,
+        None,
     )?;
     Ok(sessions)
 }
@@ -1169,6 +1195,7 @@ pub(crate) fn scan_codex_session_summaries_for_files(
         CodexSessionParseMode::ThreadPreview,
         usize::MAX,
         usize::MAX,
+        None,
     )?;
     Ok(sessions)
 }
@@ -1821,7 +1848,8 @@ fn read_number_before_keyword(line: &str, keyword: &str) -> Option<i64> {
     let keyword_index = lower.find(keyword)?;
     let prefix = &line[..keyword_index];
     prefix
-        .split(|ch: char| !ch.is_ascii_digit()).rfind(|segment| !segment.is_empty())
+        .split(|ch: char| !ch.is_ascii_digit())
+        .rfind(|segment| !segment.is_empty())
         .and_then(|segment| segment.parse::<i64>().ok())
 }
 
@@ -1969,9 +1997,7 @@ fn codex_subagent_display_title(metadata: &CodexSubagentSessionMetadata) -> Opti
 }
 
 fn portable_path_basename(path: &str) -> Option<String> {
-    let trimmed = path
-        .trim()
-        .trim_end_matches(['/', '\\']);
+    let trimmed = path.trim().trim_end_matches(['/', '\\']);
     if trimmed.is_empty() {
         return None;
     }

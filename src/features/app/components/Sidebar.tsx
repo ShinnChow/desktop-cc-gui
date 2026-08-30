@@ -31,6 +31,7 @@ import { WorkspaceSettingsDialog } from "./WorkspaceSettingsDialog";
 import { SidebarFolderMovePicker } from "./SidebarFolderMovePicker";
 import { SidebarSearchBox } from "./SidebarSearchBox";
 import { SidebarSettingsMenu } from "./SidebarSettingsMenu";
+import { SystemProxyDrawer } from "./SystemProxyDrawer";
 import { SidebarTopbarSlot } from "./SidebarTopbarSlot";
 import { SidebarVersionTag } from "./SidebarVersionTag";
 import { SidebarWorkspaceDropOverlay } from "./SidebarWorkspaceDropOverlay";
@@ -59,6 +60,7 @@ import { debugPiSidebarDrop } from "../../pi-session/store/piSidebarDropDiagnost
 import { isDefaultWorkspacePath } from "../../workspaces/utils/defaultWorkspace";
 import {
   formatShortcutForPlatform,
+  formatShortcutLabelOrNull,
   isMacPlatform,
 } from "../../../utils/shortcuts";
 import { isMacPlatform as isMacDesktopHost } from "../../../utils/platform";
@@ -170,6 +172,10 @@ type SidebarProps = {
   activeThreadId: string | null;
   systemProxyEnabled?: boolean;
   systemProxyUrl?: string | null;
+  onUpdateSystemProxy?: (patch: {
+    systemProxyEnabled: boolean;
+    systemProxyUrl: string | null;
+  }) => Promise<unknown>;
   accountRateLimits: RateLimitSnapshot | null;
   usageShowRemaining: boolean;
   showProviderLabels?: boolean;
@@ -208,6 +214,7 @@ type SidebarProps = {
   onAddSharedAgent?: (
     workspace: WorkspaceInfo,
     engine: SharedSessionSupportedEngine,
+    options?: { providerProfileId?: string },
   ) => Promise<string | null> | string | null | void;
   onAddWorktreeAgent: (workspace: WorkspaceInfo) => void;
   onAddCloneAgent: (workspace: WorkspaceInfo) => void;
@@ -295,6 +302,7 @@ type SidebarProps = {
   onCollapseSidebar?: () => void;
   globalSearchShortcut: string | null;
   openChatShortcut: string | null;
+  openSettingsShortcut?: string | null;
   isExitedSessionsHidden?: (workspacePath: string) => boolean;
   onToggleExitedSessionsHidden?: (workspacePath: string) => void;
   rootSessionFolderDraftRequestByWorkspaceId?: Record<string, number>;
@@ -321,13 +329,14 @@ function SidebarImpl({
   hydratedThreadListWorkspaceIds,
   runningSessionCountByWorkspaceId: _runningSessionCountByWorkspaceId = {},
   recentSessionCountByWorkspaceId: _recentSessionCountByWorkspaceId = {},
-  threadListLoadingByWorkspace: _threadListLoadingByWorkspace,
+  threadListLoadingByWorkspace,
   threadListPagingByWorkspace,
   threadListCursorByWorkspace,
   activeWorkspaceId,
   activeThreadId,
   systemProxyEnabled = false,
   systemProxyUrl = null,
+  onUpdateSystemProxy = async () => undefined,
   showProviderLabels = false,
   defaultVisibleThreadRootCount,
   onChangeDefaultVisibleThreadRootCount,
@@ -407,6 +416,7 @@ function SidebarImpl({
   onCollapseSidebar,
   globalSearchShortcut,
   openChatShortcut,
+  openSettingsShortcut,
   isExitedSessionsHidden: controlledIsExitedSessionsHidden,
   onToggleExitedSessionsHidden: controlledToggleExitedSessionsHidden,
   rootSessionFolderDraftRequestByWorkspaceId:
@@ -440,6 +450,10 @@ function SidebarImpl({
   const quickSearchShortcutLabel = useMemo(
     () => formatShortcutForPlatform(globalSearchShortcut, isMac),
     [globalSearchShortcut, isMac],
+  );
+  const openSettingsShortcutLabel = useMemo(
+    () => formatShortcutLabelOrNull(openSettingsShortcut, isMac),
+    [openSettingsShortcut, isMac],
   );
 
   const [workspaceSettingsOpen, setWorkspaceSettingsOpen] = useState(false);
@@ -602,6 +616,7 @@ function SidebarImpl({
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isSearchOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [isSystemProxyDrawerOpen, setIsSystemProxyDrawerOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const { collapsedGroups, toggleGroupCollapse, replaceCollapsedGroups } =
@@ -1197,6 +1212,7 @@ function SidebarImpl({
     onOpenClaudeTui,
     onReloadWorkspaceThreads:
       onQuickReloadWorkspaceThreads ?? onReloadWorkspaceThreads,
+    threadListLoadingByWorkspace,
     onSelectThread,
     onProviderContinuationTargetReady,
     isThreadAvailable: (workspaceId, threadId) =>
@@ -1825,6 +1841,19 @@ function SidebarImpl({
   }, [isSettingsMenuOpen]);
 
   useEffect(() => {
+    if (!isSystemProxyDrawerOpen) {
+      return;
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsSystemProxyDrawerOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isSystemProxyDrawerOpen]);
+
+  useEffect(() => {
     if (!isSearchOpen && searchQuery) {
       setSearchQuery("");
     }
@@ -2208,7 +2237,7 @@ function SidebarImpl({
               deletingWorktreeIds={deletingWorktreeIds}
               threadsByWorkspace={threadsByWorkspace}
               threadStatusById={threadStatusById}
-              threadListLoadingByWorkspace={_threadListLoadingByWorkspace}
+              threadListLoadingByWorkspace={threadListLoadingByWorkspace}
               threadListPagingByWorkspace={threadListPagingByWorkspace}
               threadListCursorByWorkspace={threadListCursorByWorkspace}
               threadListPageByWorkspace={threadListPageByWorkspace}
@@ -2421,7 +2450,7 @@ function SidebarImpl({
       threadsByWorkspace,
       toggleExitedSessionsHidden,
       worktreesByParent,
-      _threadListLoadingByWorkspace,
+      threadListLoadingByWorkspace,
     ],
   );
 
@@ -2743,12 +2772,17 @@ function SidebarImpl({
               onOpenSpecHub={onOpenSpecHub}
               onOpenProjectMemory={onOpenProjectMemory}
               onOpenSettings={onOpenSettings}
+              onToggleSystemProxy={() =>
+                setIsSystemProxyDrawerOpen((open) => !open)
+              }
+              systemProxyDrawerOpen={isSystemProxyDrawerOpen}
               onAppModeChange={onAppModeChange}
               onOpenRuntimeNotice={onOpenRuntimeNotice}
               showRuntimeNotice={showRuntimeNoticeMenuItem}
               runtimeNoticeHasError={runtimeNoticeHasError}
               showHideThreadsSidebar={showHideThreadsSidebar}
               onCollapseSidebar={onCollapseSidebar}
+              openSettingsShortcutLabel={openSettingsShortcutLabel}
             />
             {/* 锚点保留在侧栏底部供展开面板定位；外显气泡入口已收入设置二级菜单 */}
             {runtimeNoticeDockNode}
@@ -2756,6 +2790,15 @@ function SidebarImpl({
           </div>
         </div>
       </div>
+      {isSystemProxyDrawerOpen ? (
+        <SystemProxyDrawer
+          systemProxyEnabled={systemProxyEnabled}
+          systemProxyUrl={systemProxyUrl}
+          onUpdateSystemProxy={onUpdateSystemProxy}
+          onClose={() => setIsSystemProxyDrawerOpen(false)}
+          t={t}
+        />
+      ) : null}
       {folderMovePicker ? (
         <SidebarFolderMovePicker
           picker={folderMovePicker}

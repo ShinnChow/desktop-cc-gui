@@ -26,7 +26,8 @@ import {
 import {
   clearFullCatalogAutoRetryCooldown,
   isFullCatalogAutoRetryBlocked,
-  markFullCatalogAutoRetryCooldown,
+  noteFullCatalogAutoRetrySuccess,
+  noteFullCatalogAutoRetryTimeout,
 } from "../../features/startup-orchestration/utils/fullCatalogAutoRetry";
 import {
   clearFullCatalogFresh,
@@ -183,8 +184,10 @@ export const POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_WAIT_MS = IS_VITEST
  * soft re-sync, but a user who never stops clicking would starve it via a
  * cancel → quiet re-arm loop. Cap consecutive deferrals: after MAX_DEFERS
  * soft-cancels or MAX_DEFER_WINDOW_MS since the first defer (whichever hits
- * first), force one run even while the user is still clicking, then reset
- * so the next cycle may defer again.
+ * first), re-arm quiet-only — the run waits for the first real quiet window
+ * instead of forcing through mid-click (F1: a forced second-level writer
+ * rescan inside a click storm is worse than a delayed convergence; the
+ * importer poll and explicit force reload still cover new-session pickup).
  * @internal exported for tests
  */
 export const POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_DEFERS = 3;
@@ -573,7 +576,10 @@ export function useWorkspaceThreadListHydration({
    * First-paint / this re-sync never probe DSH/PI disk or host.
    */
   const schedulePostFirstPaintIndexSoftResync = useCallback(
-    (workspaceId: string, options?: { allowRepeat?: boolean }) => {
+    (
+      workspaceId: string,
+      options?: { allowRepeat?: boolean; quietOnly?: boolean },
+    ) => {
       const id = workspaceId.trim();
       if (!id) {
         return;
@@ -607,7 +613,12 @@ export function useWorkspaceThreadListHydration({
       const quietCleanup = scheduleWhenInteractiveQuiet(runIndexSoftRefresh, {
         quietMs: POST_FIRST_PAINT_INDEX_SOFT_RESYNC_QUIET_MS,
         minDelayMs: POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MIN_DELAY_MS,
-        maxWaitMs: POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_WAIT_MS,
+        // F1（perf-cold-start-click-storm-convergence）：quietOnly（defer 满
+        // 上限后的冷却重武装）不给 maxWait 强跑许可——收敛由「quiet 到达必跑」
+        // 保证，上限不再授权在交互中执行（现场 2026-08-28 22:31:18 syncMs=3111）。
+        maxWaitMs: options?.quietOnly
+          ? Number.MAX_SAFE_INTEGER
+          : POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_WAIT_MS,
       });
       unregisterForceCancel = registerStartupIdleHydrationCancel(() => {
         quietCleanup();
@@ -654,29 +665,32 @@ export function useWorkspaceThreadListHydration({
         now - firstDeferAt >=
           POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_DEFER_WINDOW_MS;
       if (deferCeilingHit) {
-        // Defer ceiling: run now even though the user is still clicking — the
-        // sidebar must converge. Reset so the next cycle may defer again.
+        // F1（perf-cold-start-click-storm-convergence）：defer 满上限不再「仍在
+        // 点击也强跑」——那会把秒级写者 rescan 正正砸进点击风暴（现场
+        // 2026-08-28 22:31:18 syncMs=3111）。改为冷却：重置计数，按普通 defer
+        // 走 soft-cancel + 重武装 quietOnly 调度，等真实 quiet 窗口执行。
+        // 防饿死：quiet 到达必跑；新会话发现另有 importer 轮询与显式 reload
+        // （forceSessionIndexSync 全量语义不变）兜底。
         postFirstPaintIndexSoftResyncDeferCountRef.current = 0;
         postFirstPaintIndexSoftResyncFirstDeferAtRef.current = 0;
-        if (isPending && !isInFlight) {
-          cancelPendingPostFirstPaintIndexSoftResync();
-          runPostFirstPaintIndexSoftResync(workspaceId);
-        }
-        // In-flight: do not cancel — let this run finish.
-        return;
       }
       postFirstPaintIndexSoftResyncDeferCountRef.current += 1;
-      postFirstPaintIndexSoftResyncFirstDeferAtRef.current = firstDeferAt;
+      postFirstPaintIndexSoftResyncFirstDeferAtRef.current =
+        postFirstPaintIndexSoftResyncFirstDeferAtRef.current || Date.now();
       if (isInFlight) {
         // Soft-cancel: generation bump makes the orphan's late setThreads no-op.
         postFirstPaintIndexSoftResyncGenerationRef.current += 1;
         postFirstPaintIndexSoftResyncInFlightIdRef.current = null;
       }
       // Re-arm the quiet-gated schedule so the list converges once the user
-      // stops clicking (or the schedule's own maxWait forces it).
+      // stops clicking. Post-ceiling re-arms are quiet-only: the schedule
+      // must not force a run through maxWait while input keeps coming.
       cancelPendingPostFirstPaintIndexSoftResync();
       postFirstPaintIndexSoftResyncArmedIdsRef.current.delete(workspaceId);
-      schedulePostFirstPaintIndexSoftResync(workspaceId, { allowRepeat: true });
+      schedulePostFirstPaintIndexSoftResync(workspaceId, {
+        allowRepeat: true,
+        quietOnly: deferCeilingHit,
+      });
     },
     [
       cancelPendingPostFirstPaintIndexSoftResync,
@@ -811,11 +825,15 @@ export function useWorkspaceThreadListHydration({
               workspace.id,
             );
             if (settledAsTimeout) {
-              markFullCatalogAutoRetryCooldown(workspace.id, "timeout");
+              // 连续 timeout 指数退避（60s→15min 封顶），打破「永不成功扫描
+              // + 固定 60s 冷却 + 清 freshness」的常驻风暴回路（2026-08-27
+              // Windows 用户实测：129 次 30s 超时 / 49 分钟）。
+              noteFullCatalogAutoRetryTimeout(workspace.id);
               clearFullCatalogFresh(workspace.id);
             } else {
               // Successful multi-engine settle — block soft re-scans (focus-refresh).
               markFullCatalogFresh(workspace.id);
+              noteFullCatalogAutoRetrySuccess(workspace.id);
             }
             // MUST NOT stamp startup-gate-ready from full-catalog settle.
           } else if (isStillActive) {

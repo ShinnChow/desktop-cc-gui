@@ -17,6 +17,10 @@ import {
   stopLongTaskObserver,
 } from "./frameDropMonitor";
 import {
+  startHotspotSummaryRecorder,
+  stopHotspotSummaryRecorder,
+} from "./hotspotSummaryRecorder";
+import {
   isPerfDiagnosticsFlagEnabled,
   persistPerfDiagnosticsFlag,
 } from "./perfDiagnosticsFlag";
@@ -34,6 +38,8 @@ function startMonitors(): void {
   installPerfInteractionTracking();
   startFrameDropMonitor();
   startLongTaskObserver();
+  // F5：hotspot 周期汇总（背景税的独立时间序列证据）。
+  startHotspotSummaryRecorder();
   // MON-5:即便打包版关闭了 build-time perf baseline,也在运行时开关下采集 web-vitals(INP)。
   void import("./index")
     .then((module) => module.installPerfBaselineWebVitals(true))
@@ -49,6 +55,7 @@ function stopMonitors(): void {
   running = false;
   stopFrameDropMonitor();
   stopLongTaskObserver();
+  stopHotspotSummaryRecorder();
   uninstallPerfInteractionTracking();
 }
 

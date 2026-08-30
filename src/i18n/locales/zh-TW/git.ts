@@ -13,6 +13,7 @@ const git = {
     "commitStagedChanges": "提交已暫存的變更",
     "commitAllChanges": "提交所有未暫存的變更",
     "diffUnavailable": "無法使用差異比較。",
+    "diffNoTextChanges": "沒有文字差異（可能僅為換行符差異）。",
     "imageDiffUnavailable": "無法使用圖片預覽。",
     "untracked": "未追蹤",
     "noChanges": "沒有變更",

@@ -54,7 +54,6 @@ vi.mock("./selectors", () => ({
       {locked ? "-locked" : ""}
     </div>
   ),
-  ProviderSelect: () => <div data-testid="provider-select" />,
   ReasoningSelect: ({
     value,
     options,
@@ -80,7 +79,6 @@ vi.mock("./selectors", () => ({
       </button>
     </div>
   ),
-  ShortcutActionsSelect: () => <div data-testid="shortcut-actions-select" />,
 }));
 
 describe("ButtonArea custom model storage refresh", () => {

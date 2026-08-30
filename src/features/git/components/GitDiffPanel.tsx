@@ -83,6 +83,7 @@ import {
   GitMultiRepositoryChanges,
   type RepositoryCommitSelection,
 } from "./GitMultiRepositoryChanges";
+import { countDiffStats } from "../utils/gitChangeModel";
 import { useGitCommitComposerPlacement } from "../hooks/useGitCommitComposerPlacement";
 import { useCommitMessageGenerationMenu } from "../hooks/useCommitMessageGenerationMenu";
 import { readInitialCommitMessageMenuEngine } from "../utils/commitMessageMenuConfig";
@@ -125,6 +126,10 @@ type PreviewFileState = DiffFile & {
   repositoryRoot: string | null;
   scopedDiffEntry: GitFileDiff | null;
   isDiffLoading: boolean;
+  // 单文件兜底结果：批量 diff 列表缺失/为空时通过 get_git_file_full_diff 取回。
+  fallbackDiffEntry: GitFileDiff | null;
+  // 兜底取回成功但内容为空：文件没有文本级差异（如 CRLF 幻影修改），而非加载失败。
+  fallbackResolvedEmpty: boolean;
 };
 
 function renderModeIcon(mode: GitDiffPanelProps["mode"], className: string, size = 12) {
@@ -1015,6 +1020,9 @@ function GitDiffPanelImpl({
       if (!previewFile) {
         return null;
       }
+      if (previewFile.fallbackDiffEntry) {
+        return previewFile.fallbackDiffEntry;
+      }
       if (previewFile.repositoryRoot !== null) {
         return previewFile.scopedDiffEntry;
       }
@@ -1024,6 +1032,15 @@ function GitDiffPanelImpl({
     },
     [diffEntries, previewFile],
   );
+  const previewStats = useMemo(() => {
+    if (previewFile && (previewFile.additions !== 0 || previewFile.deletions !== 0)) {
+      return { additions: previewFile.additions, deletions: previewFile.deletions };
+    }
+    if (previewDiffEntry && !previewDiffEntry.isImage) {
+      return countDiffStats(previewDiffEntry.diff ?? "");
+    }
+    return { additions: previewFile?.additions ?? 0, deletions: previewFile?.deletions ?? 0 };
+  }, [previewDiffEntry, previewFile]);
   const closePreviewModalNow = useCallback(() => {
     scopedPreviewRequestIdRef.current += 1;
     setIsPreviewModalDirty(false);
@@ -1178,6 +1195,68 @@ function GitDiffPanelImpl({
     [openLocalHtmlInBuiltInBrowser],
   );
 
+  const resolvePreviewRepositoryRoot = useCallback((repositoryRoot: string | null) => {
+    if (repositoryRoot !== null) {
+      return repositoryRoot;
+    }
+    if (gitRoot === "") {
+      return "";
+    }
+    if (workspacePath && gitRoot) {
+      return resolveGitRootWorkspacePrefix(workspacePath, gitRoot);
+    }
+    return null;
+  }, [gitRoot, workspacePath]);
+  // 批量 diff 列表缺失/为空时的单文件兜底：内容非空则回填弹窗，空则标记
+  // 「无文本差异」，失败则回落「差异不可用」。请求过期（关闭/换文件）直接丢弃。
+  const loadPreviewFallbackDiff = useCallback(async (target: PreviewFileState) => {
+    if (!workspaceId) {
+      return;
+    }
+    const requestId = scopedPreviewRequestIdRef.current;
+    const repositoryRoot = resolvePreviewRepositoryRoot(target.repositoryRoot);
+    try {
+      const fullDiff = await getGitFileFullDiff(workspaceId, target.path, repositoryRoot);
+      if (scopedPreviewRequestIdRef.current !== requestId) {
+        return;
+      }
+      setPreviewFile((current) => {
+        if (
+          !current
+          || current.path !== target.path
+          || current.section !== target.section
+          || current.repositoryRoot !== target.repositoryRoot
+        ) {
+          return current;
+        }
+        if (fullDiff.trim().length === 0) {
+          return { ...current, isDiffLoading: false, fallbackResolvedEmpty: true };
+        }
+        return {
+          ...current,
+          isDiffLoading: false,
+          fallbackDiffEntry: { path: current.path, diff: fullDiff },
+        };
+      });
+    } catch (error) {
+      console.error("Failed to load preview fallback git diff", error);
+      if (scopedPreviewRequestIdRef.current !== requestId) {
+        return;
+      }
+      setPreviewFile((current) => {
+        if (
+          !current
+          || current.path !== target.path
+          || current.section !== target.section
+          || current.repositoryRoot !== target.repositoryRoot
+        ) {
+          return current;
+        }
+        return { ...current, isDiffLoading: false };
+      });
+    }
+  }, [resolvePreviewRepositoryRoot, workspaceId]);
+
   const handleOpenFilePreview = useCallback((
     file: DiffFile,
     section: "staged" | "unstaged",
@@ -1186,14 +1265,28 @@ function GitDiffPanelImpl({
     scopedPreviewRequestIdRef.current += 1;
     setIsPreviewModalDirty(false);
     setIsPreviewModalMaximized(maximized);
-    setPreviewFile({
+    const normalizedPath = normalizeDiffPath(file.path);
+    const existingEntry = diffEntries.find(
+      (entry) => normalizeDiffPath(entry.path) === normalizedPath,
+    ) ?? null;
+    const existingEntryHasContent = Boolean(
+      existingEntry
+      && (existingEntry.isImage || existingEntry.diff.trim().length > 0),
+    );
+    const target: PreviewFileState = {
       ...file,
       section,
       repositoryRoot: null,
       scopedDiffEntry: null,
-      isDiffLoading: false,
-    });
-  }, []);
+      fallbackDiffEntry: null,
+      fallbackResolvedEmpty: false,
+      isDiffLoading: !existingEntryHasContent,
+    };
+    setPreviewFile(target);
+    if (!existingEntryHasContent) {
+      void loadPreviewFallbackDiff(target);
+    }
+  }, [diffEntries, loadPreviewFallbackDiff]);
   const handleOpenRepositoryFilePreview = useCallback(async (
     repositoryRoot: string,
     file: DiffFile,
@@ -1211,6 +1304,8 @@ function GitDiffPanelImpl({
       section,
       repositoryRoot,
       scopedDiffEntry: null,
+      fallbackDiffEntry: null,
+      fallbackResolvedEmpty: false,
       isDiffLoading: true,
     });
     try {
@@ -1222,13 +1317,23 @@ function GitDiffPanelImpl({
       const scopedDiffEntry = scopedDiffs.find(
         (entry) => normalizeDiffPath(entry.path) === normalizedPath,
       ) ?? null;
-      setPreviewFile({
+      const scopedDiffEntryHasContent = Boolean(
+        scopedDiffEntry
+        && (scopedDiffEntry.isImage || scopedDiffEntry.diff.trim().length > 0),
+      );
+      const target: PreviewFileState = {
         ...file,
         section,
         repositoryRoot,
         scopedDiffEntry,
-        isDiffLoading: false,
-      });
+        fallbackDiffEntry: null,
+        fallbackResolvedEmpty: false,
+        isDiffLoading: !scopedDiffEntryHasContent,
+      };
+      setPreviewFile(target);
+      if (!scopedDiffEntryHasContent) {
+        void loadPreviewFallbackDiff(target);
+      }
     } catch (error) {
       if (scopedPreviewRequestIdRef.current !== requestId) {
         return;
@@ -1239,10 +1344,12 @@ function GitDiffPanelImpl({
         section,
         repositoryRoot,
         scopedDiffEntry: null,
+        fallbackDiffEntry: null,
+        fallbackResolvedEmpty: false,
         isDiffLoading: false,
       });
     }
-  }, [workspaceId]);
+  }, [loadPreviewFallbackDiff, workspaceId]);
   const previewFullDiffLoader = useMemo(() => {
     if (!workspaceId || !previewFile) {
       return null;
@@ -3015,9 +3122,9 @@ function GitDiffPanelImpl({
                     </span>
                     <span className="git-history-diff-modal-path">{previewFile.path}</span>
                     <span className="git-history-diff-modal-stats">
-                      <span className="is-add">+{previewFile.additions}</span>
+                      <span className="is-add">+{previewStats.additions}</span>
                       <span className="is-sep">/</span>
-                      <span className="is-del">-{previewFile.deletions}</span>
+                      <span className="is-del">-{previewStats.deletions}</span>
                     </span>
                   </div>
                   <div className="git-history-diff-modal-actions" ref={setPreviewHeaderControlsTarget}>
@@ -3035,7 +3142,8 @@ function GitDiffPanelImpl({
                   </div>
                 </div>
                 <div className="git-history-diff-modal-viewer">
-                  {previewDiffEntry ? (
+                  {previewDiffEntry
+                    && (previewDiffEntry.isImage || previewDiffEntry.diff.trim().length > 0) ? (
                     <WorkspaceEditableDiffReviewSurface
                       workspaceId={workspaceId}
                       workspacePath={workspacePath}
@@ -3087,6 +3195,8 @@ function GitDiffPanelImpl({
                     />
                   ) : previewFile.isDiffLoading ? (
                     <div className="diff-empty">{t("common.loading")}</div>
+                  ) : previewFile.fallbackResolvedEmpty ? (
+                    <div className="diff-empty">{t("git.diffNoTextChanges")}</div>
                   ) : (
                     <div className="diff-empty">{t("git.diffUnavailable")}</div>
                   )}

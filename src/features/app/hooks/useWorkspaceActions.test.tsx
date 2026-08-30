@@ -67,6 +67,12 @@ vi.mock("../../../services/globalRuntimeNotices", () => ({
   pushGlobalRuntimeNotice: vi.fn(),
 }));
 
+vi.mock("../../../services/rendererDiagnostics", () => ({
+  appendRendererDiagnostic: vi.fn(),
+  appendRendererDiagnosticImmediate: vi.fn(),
+  appendVolatileRendererDiagnostic: vi.fn(),
+}));
+
 const baseWorkspace: WorkspaceInfo = {
   id: "ws-1",
   name: "Workspace",

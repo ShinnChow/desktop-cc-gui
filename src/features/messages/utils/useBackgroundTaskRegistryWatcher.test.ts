@@ -10,6 +10,7 @@ import {
 import {
   registryMetadataPathForOutput,
   useBackgroundTaskRegistryWatcher,
+  useBackgroundTaskRegistryWatcherForRunningThreads,
 } from "./useBackgroundTaskRegistryWatcher";
 
 const WS = "ws-1";
@@ -222,5 +223,115 @@ describe("useBackgroundTaskRegistryWatcher", () => {
         setBackgroundTaskUpdateSink(null);
       });
     }
+  });
+});
+
+describe("useBackgroundTaskRegistryWatcherForRunningThreads", () => {
+  beforeEach(() => {
+    resetBackgroundTaskStoreForTests();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("probes every thread with running tasks (app 级，与当前活跃会话无关)", async () => {
+    const readFile = vi.fn(async (_workspaceId: string, path: string) => ({
+      content: JSON.stringify({
+        id: path.includes("t-a") ? "t-a" : "t-b",
+        status: "completed",
+        exitCode: 0,
+      }),
+      truncated: false,
+    }));
+    const sink = vi.fn();
+    applyBackgroundTaskUpdate("ws-1", "pi:s1", {
+      toolId: "tool-a",
+      task: {
+        id: "t-a",
+        status: "running",
+        outputPath: ".pi/tasks/session-5-5/t-a.output",
+      },
+      source: "receipt",
+    });
+    applyBackgroundTaskUpdate("ws-2", "pi:s2", {
+      toolId: "tool-b",
+      task: {
+        id: "t-b",
+        status: "running",
+        outputPath: ".pi/tasks/session-7-7/t-b.output",
+      },
+      source: "receipt",
+    });
+
+    act(() => {
+      setBackgroundTaskUpdateSink(sink);
+    });
+    try {
+      renderHook(() =>
+        useBackgroundTaskRegistryWatcherForRunningThreads({
+          pollMs: 1000,
+          staleAfterMs: 30000,
+          readFile,
+        }),
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const probedWorkspaces = readFile.mock.calls.map(
+        (call) => call[0] as string,
+      );
+      expect(probedWorkspaces).toContain("ws-1");
+      expect(probedWorkspaces).toContain("ws-2");
+      expect(sink).toHaveBeenCalledWith(
+        "ws-1",
+        "pi:s1",
+        expect.objectContaining({
+          source: "registry",
+          task: expect.objectContaining({ id: "t-a", status: "completed" }),
+        }),
+      );
+      expect(sink).toHaveBeenCalledWith(
+        "ws-2",
+        "pi:s2",
+        expect.objectContaining({
+          source: "registry",
+          task: expect.objectContaining({ id: "t-b", status: "completed" }),
+        }),
+      );
+    } finally {
+      act(() => {
+        setBackgroundTaskUpdateSink(null);
+      });
+    }
+  });
+
+  it("stops probing once every task is terminal (running=0 的会话不入队)", async () => {
+    const readFile = vi.fn(async () => {
+      throw new Error("no file");
+    });
+    applyBackgroundTaskUpdate("ws-1", "pi:s1", {
+      toolId: "tool-a",
+      task: {
+        id: "t-a",
+        status: "completed",
+        outputPath: ".pi/tasks/session-5-5/t-a.output",
+      },
+      source: "notification",
+    });
+
+    renderHook(() =>
+      useBackgroundTaskRegistryWatcherForRunningThreads({
+        pollMs: 1000,
+        staleAfterMs: 30000,
+        readFile,
+      }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(readFile).not.toHaveBeenCalled();
   });
 });

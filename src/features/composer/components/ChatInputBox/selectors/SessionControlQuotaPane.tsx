@@ -162,15 +162,6 @@ export function SessionControlQuotaPane({
   const primaryReset = primaryWindow
     ? formatQuotaReset(primaryWindow.resetsAt, "usage.sessionReset", t)
     : null;
-  const sparkBase = primaryWindow?.displayPercent ?? 0;
-  const sparkHeights = [
-    0.35, 0.48, 0.3, 0.62, 0.42, 0.55, 0.38, 0.7, 0.45, 0.52, 0.33, 0.64,
-  ].map((scale, index) => {
-    const tip = index >= 8;
-    const height = Math.max(12, Math.round((sparkBase || 36) * scale * 0.9));
-    return { height, tip };
-  });
-
   const hasUsageDetail = quota.usageSummary != null;
   const isBalanceOrUsageOnly =
     !loading &&
@@ -315,7 +306,14 @@ export function SessionControlQuotaPane({
             </div>
           </div>
 
-          <div className="composer-session-hud-quota-progress" aria-hidden="true">
+          <div
+            className="composer-session-hud-quota-progress"
+            role="progressbar"
+            aria-label={primaryWindow?.label ?? title}
+            aria-valuenow={primaryWindow?.displayPercent ?? 0}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
             <span
               className="composer-session-hud-quota-progress-fill"
               style={{ width: `${primaryWindow?.displayPercent ?? 0}%` }}
@@ -338,6 +336,19 @@ export function SessionControlQuotaPane({
                   {`${secondaryWindow.displayPercent}% ${usedLabel}`}
                 </span>
               </div>
+              <div
+                className="composer-session-hud-quota-progress"
+                role="progressbar"
+                aria-label={secondaryWindow.label}
+                aria-valuenow={secondaryWindow.displayPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <span
+                  className="composer-session-hud-quota-progress-fill"
+                  style={{ width: `${secondaryWindow.displayPercent}%` }}
+                />
+              </div>
               {formatQuotaReset(
                 secondaryWindow.resetsAt,
                 "usage.weeklyReset",
@@ -353,16 +364,6 @@ export function SessionControlQuotaPane({
               ) : null}
             </div>
           ) : null}
-
-          <div className="composer-session-hud-spark" aria-hidden="true">
-            {sparkHeights.map((bar, index) => (
-              <i
-                key={`spark-${index}`}
-                className={bar.tip ? "is-tip" : undefined}
-                style={{ height: `${bar.height}%` }}
-              />
-            ))}
-          </div>
         </>
       ) : (
         <div className="composer-session-hud-quota-metrics">

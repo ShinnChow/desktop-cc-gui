@@ -52,7 +52,11 @@ pub fn capability_state(engine_type: EngineType, capability: &str) -> &'static s
         "image.input" => bool_state(features.image_input),
         "session.resume" => bool_state(features.session_resume),
         "input.mid-turn" | "session.fork" | "session.switch" | "session.tree" | "rpc.server" => {
-            "unknown"
+            // 2026-08-27 L3 对齐：这五个 key 的运行时口径此前对全引擎硬编码
+            // "unknown"，与 spec-generated matrix（权威事实源）不一致——pi 的
+            // mid-turn/fork/tree/rpc 早已 supported。改为委托 generated 表，
+            // 消灭双源漂移；未识别 key 仍返 unknown。
+            spec_capability_state(engine_type, capability)
         }
         _ => "unknown",
     }
@@ -182,6 +186,59 @@ mod tests {
         assert_eq!(
             spec_capability_state(EngineType::Claude, "session.fork"),
             "supported"
+        );
+    }
+
+    #[test]
+    fn runtime_matches_generated_for_formerly_unknown_keys() {
+        // L3 对齐后，runtime 与 spec-generated 在五个曾硬编码 unknown 的 key 上
+        // 必须逐引擎一致（消灭双源口径漂移）。
+        for engine in [
+            EngineType::Claude,
+            EngineType::Codex,
+            EngineType::Gemini,
+            EngineType::Grok,
+            EngineType::OpenCode,
+            EngineType::Kimi,
+            EngineType::Pi,
+            EngineType::Dsh,
+            EngineType::Qoder,
+        ] {
+            for key in [
+                "input.mid-turn",
+                "session.fork",
+                "session.switch",
+                "session.tree",
+                "rpc.server",
+            ] {
+                assert_eq!(
+                    capability_state(engine, key),
+                    spec_capability_state(engine, key),
+                    "runtime/spec mismatch: {engine:?} / {key}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn pi_runtime_now_reports_rpc_capabilities() {
+        assert_eq!(
+            capability_state(EngineType::Pi, "input.mid-turn"),
+            "supported"
+        );
+        assert_eq!(
+            capability_state(EngineType::Pi, "session.fork"),
+            "supported"
+        );
+        assert_eq!(
+            capability_state(EngineType::Pi, "session.tree"),
+            "supported"
+        );
+        assert_eq!(capability_state(EngineType::Pi, "rpc.server"), "supported");
+        // pi RPC 无 lane-switch 命令，保持 unknown（诚实口径）。
+        assert_eq!(
+            capability_state(EngineType::Pi, "session.switch"),
+            "unknown"
         );
     }
 }

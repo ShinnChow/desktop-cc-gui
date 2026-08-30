@@ -37,12 +37,14 @@
 - **AND** `agent_settled` 到达时 MUST 按既有逻辑结算（含 `get_last_assistant_text` 回填）
 - **AND** orphan run 的流式事件 MUST 发往合成 turn id，MUST NOT 冒充任何真实用户 turn（daemon 按 turn_id 过滤天然丢弃）
 
-#### Scenario: streaming 无本地 run 时发送走 steer 并收养主流
+#### Scenario: streaming 无本地 run 时发送走 steer 并绑定下一个原生 turn
 
 - **WHEN** 发送时本地无活跃 run 但 resident `is_streaming == true`
 - **THEN** 系统 MUST 发送 `steer` 而非 `prompt`
 - **AND** run 尚不存在时 MUST 先建 orphan run 再 attach
-- **AND** 首个 attach 到 orphan run 的真实 turn MUST 收养主流：成为 main turn、即时回放已缓冲 `response_text`、settle 时取得完整文本
+- **AND** attach 的真实 turn ID MUST 进入 pending 队列，并在下一个原生 `turn_start` 到达时绑定
+- **AND** 外部 orphan turn 的已缓冲正文 MUST NOT 复制或回放到该用户 turn
+- **AND** 新 turn 的 delta、`message_end` snapshot 与 `turn_end` MUST 使用同一个真实 turn ID
 - **AND** MUST NOT 返回「会话失败」
 
 #### Scenario: prompt 被 pi 以 already processing 拒绝时自动转 steer
@@ -58,3 +60,20 @@
 - **THEN** 发送前置检查 MUST 按活跃 run 处理，跳过 `align_rpc_session` 与 `reconcile_rpc_model`
 - **AND** `align_rpc_session` MUST 拒绝 `switch_session`（同活跃 run 拒绝语义）
 - **AND** `rpc_has_active_run_for` MUST 返回 true（fork/compact 守卫不被绕过）
+
+#### Scenario: run 内前台 follow-up turn 实时投影（2026-08-30 实测校准）
+
+- **WHEN** 一个 RPC agent run 内出现第 N（N≥2）个原生 `turn_start`（pi 的每个工具往返都是一个新原生 turn，实测 0.84.4）
+- **AND** 本地无排队的用户 steer turn id
+- **THEN** 非 orphan run MUST 为该 turn 分配派生前台 id `{main}:t{n}`（orphan run 仍用 `pi-external-*` 合成 id）
+- **AND** daemon forwarder MUST 无条件放行 primary 本体与 `{primary}:t{n}` 派生 turn 的事件（它们是用户自己 run 的正文，不得套用外部 turn 门控）
+- **AND** 每个 follow-up turn 的 delta、snapshot、`turn_end` MUST 使用同一派生 id，前端按 turn 生成独立 assistant 气泡
+- **AND** 实时幕布的段落序列 MUST 与历史重载（session 文件逐 assistant 消息）一致
+
+#### Scenario: forwarder 断开绑定 agent_settled 生命周期标记
+
+- **WHEN** pump 收到 `agent_settled`（run 彻底 settle，无重试/无排队 continuation）
+- **THEN** pump MUST 发出 `Raw{kind:"agent_settled"}` 生命周期标记
+- **AND** daemon forwarder MUST 在「标记已到 + 后台任务全部回收 + 无活跃外部唤醒 turn」时才允许断开
+- **AND** 第一个原生 turn 的 `TurnCompleted` 到达时 MUST NOT 断开（run 内通常还有后续原生 turn）
+- **AND** 新的 `TurnStarted` 到达时 MUST 复位标记（后台唤醒紧跟 settled 开新 run）

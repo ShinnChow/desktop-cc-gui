@@ -61,8 +61,8 @@
       "displayName": "PI CLI",
       "shortName": "PI",
       "adapterId": "builtin.pi",
-      "protocolFamily": "stream-json-cli",
-      "executionModel": "one-shot",
+      "protocolFamily": "pi-rpc",
+      "executionModel": "persistent",
       "capabilityProfile": "pi"
     },
     {

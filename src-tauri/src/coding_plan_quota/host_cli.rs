@@ -282,6 +282,39 @@ fn read_pi_models_store_base_url(agent_dir: &Path, vendor: &str) -> Option<Strin
     None
 }
 
+pub(crate) fn read_pi_openai_codex_auth() -> Result<(String, String), String> {
+    let agent_dir =
+        pi_agent_dir().ok_or_else(|| "pi credentials directory unavailable".to_string())?;
+    let auth_path = agent_dir.join("auth.json");
+    let content = std::fs::read_to_string(&auth_path)
+        .map_err(|_| "pi OpenAI login missing; run `pi /login openai`".to_string())?;
+    let root: Value = serde_json::from_str(&content)
+        .map_err(|error| format!("pi credentials missing (auth.json invalid): {error}"))?;
+    for provider in ["openai-codex", "openai"] {
+        let Some(entry) = root.get(provider) else {
+            continue;
+        };
+        if entry.get("type").and_then(Value::as_str) != Some("oauth") {
+            continue;
+        }
+        let Some(access) = entry.get("access").and_then(Value::as_str).map(str::trim) else {
+            continue;
+        };
+        let Some(account_id) = entry
+            .get("accountId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            continue;
+        };
+        if !access.is_empty() {
+            return Ok((access.to_string(), account_id.to_string()));
+        }
+    }
+    Err("pi OpenAI login missing; run `pi /login openai`".to_string())
+}
+
 fn read_pi_api_key(
     agent_dir: &Path,
     vendor: &str,

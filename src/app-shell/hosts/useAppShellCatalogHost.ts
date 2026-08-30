@@ -37,6 +37,9 @@ const GIT_FIELDS = ["filePanelMode"] as const;
 /** 刀 3：models / engine / files / prompts / collab catalog Host。 */
 export function useAppShellCatalogHost() {
   const session = useHostFields("session", SESSION_FIELDS);
+  // D4-Live：runtime slice 已发布 activeThreadId（与 GitSurfaceHost 同源）。
+  const runtimeFields = useHostFields("runtime", ["activeThreadId"] as const);
+  const activeThreadIdForUserLock = (runtimeFields.activeThreadId as string | null | undefined) ?? null;
   const git = useHostFields("git", GIT_FIELDS);
   const activeWorkspace = session.activeWorkspace as any;
   const addDebugEntry = session.addDebugEntry as any;
@@ -62,6 +65,7 @@ export function useAppShellCatalogHost() {
     globalSelectionReady,
   } = useModels({
     activeWorkspace,
+    activeThreadId: activeThreadIdForUserLock,
     onDebug: addDebugEntry,
     preferredModelId: appSettings.lastComposerModelId,
     preferredEffort: appSettings.lastComposerReasoningEffort,

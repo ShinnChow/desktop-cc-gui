@@ -7,12 +7,12 @@ import {
   whenClientStoreReady,
 } from "../../../services/clientStorage";
 import {
-  detectEngines,
   getAppSettings,
   getCliInstallPlan,
   runCliInstaller,
   updateAppSettings,
 } from "../../../services/tauri";
+import { requestEngineDetection } from "../../engine/hooks/engineDetectionCoordinator";
 import { persistEngineSelection } from "../../engine/hooks/engineControllerSelection";
 import { resolveCliInstallStrategy } from "../../settings/hooks/useCliInstallLifecycle";
 import type { FirstRunEngineCardState } from "../components/FirstRunCliStep";
@@ -188,7 +188,7 @@ export function useFirstRunSetup() {
   const refreshEngines = useCallback(async () => {
     setDetecting(true);
     try {
-      const statuses = await detectEngines();
+      const statuses = await requestEngineDetection({ source: "onboarding", force: true });
       setEngineStatuses(statuses);
       setCardStateByEngine((current) => {
         const next = { ...current };

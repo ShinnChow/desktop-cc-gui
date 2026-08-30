@@ -22,6 +22,8 @@ describe("threadReducer compaction lifecycle", () => {
       type: "appendContextCompacted",
       threadId: "thread-1",
       turnId: "turn-1",
+      // 显式时间戳：避免消耗下方 Date.now mock 序列（生产路径总传 timestampMs）
+      timestampMs: 1_500,
     });
     const secondTrigger = threadReducer(interveningMessage, {
       type: "appendCodexCompactionMessage",
@@ -33,9 +35,8 @@ describe("threadReducer compaction lifecycle", () => {
     expect(items).toHaveLength(2);
     expect(items[0]).toMatchObject({
       id: "context-compacted-turn-1",
-      kind: "message",
-      role: "assistant",
-      text: "Context compacted.",
+      kind: "context-event",
+      eventType: "compacted",
     });
     expect(items[1]).toMatchObject({
       id: "context-compacted-codex-compact-thread-1-2222",

@@ -1,14 +1,30 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceMenuAction } from "../hooks/useSidebarMenus";
+import {
+  readSidebarWorkspaceMenuCollapsedSectionIds,
+  SIDEBAR_WORKSPACE_MENU_COLLAPSED_SECTIONS_KEY,
+} from "../hooks/useSidebarWorkspaceMenuSectionCollapse";
+import {
+  resetClientStorageForTests,
+  writeClientStoreValue,
+} from "../../../services/clientStorage";
 import { SidebarWorkspaceMenuOverlay } from "./SidebarWorkspaceMenuOverlay";
 
 const translations: Record<string, string> = {
   "sidebar.sessionActionsGroup": "New session",
   "sidebar.workspaceActionsGroup": "Workspace actions",
   "sidebar.unavailableTag": "Unavailable",
+  "sidebar.nativeCliGroupLabel": "Native CLI",
+  "sidebar.sharedCliHint": "Switchable engines",
+  "sidebar.nativeCliHint": "Dedicated engine",
+  "sidebar.sharedCliHelp": "Multiple CLIs share one context",
+  "sidebar.nativeCliHelp": "Each session binds one engine",
+  "sidebar.providerChoiceHelp":
+    "Remembered for new sessions; manage in Settings → CLI Config.",
   "common.refresh": "Refresh",
+  "common.close": "Close",
   "common.showOnWorkspaceRow": "Show on project row",
 };
 
@@ -22,7 +38,9 @@ function createCodexAction(): WorkspaceMenuAction {
     label: "Codex",
     iconKind: "engine-codex",
     submenuTitle: "Provider selection",
+    submenuHelpTip: t("sidebar.providerChoiceHelp"),
     selectionHint: "Selected. Click Codex to create a session.",
+    selectedChildLabel: "Local config",
     onSelect: vi.fn(),
     children: [
       {
@@ -45,27 +63,35 @@ function createCodexAction(): WorkspaceMenuAction {
   };
 }
 
-function createSharedAction(): WorkspaceMenuAction {
+function createSharedEngineAction(): WorkspaceMenuAction {
   return {
-    id: "new-session-shared",
-    label: "Shared CLI",
-    iconKind: "new-shared",
-    submenuOnly: true,
+    id: "new-session-shared-grok",
+    label: "Grok CLI",
+    iconKind: "engine-grok",
     onSelect: vi.fn(),
-    children: [
-      {
-        id: "new-session-shared-grok",
-        label: "Grok CLI",
-        iconKind: "engine-grok",
-        onSelect: vi.fn(),
-      },
-    ],
   };
 }
 
 describe("SidebarWorkspaceMenuOverlay", () => {
-  it("opens submenu-only actions on click without running their default action", () => {
-    const sharedAction = createSharedAction();
+  beforeEach(() => {
+    resetClientStorageForTests();
+  });
+
+  it("runs the picked engine from the Shared CLI flyout submenu", () => {
+    const sharedEngineChild: WorkspaceMenuAction = {
+      id: "new-session-shared-grok",
+      label: "Grok CLI",
+      iconKind: "engine-grok",
+      onSelect: vi.fn(),
+    };
+    const sharedParent: WorkspaceMenuAction = {
+      id: "new-session-shared",
+      label: "Shared CLI",
+      iconKind: "new-shared",
+      submenuOnly: true,
+      onSelect: vi.fn(),
+      children: [sharedEngineChild],
+    };
     const onAction = vi.fn();
 
     render(
@@ -77,7 +103,7 @@ describe("SidebarWorkspaceMenuOverlay", () => {
             {
               id: "new-session",
               label: "New session",
-              actions: [sharedAction],
+              actions: [sharedParent],
             },
           ],
         }}
@@ -88,13 +114,105 @@ describe("SidebarWorkspaceMenuOverlay", () => {
       />,
     );
 
+    // 父行 submenuOnly：点击只展开 flyout，不触发动作。
     fireEvent.click(screen.getByRole("menuitem", { name: "Shared CLI" }));
+    expect(onAction).not.toHaveBeenCalled();
+    expect(sharedParent.onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Grok CLI" }));
+
+    expect(onAction).toHaveBeenCalledWith(sharedEngineChild);
+  });
+
+  it("scopes the menu label to the workspace and renders section hints", () => {
+    const workspaceStub = {
+      id: "ws-1",
+      name: "guanjia",
+      path: "/tmp/guanjia",
+      connected: true,
+      kind: "main",
+      settings: {},
+    } as never;
+
+    render(
+      <SidebarWorkspaceMenuOverlay
+        menu={{
+          x: 32,
+          y: 28,
+          workspace: workspaceStub,
+          groups: [
+            {
+              id: "new-session-shared",
+              label: "Shared CLI",
+              hint: t("sidebar.sharedCliHint"),
+              helpTip: t("sidebar.sharedCliHelp"),
+              collapsible: true,
+              actions: [createSharedEngineAction()],
+            },
+            {
+              id: "new-session",
+              label: "Native CLI",
+              hint: t("sidebar.nativeCliHint"),
+              helpTip: t("sidebar.nativeCliHelp"),
+              collapsible: true,
+              actions: [createCodexAction()],
+            },
+          ],
+        }}
+        t={t}
+        onClose={vi.fn()}
+        onAction={vi.fn()}
+        renderIcon={() => null}
+      />,
+    );
 
     expect(
-      screen.getByRole("menuitemradio", { name: "Grok CLI" }),
+      screen.getByRole("menu", { name: "New session · guanjia" }),
     ).toBeTruthy();
-    expect(onAction).not.toHaveBeenCalled();
-    expect(sharedAction.onSelect).not.toHaveBeenCalled();
+    expect(screen.getByText("Switchable engines")).toBeTruthy();
+    expect(screen.getByText("Dedicated engine")).toBeTruthy();
+    // 「?」图标携带长语义说明（悬停气泡 data-tip / 读屏 aria-label）。
+    expect(
+      screen.getByRole("img", { name: "Multiple CLIs share one context" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("img", { name: "Each session binds one engine" }),
+    ).toBeTruthy();
+  });
+
+  it("anchors the popover at the menu coordinates and closes from the backdrop", () => {
+    const onClose = vi.fn();
+
+    render(
+      <SidebarWorkspaceMenuOverlay
+        menu={{
+          x: 32,
+          y: 28,
+          groups: [
+            {
+              id: "new-session",
+              label: "New session",
+              actions: [createCodexAction()],
+            },
+          ],
+        }}
+        t={t}
+        onClose={onClose}
+        onAction={vi.fn()}
+        renderIcon={() => null}
+      />,
+    );
+
+    const menu = screen.getByRole("menu", { name: "New session" });
+    expect(menu.classList.contains("sidebar-workspace-menu")).toBe(true);
+    // 贴点定位：弹窗出现在触发坐标处，而不是从侧栏顶部滑出。
+    expect(menu.style.left).toBe("32px");
+    expect(menu.style.top).toBe("28px");
+    expect(document.querySelector(".sidebar-workspace-drawer")).toBeNull();
+
+    fireEvent.click(document.querySelector(".sidebar-workspace-menu-backdrop") as Element);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("still opens an unavailable parent submenu so the user can pick another provider", () => {
@@ -154,7 +272,7 @@ describe("SidebarWorkspaceMenuOverlay", () => {
     expect(claudeAction.onSelect).not.toHaveBeenCalled();
   });
 
-  it("defaults workspace actions to collapsed and toggles them from the group header", () => {
+  it("expands every collapsible section by default and persists toggles locally", () => {
     const reloadAction: WorkspaceMenuAction = {
       id: "reload-threads",
       label: "Reload threads",
@@ -169,15 +287,21 @@ describe("SidebarWorkspaceMenuOverlay", () => {
           y: 28,
           groups: [
             {
+              id: "new-session-shared",
+              label: "Shared CLI",
+              collapsible: true,
+              actions: [createSharedEngineAction()],
+            },
+            {
               id: "new-session",
-              label: "New session",
+              label: "Native CLI",
+              collapsible: true,
               actions: [createCodexAction()],
             },
             {
               id: "workspace-actions",
               label: "Workspace actions",
               collapsible: true,
-              defaultCollapsed: true,
               actions: [reloadAction],
             },
           ],
@@ -189,22 +313,88 @@ describe("SidebarWorkspaceMenuOverlay", () => {
       />,
     );
 
+    // 默认全部展开。
+    expect(screen.getByRole("menuitem", { name: "Grok CLI" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Codex" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Reload threads" })).toBeTruthy();
+
     const toggle = screen.getByRole("button", { name: "Workspace actions" });
+    fireEvent.click(toggle);
+
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByRole("menuitem", { name: "Reload threads" })).toBeNull();
-    expect(screen.getByRole("menuitem", { name: "Codex" })).toBeTruthy();
+    // 折叠态写入本地存储。
+    expect(readSidebarWorkspaceMenuCollapsedSectionIds()).toEqual([
+      "workspace-actions",
+    ]);
 
     fireEvent.click(toggle);
 
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("menuitem", { name: "Reload threads" })).toBeTruthy();
+    expect(readSidebarWorkspaceMenuCollapsedSectionIds()).toEqual([]);
+  });
+
+  it("shows a busy disabled reload action while sessions are loading", () => {
+    const action: WorkspaceMenuAction = {
+      id: "reload-threads",
+      label: "Reload threads",
+      iconKind: "reload",
+      refreshing: true,
+      onSelect: vi.fn(),
+    };
+    render(
+      <SidebarWorkspaceMenuOverlay
+        menu={{ x: 0, y: 0, groups: [{ id: "workspace-actions", label: "Workspace actions", actions: [action] }] }}
+        t={t}
+        onClose={vi.fn()}
+        onAction={vi.fn()}
+        renderIcon={() => null}
+      />,
+    );
+
+    const item = screen.getByRole("menuitem", { name: "Reload threads" });
+    expect((item as HTMLButtonElement).disabled).toBe(true);
+    expect(item.getAttribute("aria-busy")).toBe("true");
+    expect(item.classList.contains("is-refreshing")).toBe(true);
+  });
+
+  it("restores locally persisted collapsed sections on mount", () => {
+    writeClientStoreValue("app", SIDEBAR_WORKSPACE_MENU_COLLAPSED_SECTIONS_KEY, [
+      "new-session-shared",
+    ]);
+
+    render(
+      <SidebarWorkspaceMenuOverlay
+        menu={{
+          x: 32,
+          y: 28,
+          groups: [
+            {
+              id: "new-session-shared",
+              label: "Shared CLI",
+              collapsible: true,
+              actions: [createSharedEngineAction()],
+            },
+            {
+              id: "new-session",
+              label: "Native CLI",
+              collapsible: true,
+              actions: [createCodexAction()],
+            },
+          ],
+        }}
+        t={t}
+        onClose={vi.fn()}
+        onAction={vi.fn()}
+        renderIcon={() => null}
+      />,
+    );
+
     expect(
-      screen.getByRole("menuitem", { name: "Reload threads" }),
-    ).toBeTruthy();
-
-    fireEvent.click(toggle);
-
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("menuitem", { name: "Reload threads" })).toBeNull();
+      screen.queryByRole("menuitem", { name: "Grok CLI" }),
+    ).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Codex" })).toBeTruthy();
   });
 
   it("renders child options in a fixed flyout outside the root menu", () => {
@@ -279,6 +469,16 @@ describe("SidebarWorkspaceMenuOverlay", () => {
     expect(screen.getByText("OpenAI")).toBeTruthy();
     expect(screen.getAllByText("Disk config")).toHaveLength(2);
     expect(screen.getByText("Custom config")).toBeTruthy();
+    // 父行内联展示当前记住的供应商名。
+    expect(
+      screen.getByText("Local config").className,
+    ).toBe("sidebar-workspace-menu-item-provider");
+    // 子菜单标题旁「?」携带供应商说明（悬停气泡 / 读屏）。
+    expect(
+      screen.getByRole("img", {
+        name: "Remembered for new sessions; manage in Settings → CLI Config.",
+      }),
+    ).toBeTruthy();
   });
 
   it("shows the selection hint after picking a provider that keeps the menu open", () => {
@@ -475,9 +675,9 @@ describe("SidebarWorkspaceMenuOverlay", () => {
             y: 28,
             groups: [
               {
-                id: "new-session",
-                label: "New session",
-                actions: [createSharedAction()],
+                id: "new-session-shared",
+                label: "Shared CLI",
+                actions: [createSharedEngineAction()],
               },
             ],
           }}

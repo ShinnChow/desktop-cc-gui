@@ -7,6 +7,8 @@ import type {
 
 export type ThreadStatusSnapshot = {
   isProcessing?: boolean;
+  /** 后台任务运行中计数（turn 已 settle、durable 任务仍在跑时计入活跃度）。 */
+  backgroundTaskRunningCount?: number;
 };
 
 export type BuildWorkspaceSessionActivityOptions = {

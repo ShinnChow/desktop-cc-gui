@@ -116,6 +116,12 @@ vi.mock("../../../services/tauri", () => ({
   switchGrokProvider: vi.fn().mockResolvedValue(undefined),
   switchOpenCodeProvider: vi.fn().mockResolvedValue(undefined),
 }));
+const requestEngineDetectionMock = vi.fn();
+vi.mock("../../engine/hooks/engineDetectionCoordinator", () => ({
+  requestEngineDetection: (
+    options: { source: string; force?: boolean; engines?: string[] },
+  ) => requestEngineDetectionMock(options),
+}));
 vi.mock("../../../services/events", () => ({
   subscribeNativeProviderContinuationProgress: vi.fn(
     (
@@ -138,6 +144,11 @@ vi.mock("../../../services/globalRuntimeNotices", () => ({
 vi.mock("../../../services/clientStorage", () => ({
   getClientStoreSync: clientStoreMock.getClientStoreSync,
   writeClientStoreValue: clientStoreMock.writeClientStoreValue,
+}));
+vi.mock("../../../services/rendererDiagnostics", () => ({
+  appendRendererDiagnostic: vi.fn(),
+  appendRendererDiagnosticImmediate: vi.fn(),
+  appendVolatileRendererDiagnostic: vi.fn(),
 }));
 
 const getOpenCodeProviderHealthMock = vi.mocked(getOpenCodeProviderHealth);
@@ -170,6 +181,18 @@ function createDeferred<T>() {
     resolvePromise = resolve;
   });
   return { promise, resolve: resolvePromise };
+}
+
+function buildInstalledEngineStatus(engineType: EngineType): import("../../../types").EngineStatus {
+  return {
+    engineType,
+    installed: true,
+    version: "1.0.0",
+    binPath: null,
+    features: {} as import("../../../types").EngineFeatures,
+    models: [],
+    error: null,
+  };
 }
 
 function createHandlers() {
@@ -278,6 +301,8 @@ function createHandlers() {
 
 describe("useSidebarMenus", () => {
   beforeEach(() => {
+    requestEngineDetectionMock.mockReset();
+    requestEngineDetectionMock.mockResolvedValue(undefined);
     clientStoreMock.data = {};
     clientStoreMock.getClientStoreSync.mockClear();
     clientStoreMock.writeClientStoreValue.mockClear();
@@ -345,6 +370,9 @@ describe("useSidebarMenus", () => {
 
     expect(claudeAction?.unavailable).toBe(true);
     expect(claudeAction?.statusLabel).toBe("Checking...");
+    // 父行直接展示记住的供应商名，抽屉内可见「创建的是谁」。
+    expect(typeof claudeAction?.selectedChildLabel).toBe("string");
+    expect(claudeAction?.selectedChildLabel?.length).toBeGreaterThan(0);
   });
 
   it("rewrites session menu actions after engine availability finishes loading", async () => {
@@ -387,18 +415,11 @@ describe("useSidebarMenus", () => {
   it("refreshes a single engine action without closing the menu", async () => {
     const handlers = createHandlers();
     handlers.engineOptions = [];
-    let rerenderHook:
-      | ((nextHandlers: ReturnType<typeof createHandlers>) => void)
-      | null = null;
-    handlers.onRefreshEngineOptions = vi.fn(async () => {
-      rerenderHook?.(createHandlers());
-    });
+    requestEngineDetectionMock.mockResolvedValue([
+      buildInstalledEngineStatus("claude"),
+    ]);
 
-    const { result, rerender } = renderHook(
-      (nextHandlers: ReturnType<typeof createHandlers>) => useSidebarMenus(nextHandlers),
-      { initialProps: handlers },
-    );
-    rerenderHook = rerender;
+    const { result } = renderHook(() => useSidebarMenus(handlers));
 
     act(() => {
       const event = {
@@ -430,7 +451,13 @@ describe("useSidebarMenus", () => {
       expect(refreshedClaudeAction?.statusLabel).toBeNull();
     });
 
-    expect(handlers.onRefreshEngineOptions).toHaveBeenCalledTimes(1);
+    expect(requestEngineDetectionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "menu-single-engine",
+        force: true,
+        engines: ["claude"],
+      }),
+    );
     expect(pushGlobalRuntimeNoticeMock).toHaveBeenCalledWith(
       expect.objectContaining({
         messageKey: "runtimeNotice.engine.checking",
@@ -446,24 +473,12 @@ describe("useSidebarMenus", () => {
     ["kimi", "Kimi", "new-session-kimi"],
   ] as const)(
     "keeps %s refresh result visible before parent engine props rerender",
-    async (engineType, expectedLabel, actionId) => {
+    async (engineType, _expectedLabel, actionId) => {
       const handlers = createHandlers();
       handlers.engineOptions = [];
-      handlers.onRefreshEngineOptions = vi.fn(async () => ({
-        activeEngine: "claude",
-        availableEngines: [
-          {
-            type: engineType as EngineType,
-            displayName: expectedLabel,
-            shortName: expectedLabel,
-            installed: true,
-            version: "1.0.0",
-            error: null,
-            availabilityState: "ready" as const,
-            availabilityLabelKey: null,
-          },
-        ],
-      }));
+      requestEngineDetectionMock.mockResolvedValue([
+        buildInstalledEngineStatus(engineType),
+      ]);
 
       const { result } = renderHook(() => useSidebarMenus(handlers));
 
@@ -493,7 +508,15 @@ describe("useSidebarMenus", () => {
 
       expect(refreshedAction?.unavailable).toBe(false);
       expect(refreshedAction?.statusLabel).toBeNull();
-      expect(handlers.onRefreshEngineOptions).toHaveBeenCalledTimes(1);
+      // 菜单打开的 fire-and-forget 检测 + 单引擎刷新各一次
+      expect(requestEngineDetectionMock).toHaveBeenCalledTimes(2);
+      expect(requestEngineDetectionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "menu-single-engine",
+          force: true,
+          engines: [engineType],
+        }),
+      );
     },
   );
 
@@ -606,16 +629,35 @@ describe("useSidebarMenus", () => {
     expect(sessionActionIds).not.toContain("new-session-grok");
     expect(sessionActionIds).not.toContain("new-session-gemini");
 
-    const sharedAction = sessionActions.find(
+    // 单组布局：Shared CLI 是首行 submenuOnly 父行，shared 引擎平铺行为其 children。
+    const sharedParent = sessionActions.find(
       (action) => action.id === "new-session-shared",
     );
-    expect(sharedAction).toBeDefined();
-    expect(sharedAction?.children?.map((child) => child.id)).toEqual([
+    expect(sharedParent?.submenuOnly).toBe(true);
+    expect(sharedParent?.children?.map((action) => action.id)).toEqual([
       "new-session-shared-claude",
       "new-session-shared-codex",
       "new-session-shared-pi",
-      "new-session-shared-qoder",
+      "new-session-shared-qoder-global",
+      "new-session-shared-qoder-cn",
     ]);
+    // shared 子行与对应 native 行的供应商 label 同源（记住的供应商）。
+    const sharedClaude = sharedParent?.children?.find(
+      (action) => action.id === "new-session-shared-claude",
+    );
+    const nativeClaude = sessionActions.find(
+      (action) => action.id === "new-session-claude",
+    );
+    expect(sharedClaude?.selectedChildLabel).toBeDefined();
+    expect(sharedClaude?.selectedChildLabel).toEqual(
+      nativeClaude?.selectedChildLabel,
+    );
+    // pi/qoder 无供应商记忆，不出 label。
+    expect(
+      sharedParent?.children?.find(
+        (action) => action.id === "new-session-shared-pi",
+      )?.selectedChildLabel,
+    ).toBeUndefined();
   });
 
   it("hides Shared CLI entry when all shared engines are disabled", async () => {
@@ -641,6 +683,10 @@ describe("useSidebarMenus", () => {
     expect(sessionActionIds).not.toContain("new-session-shared");
     expect(sessionActionIds).not.toContain("new-session-claude");
     expect(sessionActionIds).not.toContain("new-session-codex");
+    // shared 引擎全停用：不再出现独立 shared 分组（单组内也无 Shared CLI 父行）。
+    expect(
+      result.current.workspaceMenuState?.groups.map((group) => group.id),
+    ).toEqual(["new-session", "workspace-actions"]);
   });
 
   it("moves workspace quick actions into the workspace actions menu group", async () => {
@@ -662,10 +708,8 @@ describe("useSidebarMenus", () => {
         (group) => group.id === "workspace-actions",
       );
 
-    expect(workspaceActions).toMatchObject({
-      collapsible: true,
-      defaultCollapsed: true,
-    });
+    // 三栏默认全部展开（折叠态由本地持久化接管，不再默认折叠）。
+    expect(workspaceActions).toMatchObject({ collapsible: true });
     expect(workspaceActions?.actions.map((action) => action.id)).toEqual([
       "activate-workspace",
       "reload-threads",
@@ -794,7 +838,7 @@ describe("useSidebarMenus", () => {
     ]);
   });
 
-  it("creates Qoder sessions from explicit Global/CN distribution children", async () => {
+  it("creates Qoder sessions from explicit Global/CN list entries without a distribution flyout", async () => {
     const handlers = createHandlers();
     handlers.engineOptions = [
       ...handlers.engineOptions,
@@ -823,30 +867,29 @@ describe("useSidebarMenus", () => {
       );
     });
 
-    const qoderAction = result.current.workspaceMenuState?.groups
-      .find((group) => group.id === "new-session")
-      ?.actions.find((action) => action.id === "new-session-qoder");
+    const nativeGroup = result.current.workspaceMenuState?.groups.find(
+      (group) => group.id === "new-session",
+    );
+    const qoderGlobalAction = nativeGroup?.actions.find(
+      (action) => action.id === "new-session-qoder-global",
+    );
+    const qoderCnAction = nativeGroup?.actions.find(
+      (action) => action.id === "new-session-qoder-cn",
+    );
 
-    expect(qoderAction?.children?.map((child) => child.id)).toEqual([
-      "new-session-qoder-distribution-__qoder_global__",
-      "new-session-qoder-distribution-__qoder_cn__",
-    ]);
-    expect(qoderAction?.submenuOnly).toBe(true);
+    expect(qoderGlobalAction).toBeTruthy();
+    expect(qoderCnAction).toBeTruthy();
+    expect(qoderGlobalAction?.children?.length ?? 0).toBe(0);
+    expect(qoderCnAction?.children?.length ?? 0).toBe(0);
+    expect(qoderGlobalAction?.submenuOnly).toBeUndefined();
+    expect(qoderCnAction?.submenuOnly).toBeUndefined();
+    expect(qoderGlobalAction?.label).toBe("Qoder Global");
+    expect(qoderCnAction?.label).toBe("Qoder CN");
 
     await act(async () => {
-      await qoderAction?.onSelect();
+      await qoderCnAction?.onSelect();
     });
-    expect(handlers.onAddAgent).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await qoderAction?.children
-        ?.find(
-          (child) =>
-            child.id === "new-session-qoder-distribution-__qoder_cn__",
-        )
-        ?.onSelect();
-    });
-
+    expect(handlers.onAddAgent).toHaveBeenCalledTimes(1);
     expect(handlers.onAddAgent).toHaveBeenCalledWith(
       workspace,
       "qoder",
@@ -859,9 +902,26 @@ describe("useSidebarMenus", () => {
         },
       }),
     );
+
+    await act(async () => {
+      await qoderGlobalAction?.onSelect();
+    });
+    expect(handlers.onAddAgent).toHaveBeenCalledTimes(2);
+    expect(handlers.onAddAgent).toHaveBeenLastCalledWith(
+      workspace,
+      "qoder",
+      expect.objectContaining({
+        providerProfileId: "__qoder_global__",
+        providerProfile: {
+          id: "__qoder_global__",
+          name: "Qoder Global",
+          source: "managed",
+        },
+      }),
+    );
   });
 
-  it("keeps the CN child reachable when the Global-only engine status is unavailable", async () => {
+  it("keeps the CN entry reachable when the Global-only engine status is unavailable", async () => {
     const handlers = createHandlers();
     handlers.engineOptions = [
       ...handlers.engineOptions,
@@ -890,19 +950,18 @@ describe("useSidebarMenus", () => {
       );
     });
 
-    const qoderAction = result.current.workspaceMenuState?.groups
-      .find((group) => group.id === "new-session")
-      ?.actions.find((action) => action.id === "new-session-qoder");
-    const globalChild = qoderAction?.children?.find(
-      (child) => child.id === "new-session-qoder-distribution-__qoder_global__",
+    const nativeGroup = result.current.workspaceMenuState?.groups.find(
+      (group) => group.id === "new-session",
     );
-    const cnChild = qoderAction?.children?.find(
-      (child) => child.id === "new-session-qoder-distribution-__qoder_cn__",
+    const globalAction = nativeGroup?.actions.find(
+      (action) => action.id === "new-session-qoder-global",
+    );
+    const cnAction = nativeGroup?.actions.find(
+      (action) => action.id === "new-session-qoder-cn",
     );
 
-    expect(qoderAction?.unavailable).toBe(false);
-    expect(globalChild?.unavailable).toBe(true);
-    expect(cnChild?.unavailable).toBe(false);
+    expect(globalAction?.unavailable).toBe(true);
+    expect(cnAction?.unavailable).toBe(false);
   });
 
   it("remembers the last picked Codex provider for direct main-entry creation", async () => {
@@ -2637,23 +2696,22 @@ describe("useSidebarMenus", () => {
       result.current.showWorkspaceMenu(event, workspace);
     });
 
-    const sharedAction = result.current.workspaceMenuState?.groups
+    const sharedParent = result.current.workspaceMenuState?.groups
       .find((group) => group.id === "new-session")
       ?.actions.find((action) => action.id === "new-session-shared");
 
-    expect(sharedAction).toBeTruthy();
-    expect(sharedAction?.submenuOnly).toBe(true);
-    expect(sharedAction?.children?.map((action) => action.id)).toEqual([
+    expect(sharedParent?.children?.map((action) => action.id)).toEqual([
       "new-session-shared-claude",
       "new-session-shared-codex",
       "new-session-shared-opencode",
       "new-session-shared-kimi",
       "new-session-shared-grok",
       "new-session-shared-pi",
-      "new-session-shared-qoder",
+      "new-session-shared-qoder-global",
+      "new-session-shared-qoder-cn",
     ]);
 
-    const grokAction = sharedAction?.children?.find(
+    const grokAction = sharedParent?.children?.find(
       (action) => action.id === "new-session-shared-grok",
     );
     expect(grokAction).toBeTruthy();
@@ -2664,6 +2722,35 @@ describe("useSidebarMenus", () => {
 
     expect(handlers.onAddSharedAgent).toHaveBeenCalledTimes(1);
     expect(handlers.onAddSharedAgent).toHaveBeenCalledWith(workspace, "grok");
+  });
+
+  it("creates shared Qoder sessions from the explicitly picked distribution entry", async () => {
+    const handlers = createHandlers();
+    const { result } = renderHook(() => useSidebarMenus(handlers));
+
+    await act(async () => {
+      const event = {
+        clientX: 180,
+        clientY: 180,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      } as unknown as Parameters<typeof result.current.showWorkspaceMenu>[0];
+      result.current.showWorkspaceMenu(event, workspace);
+    });
+
+    const qoderCnAction = result.current.workspaceMenuState?.groups
+      .find((group) => group.id === "new-session")
+      ?.actions.find((action) => action.id === "new-session-shared")
+      ?.children?.find((action) => action.id === "new-session-shared-qoder-cn");
+    expect(qoderCnAction).toBeTruthy();
+
+    await act(async () => {
+      result.current.onWorkspaceMenuAction(qoderCnAction!);
+    });
+
+    expect(handlers.onAddSharedAgent).toHaveBeenCalledWith(workspace, "qoder", {
+      providerProfileId: "__qoder_cn__",
+    });
   });
 
   it("triggers workspace alias action from the workspace menu", async () => {
@@ -2835,16 +2922,33 @@ describe("useSidebarMenus", () => {
     expect(result.current.workspaceMenuState?.groups.map((group) => group.id)).toEqual([
       "new-session",
     ]);
+    const sessionActions =
+      result.current.workspaceMenuState?.groups
+        .find((group) => group.id === "new-session")
+        ?.actions ?? [];
     expect(
-      result.current.workspaceMenuState?.groups[0]?.actions.map((action) => action.id),
+      sessionActions
+        .find((action) => action.id === "new-session-shared")
+        ?.children?.map((action) => action.id),
     ).toEqual([
+      "new-session-shared-claude",
+      "new-session-shared-codex",
+      "new-session-shared-opencode",
+      "new-session-shared-kimi",
+      "new-session-shared-grok",
+      "new-session-shared-pi",
+      "new-session-shared-qoder-global",
+      "new-session-shared-qoder-cn",
+    ]);
+    expect(sessionActions.map((action) => action.id)).toEqual([
       "new-session-shared",
       "new-session-claude",
       "new-session-codex",
       "new-session-opencode",
       "new-session-kimi",
       "new-session-pi",
-      "new-session-qoder",
+      "new-session-qoder-global",
+      "new-session-qoder-cn",
       "new-session-grok",
       "new-session-dsh",
     ]);

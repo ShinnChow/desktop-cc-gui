@@ -28,22 +28,21 @@ import {
   readLocalBooleanFlag,
   writeLocalBooleanFlag,
 } from "../../../live-canvas/liveCanvasControls";
-import {
-  RendererContextMenu,
-} from "../../../components/ui/RendererContextMenu";
+import { RendererContextMenu } from "../../../components/ui/RendererContextMenu";
 import { appendRendererDiagnostic } from "../../../services/rendererDiagnostics";
 import { MessagesTimeline } from "./MessagesTimeline";
 import { MemoryPickGateHost } from "../../project-memory/components/MemoryPickGateHost";
 import { MessagesAnchorRail } from "./conversation/MessagesAnchorRail";
 import { resolveAnchorSchedulePlan } from "./conversation/messagesAnchorSchedule";
-import { ScrollControl, type ConversationScrollEdge } from "./conversation/ScrollControl";
+import {
+  ScrollControl,
+  type ConversationScrollEdge,
+} from "./conversation/ScrollControl";
 import {
   MessagesInlineApproval,
   MessagesInlineUserInput,
 } from "./conversation/MessagesInlinePrompts";
-import {
-  parseReasoning,
-} from "../presentation/messagesReasoning";
+import { parseReasoning } from "../presentation/messagesReasoning";
 import {
   buildLiveTailWorkingSet,
   suppressCompletedExploreItemsBetweenLatestUserTurns,
@@ -55,6 +54,7 @@ import {
   isUserMessageConversationItem,
 } from "../utils/messageItemPredicates";
 import { parseAgentTaskNotification } from "../../engine-task-output/contracts/agentTaskNotification";
+import { useBackgroundTaskRunningSnapshot } from "../utils/useBackgroundTaskRunningCount";
 import { usePromptDistillation } from "../../prompt-distill/hooks/usePromptDistillation";
 import { PromptDistillDialog } from "../../prompt-distill/components/PromptDistillDialog";
 import { dedupeExitPlanItemsKeepFirst } from "../utils/messagesExitPlan";
@@ -256,6 +256,15 @@ export const MessagesCore = memo(function MessagesCore({
   const userInputRequests = conversationState.userInputQueue;
   const workspaceId = conversationState.meta.workspaceId || null;
   const threadId = conversationState.meta.threadId || null;
+  const {
+    runningCount: backgroundTaskRunningCount,
+    earliestRunningStartTime: backgroundTaskEarliestStartTime,
+  } = useBackgroundTaskRunningSnapshot({
+    enabled: conversationState.meta.engine === "pi",
+    workspaceId,
+    threadId,
+    items,
+  });
   // 注意：不要在此处 closeSubagentInspector。
   // 右侧抽屉会嵌套挂载另一个 Messages（子 session threadId），若在这里按 thread 关抽屉，
   // 打开瞬间就会被嵌套实例关掉 → 闪屏。切会话关闭改由 SubagentChatSplit 只监听父幕布 scope。
@@ -269,6 +278,8 @@ export const MessagesCore = memo(function MessagesCore({
     workspaceId && threadId ? `${workspaceId}\u0000${threadId}` : null;
   const isThinking = conversationState.meta.isThinking;
   const isWorking = isThinking || isContextCompacting;
+  const preRuntimeIsWorking =
+    isContextCompacting || isThinking || backgroundTaskRunningCount > 0;
   const heartbeatPulse = conversationState.meta.heartbeatPulse ?? 0;
   const promptDistillation = usePromptDistillation({ workspaceId });
   const {
@@ -287,28 +298,35 @@ export const MessagesCore = memo(function MessagesCore({
   const renderStartedAt =
     typeof performance === "undefined" ? 0 : performance.now();
   const messageNodeByIdRef = useRef<Map<string, HTMLDivElement>>(new Map());
-  const agentTaskNodeByTaskIdRef = useRef<Map<string, HTMLDivElement>>(new Map());
-  const agentTaskNodeByToolUseIdRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const agentTaskNodeByTaskIdRef = useRef<Map<string, HTMLDivElement>>(
+    new Map(),
+  );
+  const agentTaskNodeByToolUseIdRef = useRef<Map<string, HTMLDivElement>>(
+    new Map(),
+  );
   const anchorUpdateRafRef = useRef<number | null>(null);
   const lastRenderSnapshotRef = useRef<LastRenderSnapshot | null>(null);
-  const [lightweightConversationKeys, setLightweightConversationKeys] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [detailHydrationConversationKeys, setDetailHydrationConversationKeys] = useState<
-    Set<string>
-  >(() => new Set());
+  const [lightweightConversationKeys, setLightweightConversationKeys] =
+    useState<Set<string>>(() => new Set());
+  const [detailHydrationConversationKeys, setDetailHydrationConversationKeys] =
+    useState<Set<string>>(() => new Set());
   const conversationLightweightModeEnabled = Boolean(
-    conversationRenderModeKey && lightweightConversationKeys.has(conversationRenderModeKey),
+    conversationRenderModeKey &&
+      lightweightConversationKeys.has(conversationRenderModeKey),
   );
   const conversationDetailHydrationRequested = Boolean(
-    conversationRenderModeKey && detailHydrationConversationKeys.has(conversationRenderModeKey),
+    conversationRenderModeKey &&
+      detailHydrationConversationKeys.has(conversationRenderModeKey),
   );
   const handleConversationLightweightModeEnable = useCallback(() => {
     if (!conversationRenderModeKey) {
       return;
     }
     setLightweightConversationKeys((previous) => {
-      return addBoundedConversationRenderModeKey(previous, conversationRenderModeKey);
+      return addBoundedConversationRenderModeKey(
+        previous,
+        conversationRenderModeKey,
+      );
     });
     setDetailHydrationConversationKeys((previous) => {
       if (!previous.has(conversationRenderModeKey)) {
@@ -324,7 +342,10 @@ export const MessagesCore = memo(function MessagesCore({
       return;
     }
     setDetailHydrationConversationKeys((previous) => {
-      return addBoundedConversationRenderModeKey(previous, conversationRenderModeKey);
+      return addBoundedConversationRenderModeKey(
+        previous,
+        conversationRenderModeKey,
+      );
     });
     setLightweightConversationKeys((previous) => {
       if (!previous.has(conversationRenderModeKey)) {
@@ -343,9 +364,9 @@ export const MessagesCore = memo(function MessagesCore({
   const [liveAutoFollowEnabled, setLiveAutoFollowEnabled] = useState(() =>
     readLocalBooleanFlag(MESSAGES_LIVE_AUTO_FOLLOW_FLAG_KEY, true),
   );
-  const [expandedProcessPhaseKeys, setExpandedProcessPhaseKeys] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [expandedProcessPhaseKeys, setExpandedProcessPhaseKeys] = useState<
+    Set<string>
+  >(() => new Set());
   const liveAutoFollowEnabledRef = useRef(liveAutoFollowEnabled);
   liveAutoFollowEnabledRef.current = liveAutoFollowEnabled;
   const [minimalTranscriptEnabled, setMinimalTranscriptEnabled] = useState(() =>
@@ -379,7 +400,7 @@ export const MessagesCore = memo(function MessagesCore({
   } | null>(null);
   const effectiveItems = useMemo(() => {
     const baseItems = isSelectionFrozen
-      ? frozenItemsRef.current ?? items
+      ? (frozenItemsRef.current ?? items)
       : items;
     const cache = exitPlanDedupeCacheRef.current;
     if (
@@ -436,17 +457,26 @@ export const MessagesCore = memo(function MessagesCore({
   } | null>(null);
   const messageActionTargets = useMemo(() => {
     const cache = messageActionTargetsCacheRef.current;
-    if (cache && isTrailingMessageTextOnlyUpdate(cache.baseItems, effectiveItems)) {
-      messageActionTargetsCacheRef.current = { baseItems: effectiveItems, result: cache.result };
+    if (
+      cache &&
+      isTrailingMessageTextOnlyUpdate(cache.baseItems, effectiveItems)
+    ) {
+      messageActionTargetsCacheRef.current = {
+        baseItems: effectiveItems,
+        result: cache.result,
+      };
       return cache.result;
     }
     const result = buildMessageActionTargets(effectiveItems);
-    messageActionTargetsCacheRef.current = { baseItems: effectiveItems, result };
+    messageActionTargetsCacheRef.current = {
+      baseItems: effectiveItems,
+      result,
+    };
     return result;
   }, [effectiveItems]);
   const turnBoundaryStateRef = useRef({
     isHistoryLoading,
-    isWorking,
+    isWorking: preRuntimeIsWorking,
     pendingWorkingStartCovered: false,
     renderScopeKey,
     latestUserMessageId: messageActionTargets.latestUserMessageId,
@@ -488,6 +518,9 @@ export const MessagesCore = memo(function MessagesCore({
     getPendingRuntimeResourceCount,
     handleAssistantVisibleTextRender,
     isAssistantFinalizing,
+    isBackgroundTaskAwaiting,
+    backgroundTaskAwaitingStartedAt,
+    isWorking: timelineIsWorking,
     latestAssistantMessageId,
     latestRetryMessage,
     latestRuntimeReconnectItemId,
@@ -498,6 +531,8 @@ export const MessagesCore = memo(function MessagesCore({
     visibleStallRecoveryActive,
     waitingForFirstChunk,
   } = useMessagesRuntimeState({
+    backgroundTaskRunningCount,
+    backgroundTaskEarliestStartTime,
     activeEngine,
     activeTurnId,
     codexSilentSuspectedAt,
@@ -548,6 +583,11 @@ export const MessagesCore = memo(function MessagesCore({
         ),
       }),
       contextCompacting: t("chat.contextDualViewCompacting"),
+      // 幕布标签必须带 running count（spec「正在等待 N 个后台任务完成」）；
+      // threads.runtimeBackgroundTasks 无 count 占位，是 sidebar pill 专用文案。
+      backgroundTasksRunning: t("messages.backgroundTaskAwaitingRunning", {
+        count: backgroundTaskRunningCount,
+      }),
     },
     nativeRuntimeRecoveryEnabled,
     renderScopeKey,
@@ -566,7 +606,10 @@ export const MessagesCore = memo(function MessagesCore({
   const activeUserInputRequestId = activeUserInputRequest?.request_id ?? null;
   const activeUserInputAnchorItemId =
     activeUserInputRequest?.params.item_id?.trim() || null;
-  const rawScrollKey = buildMessagesScrollKey(effectiveItems, activeUserInputRequestId);
+  const rawScrollKey = buildMessagesScrollKey(
+    effectiveItems,
+    activeUserInputRequestId,
+  );
   // working 边沿并入 followSignal：工具折叠/结算等不改尾条 text 时也触发布局追底。
   // live 正文外部化走 useMessagesCanvasFollow 内 channel 订阅（无 React 重渲）。
   const canvasFollowSignal = `${rawScrollKey}|w:${isWorking ? 1 : 0}|liveId:${liveAssistantMessageId ?? ""}`;
@@ -601,29 +644,35 @@ export const MessagesCore = memo(function MessagesCore({
     () => (threadId ? hasThreadDiskHistoryMore(threadId) : false),
     () => false,
   );
-  const tryLoadOlderHistoryPage = useCallback((drainAll = false) => {
-    if (!threadId) {
-      return false;
-    }
-    if (!hasPendingOlderHistory(threadId) && !hasThreadDiskHistoryMore(threadId)) {
-      return false;
-    }
-    // 用户点芯片 = 主动回看。只 pauseFollow，不改吸底判定/RO/followSignal。
-    pauseFollow();
-    olderHistoryRestoreRef.current = readHistoryExpansionScrollSnapshot(
-      containerRef.current,
-    );
-    const applied = requestOlderHistory(
-      threadId,
-      drainAll ? { drainAll: true } : undefined,
-    );
-    if (!applied) {
-      olderHistoryRestoreRef.current = null;
-      return false;
-    }
-    setOlderHistoryRestoreToken((token) => token + 1);
-    return true;
-  }, [containerRef, pauseFollow, threadId]);
+  const tryLoadOlderHistoryPage = useCallback(
+    (drainAll = false) => {
+      if (!threadId) {
+        return false;
+      }
+      if (
+        !hasPendingOlderHistory(threadId) &&
+        !hasThreadDiskHistoryMore(threadId)
+      ) {
+        return false;
+      }
+      // 用户点芯片 = 主动回看。只 pauseFollow，不改吸底判定/RO/followSignal。
+      pauseFollow();
+      olderHistoryRestoreRef.current = readHistoryExpansionScrollSnapshot(
+        containerRef.current,
+      );
+      const applied = requestOlderHistory(
+        threadId,
+        drainAll ? { drainAll: true } : undefined,
+      );
+      if (!applied) {
+        olderHistoryRestoreRef.current = null;
+        return false;
+      }
+      setOlderHistoryRestoreToken((token) => token + 1);
+      return true;
+    },
+    [containerRef, pauseFollow, threadId],
+  );
   useLayoutEffect(() => {
     if (olderHistoryRestoreToken === 0) {
       return;
@@ -693,34 +742,42 @@ export const MessagesCore = memo(function MessagesCore({
   });
 
   const computeActiveAnchor = useCallback(() => {
-    return resolveActiveMessageAnchor(containerRef.current, messageNodeByIdRef.current);
+    return resolveActiveMessageAnchor(
+      containerRef.current,
+      messageNodeByIdRef.current,
+    );
   }, [containerRef]);
 
-  const scrollToAgentTaskCard = useCallback((request: AgentTaskScrollRequest | null) => {
-    if (!request) {
-      return;
-    }
-    const container = containerRef.current;
-    const node =
-      (request.taskId
-        ? agentTaskNodeByTaskIdRef.current.get(request.taskId)
-        : null) ??
-      (request.toolUseId
-        ? agentTaskNodeByToolUseIdRef.current.get(request.toolUseId)
-        : null);
-    if (!node || !container) {
-      return;
-    }
-    const containerRect = container.getBoundingClientRect();
-    const nodeRect = node.getBoundingClientRect();
-    const targetTop =
-      container.scrollTop + (nodeRect.top - containerRect.top) - container.clientHeight * 0.22;
-    pauseFollow();
-    container.scrollTo({
-      top: Math.max(0, targetTop),
-      behavior: "smooth",
-    });
-  }, [containerRef, pauseFollow]);
+  const scrollToAgentTaskCard = useCallback(
+    (request: AgentTaskScrollRequest | null) => {
+      if (!request) {
+        return;
+      }
+      const container = containerRef.current;
+      const node =
+        (request.taskId
+          ? agentTaskNodeByTaskIdRef.current.get(request.taskId)
+          : null) ??
+        (request.toolUseId
+          ? agentTaskNodeByToolUseIdRef.current.get(request.toolUseId)
+          : null);
+      if (!node || !container) {
+        return;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const nodeRect = node.getBoundingClientRect();
+      const targetTop =
+        container.scrollTop +
+        (nodeRect.top - containerRect.top) -
+        container.clientHeight * 0.22;
+      pauseFollow();
+      container.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: "smooth",
+      });
+    },
+    [containerRef, pauseFollow],
+  );
 
   useEffect(() => {
     const previousThreadId = resourceCleanupThreadIdRef.current;
@@ -734,7 +791,8 @@ export const MessagesCore = memo(function MessagesCore({
       scrollThrottleTimer: getPendingScrollResourceCount(),
       messageNodeCount: messageNodeByIdRef.current.size,
       agentTaskNodeCount:
-        agentTaskNodeByTaskIdRef.current.size + agentTaskNodeByToolUseIdRef.current.size,
+        agentTaskNodeByTaskIdRef.current.size +
+        agentTaskNodeByToolUseIdRef.current.size,
     };
     resetInteractionScope();
     // thread→null→thread 的重开（previous 为 null 的真正「打开」事件）允许 history-open
@@ -788,13 +846,19 @@ export const MessagesCore = memo(function MessagesCore({
   }, [agentTaskScrollRequest, scrollToAgentTaskCard]);
   useEffect(() => {
     const handleSelectionChange = () => {
-      const nextFrozen = isSelectionInsideNode(window.getSelection(), containerRef.current);
+      const nextFrozen = isSelectionInsideNode(
+        window.getSelection(),
+        containerRef.current,
+      );
       if (nextFrozen) {
-        frozenItemsRef.current = frozenItemsRef.current ?? latestItemsRef.current;
+        frozenItemsRef.current =
+          frozenItemsRef.current ?? latestItemsRef.current;
       } else {
         frozenItemsRef.current = null;
       }
-      setIsSelectionFrozen((previous) => (previous === nextFrozen ? previous : nextFrozen));
+      setIsSelectionFrozen((previous) =>
+        previous === nextFrozen ? previous : nextFrozen,
+      );
     };
     document.addEventListener("selectionchange", handleSelectionChange);
     return () => {
@@ -808,16 +872,17 @@ export const MessagesCore = memo(function MessagesCore({
   }, [isSelectionFrozen, items]);
 
   useEffect(() => {
-    writeLocalBooleanFlag(MESSAGES_LIVE_AUTO_FOLLOW_FLAG_KEY, liveAutoFollowEnabled);
+    writeLocalBooleanFlag(
+      MESSAGES_LIVE_AUTO_FOLLOW_FLAG_KEY,
+      liveAutoFollowEnabled,
+    );
   }, [liveAutoFollowEnabled]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
-    const handleLiveControlsUpdated = (
-      event: Event,
-    ) => {
+    const handleLiveControlsUpdated = (event: Event) => {
       const customEvent = event as CustomEvent<{
         liveAutoFollowEnabled?: boolean;
         minimalTranscriptEnabled?: boolean;
@@ -843,7 +908,9 @@ export const MessagesCore = memo(function MessagesCore({
       }
       if (typeof detail.minimalTranscriptEnabled === "boolean") {
         const nextMinimalTranscriptEnabled = detail.minimalTranscriptEnabled;
-        if (minimalTranscriptEnabledRef.current !== nextMinimalTranscriptEnabled) {
+        if (
+          minimalTranscriptEnabledRef.current !== nextMinimalTranscriptEnabled
+        ) {
           minimalTranscriptEnabledRef.current = nextMinimalTranscriptEnabled;
           setMinimalTranscriptEnabled(nextMinimalTranscriptEnabled);
         }
@@ -875,7 +942,9 @@ export const MessagesCore = memo(function MessagesCore({
           MESSAGES_MINIMAL_TRANSCRIPT_FLAG_KEY,
           false,
         );
-        if (minimalTranscriptEnabledRef.current !== nextMinimalTranscriptEnabled) {
+        if (
+          minimalTranscriptEnabledRef.current !== nextMinimalTranscriptEnabled
+        ) {
           minimalTranscriptEnabledRef.current = nextMinimalTranscriptEnabled;
           setMinimalTranscriptEnabled(nextMinimalTranscriptEnabled);
         }
@@ -890,14 +959,20 @@ export const MessagesCore = memo(function MessagesCore({
       handleLiveControlsUpdated as EventListener,
     );
     window.addEventListener("storage", handleStorage);
-    document.addEventListener(MESSAGES_FORCE_PIN_BOTTOM_EVENT, handleForcePinBottom);
+    document.addEventListener(
+      MESSAGES_FORCE_PIN_BOTTOM_EVENT,
+      handleForcePinBottom,
+    );
     return () => {
       window.removeEventListener(
         MESSAGES_LIVE_CONTROLS_UPDATED_EVENT,
         handleLiveControlsUpdated as EventListener,
       );
       window.removeEventListener("storage", handleStorage);
-      document.removeEventListener(MESSAGES_FORCE_PIN_BOTTOM_EVENT, handleForcePinBottom);
+      document.removeEventListener(
+        MESSAGES_FORCE_PIN_BOTTOM_EVENT,
+        handleForcePinBottom,
+      );
     };
   }, [pauseFollow, resumeFollowAndPin]);
   const reasoningMetaById = useMemo(() => {
@@ -993,7 +1068,8 @@ export const MessagesCore = memo(function MessagesCore({
     }
     return null;
   }, [renderSourceItems, reasoningWindowStartIndex]);
-  const latestReasoningId = latestLiveReasoningItem?.id ?? latestDeferredReasoningId;
+  const latestReasoningId =
+    latestLiveReasoningItem?.id ?? latestDeferredReasoningId;
   const claudeDockedReasoningItems = useMemo(() => {
     if (!legacyClaudeReasoningDockEnabled) {
       return [] as Array<{
@@ -1036,7 +1112,11 @@ export const MessagesCore = memo(function MessagesCore({
   ]);
   const previousIsThinkingRef = useRef(isThinking);
   useEffect(() => {
-    if (previousIsThinkingRef.current && !isThinking && claudeDockedReasoningItems.length > 0) {
+    if (
+      previousIsThinkingRef.current &&
+      !isThinking &&
+      claudeDockedReasoningItems.length > 0
+    ) {
       collapseExpandedIds(
         new Set(claudeDockedReasoningItems.map((entry) => entry.item.id)),
       );
@@ -1082,7 +1162,11 @@ export const MessagesCore = memo(function MessagesCore({
       if (isAssistantMessageConversationItem(item)) {
         break;
       }
-      const label = resolveWorkingActivityLabel(item, activeEngine, presentationProfile);
+      const label = resolveWorkingActivityLabel(
+        item,
+        activeEngine,
+        presentationProfile,
+      );
       if (label) {
         return label;
       }
@@ -1149,7 +1233,9 @@ export const MessagesCore = memo(function MessagesCore({
         // the reference "已处理 1m 3s" control when tool timing is missing.
         durationMs:
           phase.durationMs ??
-          (typeof lastDurationMs === "number" && lastDurationMs >= 0 ? lastDurationMs : null),
+          (typeof lastDurationMs === "number" && lastDurationMs >= 0
+            ? lastDurationMs
+            : null),
         insertBeforeItemId: phase.insertBeforeItemId,
         collapsedAnchorItemId: phase.collapsedAnchorItemId,
         assistantItemId: phase.assistantItemId,
@@ -1178,17 +1264,19 @@ export const MessagesCore = memo(function MessagesCore({
     if (!latestReasoningId) {
       return false;
     }
-    return timelineItems.some((item) => item.kind === "reasoning" && item.id === latestReasoningId);
+    return timelineItems.some(
+      (item) => item.kind === "reasoning" && item.id === latestReasoningId,
+    );
   }, [latestReasoningId, timelineItems]);
   const workingIndicatorShowsActivityLabel = shouldDisplayWorkingActivityLabel(
     latestReasoningLabel,
     latestWorkingActivityLabel,
   );
   const workingIndicatorReasoningLabel =
-    activeEngine === "claude"
-    && latestAssistantMessageId === null
-    && workingIndicatorShowsActivityLabel
-    && latestReasoningVisibleInTimeline
+    activeEngine === "claude" &&
+    latestAssistantMessageId === null &&
+    workingIndicatorShowsActivityLabel &&
+    latestReasoningVisibleInTimeline
       ? null
       : latestReasoningLabel;
   useEffect(() => {
@@ -1417,7 +1505,8 @@ export const MessagesCore = memo(function MessagesCore({
       // 一次 rAF + DOM 解析，overlay-loop-guard 只能拦 setState。
       // 真正要改 active 时仍走 rAF：与既有测试/跟随时序对齐，避免在 effect 里同步 setState。
       const container = containerRef.current;
-      const latestAnchorId = messageAnchors[messageAnchors.length - 1]?.id ?? null;
+      const latestAnchorId =
+        messageAnchors[messageAnchors.length - 1]?.id ?? null;
       if (
         container &&
         resolveAnchorSchedulePlan({
@@ -1454,7 +1543,7 @@ export const MessagesCore = memo(function MessagesCore({
         const nextActiveAnchor =
           plan.action === "commit"
             ? plan.nextActiveAnchor
-            : computeActiveAnchor() ?? latestNow;
+            : (computeActiveAnchor() ?? latestNow);
         const elapsedMs =
           typeof performance === "undefined"
             ? 0
@@ -1500,7 +1589,12 @@ export const MessagesCore = memo(function MessagesCore({
     // 展开期间暂停钉底，防止 RO/高度变化把视口拽回底；用户阅读旧历史时保持释放。
     pauseFollow();
     revealNextHistoryPage(OLDER_HISTORY_REVEAL_PAGE_SIZE);
-  }, [containerRef, pauseFollow, revealNextHistoryPage, tryLoadOlderHistoryPage]);
+  }, [
+    containerRef,
+    pauseFollow,
+    revealNextHistoryPage,
+    tryLoadOlderHistoryPage,
+  ]);
   const handleLoadAllEarlierHistory = useCallback(() => {
     if (tryLoadOlderHistoryPage(true)) {
       revealAllHistoryItems("manual");
@@ -1543,7 +1637,11 @@ export const MessagesCore = memo(function MessagesCore({
     }
     container.scrollTop = snapshot.scrollTop + insertedHeight;
     scheduleAnchorUpdate("sync");
-  }, [containerRef, presentationCollapsedHistoryItemCount, scheduleAnchorUpdate]);
+  }, [
+    containerRef,
+    presentationCollapsedHistoryItemCount,
+    scheduleAnchorUpdate,
+  ]);
   useLayoutEffect(() => {
     if (!showAllHistoryItems) {
       discardPendingHistoryExpansion();
@@ -1679,7 +1777,13 @@ export const MessagesCore = memo(function MessagesCore({
 
   useEffect(() => {
     if (
-      (activeEngine !== "claude" && activeEngine !== "codex" && activeEngine !== "gemini" && activeEngine !== "grok" && activeEngine !== "kimi" && activeEngine !== "dsh" && activeEngine !== "qoder") ||
+      (activeEngine !== "claude" &&
+        activeEngine !== "codex" &&
+        activeEngine !== "gemini" &&
+        activeEngine !== "grok" &&
+        activeEngine !== "kimi" &&
+        activeEngine !== "dsh" &&
+        activeEngine !== "qoder") ||
       (!isThinking && !isAssistantFinalizing) ||
       !threadId
     ) {
@@ -1688,7 +1792,13 @@ export const MessagesCore = memo(function MessagesCore({
     noteThreadVisibleRender(threadId, {
       visibleItemCount: renderedItems.length,
     });
-  }, [activeEngine, isAssistantFinalizing, isThinking, renderedItems.length, threadId]);
+  }, [
+    activeEngine,
+    isAssistantFinalizing,
+    isThinking,
+    renderedItems.length,
+    threadId,
+  ]);
 
   useEffect(() => clearTransientUiState, [clearTransientUiState]);
 
@@ -1704,7 +1814,13 @@ export const MessagesCore = memo(function MessagesCore({
       return;
     }
     scheduleAnchorUpdate("sync");
-  }, [hasAnchorRail, messageAnchors, scheduleAnchorUpdate, scrollKey, threadId]);
+  }, [
+    hasAnchorRail,
+    messageAnchors,
+    scheduleAnchorUpdate,
+    scrollKey,
+    threadId,
+  ]);
 
   // 关闭会话时清 history-open 去重，保证 null→同 thread 重开仍能落底
   // （useEffect 清理会晚于本 layout 效应，不能依赖它）。
@@ -1813,7 +1929,12 @@ export const MessagesCore = memo(function MessagesCore({
       return;
     }
     collapseExploreItems(effectiveItems);
-  }, [collapseExploreItems, effectiveItems, isThinking, liveAutoExpandedExploreId]);
+  }, [
+    collapseExploreItems,
+    effectiveItems,
+    isThinking,
+    liveAutoExpandedExploreId,
+  ]);
   const shouldRenderUserInputNode =
     (activeEngine === "codex" ||
       activeEngine === "claude" ||
@@ -1868,7 +1989,10 @@ export const MessagesCore = memo(function MessagesCore({
     ],
   );
   const timelineHeartbeatPulse =
-    (presentationProfile?.heartbeatWaitingHint ?? (activeEngine === "opencode" || activeEngine === "dsh" || activeEngine === "qoder"))
+    (presentationProfile?.heartbeatWaitingHint ??
+    (activeEngine === "opencode" ||
+      activeEngine === "dsh" ||
+      activeEngine === "qoder"))
       ? heartbeatPulse
       : 0;
   const { handlePendingJumpTargetReady, requestScrollToAnchor } =
@@ -1894,8 +2018,10 @@ export const MessagesCore = memo(function MessagesCore({
       effectiveItemsCount: timelinePresentationItems.length,
       groupedEntries,
       hasPendingUserTurn: messageActionTargets.hasPendingUserTurn,
-      latestFinalAssistantMessageId: messageActionTargets.latestFinalAssistantMessageId,
-      messageActionTargetByAssistantId: messageActionTargets.targetByAssistantId,
+      latestFinalAssistantMessageId:
+        messageActionTargets.latestFinalAssistantMessageId,
+      messageActionTargetByAssistantId:
+        messageActionTargets.targetByAssistantId,
       messageCopyTextByAssistantId: messageActionTargets.copyTextByAssistantId,
       reasoningMetaById,
       sessionFileChangesSummary,
@@ -1910,7 +2036,10 @@ export const MessagesCore = memo(function MessagesCore({
       heartbeatPulse: timelineHeartbeatPulse,
       hiddenClaudeReasoningOnly,
       isThinking,
-      isWorking,
+      isBackgroundTaskAwaiting,
+      backgroundTaskRunningCount,
+      backgroundTaskAwaitingStartedAt,
+      isWorking: timelineIsWorking,
       lastDurationMs,
       latestReasoningId,
       latestReasoningLabel: workingIndicatorReasoningLabel,
@@ -1957,8 +2086,10 @@ export const MessagesCore = memo(function MessagesCore({
       handleCopyMessage,
       handleExitPlanModeExecuteForItem,
       onAssistantVisibleTextRender: handleAssistantVisibleTextRender,
-      onConversationDetailHydrationRequest: handleConversationDetailHydrationRequest,
-      onConversationLightweightModeEnable: handleConversationLightweightModeEnable,
+      onConversationDetailHydrationRequest:
+        handleConversationDetailHydrationRequest,
+      onConversationLightweightModeEnable:
+        handleConversationLightweightModeEnable,
       onForkFromMessage,
       onOpenDiffPath,
       onOpenNoteCaptureMenu: timelineOpenNoteCaptureMenu,
@@ -2000,7 +2131,9 @@ export const MessagesCore = memo(function MessagesCore({
         activeAnchorId={activeAnchorId}
         anchors={messageAnchors}
         anchorNavigationLabel={t("messages.anchorNavigation")}
-        getFallbackTitle={(index) => t("messages.anchorUserTitle", { index: index + 1 })}
+        getFallbackTitle={(index) =>
+          t("messages.anchorUserTitle", { index: index + 1 })
+        }
         onScrollToAnchor={requestScrollToAnchor}
       />
       <div
@@ -2017,7 +2150,11 @@ export const MessagesCore = memo(function MessagesCore({
         </div>
         {timelineTrailingNode}
         {/* jetbrains messagesEndRef：两步追底的 scrollIntoView 锚点；无视觉高度。 */}
-        <div ref={messagesEndRef} className="messages-end-sentinel" aria-hidden="true" />
+        <div
+          ref={messagesEndRef}
+          className="messages-end-sentinel"
+          aria-hidden="true"
+        />
       </div>
       <ScrollControl
         containerRef={containerRef}

@@ -155,6 +155,31 @@ pub(crate) fn engine_enabled_in_settings(
     }
 }
 
+/// 检测范围黑名单（refactor-engine-detection-pipeline D9 启用范围铁律）：
+/// 供应商页面关闭的引擎不进入检测环节（0 spawn）。只作用于 detect 路径，
+/// 不改变 switch/send 的既有「开关只控制可见性」语义。
+pub(crate) fn detection_disabled_engines(settings: &crate::types::AppSettings) -> Vec<EngineType> {
+    [
+        EngineType::Claude,
+        EngineType::Codex,
+        EngineType::Gemini,
+        EngineType::Grok,
+        EngineType::OpenCode,
+        EngineType::Kimi,
+        EngineType::Pi,
+        EngineType::Dsh,
+        EngineType::Qoder,
+    ]
+    .into_iter()
+    .filter(|engine_type| {
+        settings
+            .disabled_cli_engines
+            .iter()
+            .any(|id| id == engine_type.icon())
+    })
+    .collect()
+}
+
 pub(crate) fn engine_disabled_diagnostic(engine_type: EngineType) -> Option<&'static str> {
     match engine_type {
         EngineType::Gemini => Some(crate::engine_policy::GEMINI_DISABLED_DIAGNOSTIC),
@@ -183,6 +208,7 @@ pub(crate) fn disabled_engine_status(engine_type: EngineType) -> EngineStatus {
     };
     EngineStatus {
         engine_type,
+        auth_state: crate::engine::AuthState::default(),
         installed: false,
         version: None,
         bin_path: None,
@@ -200,12 +226,26 @@ impl std::fmt::Display for EngineType {
     }
 }
 
+/// 登录态三态（refactor-engine-detection-pipeline B6/D6）：detect phase 1 只做
+/// 同步凭据检查（多为 Unknown），spawn 型登录探测在 phase 2 异步补推。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthState {
+    #[default]
+    Unknown,
+    Authenticated,
+    RequiresLogin,
+}
+
 /// Engine installation and capability status
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineStatus {
     /// Engine type identifier
     pub engine_type: EngineType,
+    /// 登录态（serde default 向后兼容 remote/daemon 与历史 last-good）。
+    #[serde(default)]
+    pub auth_state: AuthState,
     /// Whether the CLI is installed and accessible
     pub installed: bool,
     /// CLI version string if available

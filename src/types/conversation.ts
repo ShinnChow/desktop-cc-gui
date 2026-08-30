@@ -136,6 +136,19 @@ export type RuntimeModelReceipt = {
   contextWindowSource?: RuntimeModelReceiptWindowSource | null;
 };
 
+/** 发送边界固化的执行目标快照；native 侧复用为 `MessageSendOptions.nativeExecutionTarget`。 */
+export type ExecutionTargetSnapshot = {
+  engine: EngineType;
+  providerProfileId?: string | null;
+  modelCatalogEntryId?: string | null;
+  model?: string | null;
+  reasoning?: { effort: string } | null;
+  providerProfileNameSnapshot?: string | null;
+  providerProfileSource?: string | null;
+  runtimeCapabilityFingerprint?: string | null;
+  providerAvailable?: boolean;
+};
+
 export type ConversationItem =
   | {
       id: string;
@@ -144,17 +157,7 @@ export type ConversationItem =
       text: string;
       turnId?: string | null;
       engineSource?: EngineType;
-      executionTargetSnapshot?: {
-        engine: EngineType;
-        providerProfileId?: string | null;
-        modelCatalogEntryId?: string | null;
-        model?: string | null;
-        reasoning?: { effort: string } | null;
-        providerProfileNameSnapshot?: string | null;
-        providerProfileSource?: string | null;
-        runtimeCapabilityFingerprint?: string | null;
-        providerAvailable?: boolean;
-      };
+      executionTargetSnapshot?: ExecutionTargetSnapshot;
       runtimeReceipt?: RuntimeModelReceipt;
       isFinal?: boolean;
       finalCompletedAt?: number;
@@ -243,6 +246,20 @@ export type ConversationItem =
       senderThreadId?: string;
       receiverThreadIds?: string[];
       agentStatus?: Record<string, { status?: string } | string>;
+    }
+  | {
+      /** 引擎侧上下文事件留痕（如压缩完成）。不是模型说的话： MUST NOT
+       * 伪装 assistant message——finality / 折叠 / prose 聚合的既有谓词
+       * 均按 kind 排除，杜绝「留痕劫持 turn 终态锚点」的回归。 */
+      id: string;
+      kind: "context-event";
+      eventType: "compacted";
+      /** pi: threshold/overflow/manual；缺失（未知/异常 payload）为 null。 */
+      reason: "threshold" | "overflow" | "manual" | null;
+      tokensBefore: number | null;
+      estimatedTokensAfter: number | null;
+      turnId?: string | null;
+      timestampMs: number;
     };
 
 export type AutoSessionVisibility = "hidden" | "system-auto" | "user-visible";
@@ -572,6 +589,11 @@ export type MessageSendOptions = {
   createSessionTarget?: ComposerCreateSessionTarget;
   /** Queue/Fusion 专用：发送边界必须优先使用该冻结目标，禁止重读 Picker。 */
   sharedExecutionTarget?: SharedQueuedExecutionTarget;
+  /**
+   * Native 发送边界冻结的执行目标快照（对齐 sharedExecutionTarget 冻结模式）。
+   * messaging 层记账进 nativeTurnTargetLedger，供幕布 turn-target 显示条标注本轮 provenance。
+   */
+  nativeExecutionTarget?: ExecutionTargetSnapshot;
   /** Shared Session one-shot Multi-Agent request；target 仍由 sharedExecutionTarget 冻结。 */
   squadRequest?: true;
   /** DSH create-time Agent Preset; ignored by other engines. */

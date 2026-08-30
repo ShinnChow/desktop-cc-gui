@@ -395,7 +395,7 @@ mod tests {
             ),
             semantic_navigation_runtime: crate::code_intel_lsp::SemanticNavigationRuntime::default(
             ),
-            engine_manager: crate::engine::EngineManager::new(),
+            engine_manager: std::sync::Arc::new(crate::engine::EngineManager::new()),
         }
     }
 

@@ -158,4 +158,30 @@ describe("BackgroundTaskCard fold（终态原地折叠）", () => {
     expect(document.querySelector(".background-task-card-log-link")).toBeNull();
     expect(queryByText("b_noout")).toBeTruthy();
   });
+
+  it("shows the notification summary row when completionText is present (实时/历史同源)", () => {
+    // pi 终态通知的 `<summary>` 清洗文本随快照走：实时（store/时间线 upsert）
+    // 与历史（toolOutput 合并）两侧都渲染同一行，幕布对齐不另起气泡。
+    const withSummary: CanonicalBackgroundTask = {
+      ...completedTask,
+      completionText: "Hello world 5s",
+    };
+    const first = render(
+      <BackgroundTaskCard toolName="bg_run" task={withSummary} terminal />,
+    );
+    fireEvent.click(
+      first.getByTestId("background-task-card-fold").querySelector("button")!,
+    );
+    expect(first.getByText("Hello world 5s")).toBeTruthy();
+    first.unmount();
+
+    // 无 completionText 时不渲染 summary 行。
+    const second = render(
+      <BackgroundTaskCard toolName="bg_run" task={completedTask} terminal />,
+    );
+    fireEvent.click(
+      second.getByTestId("background-task-card-fold").querySelector("button")!,
+    );
+    expect(second.queryByText("Hello world 5s")).toBeNull();
+  });
 });

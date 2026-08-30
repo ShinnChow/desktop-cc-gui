@@ -17,6 +17,13 @@ const windowsQuota: SessionOverviewQuotaView = {
       usedPercent: 42,
       resetsAt: null,
     },
+    {
+      id: "seven_day",
+      label: "7天",
+      displayPercent: 75,
+      usedPercent: 75,
+      resetsAt: null,
+    },
   ],
   creditsBalance: null,
   creditsUnlimited: false,
@@ -78,6 +85,21 @@ describe("SessionControlQuotaPane", () => {
     const pane = screen.getByTestId("composer-session-quota-pane");
     expect(pane.textContent).toMatch(/42%/);
     expect(pane.textContent).toMatch(/minimax/i);
+  });
+
+  it("renders every quota window as its actual percentage progress", () => {
+    const { container } = render(<SessionControlQuotaPane quota={windowsQuota} />);
+
+    expect(
+      screen.getByRole("progressbar", { name: "5小时" }).getAttribute("aria-valuenow"),
+    ).toBe("42");
+    const weeklyProgress = screen.getByRole("progressbar", { name: "7天" });
+    expect(weeklyProgress.getAttribute("aria-valuenow")).toBe("75");
+    expect(weeklyProgress.firstElementChild?.getAttribute("style")).toBe(
+      "width: 75%;",
+    );
+    expect(screen.getByText("75% used")).toBeTruthy();
+    expect(container.querySelector(".composer-session-hud-spark")).toBeNull();
   });
 
   it("renders balance-only deepseek credits without windows", () => {

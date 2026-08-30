@@ -2,41 +2,49 @@ import { useCallback, useEffect, useState } from "react";
 import type { AppSettings } from "@/types";
 import { pushErrorToast } from "@/services/toasts";
 
-type InlineNoticeState =
-  | {
-      kind: "success" | "error";
-      message: string;
-    }
-  | null;
+type InlineNoticeState = {
+  kind: "success" | "error";
+  message: string;
+} | null;
 
 type TranslateFn = (key: string) => string;
 
+export const DEFAULT_SYSTEM_PROXY_URL = "http://127.0.0.1:7890";
+
+export type SystemProxySettingsPatch = Pick<
+  AppSettings,
+  "systemProxyEnabled" | "systemProxyUrl"
+>;
+
 type UseSystemProxySettingsInput = {
-  appSettings: AppSettings;
-  onUpdateAppSettings: (next: AppSettings) => Promise<void>;
+  systemProxyEnabled?: boolean;
+  systemProxyUrl?: string | null;
+  onUpdateSystemProxy: (patch: SystemProxySettingsPatch) => Promise<unknown>;
   t: TranslateFn;
 };
 
 export function useSystemProxySettings({
-  appSettings,
-  onUpdateAppSettings,
+  systemProxyEnabled,
+  systemProxyUrl,
+  onUpdateSystemProxy,
   t,
 }: UseSystemProxySettingsInput) {
-  const [systemProxyEnabledDraft, setSystemProxyEnabledDraft] = useState(
-    appSettings.systemProxyEnabled ?? false,
-  );
-  const [systemProxyUrlDraft, setSystemProxyUrlDraft] = useState(
-    appSettings.systemProxyUrl ?? "",
-  );
+  const persistedEnabled = systemProxyEnabled ?? false;
+  const persistedProxyUrl = systemProxyUrl ?? DEFAULT_SYSTEM_PROXY_URL;
+  const [systemProxyEnabledDraft, setSystemProxyEnabledDraft] =
+    useState(persistedEnabled);
+  const [systemProxyUrlDraft, setSystemProxyUrlDraft] =
+    useState(persistedProxyUrl);
   const [systemProxyError, setSystemProxyError] = useState<string | null>(null);
-  const [systemProxyNotice, setSystemProxyNotice] = useState<InlineNoticeState>(null);
+  const [systemProxyNotice, setSystemProxyNotice] =
+    useState<InlineNoticeState>(null);
   const [systemProxySaving, setSystemProxySaving] = useState(false);
 
   useEffect(() => {
-    setSystemProxyEnabledDraft(appSettings.systemProxyEnabled ?? false);
-    setSystemProxyUrlDraft(appSettings.systemProxyUrl ?? "");
+    setSystemProxyEnabledDraft(persistedEnabled);
+    setSystemProxyUrlDraft(persistedProxyUrl);
     setSystemProxyError(null);
-  }, [appSettings.systemProxyEnabled, appSettings.systemProxyUrl]);
+  }, [persistedEnabled, persistedProxyUrl]);
 
   useEffect(() => {
     if (!systemProxyNotice) {
@@ -72,8 +80,7 @@ export function useSystemProxySettings({
       setSystemProxyError(null);
       setSystemProxyNotice(null);
       try {
-        await onUpdateAppSettings({
-          ...appSettings,
+        await onUpdateSystemProxy({
           systemProxyEnabled: nextEnabled,
           systemProxyUrl: trimmedProxyUrl || null,
         });
@@ -97,7 +104,7 @@ export function useSystemProxySettings({
         setSystemProxySaving(false);
       }
     },
-    [appSettings, onUpdateAppSettings, t],
+    [onUpdateSystemProxy, t],
   );
 
   const handleSaveSystemProxy = useCallback(async () => {
@@ -106,13 +113,13 @@ export function useSystemProxySettings({
       systemProxyUrlDraft,
       t("settings.behaviorProxySaved"),
       {
-        enabled: appSettings.systemProxyEnabled ?? false,
-        proxyUrl: appSettings.systemProxyUrl ?? "",
+        enabled: persistedEnabled,
+        proxyUrl: persistedProxyUrl,
       },
     );
   }, [
-    appSettings.systemProxyEnabled,
-    appSettings.systemProxyUrl,
+    persistedEnabled,
+    persistedProxyUrl,
     systemProxyEnabledDraft,
     systemProxyUrlDraft,
     t,
@@ -125,12 +132,12 @@ export function useSystemProxySettings({
         return;
       }
       const rollbackDraft = {
-        enabled: appSettings.systemProxyEnabled ?? false,
-        proxyUrl: appSettings.systemProxyUrl ?? "",
+        enabled: persistedEnabled,
+        proxyUrl: persistedProxyUrl,
       };
       const nextProxyUrl = checked
         ? systemProxyUrlDraft
-        : (systemProxyUrlDraft.trim() || rollbackDraft.proxyUrl);
+        : systemProxyUrlDraft.trim() || rollbackDraft.proxyUrl;
 
       setSystemProxyEnabledDraft(checked);
       setSystemProxyError(null);
@@ -146,8 +153,8 @@ export function useSystemProxySettings({
       );
     },
     [
-      appSettings.systemProxyEnabled,
-      appSettings.systemProxyUrl,
+      persistedEnabled,
+      persistedProxyUrl,
       systemProxySaving,
       systemProxyUrlDraft,
       t,
@@ -162,8 +169,8 @@ export function useSystemProxySettings({
   }, []);
 
   const systemProxyDirty =
-    (appSettings.systemProxyEnabled ?? false) !== systemProxyEnabledDraft ||
-    (appSettings.systemProxyUrl ?? "") !== systemProxyUrlDraft;
+    persistedEnabled !== systemProxyEnabledDraft ||
+    persistedProxyUrl !== systemProxyUrlDraft;
 
   return {
     handleSaveSystemProxy,

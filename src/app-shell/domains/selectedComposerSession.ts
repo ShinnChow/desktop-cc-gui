@@ -150,14 +150,46 @@ export function shouldApplyDraftComposerSelectionToThread(input: {
   shouldApplyDraftToNextThread: boolean;
   draftComposerSelection: ComposerSessionSelection | null;
   activeThreadId: string | null;
+  /** 来源线程 id；carry 自会话时必传，Home 点选等无线程来源为 null。 */
+  draftSourceThreadId?: string | null;
+  /**
+   * D6 闸2：目标线程引擎的 catalog 成员资格 key 集（id+model 双通道）。
+   * 提供且非空时，draft 模型不在集合内 → 拒绝应用（封死 Home draft 引擎盲区
+   * 把他引擎模型写进 pending 账本）。null/未提供 = catalog 不可得，维持放行。
+   */
+  targetEngineModelKeys?: readonly string[] | null;
 }): boolean {
-  return Boolean(
+  const baseOk = Boolean(
     !input.candidate &&
       input.shouldApplyDraftToNextThread &&
       input.draftComposerSelection &&
       input.activeThreadId &&
       input.activeThreadId.includes("-pending-"),
   );
+  if (!baseOk) {
+    return false;
+  }
+  // composer-session-selection-isolation：draft 只允许落在同引擎 pending。
+  // 与迁移路径 hasEngineMismatch 同构——任一侧引擎解析不出（Home 点选 /
+  // Shared / 无前缀 id）保持既有放行语义，不在此处引入回归。
+  const sourceEngine = resolveThreadEngine(input.draftSourceThreadId ?? "");
+  const targetEngine = resolveThreadEngine(input.activeThreadId ?? "");
+  if (
+    sourceEngine !== null &&
+    targetEngine !== null &&
+    sourceEngine !== targetEngine
+  ) {
+    return false;
+  }
+  // D6 闸2：catalog 成员资格校验（引擎门禁覆盖不到的 Home 无源 draft 在此拦截）
+  const membershipKeys = input.targetEngineModelKeys;
+  if (membershipKeys && membershipKeys.length > 0) {
+    const draftModelId = input.draftComposerSelection?.modelId?.trim() ?? "";
+    if (draftModelId && !membershipKeys.includes(draftModelId)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function shouldMigrateComposerSelectionBetweenThreadIds(input: {

@@ -10,7 +10,13 @@ import {
 
 export type ThreadStatusMap = Record<
   string,
-  { isProcessing: boolean; hasUnread: boolean; isReviewing: boolean }
+  {
+    isProcessing: boolean;
+    hasUnread: boolean;
+    isReviewing: boolean;
+    /** 后台任务运行中计数；旧形状/缺失视为 0。 */
+    backgroundTaskRunningCount?: number;
+  }
 >;
 
 export type ThreadRowStatus = ThreadStatusMap[string];
@@ -31,7 +37,8 @@ function areThreadRowStatusesEqual(
   return (
     left?.isProcessing === right?.isProcessing &&
     left?.hasUnread === right?.hasUnread &&
-    left?.isReviewing === right?.isReviewing
+    left?.isReviewing === right?.isReviewing &&
+    left?.backgroundTaskRunningCount === right?.backgroundTaskRunningCount
   );
 }
 

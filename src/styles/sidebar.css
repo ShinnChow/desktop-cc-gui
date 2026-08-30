@@ -369,8 +369,11 @@
   flex-direction: column;
   gap: 0;
   padding-top: 2px;
-  padding-left: 2px;
-  padding-right: 2px;
+  /* 横向 inset 交给 .workspace-row 自身 margin（4px），与置顶区
+     section 的 0 4px 对齐，不叠第二层边距（勿在注释里写字面选择器，
+     ruleBody 会误匹配）。 */
+  padding-left: 0;
+  padding-right: 0;
   -webkit-app-region: no-drag;
 }
 
@@ -559,10 +562,17 @@
 }
 
 .workspace-children {
+  /* 树线色基于 --text-muted（--border-subtle 78% 实测过浅几乎不可见）。
+     线位 x=10 落在 .thread-list 现成的 10px 左 padding 沟槽里，
+     因此这里保持 padding-left: 0，不挤压子行标题宽度。
+     整块 margin-left: 4px 加深子级缩进：rail / 弯钩 / footer 遮罩
+     全部随容器刚性右移，内部对齐与右缘位置不变。 */
+  --workspace-tree-rail: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  --workspace-tree-rail-x: 10px;
   position: relative;
   display: grid;
   grid-template-rows: 1fr;
-  margin: 2px 0 0;
+  margin: 2px 0 0 4px;
   padding-left: 0;
   opacity: 1;
   transform: translateY(0);
@@ -588,10 +598,26 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  position: relative;
+  z-index: 1;
 }
 
+/* v4：容器级贯穿竖线保证连续性——每行各画一段的方案在相邻行高
+   不一致时必然断缝（-50% 猜不准上一行中线）。行的 ╰ 圆弧弯钩
+   改为只画「弧 + 水平线」叠在贯穿线上（见 .thread-row::before），
+   不带竖线尾巴、无叠色。线位 x=10（--workspace-tree-rail-x）。
+   竖线起点上延 4px 到容器顶（v4.2 校准，2026-08-30 用户反馈：
+   top: 4px 起点距 workspace 标题行过远、线头悬空，top: 0 后
+   只剩容器自身 2px margin，线头贴近标题行）。 */
 .workspace-children::before {
-  content: none;
+  content: "";
+  position: absolute;
+  left: var(--workspace-tree-rail-x);
+  top: 0;
+  bottom: 6px;
+  width: 1px;
+  background: var(--workspace-tree-rail);
+  pointer-events: none;
 }
 
 /* Updated Workspace Row Styles — monochrome / minimal selected state */
@@ -1097,6 +1123,66 @@
   transform: rotate(90deg);
 }
 
+.sidebar-workspace-menu-group-hint {
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint, var(--text-muted));
+  font-size: 10px;
+  font-weight: 520;
+}
+
+.sidebar-workspace-menu-group-help {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-left: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  color: var(--text-faint, var(--text-muted));
+  font-size: 9px;
+  font-weight: 620;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+}
+
+.sidebar-floating-help-tip {
+  position: fixed;
+  z-index: 1215;
+  width: max-content;
+  max-width: 264px;
+  padding: 6px 9px;
+  border: 1px solid var(--border-quiet);
+  border-radius: 8px;
+  background: var(--surface-popover, #1c1c1c);
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
+  animation: sidebar-floating-help-tip-in 120ms ease-out 60ms backwards;
+}
+
+@keyframes sidebar-floating-help-tip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .sidebar-workspace-menu-divider,
 .renderer-context-menu-separator {
   margin: 8px 4px 2px;
@@ -1268,6 +1354,25 @@
   flex: 0 0 auto;
 }
 
+.sidebar-workspace-menu-item-provider {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 560;
+  line-height: 1.1;
+}
+
+.sidebar-workspace-menu-item-provider
+  + .sidebar-workspace-menu-item-submenu-icon {
+  margin-left: 0;
+}
+
 .sidebar-workspace-submenu {
   --sidebar-floating-menu-bg: color-mix(
     in srgb,
@@ -1280,8 +1385,12 @@
   z-index: 1202;
   min-width: 260px;
   max-width: min(320px, calc(100vw - 24px));
-  max-height: min(52vh, 360px);
+  /* 自适应高度：常规供应商列表不出滚动条；超长列表兜底滚动但滚动条隐藏。 */
+  max-height: min(76vh, 640px);
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 6px;
   border-radius: 10px;
   border: 1px solid var(--border-quiet);
@@ -1292,7 +1401,16 @@
   backdrop-filter: blur(14px);
 }
 
+.sidebar-workspace-submenu::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .sidebar-workspace-submenu-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 8px 7px;
   font-size: 12px;
   font-weight: 650;
@@ -1378,6 +1496,11 @@
 }
 
 .sidebar-workspace-menu-item-refresh.is-refreshing svg {
+  animation: sidebar-workspace-menu-spin 0.85s linear infinite;
+}
+
+.sidebar-workspace-menu-item.is-refreshing
+  .sidebar-workspace-menu-item-icon svg {
   animation: sidebar-workspace-menu-spin 0.85s linear infinite;
 }
 
@@ -2038,7 +2161,7 @@
    * session backgrounds are narrower and do not flush-align with the project
    * pill above. Left is a bit larger for clear tree hierarchy.
    */
-  padding: 1px 8px 2px 12px;
+  padding: 1px 4px 2px 10px;
 }
 
 .thread-list[data-virtualized="true"] {
@@ -2080,13 +2203,12 @@
 
 /*
  * In the virtualized list the rows live (absolutely positioned) inside
- * `.thread-list-virtual-spacer`, while the footer controls ("收起"/"更多"/
- * "加载更多") are rendered as siblings after the spacer. Since the virtualized
- * `.thread-list` is `display: block`, force these footer controls to stack as
- * block rows instead of flowing inline side-by-side.
+ * `.thread-list-virtual-spacer`, while the footer wrapper ("收起"/"更多"/
+ * "加载更多" + hidden summary) is rendered as a sibling after the spacer.
+ * Since the virtualized `.thread-list` is `display: block`, keep the footer
+ * wrapper stacked as a block row instead of flowing inline.
  */
-.thread-list[data-virtualized="true"] > .thread-more,
-.thread-list[data-virtualized="true"] > .thread-list-hidden-summary {
+.thread-list[data-virtualized="true"] > .thread-list-footer {
   display: block;
 }
 
@@ -2194,7 +2316,9 @@
   min-height: var(--sidebar-row-height-thread);
   width: calc(100% + var(--workspace-session-folder-depth, 0) * 11px);
   margin: 0;
-  padding: 2px 6px 2px calc(8px + var(--workspace-session-folder-depth, 0) * 11px);
+  /* 基础 8px → 13px：行盒仍在 x=0，但内容右移避让树线线位（x=10），
+     行首 padding 沟槽容纳弯钩水平段而不压 folder 图标。 */
+  padding: 2px 6px 2px calc(13px + var(--workspace-session-folder-depth, 0) * 11px);
   border: 0;
   border-radius: var(--sidebar-row-radius);
   background: transparent;
@@ -2380,16 +2504,18 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-left: calc(12px + var(--workspace-session-folder-depth, 0) * 10px);
+  margin-left: calc(10px + var(--workspace-session-folder-depth, 0) * 10px);
   padding-left: 8px;
 }
 
-/* Quieter guide line — container cue, not file-tree drama */
+/* Quieter guide line — container cue, not file-tree drama.
+   left: 0（原 2px）让嵌套 guide 与 workspace 树线同一线位（x=10），
+   与 folder 弯钩段的竖线衔接成一条，避免出现 2px 双线。 */
 .workspace-session-folder-children::before {
   position: absolute;
   top: 0;
   bottom: 4px;
-  left: 2px;
+  left: 0;
   width: 1px;
   background: color-mix(in srgb, var(--text-muted) 14%, transparent);
   content: "";
@@ -2410,7 +2536,7 @@
 .workspace-session-folder-children .thread-row.has-pin-toggle:hover,
 .workspace-session-folder-children .thread-row.has-pin-toggle:focus-within,
 .workspace-session-folder-children .thread-row.has-pin-toggle.is-pinned-thread {
-  padding-left: calc(16px + var(--thread-indent, 0px));
+  padding-left: calc(14px + var(--thread-indent, 0px));
 }
 
 .workspace-session-folder-error {
@@ -2418,6 +2544,59 @@
   color: var(--danger, #ef4444);
   font-size: 11px;
   line-height: 1.4;
+}
+
+/* v4：贯穿竖线重新回归，「更多 / 收起 / 隐藏摘要」footer 需要用侧栏
+   底色遮罩盖住穿过的线——树线只延伸到最后一个标题行的弯钩处。
+   用 --desktop-sidebar-background 回退链与侧栏实际背景保持一致
+   （裸 --surface-sidebar 是半透明色，叠两层会出色块）。 */
+.workspace-children-inner > .thread-list > .thread-list-footer,
+.workspace-children-inner
+  > .workspace-session-folder-tree
+  .thread-list-footer {
+  position: relative;
+  background: var(
+    --desktop-sidebar-background,
+    var(--surface-sidebar-opaque, var(--surface-sidebar))
+  );
+  z-index: 2;
+}
+
+/* footer 盒顶与最后一个标题行弯钩之间还会露出一段贯穿线（最后行
+   下半行 + gap）。用一条向上的窄遮罩带（1px 宽，与贯穿竖线同像素）
+   盖掉。
+   带宽必须 = 竖线宽（1px）：实测 2px 带会擦掉弯钩弧线在 x∈[1,2)
+   的左上过渡段，竖线止点与弧线可见起点之间出现斜向缺口，最后一项
+   视觉上从树上脱开（2026-08-30 用户截图实证）。
+   上探 19px（v4.2 校准，原 20px，用户拍板）：行高钉 30px + gap 2px
+   → 露出段 17px，19 = 1.5px 余量。零咬合上限：带顶（footer_top -
+   探针）必须高于弧线在带列（x∈[0,1)）内的最低墨点 —— R=4 弯钩该点
+   在中线-1.35px，即探针 ≤ 露出段 + 1.35 = 18.35；19px 超限 0.65，
+   理论上在弧线 x∈[0.54,1) 段留 ~0.5×0.7px 亚像素豁口，隐没在
+   抗锯齿内（若可见回 18）。行高若调大（>32px），露出段超出探头会
+   残留竖线细点，需重新校准探针。 */
+.workspace-children-inner > .thread-list > .thread-list-footer::before,
+.workspace-children-inner
+  > .workspace-session-folder-tree
+  .thread-list-footer::before {
+  content: "";
+  position: absolute;
+  top: -19px;
+  left: 0;
+  width: 1px;
+  height: calc(100% + 19px);
+  background: var(
+    --desktop-sidebar-background,
+    var(--surface-sidebar-opaque, var(--surface-sidebar))
+  );
+}
+
+/* folder 内嵌 list 的 footer 左缘在 x=18（wrapper margin 10 +
+   padding 8），而嵌套 guide 画在 x=10——遮罩带左移 8px 才能盖住
+   guide 露出段（偏移由 wrapper padding-left 决定，不随线位移动；
+   带宽 1px 与 guide 同像素，无富余列）。 */
+.workspace-session-folder-children .thread-list-footer::before {
+  left: -8px;
 }
 
 .thread-list-hidden-summary {
@@ -2543,7 +2722,7 @@
   align-items: center;
   gap: 2px;
   min-height: var(--sidebar-row-height-thread);
-  padding: 2px 6px 2px calc(10px + var(--thread-indent, 0px));
+  padding: 2px 5px 2px calc(8px + var(--thread-indent, 0px));
   border-radius: var(--sidebar-row-radius);
   color: var(--text-quiet);
   font-size: var(--sidebar-content-font-size);
@@ -2562,13 +2741,88 @@
   text-align: left;
 }
 
+/* 直接子行的 ╰ 圆弧弯钩（v4.2）：只画「四分之一圆弧 + 水平短线」，
+   叠加在容器贯穿竖线上——竖线连续性由贯穿线保证，弯钩不画竖线
+   尾巴（border-bottom 的圆角会自然画出完整弧线到左边竖直方向），
+   与贯穿线同像素相切衔接、无叠色变深。
+   盒子只覆盖 [中线-4px, 中线]：top: calc(50% - 4px) 自适应行高，
+   flex / 虚拟列表无需区分（无上探、无跨行假设）。
+   盒子挂在行盒左缘（= 线位 x=10，.thread-list 现成左 padding 沟槽），
+   不新增任何横向占位。
+   水平段 10px → 7px（2026-08-30 视觉校准：钩尖距图标仅 3px 过近，
+   缩短后间隙 6px）。弧半径 6px → 4px（v4.2，用户选择「弯头更实」）：
+   斜段（抗锯齿摊薄区）变短、满覆盖像素占比升高，弯头观感更接近
+   直线；半径 < 盒高 4px 时圆角自动吃满盒高、直段归零，故盒高同步
+   收到 4px 保持「盒子 = 弧段外接矩形」契约。竖线列（x∈[0,1)）内
+   弧墨最低点 = 中线-1.35px（R=4 时 y = 中线-R+√(2R-1)），footer
+   遮罩带顶必须高于该点才不咬弧（见遮罩带规则注释）。 */
+.workspace-children-inner > .thread-list > .thread-row::before,
+.workspace-children-inner
+  > .thread-list
+  > .thread-list-virtual-spacer
+  > .thread-list-virtual-row
+  .thread-row::before,
+.workspace-children-inner
+  > .workspace-session-folder-tree
+  > .thread-list
+  > .thread-row::before,
+.workspace-children-inner
+  > .workspace-session-folder-tree
+  > .thread-list
+  > .thread-list-virtual-spacer
+  > .thread-list-virtual-row
+  .thread-row::before,
+.workspace-children-inner
+  > .workspace-session-folder-tree
+  > .workspace-session-folder-group
+  > .workspace-session-folder-row::before,
+.workspace-children-inner
+  > .workspace-session-folder-tree
+  > .workspace-session-folder-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 7px;
+  top: calc(50% - 4px);
+  height: 4px;
+  border-bottom: 1px solid var(--workspace-tree-rail);
+  border-bottom-left-radius: 4px;
+  pointer-events: none;
+}
+
+/* folder 行盒从 x=0 起（tree 无左 padding），弯钩左移 10px 对齐
+   session 行的线位；depth-0 的 13px 避让沟槽容纳 7px 水平段
+   后仍留 6px 间隙。 */
+.workspace-children-inner
+  > .workspace-session-folder-tree
+  > .workspace-session-folder-group
+  > .workspace-session-folder-row::before,
+.workspace-children-inner
+  > .workspace-session-folder-tree
+  > .workspace-session-folder-row::before {
+  left: 10px;
+}
+
+/* subagent 行属于其父会话而非 workspace：不画弯钩
+   （竖线连续性由容器贯穿线负责）。 */
+.workspace-children-inner .thread-row.is-subagent::before {
+  content: none;
+}
+
+/* worktree 卡片挂在贯穿线上：左缘即线位（margin-left =
+   --workspace-tree-rail-x），卡片半透明背景会隐约透出线（≈20%
+   可见度），视觉上即「卡片挂在树上」，内部不再画线。 */
+.workspace-children-inner > .worktree-section {
+  margin-left: var(--workspace-tree-rail-x);
+}
+
 /* Pin 图标仅在悬停/聚焦时淡入，左侧留白也随之腾出；
    平时保持紧凑，不为按钮预留固定的一列空间。
    例外：已置顶会话 pin 图标常亮（.is-pinned-thread），行首留白与悬停态一致。 */
 .thread-row.has-pin-toggle:hover,
 .thread-row.has-pin-toggle:focus-within,
 .thread-row.has-pin-toggle.is-pinned-thread {
-  padding-left: calc(20px + var(--thread-indent, 0px));
+  padding-left: calc(18px + var(--thread-indent, 0px));
 }
 
 .thread-row:hover {
@@ -2736,6 +2990,27 @@
   background: #1dd1a1;
 }
 
+/* 后台任务运行计数徽标（右侧 meta 区，紧贴 runtime dot，独立于灯色：蓝灯+徽标可并存）。 */
+.thread-bg-task-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 14px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: #a55eea;
+  background: rgba(165, 94, 234, 0.12);
+}
+
+:root[data-theme="light"] .thread-bg-task-count {
+  color: #7c3aed;
+  background: rgba(139, 92, 246, 0.12);
+}
+
 .thread-engine-badge {
   display: flex;
   align-items: center;
@@ -2789,7 +3064,7 @@
   white-space: nowrap;
   line-height: 1.3;
   font-weight: 400;
-  margin-right: 8px;
+  margin-right: 6px;
 }
 
 .thread-row.is-renaming {
@@ -2829,7 +3104,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-left: 6px;
+  margin-left: 4px;
   min-width: 0;
   flex-shrink: 0;
 }
@@ -2894,6 +3169,20 @@
 :root[data-theme="light"] .thread-runtime-dot--completed {
   background: #10b981;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+/* 第四态：后台任务运行中（turn 已 settle，durable 任务仍在跑）——右侧 meta
+   紫色呼吸 + 计数徽标。与 unread 橙点错开色系：终态瞬间紫呼吸熄灭→橙静态
+   亮起（左侧 thread-status），切换可辨。 */
+.thread-runtime-dot--bg-running {
+  background: #a55eea;
+  box-shadow: 0 0 0 3px rgba(165, 94, 234, 0.16);
+  animation: sidebar-thread-status-breathe 1.8s ease-in-out infinite;
+}
+
+:root[data-theme="light"] .thread-runtime-dot--bg-running {
+  background: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.14);
 }
 
 .thread-provider-label {
@@ -2985,6 +3274,7 @@
 
   .thread-status.processing,
   .thread-runtime-dot--processing,
+  .thread-runtime-dot--bg-running,
   .thread-engine-badge.is-processing {
     animation: none;
   }

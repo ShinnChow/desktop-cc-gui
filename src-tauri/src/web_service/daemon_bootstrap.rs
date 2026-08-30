@@ -34,7 +34,18 @@ pub(crate) async fn maybe_start_local_daemon_for_remote(
     }
 
     if is_host_reachable(&resolved_host).await {
-        return Ok(true);
+        // 端口已有人监听 ≠ 可以直接收编。daemon 是常驻进程，会跨 app 升级
+        // 存活（2026-08-30 实证：8/27 的孤儿 daemon 占着 4733，dev 客户端
+        // 连了几天旧代码毫无察觉）。只收编「与本 app 同一 daemon 构建」的
+        // 监听进程；识别为旧构建/异源时杀掉重衍，否则升级后新 app 会一直
+        // 被旧 daemon 服务，修复与新功能永远不生效。
+        let expected_binary = resolve_daemon_binary(app);
+        if ensure_listening_daemon_matches_build(&resolved_host, expected_binary.as_deref()) {
+            return Ok(true);
+        }
+        log::warn!(
+            "[daemon-bootstrap] listener on {resolved_host} is not the current daemon build; restarting it"
+        );
     }
 
     let daemon_binary = resolve_or_build_daemon_binary(app).await?;
@@ -223,6 +234,147 @@ fn parse_port_from_host(host: &str) -> Option<u16> {
         .and_then(|(_, value)| value.parse::<u16>().ok())
 }
 
+/// 判定端口上的 moss daemon 监听进程是否与本 app 的 daemon 构建一致。
+/// 一致 → true（收编）；识别为旧构建/异源二进制 → 杀掉并返回 false（外层
+/// 随即 spawn 当前构建）；无法识别（非 unix、lsof/ps 失败、无 moss 进程）
+/// → true（保守收编，保持既有行为，避免误杀未知部署）。
+fn ensure_listening_daemon_matches_build(host: &str, expected_binary: Option<&Path>) -> bool {
+    let Some(port) = parse_port_from_host(host) else {
+        return true;
+    };
+    let Some(expected_binary) = expected_binary else {
+        return true;
+    };
+    let Ok(expected_path) = expected_binary.canonicalize() else {
+        return true;
+    };
+    let Ok(listener_pids) = collect_listener_pids(port) else {
+        return true;
+    };
+    let Ok(daemon_pids) = filter_moss_daemon_pids(&listener_pids) else {
+        return true;
+    };
+    if daemon_pids.is_empty() {
+        // 监听者不是本项目的 daemon（远端网关/未知部署），不越权处理。
+        return true;
+    }
+
+    let Ok(expected_meta) = std::fs::metadata(&expected_path) else {
+        return true;
+    };
+    let expected_modified = expected_meta.modified().ok();
+
+    let mut stale_pids = Vec::new();
+    for pid in &daemon_pids {
+        match inspect_daemon_process_freshness(*pid, &expected_path, expected_modified) {
+            ProcessFreshness::Current => {}
+            ProcessFreshness::Stale => stale_pids.push(*pid),
+            ProcessFreshness::Unknown => return true,
+        }
+    }
+    if stale_pids.is_empty() {
+        return true;
+    }
+    if let Err(error) = terminate_pids(&stale_pids) {
+        log::warn!(
+            "[daemon-bootstrap] failed to restart stale daemon pids {stale_pids:?}: {error}"
+        );
+        return true;
+    }
+    false
+}
+
+enum ProcessFreshness {
+    /// 监听进程就是当前构建（同路径且二进制未在进程启动后被替换）。
+    Current,
+    /// 旧构建在跑（异源路径，或二进制 mtime 晚于进程启动 = 已被替换）。
+    Stale,
+    /// 无法判定（ps 失败/输出异常）：保守收编。
+    Unknown,
+}
+
+fn inspect_daemon_process_freshness(
+    pid: u32,
+    expected_path: &Path,
+    expected_modified: Option<std::time::SystemTime>,
+) -> ProcessFreshness {
+    let Some(identity) = read_process_identity(pid).ok().flatten() else {
+        return ProcessFreshness::Unknown;
+    };
+    // Unix `ps` 返回的是“命令 + 参数”，取首 token；Windows PowerShell 返回
+    // 完整 ExecutablePath，不能按空格切分（例如 `C:\Program Files\...`）。
+    #[cfg(windows)]
+    let running_binary = Some({
+        let path = PathBuf::from(identity.trim());
+        path.canonicalize().unwrap_or(path)
+    });
+    #[cfg(not(windows))]
+    let running_binary = identity
+        .split_whitespace()
+        .next()
+        .map(PathBuf::from)
+        .map(|path| path.canonicalize().unwrap_or(path));
+    let Some(running_binary) = running_binary else {
+        return ProcessFreshness::Unknown;
+    };
+
+    // Windows：identity 为 PowerShell 拿到的完整 ExecutablePath（无可靠的
+    // 进程启动时间源，ps lstart 不可用），退化为「大小写不敏感的全路径
+    // 比较」：同路径视为当前构建收编；二进制被替换的旧进程无法据此识别，
+    // 由安装器停止服务/用户重启兜底（已知限制）。异源路径以本 app 的构建
+    // 为准重建。
+    if cfg!(windows) {
+        return if running_binary
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&expected_path.to_string_lossy())
+        {
+            ProcessFreshness::Current
+        } else {
+            ProcessFreshness::Stale
+        };
+    }
+
+    if running_binary != expected_path {
+        // 异源二进制（dev target/debug vs 安装版 /Applications 等）：
+        // 一律以本 app 的构建为准重建。
+        return ProcessFreshness::Stale;
+    }
+    // 同路径：cargo/安装器替换二进制后，老进程内存里仍是旧代码。
+    // 二进制 mtime 晚于进程启动 ⇒ 旧构建。ps lstart 输出为 C locale
+    // 英文缩写（macOS/Linux 实证），非 C locale 环境解析失败时保守收编。
+    let (Ok(output), Some(binary_modified)) = (
+        crate::utils::std_command("ps")
+            .arg("-p")
+            .arg(pid.to_string())
+            .arg("-o")
+            .arg("lstart=")
+            .output(),
+        expected_modified,
+    ) else {
+        return ProcessFreshness::Unknown;
+    };
+    if !output.status.success() {
+        return ProcessFreshness::Unknown;
+    }
+    let started_at = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let Ok(started) = chrono::NaiveDateTime::parse_from_str(&started_at, "%a %b %d %H:%M:%S %Y")
+    else {
+        return ProcessFreshness::Unknown;
+    };
+    let Some(started_system) = started
+        .and_local_timezone(chrono::Local)
+        .single()
+        .map(std::time::SystemTime::from)
+    else {
+        return ProcessFreshness::Unknown;
+    };
+    if binary_modified > started_system {
+        ProcessFreshness::Stale
+    } else {
+        ProcessFreshness::Current
+    }
+}
+
 #[cfg(unix)]
 fn collect_listener_pids(port: u16) -> Result<Vec<u32>, String> {
     let target = format!("-iTCP:{port}");
@@ -334,33 +486,23 @@ fn read_process_identity(pid: u32) -> Result<Option<String>, String> {
 
 #[cfg(windows)]
 fn read_process_identity(pid: u32) -> Result<Option<String>, String> {
-    let output = crate::utils::std_command("tasklist")
-        .arg("/FI")
-        .arg(format!("PID eq {pid}"))
-        .arg("/FO")
-        .arg("CSV")
-        .arg("/NH")
+    let output = crate::utils::std_command("powershell")
+        .arg("-NoProfile")
+        .arg("-NonInteractive")
+        .arg("-Command")
+        .arg(format!(
+            "(Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}').ExecutablePath"
+        ))
         .output()
         .map_err(|error| format!("failed to inspect process identity for pid {pid}: {error}"))?;
     if !output.status.success() {
         return Ok(None);
     }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let line = stdout.lines().next().map(str::trim).unwrap_or_default();
-    if line.is_empty() || line.starts_with("INFO:") {
+    let identity = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if identity.is_empty() {
         return Ok(None);
     }
-    let image_name = line
-        .split(',')
-        .next()
-        .map(|value| value.trim_matches('"').trim())
-        .unwrap_or_default()
-        .to_string();
-    if image_name.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(image_name))
-    }
+    Ok(Some(identity))
 }
 
 fn is_moss_daemon_identity(identity: &str) -> bool {

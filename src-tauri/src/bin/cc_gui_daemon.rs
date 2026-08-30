@@ -75,7 +75,7 @@ mod state {
         pub(crate) storage_path: PathBuf,
         pub(crate) settings_path: PathBuf,
         pub(crate) runtime_manager: Arc<RuntimeManager>,
-        pub(crate) engine_manager: EngineManager,
+        pub(crate) engine_manager: Arc<EngineManager>,
     }
 
     impl AppState {
@@ -678,8 +678,7 @@ struct OpenCodeSessionEntry {
     directory: Option<String>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 enum GeminiRenderLane {
     Text,
     Reasoning,
@@ -687,7 +686,6 @@ enum GeminiRenderLane {
     #[default]
     Other,
 }
-
 
 #[derive(Default)]
 struct GeminiRenderRoutingState {
@@ -828,7 +826,7 @@ struct DaemonState {
     web_service_runtime: Mutex<WebServiceRuntime>,
     event_sink: DaemonEventSink,
     codex_login_cancels: Mutex<HashMap<String, oneshot::Sender<()>>>,
-    engine_manager: engine::EngineManager,
+    engine_manager: Arc<crate::engine::EngineManager>,
     active_engine: Mutex<engine::EngineType>,
     runtime_manager: Arc<runtime::RuntimeManager>,
 }
@@ -2096,7 +2094,18 @@ async fn handle_rpc_request(
             serde_json::to_value(result).map_err(|err| err.to_string())
         }
         "detect_engines" => {
-            let statuses = state.detect_engines().await;
+            let force = params.get("force").and_then(|value| value.as_bool()).unwrap_or(false);
+            let engines: Option<Vec<engine::EngineType>> = params
+                .get("engines")
+                .and_then(|value| value.as_array())
+                .map(|list| {
+                    list.iter()
+                        .filter_map(|item| {
+                            serde_json::from_value::<engine::EngineType>(item.clone()).ok()
+                        })
+                        .collect()
+                });
+            let statuses = state.detect_engines_cached(force, engines.as_deref()).await;
             serde_json::to_value(statuses).map_err(|err| err.to_string())
         }
         "get_active_engine" => {

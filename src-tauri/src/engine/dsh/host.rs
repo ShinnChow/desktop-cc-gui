@@ -11,13 +11,20 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use uuid::Uuid;
 
+use super::breaker::{breaker_for_origin, DshTransportBreaker, SharedBreaker};
+
 const RPC_TIMEOUT: Duration = Duration::from_secs(30);
 const DESCRIBE_TIMEOUT: Duration = Duration::from_secs(3);
+// 宿主离线（daemon 未启动 / 端口拒绝 / 防火墙 Drop）时连接阶段的快速失败上限；
+// refused 本就秒回，这里主要收掉「Drop 不回包」场景下挂在总超时上的等待。
+const CONNECT_TIMEOUT: Duration = Duration::from_millis(800);
 
 #[derive(Debug, Clone)]
 pub struct DshHostClient {
     http: Client,
     origin: String,
+    // 按 origin 全局共享（client_for_snapshot 每次新建实例，熔断状态必须落在实例之外）。
+    breaker: SharedBreaker,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,16 +81,24 @@ impl DshHostClient {
     pub fn new(origin: impl Into<String>) -> Result<Self, String> {
         let http = Client::builder()
             .timeout(RPC_TIMEOUT)
+            .connect_timeout(CONNECT_TIMEOUT)
             .build()
             .map_err(|error| format!("dsh http client: {error}"))?;
+        let origin = origin.into().trim_end_matches('/').to_string();
+        let breaker = breaker_for_origin(&origin);
         Ok(Self {
             http,
-            origin: origin.into().trim_end_matches('/').to_string(),
+            origin,
+            breaker,
         })
     }
 
     pub fn origin(&self) -> &str {
         &self.origin
+    }
+
+    pub fn breaker(&self) -> &SharedBreaker {
+        &self.breaker
     }
 
     pub fn mux_url(&self) -> String {
@@ -170,10 +185,29 @@ impl DshHostClient {
             "payload": payload,
         });
         let url = format!("{}/api/{method}", self.origin);
-        let response = tokio::time::timeout(timeout, self.http.post(url).json(&body).send())
-            .await
-            .map_err(|_| format!("dsh {method} timed out"))?
-            .map_err(|error| format!("dsh {method} transport: {error}"))?;
+        // 熔断 open 期内不发 HTTP，直接结构化快速失败
+        // （`dsh host.down {"reason":"breaker-open",...}`，前端 parseDshHostDownError 识别）。
+        if let Err(down) = self.breaker.acquire(DshTransportBreaker::system_now_ms()) {
+            return Err(down);
+        }
+        let response =
+            match tokio::time::timeout(timeout, self.http.post(url).json(&body).send()).await {
+                // 任何响应（含 HTTP 4xx/5xx、信封错误）都证明宿主可达：重置连续失败。
+                Ok(Ok(response)) => {
+                    self.breaker.record_success();
+                    response
+                }
+                Ok(Err(error)) => {
+                    self.breaker
+                        .record_transport_failure(DshTransportBreaker::system_now_ms());
+                    return Err(format!("dsh {method} transport: {error}"));
+                }
+                Err(_) => {
+                    self.breaker
+                        .record_transport_failure(DshTransportBreaker::system_now_ms());
+                    return Err(format!("dsh {method} timed out"));
+                }
+            };
         let status = response.status();
         let text = response
             .text()
@@ -251,6 +285,20 @@ pub fn mux_url_from_origin(origin: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn client_shares_breaker_per_origin() {
+        let client = DshHostClient::new("http://127.0.0.1:43111").unwrap();
+        let other = DshHostClient::new("http://127.0.0.1:43111/").unwrap();
+        assert!(
+            std::sync::Arc::ptr_eq(client.breaker(), other.breaker()),
+            "same origin clients must share the breaker"
+        );
+        assert!(std::sync::Arc::ptr_eq(
+            client.breaker(),
+            &breaker_for_origin("http://127.0.0.1:43111"),
+        ));
+    }
 
     #[test]
     fn parses_ok_envelope() {

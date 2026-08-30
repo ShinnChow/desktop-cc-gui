@@ -22,6 +22,7 @@ import type {
   IntentCanvasContextSendAttachment,
   SelectedAgentOption,
   SharedQueuedExecutionTarget,
+  ExecutionTargetSnapshot,
   SkillInvocation,
 } from "../../../types";
 import type { AutoSessionMetadata } from "../../../services/tauri";
@@ -69,6 +70,11 @@ import {
   isResolvedExecutionTarget,
 } from "../../shared-session/target/types";
 import { rememberRuntimeReceipt } from "../utils/runtimeModelReceipt";
+import {
+  recordNativeTurnTarget,
+  resolveNativeSendExecutionTarget,
+} from "../utils/nativeTurnTargetLedger";
+import { appendTurnTargetBadge } from "../utils/turnTargetBadgeStorage";
 import { requestAgentPlan } from "../../multi-agent/runtime/executor";
 import { injectCollabSkillContext } from "../../multi-agent/runtime/skillContextInjection";
 import { injectMainCanvasContext } from "../../multi-agent/runtime/mainCanvasContextInjection";
@@ -82,6 +88,7 @@ import {
   shouldSpawnNativeThreadForEngineMismatch,
 } from "../../composer/hooks/explicitComposerEngineSwitch";
 import { resolveSendProviderProfileId } from "./sessionLifecycleController";
+import { resolvePiFirstMessageEffort } from "../utils/piThinkingDowngrade";
 import {
   canonicalQoderProviderProfileId,
   parseQoderSessionIdentity,
@@ -334,6 +341,8 @@ type SendMessageOptions = {
   codexInvalidThreadRetryAttempted?: boolean;
   autoSession?: AutoSessionMetadata | null;
   sharedExecutionTarget?: SharedQueuedExecutionTarget;
+  /** Native 发送边界冻结的执行目标快照（Composer 传入；缺失时按 resolved 值兜底）。 */
+  nativeExecutionTarget?: ExecutionTargetSnapshot;
   squadRequest?: true;
   originKind?: "shared-provider-retry";
   providerRetryAttempt?: number;
@@ -397,7 +406,8 @@ type UseThreadMessagingOptions = {
   model?: string | null;
   effort?: string | null;
   collaborationMode?: Record<string, unknown> | null;
-  resolveComposerSelection?: () => {
+  resolveComposerSelection?: (threadId?: string | null) => {
+    threadId?: string | null;
     id?: string | null;
     model: string | null;
     source?: string | null;
@@ -1765,19 +1775,35 @@ export function useThreadMessaging({
           },
         });
       }
-      const resolvedComposerSelection = resolveComposerSelection?.() ?? null;
+      const rawComposerSelection = resolveComposerSelection?.(threadId) ?? null;
+      // A stale render may still expose the previous native thread snapshot.
+      // Do not let it cross the send boundary even if an injected resolver
+      // ignores the requested thread argument.
+      const resolvedComposerSelection =
+        rawComposerSelection?.threadId &&
+        rawComposerSelection.threadId !== threadId
+          ? null
+          : rawComposerSelection;
       const modelFromOptions =
         options?.model !== undefined ? options.model : undefined;
       // resolver 在场时是 Native send 唯一模型权威：禁止回落到全局 / 其他会话 hook model。
-      const modelFromHook = resolveComposerSelection
-        ? (resolvedComposerSelection?.model?.trim() ||
+      // A frozen native target is the Composer/send boundary contract. Without
+      // one, an existing resolver remains authoritative; a mismatched resolver
+      // must fail closed rather than falling back to another thread's global model.
+      const modelFromHook =
+        options?.nativeExecutionTarget?.model?.trim() ||
+        options?.nativeExecutionTarget?.modelCatalogEntryId?.trim() ||
+        (resolveComposerSelection
+          ? (resolvedComposerSelection?.model?.trim() ||
             resolvedComposerSelection?.id?.trim() ||
             null)
-        : model;
+          : model);
       const selectedModelId =
         threadKind === "shared"
           ? (supportedStoredSharedTarget?.modelCatalogEntryId ?? null)
-          : (resolvedComposerSelection?.id ?? null);
+          : (options?.nativeExecutionTarget?.modelCatalogEntryId?.trim() ||
+            resolvedComposerSelection?.id?.trim() ||
+            null);
       const selectedModelSource =
         threadKind === "shared"
           ? (supportedStoredSharedTarget?.providerProfileSource ?? "unknown")
@@ -1791,9 +1817,10 @@ export function useThreadMessaging({
       const rawResolvedEffort =
         threadKind === "shared" && supportedStoredSharedTarget
           ? (supportedStoredSharedTarget.reasoning?.effort ?? null)
-          : options?.effort !== undefined
-            ? options.effort
-            : (resolvedComposerSelection?.effort ?? effort);
+          : options?.nativeExecutionTarget?.reasoning?.effort ??
+            (options?.effort !== undefined
+              ? options.effort
+              : (resolvedComposerSelection?.effort ?? effort));
       const resolvedEffort = normalizeEngineScopedEffort(
         resolvedEngine,
         rawResolvedEffort,
@@ -2817,11 +2844,45 @@ export function useThreadMessaging({
                     threadProviderProfileId,
                   }))
                 : resolveSendProviderProfileId({ threadProviderProfileId });
+            // D4 思考档按需降档：新会话首条短消息 + 用户未触碰档位时本 turn
+            // 以 low 发送；执行目标快照与 wire 参数必须同值（保持 honest）。
+            const sendEffort = resolvePiFirstMessageEffort({
+              engine: resolvedEngine,
+              effort: resolvedEffort,
+              hasSession: realSessionId !== null,
+              promptText: finalText,
+            });
+            // Native 发送边界固化本轮执行目标（对齐 Shared 的 beginTurn /
+            // send.request receipt 时序）：queue drain / recovery resend 等
+            // 无 composer options 的路径走 resolved 值兜底合成。
+            {
+              const nativeTurnExecutionSnapshot =
+                resolveNativeSendExecutionTarget({
+                  frozen: options?.nativeExecutionTarget ?? null,
+                  engine: resolvedEngine,
+                  providerProfileId,
+                  modelCatalogEntryId: selectedModelId,
+                  model: modelForSend ?? sanitizedModel,
+                  effort: sendEffort,
+                });
+              recordNativeTurnTarget(
+                workspace.id,
+                threadId,
+                nativeTurnExecutionSnapshot,
+              );
+              appendTurnTargetBadge(threadId, nativeTurnExecutionSnapshot);
+            }
+            if (modelForSend) {
+              rememberRuntimeReceipt(workspace.id, threadId, {
+                model: modelForSend,
+                modelSource: "send.request",
+              });
+            }
             response = await engineSendMessageService(workspace.id, {
               text: finalText,
               engine: resolvedEngine,
               model: modelForSend,
-              effort: resolvedEffort,
+              effort: sendEffort,
               disableThinking: disableThinkingForClaude,
               images: finalImages.length > 0 ? finalImages : null,
               accessMode: resolvedAccessMode,

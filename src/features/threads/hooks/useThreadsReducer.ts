@@ -1,4 +1,10 @@
-import type { ConversationItem, ThreadSummary, ThreadTokenUsage } from "../../../types";
+import type {
+  ConversationItem,
+  ExecutionTargetSnapshot,
+  RuntimeModelReceipt,
+  ThreadSummary,
+  ThreadTokenUsage,
+} from "../../../types";
 import type { SidebarSnapshot } from "../utils/sidebarSnapshot";
 import {
   MAX_ITEM_TEXT,
@@ -10,6 +16,11 @@ import {
   upsertItem,
 } from "../../../utils/threadItems";
 import { settlePlanInProgressSteps } from "../utils/threadNormalize";
+import { mergeTurnTargetBadgesIntoItems } from "../utils/turnTargetBadgeStorage";
+import {
+  clearBackgroundTasks,
+  renameBackgroundTasksForThread,
+} from "../../messages/utils/backgroundTaskStore";
 import { isMultiAgentHistFoldItemId } from "../../multi-agent/utils/canvasItems";
 import {
   isCollabWorkerNativeThreadId,
@@ -138,6 +149,35 @@ export type { ThreadAction, ThreadState } from "./threadReducerTypes";
 
 const REDUCER_NOOP_GUARD_ENABLED = isReducerNoopGuardEnabled();
 const INCREMENTAL_DERIVATION_ENABLED = isIncrementalDerivationEnabled();
+
+/**
+ * Native turn-target（badge 快照 + 回执）的统一落地规则：仅当 item 缺失时
+ * 采纳 incoming，绝不覆盖既有值；无字段可加时保持原引用以便 fast-path
+ * 等价短路。action/params 不携带时原样返回。
+ */
+type TurnBadgeMetadataCarrier = {
+  executionTargetSnapshot?: ExecutionTargetSnapshot;
+  runtimeReceipt?: RuntimeModelReceipt;
+};
+
+function withMissingTurnBadgeMetadata<T extends object>(
+  base: T,
+  incoming?: TurnBadgeMetadataCarrier,
+): T {
+  if (!incoming) {
+    return base;
+  }
+  const carrier = base as TurnBadgeMetadataCarrier;
+  let patch: Partial<TurnBadgeMetadataCarrier> | null = null;
+  if (!carrier.executionTargetSnapshot && incoming.executionTargetSnapshot) {
+    patch = { executionTargetSnapshot: incoming.executionTargetSnapshot };
+  }
+  if (!carrier.runtimeReceipt && incoming.runtimeReceipt) {
+    patch = { ...(patch ?? {}), runtimeReceipt: incoming.runtimeReceipt };
+  }
+  return patch ? ({ ...base, ...patch } as T) : base;
+}
+
 const PENDING_THREAD_LAST_AGENT_ANCHOR_TTL_MS = 5 * 60 * 1000;
 // Continuation evidence arrives once per engine event (heartbeat/delta/item/*)
 // via raw dispatch, bypassing the delta batching layers. Consumers only do
@@ -670,6 +710,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           const newThreadId = action.threadId;
           scheduleRenameTurnFinalMetaThreadId(oldThreadId, newThreadId);
           scheduleTombstoneLocalPendingDraftIndexRow(oldThreadId);
+          // 后台任务表随迁：pending→final rename 后 watcher/回写改挂新 id。
+          renameBackgroundTasksForThread(action.workspaceId, oldThreadId, newThreadId);
           writeRemappedClientSessionIndex({
             workspaceId: action.workspaceId,
             threadId: newThreadId,
@@ -877,6 +919,13 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       };
     }
     case "removeThread": {
+      // 后台任务状态表随线程删除一并清理（幂等）：否则已删线程残留的
+      // running 记录会让 sidebar sync 持续向幽灵线程 dispatch、registry
+      // watcher 持续探测。queueMicrotask 避免 reducer 执行期同步触发
+      // 外部 store 订阅（StrictMode 双调用下重复 clear 也无副作用）。
+      queueMicrotask(() => {
+        clearBackgroundTasks(action.workspaceId, action.threadId);
+      });
       const list = state.threadsByWorkspace[action.workspaceId] ?? [];
       const filtered = list.filter((thread) => thread.id !== action.threadId);
       const nextActive =
@@ -989,6 +1038,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
               hasUnread: previous?.hasUnread ?? false,
               isReviewing: previous?.isReviewing ?? false,
               isContextCompacting: previous?.isContextCompacting ?? false,
+              backgroundTaskRunningCount:
+                previous?.backgroundTaskRunningCount ?? 0,
               processingStartedAt:
                 wasProcessing && startedAt ? startedAt : action.timestamp,
               lastDurationMs,
@@ -1037,6 +1088,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
             hasUnread: nextHasUnread,
             isReviewing: previous?.isReviewing ?? false,
             isContextCompacting: previous?.isContextCompacting ?? false,
+            backgroundTaskRunningCount:
+              previous?.backgroundTaskRunningCount ?? 0,
             processingStartedAt: null,
             lastDurationMs: nextDuration,
             heartbeatPulse: 0,
@@ -1107,6 +1160,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
             hasUnread: previous?.hasUnread ?? false,
             isReviewing: previous?.isReviewing ?? false,
             isContextCompacting: action.isCompacting,
+            backgroundTaskRunningCount:
+              previous?.backgroundTaskRunningCount ?? 0,
             processingStartedAt: nextStartedAt,
             lastDurationMs: nextDuration,
             heartbeatPulse: previous?.heartbeatPulse ?? 0,
@@ -1319,6 +1374,41 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           },
         },
       };
+    case "markBackgroundTaskActivity": {
+      const previous = state.threadStatusById[action.threadId];
+      const previousCount = previous?.backgroundTaskRunningCount ?? 0;
+      // 0 跨越收口：最后一个后台任务转终态且用户不在该会话 → 标 unread
+      // （对齐 markProcessing 非活跃结算语义）；活跃线程只熄灯，靠时间线
+      // 活体卡原地折叠表达完成。
+      const crossedToZeroWhileAway =
+        previousCount > 0 &&
+        action.runningCount === 0 &&
+        !isThreadActiveInState(
+          state.activeThreadIdByWorkspace,
+          action.threadId,
+          action.workspaceId,
+        );
+      const nextHasUnread = crossedToZeroWhileAway
+        ? true
+        : (previous?.hasUnread ?? false);
+      if (
+        previousCount === action.runningCount &&
+        (previous?.hasUnread ?? false) === nextHasUnread
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        threadStatusById: {
+          ...state.threadStatusById,
+          [action.threadId]: {
+            ...withThreadStatusDefaults(previous),
+            backgroundTaskRunningCount: action.runningCount,
+            hasUnread: nextHasUnread,
+          },
+        },
+      };
+    }
     case "addAssistantMessage": {
       const list = state.itemsByThread[action.threadId] ?? [];
       const message: ConversationItem = {
@@ -1560,12 +1650,15 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           ? existing
           : clearAssistantFinalMetadata(existing);
         list = sourceItems.slice();
-        list[index] = {
-          ...nextBase,
-          id: nextId,
-          text: nextText,
-          isFinal: keepFinalMetadata ? true : false,
-        };
+        list[index] = withMissingTurnBadgeMetadata(
+          {
+            ...nextBase,
+            id: nextId,
+            text: nextText,
+            isFinal: keepFinalMetadata ? true : false,
+          },
+          action,
+        );
         if (
           canUseLiveAssistantDeltaFastPath({
             threadId: action.threadId,
@@ -1607,13 +1700,16 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       } else {
         list = [
           ...sourceItems,
-          {
-            id: segmentedItemId,
-            kind: "message",
-            role: "assistant",
-            text: action.delta,
-            isFinal: false,
-          },
+          withMissingTurnBadgeMetadata<ConversationItem>(
+            {
+              id: segmentedItemId,
+              kind: "message",
+              role: "assistant",
+              text: action.delta,
+              isFinal: false,
+            },
+            action,
+          ),
         ];
       }
       const updatedItems = prepareThreadItems(list, {
@@ -1637,7 +1733,7 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       };
     }
     case "completeAgentMessage": {
-      // \u00a76.1: \u4ee3\u7406\u7ed9 applyCompleteAgentMessageToState, \u4fdd\u8bc1\u65e7\u8c03\u7528\u8def\u5f84\u8bed\u4e49\u4e0d\u53d8\u3002
+      // §6.1: 代理给 applyCompleteAgentMessageToState, 保证旧调用路径语义不变。
       const applied = applyCompleteAgentMessageToState(state, {
         workspaceId: action.workspaceId,
         threadId: action.threadId,
@@ -1645,6 +1741,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         text: action.text,
         hasCustomName: action.hasCustomName,
         timestamp: action.timestamp ?? Date.now(),
+        executionTargetSnapshot: action.executionTargetSnapshot,
+        runtimeReceipt: action.runtimeReceipt,
       });
       if (applied.noop) {
         return state;
@@ -1665,6 +1763,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         text: action.text,
         hasCustomName: action.hasCustomName,
         timestamp: action.timestamp,
+        executionTargetSnapshot: action.executionTargetSnapshot,
+        runtimeReceipt: action.runtimeReceipt,
       });
 
       // 1) setThreadTimestamp
@@ -2129,9 +2229,12 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           ? [...mergedItems, ...preservedFoldItems]
           : mergedItems;
       // Cold reload / history path: fill missing final footer meta from local sidecar.
-      const itemsWithSidecarMeta = mergeTurnFinalMetaIntoItems(
+      const itemsWithSidecarMeta = mergeTurnTargetBadgesIntoItems(
         action.threadId,
-        mergedWithFolds,
+        mergeTurnFinalMetaIntoItems(
+          action.threadId,
+          mergedWithFolds,
+        ),
       );
       const preserveMessageTextIds = new Set<string>();
       for (const item of itemsWithSidecarMeta) {
@@ -2268,6 +2371,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       const { workspaceId, oldThreadId, newThreadId } = action;
       scheduleRenameTurnFinalMetaThreadId(oldThreadId, newThreadId);
       scheduleTombstoneLocalPendingDraftIndexRow(oldThreadId);
+      // 后台任务表随迁（同 pending-rename 分支）：store key 是 threadId。
+      renameBackgroundTasksForThread(workspaceId, oldThreadId, newThreadId);
       const renamedThread = (state.threadsByWorkspace[workspaceId] ?? []).find(
         (thread) => thread.id === oldThreadId,
       );
@@ -2421,17 +2526,25 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       if (list.some((entry) => entry.id === id)) {
         return state;
       }
-      const compactedMessage: ConversationItem = {
+      // 压缩留痕是引擎侧系统事件，不是模型说的话：独立 context-event kind，
+      // 让 finality / 折叠 / prose 聚合的既有谓词按类型天然排除（否则
+      // markLatestAssistantMessageFinal 会把 isFinal 打在留痕上，极简模式
+      // 锚点被劫持、真实回答被折进 chip——2026-08-27 用户反馈回归）。
+      const compactedMarker: ConversationItem = {
         id,
-        kind: "message",
-        role: "assistant",
-        text: "Context compacted.",
+        kind: "context-event",
+        eventType: "compacted",
+        reason: action.reason ?? null,
+        tokensBefore: action.tokensBefore ?? null,
+        estimatedTokensAfter: action.estimatedTokensAfter ?? null,
+        turnId: action.turnId,
+        timestampMs: action.timestampMs ?? Date.now(),
       };
       return {
         ...state,
         itemsByThread: {
           ...state.itemsByThread,
-          [action.threadId]: prepareThreadItems([...list, compactedMessage]),
+          [action.threadId]: prepareThreadItems([...list, compactedMarker]),
         },
       };
     }
@@ -3181,6 +3294,41 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         },
       };
     }
+    case "hydrateThreadHistorySnapshot": {
+      // F4（fix-session-switch-jank-red-lines）：hydrate 元数据合批。递归复用既有
+      // case 实现（构造上保证终态与逐个 dispatch bit 级一致），单次状态转移把
+      // hydrate 段的 5 个根级 dispatch 收敛为 1 个 commit。
+      let next = threadReducer(state, {
+        type: "ensureThread",
+        workspaceId: action.workspaceId,
+        threadId: action.threadId,
+        ...(action.engine ? { engine: action.engine } : {}),
+      });
+      next = threadReducer(next, {
+        type: "setThreadPlan",
+        threadId: action.threadId,
+        plan: action.plan ?? null,
+      });
+      next = threadReducer(next, {
+        type: "setThreadHistoryRestoredAt",
+        threadId: action.threadId,
+        timestamp: action.historyRestoredAtMs,
+      });
+      next = threadReducer(next, {
+        type: "setThreadHistoryWindow",
+        threadId: action.threadId,
+        hasMore: action.historyHasMore,
+        nextCursor: action.historyNextCursor,
+      });
+      if (action.tokenUsage) {
+        next = threadReducer(next, {
+          type: "setThreadTokenUsage",
+          threadId: action.threadId,
+          tokenUsage: action.tokenUsage,
+        });
+      }
+      return next;
+    }
     case "setThreadTokenUsage": {
       const existingStatus = withThreadStatusDefaults(
         state.threadStatusById[action.threadId],
@@ -3413,6 +3561,9 @@ function applyCompleteAgentMessageToState(
     text: string;
     hasCustomName: boolean;
     timestamp: number;
+    /** Native turn-target：仅 existing 缺失时落地（existing-first 不变式）。 */
+    executionTargetSnapshot?: ExecutionTargetSnapshot;
+    runtimeReceipt?: RuntimeModelReceipt;
   },
 ): { itemsByThread: ThreadState["itemsByThread"]; threadsByWorkspace: ThreadState["threadsByWorkspace"]; noop: boolean } {
   const segmentedItemId = resolveLiveAssistantMessageId(
@@ -3484,37 +3635,43 @@ function applyCompleteAgentMessageToState(
     const nextBase = keepFinalMetadata
       ? existingItem
       : clearAssistantFinalMetadata(existingItem);
-    computedCompletedItem = withAssistantTurnTokenCounts(
-      {
-        ...nextBase,
-        id: targetItemId,
-        text: mergeCompletedAgentText(
-          existingItem.text,
-          params.text,
-          true,
-        ),
-        isFinal: true,
-        finalCompletedAt: nextBase.finalCompletedAt ?? completedAt,
-        ...(typeof nextBase.finalDurationMs === "number"
-          ? { finalDurationMs: nextBase.finalDurationMs }
-          : derivedDuration !== null
-            ? { finalDurationMs: derivedDuration }
-            : {}),
-      },
-      state.tokenUsageByThread[params.threadId],
+    computedCompletedItem = withMissingTurnBadgeMetadata(
+      withAssistantTurnTokenCounts(
+        {
+          ...nextBase,
+          id: targetItemId,
+          text: mergeCompletedAgentText(
+            existingItem.text,
+            params.text,
+            true,
+          ),
+          isFinal: true,
+          finalCompletedAt: nextBase.finalCompletedAt ?? completedAt,
+          ...(typeof nextBase.finalDurationMs === "number"
+            ? { finalDurationMs: nextBase.finalDurationMs }
+            : derivedDuration !== null
+              ? { finalDurationMs: derivedDuration }
+              : {}),
+        },
+        state.tokenUsageByThread[params.threadId],
+      ),
+      params,
     );
   } else {
-    computedCompletedItem = withAssistantTurnTokenCounts(
-      {
-        id: targetItemId,
-        kind: "message",
-        role: "assistant",
-        text: params.text,
-        isFinal: true,
-        finalCompletedAt: completedAt,
-        ...(derivedDuration !== null ? { finalDurationMs: derivedDuration } : {}),
-      },
-      state.tokenUsageByThread[params.threadId],
+    computedCompletedItem = withMissingTurnBadgeMetadata(
+      withAssistantTurnTokenCounts(
+        {
+          id: targetItemId,
+          kind: "message",
+          role: "assistant",
+          text: params.text,
+          isFinal: true,
+          finalCompletedAt: completedAt,
+          ...(derivedDuration !== null ? { finalDurationMs: derivedDuration } : {}),
+        },
+        state.tokenUsageByThread[params.threadId],
+      ),
+      params,
     );
   }
   if (

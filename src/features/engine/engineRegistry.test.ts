@@ -26,6 +26,11 @@ describe("engineRegistry", () => {
       executionModel: "persistent",
       source: { kind: "builtin", trustOrigin: "mossx-host" },
     });
+    expect(getEngineRegistryEntry("pi")).toMatchObject({
+      // 主传输 = `pi --mode rpc` 长驻 resident；print-json 是降级路径。
+      protocolFamily: "pi-rpc",
+      executionModel: "persistent",
+    });
     expect(getEngineRegistryEntry("grok")).toMatchObject({
       protocolFamily: "stream-json-cli",
       executionModel: "one-shot",

@@ -16,6 +16,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import {
   appendRendererDiagnostic,
   flushRendererDiagnosticsBuffer,
+  installMainThreadStallWatchdog,
   startRendererBlankScreenWatchdog,
 } from "./services/rendererDiagnostics";
 import {
@@ -316,6 +317,7 @@ async function bootstrap() {
     </React.StrictMode>,
   );
   appendRendererDiagnostic("bootstrap/render-committed");
+  installMainThreadStallWatchdog(2_000);
   startRendererBlankScreenWatchdog({
     rootId: "root",
     // getBoundingClientRect + getComputedStyle force synchronous layout on

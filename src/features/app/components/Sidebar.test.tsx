@@ -45,12 +45,16 @@ function openWorkspaceActionsMenu(workspaceCard: HTMLElement) {
       within(workspaceCard).getByRole("button", { name: "New Session" }),
     );
   });
-  const menu = screen.getByRole("menu", { name: "Workspace actions" });
-  act(() => {
-    fireEvent.click(
-      within(menu).getByRole("button", { name: "Workspace actions" }),
-    );
+  const menu = screen.getByRole("menu", { name: /New Session/ });
+  const sectionToggle = within(menu).getByRole("button", {
+    name: "Workspace actions",
   });
+  // 三栏默认全部展开：仅在被本地折叠时才点开展开。
+  if (sectionToggle.getAttribute("aria-expanded") === "false") {
+    act(() => {
+      fireEvent.click(sectionToggle);
+    });
+  }
   return menu;
 }
 
@@ -366,78 +370,36 @@ describe("Sidebar", () => {
     ).toBeTruthy();
   });
 
-  it("pins up to two settings actions beside the gear and blocks a third pin", async () => {
-    const onOpenSpecHub = vi.fn();
-    const onOpenProjectMemory = vi.fn();
-    const { container } = render(
-      <Sidebar
-        {...baseProps}
-        onOpenSpecHub={onOpenSpecHub}
-        onOpenProjectMemory={onOpenProjectMemory}
-      />,
-    );
+  it("pins up to four settings actions, including network proxy, and blocks a fifth", async () => {
+    const { container } = render(<Sidebar {...baseProps} />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 
-    const settingsToggle = container.querySelector(
-      ".sidebar-primary-nav-item-bottom",
-    );
-    expect(settingsToggle).toBeTruthy();
-    await act(async () => {
-      fireEvent.click(settingsToggle as Element);
-    });
+    const dropdown = screen.getByRole("menu");
+    const getPinBoxes = () =>
+      within(dropdown).getAllByRole("checkbox", {
+        name: "Show next to settings",
+      });
 
-    const dropdown = container.querySelector(".sidebar-settings-dropdown");
-    expect(dropdown).toBeTruthy();
-    const pinBoxes = within(dropdown as HTMLElement).getAllByRole("checkbox", {
-      name: "Show next to settings",
-    });
-    // lock / spec hub / project memory / git graph（无 runtime notice）
-    expect(pinBoxes).toHaveLength(4);
+    // lock / spec hub / project memory / git graph / network proxy
+    expect(getPinBoxes()).toHaveLength(5);
+    expect(
+      within(dropdown).getByRole("menuitem", { name: "Network Proxy" }),
+    ).toBeTruthy();
 
-    await act(async () => {
-      fireEvent.click(pinBoxes[1]); // Spec Hub
-      fireEvent.click(pinBoxes[2]); // Project Memory
-    });
+    for (const pinBox of getPinBoxes().slice(0, 4)) {
+      await act(async () => {
+        fireEvent.click(pinBox);
+      });
+    }
 
+    const updatedPinBoxes =
+      within(dropdown).getAllByRole<HTMLInputElement>("checkbox");
+    expect(updatedPinBoxes.filter((pinBox) => pinBox.disabled)).toHaveLength(1);
+    expect(updatedPinBoxes[4]?.disabled).toBe(true);
     expect(
       container.querySelectorAll(".sidebar-settings-pinned-item"),
-    ).toHaveLength(2);
-
-    // 第三个未勾选的框应被禁用，并由 wrapper 提供 tip 文案
-    const disabledPins = within(dropdown as HTMLElement).getAllByRole(
-      "checkbox",
-      {
-        name: "You can pin up to 2 items. Uncheck one first.",
-      },
-    );
-    expect(disabledPins.length).toBeGreaterThanOrEqual(1);
-    expect((disabledPins[0] as HTMLInputElement).disabled).toBe(true);
-    expect(
-      (disabledPins[0] as HTMLInputElement).closest(
-        ".sidebar-settings-dropdown-pin-wrap.is-disabled",
-      ),
-    ).toBeTruthy();
-    expect(
-      (disabledPins[0] as HTMLInputElement)
-        .closest(".sidebar-settings-dropdown-pin-wrap")
-        ?.getAttribute("title"),
-    ).toBe("You can pin up to 2 items. Uncheck one first.");
-
-    // 设置项本身没有 pin 勾选框
-    const settingsItem = within(dropdown as HTMLElement).getByRole("menuitem", {
-      name: "Settings",
-    });
-    expect(
-      settingsItem.closest(".sidebar-settings-dropdown-option"),
-    ).toBeNull();
-
-    // 点击外显图标触发对应动作
-    const pinnedSpecHub = within(
-      container.querySelector(".sidebar-settings-pinned") as HTMLElement,
-    ).getByRole("button", { name: "Spec Hub" });
-    fireEvent.click(pinnedSpecHub);
-    expect(onOpenSpecHub).toHaveBeenCalledTimes(1);
+    ).toHaveLength(4);
   });
-
   it("marks the macOS sidebar titlebar placeholder as a drag region", () => {
     const { container } = render(<Sidebar {...baseProps} />);
 
@@ -618,6 +580,70 @@ describe("Sidebar", () => {
     fireEvent.click(gitGraphItem);
     expect(onAppModeChange).toHaveBeenCalledWith("gitHistory");
     expect(container.querySelector(".sidebar-settings-dropdown")).toBeNull();
+  });
+
+  it("opens a proxy drawer from settings with the default address and persists edits", async () => {
+    const onUpdateSystemProxy = vi.fn().mockResolvedValue(undefined);
+    render(
+      <Sidebar
+        {...baseProps}
+        systemProxyEnabled={false}
+        systemProxyUrl={null}
+        onUpdateSystemProxy={onUpdateSystemProxy}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Network Proxy" }));
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(
+      screen.getByRole("dialog", { name: "Network Proxy" }),
+    ).toBeTruthy();
+    expect(
+      (screen.getByLabelText("Proxy address") as HTMLInputElement).value,
+    ).toBe("http://127.0.0.1:7890");
+
+    fireEvent.click(screen.getByRole("switch", { name: "Enable proxy" }));
+    await waitFor(() => {
+      expect(onUpdateSystemProxy).toHaveBeenCalledWith({
+        systemProxyEnabled: true,
+        systemProxyUrl: "http://127.0.0.1:7890",
+      });
+    });
+
+    fireEvent.change(screen.getByLabelText("Proxy address"), {
+      target: { value: "socks5://127.0.0.1:1080" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save proxy settings" }),
+    );
+    await waitFor(() => {
+      expect(onUpdateSystemProxy).toHaveBeenLastCalledWith({
+        systemProxyEnabled: true,
+        systemProxyUrl: "socks5://127.0.0.1:1080",
+      });
+    });
+  });
+
+  it("toggles the proxy drawer closed when the pinned network proxy button is clicked again", async () => {
+    render(<Sidebar {...baseProps} />);
+
+    // 先把 Network Proxy 勾选外显为 pinned 按钮
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const dropdown = screen.getByRole("menu");
+    await act(async () => {
+      fireEvent.click(
+        within(dropdown)
+          .getAllByRole("checkbox", { name: "Show next to settings" })[4],
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Network Proxy" }));
+    expect(screen.getByRole("dialog", { name: "Network Proxy" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Network Proxy" }));
+    expect(screen.queryByRole("dialog", { name: "Network Proxy" })).toBeNull();
   });
 
   it("keeps Market disabled and opens Extensions as a separate mode", () => {
@@ -1335,6 +1361,80 @@ describe("Sidebar", () => {
     ).toBeNull();
   });
 
+  it("restores locally persisted section collapse across menu reopens", async () => {
+    const workspace = {
+      id: "ws-collapse-persist",
+      name: "service",
+      path: "/legacy/a/service",
+      connected: true,
+      kind: "main" as const,
+      settings: {
+        sidebarCollapsed: true,
+        worktreeSetupScript: null,
+      },
+    };
+
+    render(
+      <Sidebar
+        {...baseProps}
+        workspaces={[workspace]}
+        groupedWorkspaces={[
+          {
+            id: null,
+            name: "Ungrouped",
+            workspaces: [workspace],
+          },
+        ]}
+      />,
+    );
+
+    // 第一次打开：折叠「工作区操作」栏（单组 new-session 不再 collapsible）。
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "New Session" }));
+      await Promise.resolve();
+    });
+    const menu = screen.getByRole("menu", { name: /New Session/ });
+    // 标题点明所属工作区。
+    expect(
+      screen.getByRole("menu", { name: "New Session · service" }),
+    ).toBeTruthy();
+    // 测试环境有翻译：工作区操作栏标题为 stub 文案。
+    fireEvent.click(
+      within(menu).getByRole("button", {
+        name: "Workspace actions",
+      }),
+    );
+    const workspaceActionsBody = document.getElementById(
+      "sidebar-workspace-menu-group-workspace-actions",
+    );
+    expect(workspaceActionsBody?.hasAttribute("hidden")).toBe(true);
+
+    // 关闭弹窗（点击遮罩）。
+    const backdrop = document.querySelector(".sidebar-workspace-menu-backdrop");
+    expect(backdrop).toBeTruthy();
+    fireEvent.click(backdrop as Element);
+    expect(screen.queryByRole("menu", { name: "New Session" })).toBeNull();
+
+    // 重新打开：「工作区操作」应保持折叠。
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "New Session" }));
+      await Promise.resolve();
+    });
+    const reopened = screen.getByRole("menu", { name: /New Session/ });
+    expect(
+      within(reopened)
+        .getByRole("button", {
+          name: "Workspace actions",
+        })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(
+      document
+        .getElementById("sidebar-workspace-menu-group-workspace-actions")
+        ?.hasAttribute("hidden"),
+    ).toBe(true);
+  });
+
   it("triggers workspace alias prompt from the workspace menu", async () => {
     const workspace = {
       id: "ws-alias-menu",
@@ -1368,10 +1468,13 @@ describe("Sidebar", () => {
       fireEvent.click(screen.getByRole("button", { name: "New Session" }));
       await Promise.resolve();
     });
-    const menu = screen.getByRole("menu", { name: "Workspace actions" });
-    fireEvent.click(
-      within(menu).getByRole("button", { name: "Workspace actions" }),
-    );
+    const menu = screen.getByRole("menu", { name: /New Session/ });
+    const sectionToggle = within(menu).getByRole("button", {
+      name: "Workspace actions",
+    });
+    if (sectionToggle.getAttribute("aria-expanded") === "false") {
+      fireEvent.click(sectionToggle);
+    }
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Set alias" }));
 
     expect(onRenameWorkspaceAlias).toHaveBeenCalledTimes(1);
@@ -2598,7 +2701,10 @@ describe("Sidebar", () => {
         name: /Claude Code.*CLI not installed/,
       }),
     ).toBeNull();
-    const codexItem = screen.getByRole("menuitem", { name: /Codex/ });
+    // Shared / Native 拆组后 Codex 有两行；此处要 native 行（带供应商子菜单）。
+    const codexItem = screen
+      .getAllByRole("menuitem", { name: /Codex/ })
+      .find((item) => item.getAttribute("aria-haspopup") === "menu")!;
     fireEvent.mouseEnter(codexItem);
     await act(async () => {
       fireEvent.click(screen.getByRole("menuitemradio", { name: /本地配置/ }));
@@ -3246,7 +3352,10 @@ describe("Sidebar", () => {
     fireEvent.click(
       within(folderRow).getByRole("button", { name: "New session in project" }),
     );
-    const codexItem = screen.getByRole("menuitem", { name: "Codex" });
+    // Shared / Native 拆组后 Codex 有两行；此处要 native 行（带供应商子菜单）。
+    const codexItem = screen
+      .getAllByRole("menuitem", { name: "Codex" })
+      .find((item) => item.getAttribute("aria-haspopup") === "menu")!;
     fireEvent.mouseEnter(codexItem);
     await act(async () => {
       fireEvent.click(screen.getByRole("menuitemradio", { name: /本地配置/ }));
@@ -3385,14 +3494,21 @@ describe("Sidebar", () => {
     fireEvent.click(
       within(folderRow).getByRole("button", { name: "New session in project" }),
     );
+    // Shared CLI 回归首行二级菜单：点父行展开 flyout，再点其中的 Claude Code。
     await act(async () => {
+      const sessionGroupBody = document.getElementById(
+        "sidebar-workspace-menu-group-new-session",
+      );
       fireEvent.click(
-        screen.getByRole("menuitem", { name: "sidebar.newSharedSession" }),
+        within(sessionGroupBody!).getByRole("menuitem", {
+          name: /Shared CLI/,
+        }),
       );
     });
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("menuitemradio", { name: "Claude Code" }),
+        // 子行名带 badgeLabel（记住的供应商），用正则匹配引擎名。
+        screen.getByRole("menuitemradio", { name: /Claude Code/ }),
       );
     });
 

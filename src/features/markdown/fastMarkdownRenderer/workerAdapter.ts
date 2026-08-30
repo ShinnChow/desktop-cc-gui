@@ -6,7 +6,10 @@ import {
 import { createFastMarkdownCompileIdentity } from "./compileCore";
 import { workerDiagnostics } from "./workerAdapterDiagnostics";
 import { hashStableString } from "../../files/utils/fileMarkdownDocument";
-import { appendRendererDiagnostic } from "../../../services/rendererDiagnostics";
+import {
+  appendRendererDiagnostic,
+  buildDiagnosticSourceLocation,
+} from "../../../services/rendererDiagnostics";
 import type {
   CompileFastMarkdownArgs,
   FastMarkdownRenderResult,
@@ -228,6 +231,15 @@ function attachWorkerListeners(worker: Worker) {
 
 function handleWorkerMessage(event: MessageEvent<unknown>) {
   const message = event.data;
+  if (
+    isRecord(message) &&
+    (message as { type?: unknown }).type === "fast-markdown-worker-scope-error"
+  ) {
+    handleWorkerScopeError(
+      message as { detail?: Record<string, unknown> },
+    );
+    return;
+  }
   if (!isWorkerResponse(message)) {
     workerDiagnostics.recordUnknownResponse();
     const requestId =
@@ -295,10 +307,97 @@ export function classifyFastMarkdownWorkerRuntimeError(
 
 function handleWorkerError(event: ErrorEvent) {
   const message = event.message || "Fast Markdown worker failed";
-  disposeBrokenWorker(new Error(message));
+  const errorName =
+    event.error instanceof Error && event.error.name
+      ? event.error.name
+      : "Error";
+  // fix-diagnostics-forensics-hardening：抛错模块定位（basename），下一轮日志
+  // 直读「哪个模块哪一行」，不再依赖 console 完整文本。
+  const sourceLocation = buildDiagnosticSourceLocation(
+    event.filename,
+    event.lineno,
+    event.colno,
+  );
+  // F3（fix-session-switch-jank-red-lines）：error 事件≠worker 已死（引擎语义上未捕获
+  // 异常不终止 DedicatedWorker）。空闲期（无在途请求）错误先探活，存活则保留 worker，
+  // 避免「同一句错误 → 处决 → 重建 → 同一句错误」的重建循环（实测同指纹一天 4 次）。
+  // 在途期间错误无法归因来源，维持既有处决语义。
+  if (pendingRequests.size === 0 && sharedWorker && !healthProbeInFlight) {
+    void probeWorkerHealthAfterIdleError(errorName, message, sourceLocation);
+    return;
+  }
+  disposeBrokenWorker(new Error(message), errorName, sourceLocation);
 }
 
-function disposeBrokenWorker(error: Error) {
+const WORKER_HEALTH_PROBE_TIMEOUT_MS = 2_000;
+const WORKER_HEALTH_PROBE_ARGS = {
+  documentKey: "doc-health-probe",
+  rawMarkdown: "# probe",
+  rendererProfile: "fast-html" as const,
+  featureFlags: {
+    fastHtmlRendererEnabled: true,
+    boundedFastHtmlRendererEnabled: false,
+  },
+};
+let healthProbeInFlight = false;
+
+async function probeWorkerHealthAfterIdleError(
+  errorName: string,
+  message: string,
+  sourceLocation?: ReturnType<typeof buildDiagnosticSourceLocation>,
+): Promise<void> {
+  const workerAtProbeStart = sharedWorker;
+  if (!workerAtProbeStart) {
+    return;
+  }
+  healthProbeInFlight = true;
+  try {
+    await precomputeFastMarkdownInWorker(WORKER_HEALTH_PROBE_ARGS, {
+      timeoutMs: WORKER_HEALTH_PROBE_TIMEOUT_MS,
+    });
+  } catch {
+    // 探活失败/超时：worker 真不可用，走既有 dispose + 退避。
+    healthProbeInFlight = false;
+    if (sharedWorker === workerAtProbeStart) {
+      disposeBrokenWorker(
+        new Error(message || "Fast Markdown worker health probe failed"),
+        errorName,
+        sourceLocation,
+      );
+    }
+    return;
+  }
+  healthProbeInFlight = false;
+  if (sharedWorker !== workerAtProbeStart) {
+    return;
+  }
+  // 探活成功：worker 存活，保留服务；成功响应已顺带清零崩溃计数。
+  workerDiagnostics.recordFallback("worker-error-kept-alive");
+  persistWorkerFailureDiagnostic(
+    "worker-error-kept-alive",
+    classifyFastMarkdownWorkerRuntimeError(message),
+    buildWorkerErrorFingerprint(errorName, message, sourceLocation),
+  );
+}
+
+function buildWorkerErrorFingerprint(
+  errorName: string,
+  message: string,
+  sourceLocation?: ReturnType<typeof buildDiagnosticSourceLocation>,
+) {
+  return {
+    errorName,
+    messageHash: hashStableString(message).slice(0, 16),
+    messageLength: message.length,
+    ...(sourceLocation ?? {}),
+  };
+}
+
+function disposeBrokenWorker(
+  error: Error,
+  errorName?: string,
+  sourceLocation?: ReturnType<typeof buildDiagnosticSourceLocation>,
+) {
   if (sharedWorker) {
     sharedWorker.terminate();
   }
@@ -321,9 +420,37 @@ function disposeBrokenWorker(error: Error) {
   persistWorkerFailureDiagnostic(
     "worker-runtime-error",
     classifyFastMarkdownWorkerRuntimeError(message),
+    buildWorkerErrorFingerprint(errorName ?? "Error", message, sourceLocation),
+  );
+}
+
+function handleWorkerScopeError(message: { detail?: Record<string, unknown> }) {
+  // F6：作用域错误详情指纹落盘；全文进 console。worker 存活，不 dispose。
+  const detail = message.detail ?? {};
+  const text = typeof detail.message === "string" ? detail.message : "";
+  const sourceLocation = buildDiagnosticSourceLocation(
+    typeof detail.filename === "string" ? detail.filename : null,
+    typeof detail.lineno === "number" ? detail.lineno : null,
+    typeof detail.colno === "number" ? detail.colno : null,
+  );
+  const stack = typeof detail.stack === "string" ? detail.stack : null;
+  if (typeof console !== "undefined") {
+    console.warn(
+      "[fast-markdown-worker] scope error captured (worker kept alive):",
+      detail,
+    );
+  }
+  persistWorkerFailureDiagnostic(
+    "worker-scope-error",
+    classifyFastMarkdownWorkerRuntimeError(text),
     {
-      messageHash: hashStableString(message).slice(0, 16),
-      messageLength: message.length,
+      errorName:
+        typeof detail.errorName === "string" ? detail.errorName : "Error",
+      messageHash: hashStableString(text).slice(0, 16),
+      messageLength: text.length,
+      stackHash: stack ? hashStableString(stack).slice(0, 16) : null,
+      stackLength: stack ? stack.length : 0,
+      ...sourceLocation,
     },
   );
 }
@@ -487,7 +614,16 @@ function throwIfWorkerRequestIsStale(
 function persistWorkerFailureDiagnostic(
   reasonCode: string,
   errorClass?: string,
-  fingerprint?: { messageHash: string; messageLength: number },
+  fingerprint?: {
+    errorName?: string;
+    messageHash: string;
+    messageLength: number;
+    stackHash?: string | null;
+    stackLength?: number;
+    sourceModule?: string | null;
+    sourceLine?: number | null;
+    sourceCol?: number | null;
+  },
 ) {
   const now = Date.now();
   const previousAt = persistedWorkerFailureAtByReason.get(reasonCode);

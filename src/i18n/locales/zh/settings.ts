@@ -1766,7 +1766,6 @@ const settings = {
       searchPlaceholder: "筛选供应商…",
       configured: "已配置",
       notConfigured: "未配置",
-      envActive: "环境变量生效",
       customTitle: "自定义供应商",
       customHint: "写入 ~/.pi/agent/models.json · 中转站 / 自定义模型",
       editConfig: "编辑配置",

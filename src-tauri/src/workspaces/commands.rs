@@ -46,7 +46,7 @@ use crate::backend::app_server::WorkspaceSession;
 use crate::codex::args::resolve_workspace_codex_args;
 use crate::codex::home::{resolve_default_codex_home, resolve_workspace_codex_home};
 use crate::codex::spawn_workspace_session;
-use crate::engine::{resolve_engine_type, EngineType};
+use crate::engine::{detection_disabled_engines, resolve_engine_type, EngineType};
 use crate::git_utils::resolve_git_root;
 use crate::remote_backend;
 use crate::shared::settings_core::{take_workspaces_recovery_notice_core, WorkspacesRecoveryNotice};
@@ -1278,13 +1278,20 @@ pub(crate) async fn add_workspace(
     }
 
     // Detect which engine to use based on settings and installed CLIs
-    let (app_default_engine, claude_bin_setting, codex_bin_setting, qoder_bin_setting) = {
+    let (
+        app_default_engine,
+        claude_bin_setting,
+        codex_bin_setting,
+        qoder_bin_setting,
+        disabled_engines,
+    ) = {
         let settings = state.app_settings.lock().await;
         (
             settings.default_engine.clone(),
             settings.claude_bin.clone(),
             settings.codex_bin.clone(),
             settings.qoder_bin.clone(),
+            detection_disabled_engines(&settings),
         )
     };
 
@@ -1299,6 +1306,7 @@ pub(crate) async fn add_workspace(
         None,
         None,
         qoder_bin_setting.as_deref(),
+        &disabled_engines,
     )
     .await;
 

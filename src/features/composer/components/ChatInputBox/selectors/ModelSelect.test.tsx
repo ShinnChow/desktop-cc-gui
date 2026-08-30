@@ -5,15 +5,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildProviderExecutionTarget,
-  isAtomicEmptyModelSelection,
-  isSameProviderExecutionProfile,
-  ModelSelect,
   normalizeExecutionProviderProfileId,
   resolveActiveProviderProfileId,
+} from "./model-select/executionTarget";
+import {
+  isAtomicEmptyModelSelection,
   resolveAtomicSelectedModelDisplay,
   resolveClaudeCatalogModelLabel,
-  resolveModelIdForIcon,
-} from "./ModelSelect";
+} from "./model-select/display";
+import { resolveModelIdForIcon } from "./model-select/icon";
+import { isSameProviderExecutionProfile } from "./model-select/executionTarget";
+import { ModelSelect } from "./ModelSelect";
 import { STORAGE_KEYS } from "../../../types/provider";
 import type { ExecutionTarget } from "../../../../shared-session/target/types";
 import type { ProviderTargetGroup } from "../hooks/useProviderTargetCatalogOwners";
@@ -3505,6 +3507,170 @@ describe("fallback-only legacy catalog auto recovery", () => {
 
     await user.click(
       screen.getByRole("button", { name: "chat.currentModel:auto" }),
+    );
+    await screen.findByRole("menu");
+
+    expect(onRefreshConfig).not.toHaveBeenCalled();
+  });
+});
+
+describe("capability-degraded pi catalog auto recovery", () => {
+  const buildPiListModelsRow = (id: string) => ({
+    id,
+    label: id,
+    source: "detected",
+    provenance: "cli:pi-list-models",
+  });
+
+  it("auto-triggers one refresh when the opened pi group came from --list-models", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const onRefreshConfig = vi.fn();
+    const degradedModels = [
+      buildPiListModelsRow("ark/deepseek-v4-pro-0813"),
+      buildPiListModelsRow("ark/kimi-k3"),
+    ];
+
+    render(
+      <ModelSelect
+        value="ark/deepseek-v4-pro-0813"
+        currentProvider="pi"
+        providerLabel="PI CLI"
+        triggerVariant="readiness"
+        onChange={vi.fn()}
+        models={degradedModels}
+        modelGroups={[
+          {
+            providerId: "pi" as const,
+            providerLabel: "PI CLI",
+            enabled: true,
+            models: degradedModels,
+          },
+        ]}
+        onRefreshConfig={onRefreshConfig}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "chat.currentModel:ark / deepseek-v4-pro-0813",
+      }),
+    );
+    await screen.findByRole("menu");
+
+    expect(onRefreshConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not auto-refresh when the pi group came from the rpc snapshot", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const onRefreshConfig = vi.fn();
+    // models.json 无 thinkingLevelMap 的合法五档投影同样是 RPC 快照来源，
+    // 不允许对这类用户每次打开菜单都重探。
+    const rpcModels = [
+      {
+        id: "my-relay/grok-4.6",
+        label: "grok-4.6",
+        source: "detected",
+        provenance: "cli:pi-available-models",
+      },
+    ];
+
+    render(
+      <ModelSelect
+        value="my-relay/grok-4.6"
+        currentProvider="pi"
+        providerLabel="PI CLI"
+        triggerVariant="readiness"
+        onChange={vi.fn()}
+        models={rpcModels}
+        modelGroups={[
+          {
+            providerId: "pi" as const,
+            providerLabel: "PI CLI",
+            enabled: true,
+            models: rpcModels,
+          },
+        ]}
+        onRefreshConfig={onRefreshConfig}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "chat.currentModel:my-relay / grok-4.6",
+      }),
+    );
+    await screen.findByRole("menu");
+
+    expect(onRefreshConfig).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-refresh when provenance is mixed or missing", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const onRefreshConfig = vi.fn();
+    const mixedModels = [
+      buildPiListModelsRow("ark/deepseek-v4-pro-0813"),
+      { id: "custom/model-x", label: "model-x", source: "detected" },
+    ];
+
+    render(
+      <ModelSelect
+        value="ark/deepseek-v4-pro-0813"
+        currentProvider="pi"
+        providerLabel="PI CLI"
+        triggerVariant="readiness"
+        onChange={vi.fn()}
+        models={mixedModels}
+        modelGroups={[
+          {
+            providerId: "pi" as const,
+            providerLabel: "PI CLI",
+            enabled: true,
+            models: mixedModels,
+          },
+        ]}
+        onRefreshConfig={onRefreshConfig}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "chat.currentModel:ark / deepseek-v4-pro-0813",
+      }),
+    );
+    await screen.findByRole("menu");
+
+    expect(onRefreshConfig).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-refresh for non-pi engines with detected provenance rows", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const onRefreshConfig = vi.fn();
+    const kimiModels = [
+      buildPiListModelsRow("kimi-coding/k3"),
+    ];
+
+    render(
+      <ModelSelect
+        value="kimi-coding/k3"
+        currentProvider="kimi"
+        providerLabel="Kimi CLI"
+        triggerVariant="readiness"
+        onChange={vi.fn()}
+        models={kimiModels}
+        modelGroups={[
+          {
+            providerId: "kimi" as const,
+            providerLabel: "Kimi CLI",
+            enabled: true,
+            models: kimiModels,
+          },
+        ]}
+        onRefreshConfig={onRefreshConfig}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "chat.currentModel:kimi-coding/k3" }),
     );
     await screen.findByRole("menu");
 

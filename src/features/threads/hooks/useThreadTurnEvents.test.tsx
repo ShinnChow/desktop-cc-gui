@@ -23,6 +23,12 @@ import {
   getLiveAssistantTextSnapshot,
   resetLiveAssistantTextChannelForTests,
 } from "../utils/liveAssistantTextChannel";
+import {
+  getRuntimeReceipt,
+  rememberRuntimeReceipt,
+  resetRuntimeReceiptsForTests,
+} from "../utils/runtimeModelReceipt";
+import { renameTurnTargetBadgeThread } from "../utils/turnTargetBadgeStorage";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
 import {
   clearSharedSessionBindingsForSharedThread,
@@ -31,6 +37,11 @@ import {
 import { initialState, threadReducer } from "./useThreadsReducer";
 import type { ThreadAction, ThreadState } from "./useThreadsReducer";
 import { workspaceScopedHas } from "./workspaceScopedMap";
+
+vi.mock("../utils/turnTargetBadgeStorage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../utils/turnTargetBadgeStorage")>()),
+  renameTurnTargetBadgeThread: vi.fn(),
+}));
 
 vi.mock("../../../services/tauri", () => ({
   engineInterrupt: vi.fn(),
@@ -63,6 +74,10 @@ type SetupOverrides = {
   onDebug?: ReturnType<typeof vi.fn>;
   activeWorkspaceId?: string;
   establishedThreadIds?: string[];
+  isTurnInFlightForThread?: (
+    threadId: string,
+    turnId: string | null | undefined,
+  ) => boolean;
 };
 
 const makeOptions = (overrides: SetupOverrides = {}) => {
@@ -95,6 +110,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
   const hasEstablishedThreadItems = vi.fn((threadId: string) =>
     establishedThreadIds.includes(threadId),
   );
+  const isTurnInFlightForThread = overrides.isTurnInFlightForThread;
   const renamePendingMemoryCaptureKey = vi.fn();
   // chat-stream-render-isolation-2026-06 task 8: workspace-scope ref
   // shape migrated from Set<threadId> to Map<workspaceId, Map<threadId, true>>.
@@ -144,6 +160,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
       resolvePendingThreadForSession,
       resolvePendingThreadForTurn,
       getActiveTurnIdForThread,
+      isTurnInFlightForThread,
       getThreadProviderProfileId,
       hasEstablishedThreadItems,
       renamePendingMemoryCaptureKey,
@@ -170,6 +187,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
     resolvePendingThreadForSession,
     resolvePendingThreadForTurn,
     getActiveTurnIdForThread,
+    isTurnInFlightForThread,
     getThreadProviderProfileId,
     hasEstablishedThreadItems,
     renamePendingMemoryCaptureKey,
@@ -185,6 +203,7 @@ describe("useThreadTurnEvents", () => {
     clearGlobalRuntimeNotices();
     resetCodexPendingPrewarmForTests();
     resetLiveAssistantTextChannelForTests();
+    resetRuntimeReceiptsForTests();
     vi.mocked(engineInterrupt).mockResolvedValue();
     vi.mocked(engineInterruptTurn).mockResolvedValue();
   });
@@ -705,6 +724,54 @@ describe("useThreadTurnEvents", () => {
     expect(interruptTurn).not.toHaveBeenCalled();
   });
 
+  it("settles an interleaved in-flight turn even when another turn is active", () => {
+    // pi 多原生 turn / 双 send 交错：A 的 turn 未结算时 B 的 turn 已接管
+    // activeTurnId。A 的完成稿属于在途集合 ⇒ 必须结算，否则 A 的状态
+    // 永久残留「响应中」（2026-08-30 响应中卡死实证）。
+    const inFlight = new Set(["turn-a", "turn-b"]);
+    const isTurnInFlightForThread = vi.fn(
+      (_threadId: string, turnId: string | null | undefined) =>
+        turnId ? inFlight.has(turnId) : false,
+    );
+    const { result, markProcessing, setActiveTurnId, dispatch } = makeOptions({
+      activeTurnIdByThread: { "pi:s1": "turn-b" },
+      isTurnInFlightForThread,
+    });
+
+    act(() => {
+      result.current.onTurnCompleted("ws-1", "pi:s1", "turn-a");
+    });
+
+    expect(markProcessing).toHaveBeenCalledWith("pi:s1", false);
+    expect(setActiveTurnId).toHaveBeenCalledWith("pi:s1", null);
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "finalizePendingToolStatuses",
+      threadId: "pi:s1",
+      status: "completed",
+    });
+  });
+
+  it("still rejects turn-completed for turns that are neither active nor in flight", () => {
+    // 防过度放松：旧 turn 的迟到完成稿不在在途集合内 ⇒ 维持原拒绝语义，
+    // 不复燃已结算线程。
+    const inFlight = new Set<string>(["turn-b"]);
+    const isTurnInFlightForThread = vi.fn(
+      (_threadId: string, turnId: string | null | undefined) =>
+        turnId ? inFlight.has(turnId) : false,
+    );
+    const { result, markProcessing, setActiveTurnId } = makeOptions({
+      activeTurnIdByThread: { "pi:s1": "turn-b" },
+      isTurnInFlightForThread,
+    });
+
+    act(() => {
+      result.current.onTurnCompleted("ws-1", "pi:s1", "turn-stale");
+    });
+
+    expect(markProcessing).not.toHaveBeenCalledWith("pi:s1", false);
+    expect(setActiveTurnId).not.toHaveBeenCalled();
+  });
+
   it("clears pending interrupt and active turn on turn completed", () => {
     const {
       result,
@@ -1144,6 +1211,39 @@ describe("useThreadTurnEvents", () => {
       "claude-pending-abc",
       "claude:session-xyz",
     );
+    // 持久化 badge 侧车必须随改名迁移，否则历史冷加载读不到首轮 badge。
+    expect(renameTurnTargetBadgeThread).toHaveBeenCalledWith(
+      "claude-pending-abc",
+      "claude:session-xyz",
+    );
+  });
+
+  it("migrates the runtime receipt when pi pending thread gets real session id", () => {
+    // 发送边界在 pending id 下记 send.request 回执（pi 事件流无 model，这是
+    // 实时 Ⓡ 尾巴的唯一来源）；改名后入列咽喉按正式 id 取 ingest meta，
+    // 回执不随迁 = 实时丢尾巴、历史冷加载反而有。
+    rememberRuntimeReceipt("ws-1", "pi-pending-abc", {
+      model: "minimax-cn/MiniMax-M2.7-highspeed",
+      modelSource: "send.request",
+    });
+    const { result } = makeOptions();
+
+    act(() => {
+      result.current.onThreadSessionIdUpdated(
+        "ws-1",
+        "pi-pending-abc",
+        "session-xyz",
+      );
+    });
+
+    expect(
+      getRuntimeReceipt("ws-1", "pi:session-xyz")?.model,
+    ).toBe("minimax-cn/MiniMax-M2.7-highspeed");
+    expect(getRuntimeReceipt("ws-1", "pi:session-xyz")?.modelSource).toBe(
+      "send.request",
+    );
+    // 旧 key 不残留，避免同名 pending id 复用陈旧回执。
+    expect(getRuntimeReceipt("ws-1", "pi-pending-abc")).toBeNull();
   });
 
   it("renames local mappings when dsh pending thread gets real session id", () => {
@@ -2413,6 +2513,10 @@ describe("useThreadTurnEvents", () => {
       type: "appendContextCompacted",
       threadId: "thread-1",
       turnId: "turn-9",
+      reason: null,
+      tokensBefore: null,
+      estimatedTokensAfter: null,
+      timestampMs: expect.any(Number),
     });
     expect(recordThreadActivity).toHaveBeenCalledWith("ws-1", "thread-1", 2222);
     expect(safeMessageActivity).toHaveBeenCalled();
@@ -2629,6 +2733,10 @@ describe("useThreadTurnEvents", () => {
       type: "appendContextCompacted",
       threadId: "thread-1",
       turnId: "auto-3333",
+      reason: null,
+      tokensBefore: null,
+      estimatedTokensAfter: null,
+      timestampMs: expect.any(Number),
     });
 
     nowSpy.mockRestore();
@@ -2667,7 +2775,6 @@ describe("useThreadTurnEvents", () => {
         manual: false,
       });
     });
-
     expect(dispatch).toHaveBeenCalledWith({
       type: "markContextCompacting",
       threadId: "thread-1",
@@ -2685,6 +2792,42 @@ describe("useThreadTurnEvents", () => {
     });
     expect(dispatch).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: "appendContextCompacted" }),
+    );
+  });
+
+  it("treats flagless compaction payload as non-codex-settle even on a codex thread", () => {
+    // dispatch 层为透传 pi reason/token 恒传 payload 对象；codex 原生
+    // thread/compacted notification 不带 auto/manual flags。引擎判定必须
+    // 恢复「flags 存在才按引擎判定」的旧语义（Boolean(payload) ≡ flags），
+    // 否则意外的 completed fallback 留痕会被补挂（appendIfAlreadyCompleted
+    // 放宽）。见 fix-context-compacted-marker-turn-finality 追加轮。
+    const { result, dispatch } = makeOptions();
+
+    act(() => {
+      result.current.onContextCompacted("ws-1", "thread-1", "turn-flagless", {
+        reason: null,
+        tokensBefore: null,
+        estimatedTokensAfter: null,
+      });
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "appendContextCompacted",
+      threadId: "thread-1",
+      turnId: "turn-flagless",
+      reason: null,
+      tokensBefore: null,
+      estimatedTokensAfter: null,
+      timestampMs: expect.any(Number),
+    });
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "settleCodexCompactionMessage" }),
+    );
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "markContextCompacting",
+        completionStatus: "completed",
+      }),
     );
   });
 

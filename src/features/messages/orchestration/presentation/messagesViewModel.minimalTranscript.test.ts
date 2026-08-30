@@ -39,6 +39,21 @@ function ids(result: { timelineItems: ConversationItem[] }): string[] {
   return result.timelineItems.map((item) => item.id);
 }
 
+function contextEvent(
+  turnId: string,
+): ConversationItem {
+  return {
+    id: `context-compacted-${turnId}`,
+    kind: "context-event",
+    eventType: "compacted",
+    reason: "threshold",
+    tokensBefore: 236_505,
+    estimatedTokensAfter: 41_200,
+    turnId,
+    timestampMs: 1_000,
+  };
+}
+
 describe("resolveCollapsedTimelineItems minimal transcript mode", () => {
   it("keeps interstitial prose visible when the flag is off (default isolation)", () => {
     const items = [
@@ -96,6 +111,69 @@ describe("resolveCollapsedTimelineItems minimal transcript mode", () => {
         proseCount: 1,
       },
     });
+  });
+
+  it("never anchors the turn chip on a compaction marker and keeps the marker visible", () => {
+    // 回归（2026-08-27 用户反馈）：pi compaction_end 先于 settle 入库留痕，
+    // 若留痕参与 prose 竞选，真实回答会被折进 chip、幕布只剩留痕。
+    const items = [
+      user("u1"),
+      tool("t1", "completed", 1_000),
+      assistant("a1", "真实回答", true),
+      contextEvent("turn-1"),
+      user("u2"),
+      assistant("a2", "第二轮回答", true),
+    ];
+    const result = resolveCollapsedTimelineItems({
+      activeEngine: "pi",
+      minimalTranscriptEnabled: true,
+      timelineSourceItems: items,
+    });
+
+    // 锚点必须是真实回答 a1；留痕按时间线原位保持可见（a1 之后）且不折进 chip。
+    expect(ids(result)).toEqual([
+      "u1",
+      "a1",
+      "context-compacted-turn-1",
+      "u2",
+      "a2",
+    ]);
+    const turnPhase = result.phases.find(
+      (phase) => phase.phaseKey === "turn:a1",
+    );
+    expect(turnPhase).toBeDefined();
+    expect(turnPhase?.assistantItemId).toBe("a1");
+    expect(turnPhase?.hiddenItemIds).toEqual(["t1"]);
+  });
+
+  it("anchors on the last visible assistant prose when no prose is final and a marker trails", () => {
+    const items = [
+      user("u1"),
+      assistant("a1", "中间叙述"),
+      assistant("a2", "最终回答"),
+      contextEvent("turn-1"),
+      user("u2"),
+      assistant("a3", "第二轮回答", true),
+    ];
+    const result = resolveCollapsedTimelineItems({
+      activeEngine: "pi",
+      minimalTranscriptEnabled: true,
+      timelineSourceItems: items,
+    });
+
+    expect(ids(result)).toEqual([
+      "u1",
+      "a2",
+      "context-compacted-turn-1",
+      "u2",
+      "a3",
+    ]);
+    const turnPhase = result.phases.find(
+      (phase) => phase.phaseKey === "turn:a2",
+    );
+    expect(turnPhase).toBeDefined();
+    expect(turnPhase?.assistantItemId).toBe("a2");
+    expect(turnPhase?.hiddenItemIds).toEqual(["a1"]);
   });
 
   it("renders an expanded turn chip with default-mode per-phase folding", () => {

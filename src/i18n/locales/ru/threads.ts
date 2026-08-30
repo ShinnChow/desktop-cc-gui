@@ -10,6 +10,7 @@ const threads = {
     "runtimeProcessing": "Выполняется",
     "runtimeReviewing": "Проверка",
     "runtimeCompleted": "Завершено",
+    "runtimeBackgroundTasks": "Фоновые задачи выполняются",
     "archive": "Архивировать",
     "delete": "Удалить",
     "openSessionManagement": "Массовое удаление в Управлении сеансами…",

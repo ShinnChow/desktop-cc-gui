@@ -2,6 +2,78 @@
 
 ---
 
+### **2026年8月30日（v0.9.4）**
+
+中文：
+
+这一版升到 **0.9.4**，主线是 **PI 响应提速、引擎检测重做、后台任务全程有迹可循，外加一轮切会话卡顿与跨引擎污染的集中收口**。PI 首条消息的等待明显缩短：会话激活时自动预热常驻进程（冷启约 2.5s 移出发送关键路径）、新会话首条短消息自动降思考档（省约 11s 静默）、静默期出现「等待首段文本」专属文案与 12 秒安抚提示，等待不再像卡死。引擎检测流水线整体重构：检测结果带 TTL 缓存与 last-good 落盘、逐引擎推送让菜单逐项亮起不再全量等待、检测失败有明确失败态与 25 秒守卫（根除永久「检测中」）、登录态两段式返回不再被 spawn 探测阻塞；环境解析每进程至多一次，检测开销大幅下降。后台任务第一次全程可见：会话行新增第四态呼吸灯与终态未读徽标，切走会话后终态仍全路径回写时间线卡片，卡片直读权威快照可自愈。切会话做了一轮系统提速：会话历史加载改内存索引 + raw-string 通道消除对象图过桥冻结、元数据合批、写盘旁路，切会话计时证据落盘可查。同时收口了一批跨引擎污染问题：切会话清模型锁、draft carry 引擎门禁、Home 点选引擎盲区封死，不同引擎的会话不再互相串台。
+
+✨ Features
+
+- **PI 首包提速三件套**：会话激活时自动预热常驻进程，冷启动约 2.5 秒移出发送关键路径；新会话首条短消息思考档自动降为 low，省去约 11 秒思考静默且不覆盖你手动设的档位；PI 静默期显示「等待首段文本」专属文案，超过 12 秒给出安抚提示，等待过程不再像卡死
+- **引擎检测流水线重做**：检测结果带 TTL 缓存、per-engine 强制刷新与 last-good 落盘（SWR）；逐引擎推送检测结果，引擎菜单逐项亮起，不再全量等待；检测失败有明确失败态、25 秒守卫与跨模块单飞保护，永久「检测中」被根除；登录态两段式返回，detect 不再等 spawn 探测，异步补推 requires-login；模型下拉与新会话菜单可用性同源，状态翻转统一失效
+- **后台任务会话行第四态**：会话行右侧 meta 区新增后台任务呼吸灯与终态未读徽标，并行双会话、重启终止等场景的计数与收口语义全部明确；改名会话时任务计数与任务表随迁，不再挂旧 id
+- **native 会话 turn-target 显示条**：native 会话幕布接入 turn-target 显示条与运行回执，回合归属一目了然
+- **可点控件悬停提示补全快捷键**：按钮悬停 tooltip 现在展示对应快捷键
+
+🔧 Improvements
+
+- 版本号统一升到 `0.9.4`，打包元数据同步对齐
+- **切会话系统提速**：会话历史加载改内存索引 + raw-string 通道，消除加载固定成本与对象图过桥冻结；会话 hydrate 元数据合批，切会话写盘旁路（sidebarSnapshot 签名跳过、radar 去 immediate、肥 key 治理）；threads 全量 map 收窄进 threadDataContext 并落可执行 gate
+- **引擎检测开销大降**：环境解析进程级缓存（npm prefix / login shell 每进程至多 1 次）；detect 与模型目录解耦、启用范围过滤、per-engine 隔离
+- **诊断取证增强**：崩溃取证结构化（errorName / 文本指纹 / 组件帧安全命名落盘）；worst-K 掉帧持久环、切会话分段计时（loadMs / assembleMs）与 hotspot 周期汇总；markdown worker error 先探活再处决
+- **PI 对齐 0.84.3**：auth catalog 对齐 pi 0.84.3 并补录 moonshotai 双区 provider；capability_state 五键委托 spec-generated，消灭双源口径漂移；PI registry 元数据对齐 RPC 长驻真实传输（pi-rpc/persistent）
+- **Composer selector 层重构**：删除零引用的 ProviderSelect / ShortcutActionsSelect 死代码，抽取 SelectorOptionRow 选项行原语替换六处手写渲染，ModelSelect 纯函数与 channel picker 拆分
+- **PI 幕布静默丢失链封死**：PI 会话幕布三类静默丢失链全部封堵，load 失败可重试、可观测
+
+🐛 Fixes
+
+- **压缩留痕劫持回合终态**：压缩留痕改产 context-event，不再劫持回合终态锚点；compaction_end 映射透传 reason / token 元数据不伪造 manual；codex 原生 compacted 不再被误补 fallback
+- **后台任务卡片永停「运行中」**：post-settle 终态更新绕过回合终态守卫、卡片改直读 store 权威快照自愈翻终态、registry watcher 上收 app 级枚举，切走会话后终态仍全路径回写
+- **跨引擎模型串台**：切线程清理用户模型锁杜绝残留压制选择收敛；draft carry 增加引擎门禁与 catalog 成员资格闸，封死 Home 点选引擎盲区污染；pi catalog default 改读 settings 真默认，无账本会话切入不再误绑 anthropic 模型
+- **claude-fork 会话删除复活**：删除的会话不再因持久快照回灌而复活
+- **会话列表扫描卡死**：codex 列表扫描加内层 32 秒截止，超时后线程真正停止读盘；focus-refresh 与 first-paint 冷启动不再伪造引擎超时与全表误标 degraded；full-catalog 自动重扫连续超时改指数退避
+- **Claude 会话标题误剔**：会话索引标题先还原 slash-command prompt 再截断，信封前缀超长不再整条误剔，正文引用 command 标签片段不再被误提取
+- **PI 思考 / 工具行粘连等待文案**：思考 / 工具行渲染即清「等待首段文本」，流已到标签不再粘连
+- **PI list-models 降级自愈**：降级思考目录在打开模型菜单时自动重探恢复
+- **引擎切换后思考档 / 模型缺失**：引擎切换后显式加载目标引擎目录；解耦引擎响应式目录表 + 后台预热补全非激活态目录消费漏点；authState 到达引发的 INVALIDATED 风暴收敛为 installed 翻转独占
+- **P0 模型错乱回退**：撤销解耦引擎轻量分支的静态快照回填，根因修复
+
+English：
+
+This release moves to **0.9.4**, headlined by **a faster PI first response, a rebuilt engine-detection pipeline, end-to-end background-task visibility, and a sweep of session-switch jank and cross-engine contamination fixes**. PI's wait for the first token is much shorter: sessions prewarm the resident process on activation (about 2.5s of cold-start cost leaves the send path), the first short message of a new session automatically drops to low thinking effort (saving ~11s of silence without overriding your manual setting), and a dedicated "waiting for first text" message with a 12-second reassurance hint makes the wait no longer feel frozen. Engine detection is rebuilt wholesale: TTL-cached results with last-good persistence, per-engine push so menu entries light up one by one instead of waiting for everything, explicit failure states with a 25s guard (permanent "detecting" is gone), and two-phase login status that no longer blocks on spawn probes. Background tasks are visible end-to-end: a fourth-state breathing light and terminal unread badge on session rows, final-state writeback across every path after switching away, and cards that read the authoritative store snapshot to self-heal. Session switching got a systematic speed-up — in-memory history indexing plus a raw-string channel eliminating object-graph bridge freezes, batched metadata, and a disk-write bypass, with switch timing evidence persisted for inspection. A batch of cross-engine contamination issues is also closed: model locks cleared on thread switch, draft-carry engine gates, and the Home-entry blind spot sealed, so sessions from different engines no longer bleed into each other.
+
+✨ Features
+
+- **PI first-packet speed-up trio**: sessions prewarm the resident process on activation, moving ~2.5s of cold-start cost off the send path; the first short message of a new session auto-drops thinking effort to low, saving ~11s of silent thinking without overriding your chosen level; a dedicated "waiting for first text" message appears during PI's silent window with a reassurance hint after 12 seconds
+- **Engine detection pipeline rebuilt**: detection results carry TTL caching, per-engine force refresh, and last-good persistence (SWR); results push per engine so menu entries reveal one by one instead of blocking on the full sweep; explicit failure states, a 25-second guard, and cross-module single-flight protection eliminate the permanent "detecting" state; login status returns in two phases — detect no longer waits on spawn probes and pushes requires-login asynchronously; the model dropdown and new-session menu now share one availability source with unified invalidation
+- **Fourth-state background-task indicator on session rows**: the session row's right-side meta area gains a breathing light for running background tasks and an unread badge on terminal states, with settled semantics for parallel sessions and restarts; renaming a session migrates task counts and the task table instead of leaking the old id
+- **Turn-target display bar for native sessions**: native session canvases show the turn-target bar and run receipts
+- **Shortcut hints in hover tooltips**: button tooltips now display their keyboard shortcuts
+
+🔧 Improvements
+
+- Bump the app version to `0.9.4`, aligning bundle metadata
+- **Systematic session-switch speed-up**: history loading switches to an in-memory index plus a raw-string channel, eliminating fixed load costs and object-graph bridge freezes; hydrate metadata batching; disk-write bypass on switch (sidebar snapshot signature skip, radar de-immediated, fat-key governance); the threads map narrows into threadDataContext behind an executable gate
+- **Cheaper engine detection**: process-level environment caches (npm prefix / login shell at most once per process); detect decoupled from model catalogs with enable-scope filtering and per-engine isolation
+- **Diagnostics forensics**: structured crash forensics (errorName / text fingerprints / safely-named component frames on disk); a persistent worst-K frame-drop ring, segmented session-switch timing (loadMs / assembleMs), and periodic hotspot summaries; markdown worker errors probe before reaping
+- **PI aligned to 0.84.3**: auth catalog aligned with pi 0.84.3 plus the moonshotai dual-region provider; capability_state's five keys delegate to spec-generated data, ending dual-source drift; PI registry metadata reflects the real persistent RPC transport (pi-rpc/persistent)
+- **Composer selector-layer refactor**: dead ProviderSelect / ShortcutActionsSelect code deleted, a SelectorOptionRow primitive replaces six hand-written option rows, and ModelSelect splits pure functions from the channel picker
+- **PI curtain silent-loss chains sealed**: all three silent-loss paths for PI session curtains are closed, with retryable, observable load failures
+
+🐛 Fixes
+
+- **Compaction marker hijacking turn finality**: the compaction marker now emits a context-event instead of hijacking the turn's final anchor; compaction_end passes through reason / token metadata instead of forging "manual"; codex-native compacted events no longer get a spurious fallback
+- **Background-task cards stuck on "running"**: post-settle final-state updates bypass the turn-finality guard, cards read the authoritative store snapshot to self-heal, and the registry watcher enumerates running sessions at app level — final states write back on every path even after switching away
+- **Cross-engine model bleed**: user model locks clear on thread switch; draft carry gains an engine gate and a catalog-membership gate, sealing the Home-entry blind spot; pi's catalog default reads the true settings default, so sessions without an account no longer mis-bind an anthropic model
+- **claude-fork sessions resurrecting after deletion**: deleted sessions no longer resurrect via persisted snapshot replay
+- **Session-list scan stalls**: codex list scanning gets an inner 32-second deadline so threads truly stop reading disk after timeout; focus-refresh and first-paint no longer forge engine timeouts or mark everything degraded; full-catalog auto-rescan backs off exponentially on consecutive timeouts
+- **Claude session titles wrongly dropped**: index titles restore the slash-command prompt before truncation, so overlong envelope prefixes no longer drop the whole entry and quoted command-tag fragments are no longer mis-extracted
+- **Waiting copy sticking to thinking/tool rows**: the "waiting for first text" message clears as soon as thinking or tool rows render
+- **PI list-models degradation self-heals**: degraded thinking catalogs re-probe automatically when the model menu opens
+- **Missing thinking levels / models after engine switch**: switching engines explicitly loads the target engine's catalog; decoupled engines get a reactive catalog table plus background prewarm; the INVALIDATED storm triggered by authState arrival is narrowed to installed-transitions only
+- **P0 model mix-up reverted**: the static-snapshot backfill on decoupled-engine light branches is reverted, fixing the root cause
+
 ### **2026年8月25日（v0.9.3）**
 
 中文：

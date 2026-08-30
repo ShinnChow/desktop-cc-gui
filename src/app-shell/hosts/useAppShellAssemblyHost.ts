@@ -1,4 +1,5 @@
 import { GitHubPanelData, SettingsView } from "../render/lazyViews";
+import { useMemo } from "react";
 import { useAppShellDomainAssembly } from "../domains/useAppShellDomainAssembly";
 import { useMemoizedRuntimeThreadProviderValue } from "../domains/runtimeThreadProvider";
 import { useMemoizedComposerProviderValue } from "../domains/composerProvider";
@@ -12,6 +13,8 @@ import {
   SESSION_FIELDS,
 } from "./appShellAssemblyHostFields";
 import { useHostFields } from "./appShellHostBus";
+
+const EMPTY_HOST_SECTION: Readonly<Record<string, unknown>> = Object.freeze({});
 
 function mergeHostSlices(
   ...slices: Array<Record<string, unknown>>
@@ -668,7 +671,7 @@ export function useAppShellAssemblyHost() {
     setGitPanelMode: git.setGitPanelMode as any,
   });
 
-  const quick = (flows.quickSwitcherSection ?? {}) as Record<string, unknown>;
+  const quick = (flows.quickSwitcherSection ?? EMPTY_HOST_SECTION) as Record<string, unknown>;
   const searchAndComposerInput = {
       identity: {
         activeWorkspace: session.activeWorkspace,
@@ -739,12 +742,18 @@ export function useAppShellAssemblyHost() {
         resetUiScale: session.resetUiScale,
       },
   };
+  // The object above is intentionally reconstructed for the static contract
+  // checker; slice identities are the real memoization boundary.
+  const stableSearchAndComposerInput = useMemo(
+    () => searchAndComposerInput,
+    [composer, flows, git, quick, runtime, session],
+  );
 
   return {
     runtimeThreadProviderValue,
     composerProviderValue,
     layoutChromeProviderValue,
     appShellDomainContexts,
-    searchAndComposerInput,
+    searchAndComposerInput: stableSearchAndComposerInput,
   };
 }

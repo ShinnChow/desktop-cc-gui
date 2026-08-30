@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { formatShortcutLabelOrNull } from "../../../utils/shortcuts";
 import {
   getClientStoreSync,
   writeClientStoreValue,
 } from "../../../services/clientStorage";
 import { useEventCallback } from "../../../utils/useEventCallback";
 import type { QoderSettingsHighlightTarget } from "../../../features/app/hooks/useSettingsModalState";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { useLayoutNodes } from "../../../features/layout/hooks/useLayoutNodes";
 import { useMainHeaderActionItems } from "../../../features/app/components/MainHeaderActions";
 import { useExitedSessionVisibility } from "../../../features/app/hooks/useExitedSessionVisibility";
@@ -115,6 +115,7 @@ const APP_SHELL_LAYOUT_NODES_GIT_DOMAIN_NAMES =
  */
 const USER_RELOAD_THREAD_LIST_OPTIONS = {
   forceSessionIndexSync: true,
+  sessionIndexOnly: true,
 } as const;
 
 function reportMainFileExternalChangeMonitorCleanupError(error: unknown) {
@@ -996,10 +997,35 @@ export function useAppShellLayoutNodesSection(
       return next;
     });
   }, [setCenterMode]);
+  const mainHeaderShortcutLabels = useMemo(
+    () => ({
+      rightPanel: formatShortcutLabelOrNull(
+        appSettings.toggleRightConversationSidebarShortcut,
+      ),
+      terminal: formatShortcutLabelOrNull(appSettings.toggleTerminalShortcut),
+      runtimeConsole: formatShortcutLabelOrNull(
+        appSettings.toggleRuntimeConsoleShortcut,
+      ),
+      browserDock: formatShortcutLabelOrNull(
+        appSettings.openBrowserDockShortcut,
+      ),
+      fileCompare: formatShortcutLabelOrNull(
+        appSettings.openFileCompareShortcut,
+      ),
+    }),
+    [
+      appSettings.toggleRightConversationSidebarShortcut,
+      appSettings.toggleTerminalShortcut,
+      appSettings.toggleRuntimeConsoleShortcut,
+      appSettings.openBrowserDockShortcut,
+      appSettings.openFileCompareShortcut,
+    ],
+  );
   const mainHeaderActions = useMainHeaderActionItems({
     isCompact,
     rightPanelCollapsed,
     sidebarToggleProps: mainHeaderSidebarToggleProps,
+    shortcutLabels: mainHeaderShortcutLabels,
     showRuntimeConsoleButton:
       !isCompact &&
       clientUiVisibility.isControlVisible("topTool.runtimeConsole"),
@@ -1558,50 +1584,7 @@ export function useAppShellLayoutNodesSection(
     },
   );
   const handleReloadWorkspaceThreads = useEventCallback(
-    async (workspaceId: string) => {
-      const workspace = workspacesById.get(workspaceId);
-      if (!workspace) {
-        return;
-      }
-      const workspaceName =
-        workspace.name || t("workspace.noWorkspaceSelected");
-      const detailLines = [
-        t("workspace.reloadWorkspaceThreadsEffectRefresh"),
-        t("workspace.reloadWorkspaceThreadsEffectDisplayOnly"),
-        t("workspace.reloadWorkspaceThreadsEffectNoDelete"),
-        t("workspace.reloadWorkspaceThreadsEffectNoGitWrite"),
-      ];
-      const confirmed = await ask(
-        `${t("workspace.reloadWorkspaceThreadsConfirm", { name: workspaceName })}\n\n${t("workspace.reloadWorkspaceThreadsBeforeYouConfirm")}\n${detailLines.map((line) => `• ${line}`).join("\n")}`,
-        {
-          title: t("workspace.reloadWorkspaceThreadsTitle"),
-          kind: "warning",
-          okLabel: t("threads.reloadThreads"),
-          cancelLabel: t("common.cancel"),
-        },
-      );
-      if (!confirmed) {
-        return;
-      }
-      const targets =
-        workspace.kind === "main"
-          ? [
-              workspace,
-              ...workspaces.filter(
-                (candidate: WorkspaceInfo) =>
-                  candidate.parentId === workspace.id,
-              ),
-            ]
-          : [workspace];
-      void Promise.allSettled(
-        targets.map((target) =>
-          listThreadsForWorkspaceTracked(
-            target,
-            USER_RELOAD_THREAD_LIST_OPTIONS,
-          ),
-        ),
-      );
-    },
+    (workspaceId: string) => handleQuickReloadWorkspaceThreads(workspaceId),
   );
   const handleToggleLiveEditPreview = useEventCallback(() => {
     setLiveEditPreviewEnabled((current: boolean) => !current);
@@ -1858,6 +1841,17 @@ export function useAppShellLayoutNodesSection(
       });
     },
   );
+  const handleUpdateSystemProxy = useEventCallback(
+    async (patch: {
+      systemProxyEnabled: boolean;
+      systemProxyUrl: string | null;
+    }) => {
+      await queueSaveSettings({
+        ...appSettings,
+        ...patch,
+      });
+    },
+  );
   const handlePrefillHandled = useEventCallback((id: string) => {
     if (prefillDraft?.id === id) {
       setPrefillDraft(null);
@@ -1998,6 +1992,7 @@ export function useAppShellLayoutNodesSection(
       isTablet,
       systemProxyEnabled: appSettings.systemProxyEnabled,
       systemProxyUrl: appSettings.systemProxyUrl,
+      onUpdateSystemProxy: handleUpdateSystemProxy,
     },
     runtime: {
       activeItems,
@@ -2424,6 +2419,9 @@ export function useAppShellLayoutNodesSection(
       textareaRef: composerInputRef,
       composerEditorSettings,
       composerSendShortcut: appSettings.composerSendShortcut,
+      composerInterruptShortcutLabel: formatShortcutLabelOrNull(
+        appSettings.interruptShortcut,
+      ),
       textareaHeight,
       onTextareaHeightChange,
       onOpenExperimentalSettings: handleOpenExperimentalSettings,
@@ -2483,6 +2481,7 @@ export function useAppShellLayoutNodesSection(
       onCollapseSidebar: collapseSidebar,
       globalSearchShortcut: appSettings.toggleGlobalSearchShortcut,
       openChatShortcut: appSettings.openChatShortcut,
+      openSettingsShortcut: appSettings.openSettingsShortcut,
       cycleOpenSessionPrevShortcut: appSettings.cycleOpenSessionPrevShortcut,
       cycleOpenSessionNextShortcut: appSettings.cycleOpenSessionNextShortcut,
       closeCurrentSessionShortcut: appSettings.closeCurrentSessionShortcut,

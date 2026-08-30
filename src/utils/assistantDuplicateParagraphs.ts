@@ -6,13 +6,26 @@ const INLINE_SENTENCE_BOUNDARY_REGEX = /([。！？!?])\s+(?=\S)/g;
 const EDIT_DISTANCE_MAX_TEXT_LENGTH = 700;
 const EDIT_DISTANCE_MAX_MATRIX_CELLS = 250_000;
 
+// fix-session-load-bridge-freeze（组装段）：纯函数 memo（有界），输出不变。
+const COMPACT_COMPARABLE_MEMO_LIMIT = 6000;
+const compactComparableMemo = new Map<string, string>();
+
 function compactComparableText(value: string) {
-  return value
+  const cached = compactComparableMemo.get(value);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const computed = value
     .replace(/\s+/g, "")
     .replace(/[！!]/g, "!")
     .replace(/[？?]/g, "?")
     .replace(/[，,]/g, ",")
     .replace(/[。．.]/g, ".");
+  if (compactComparableMemo.size >= COMPACT_COMPARABLE_MEMO_LIMIT) {
+    compactComparableMemo.clear();
+  }
+  compactComparableMemo.set(value, computed);
+  return computed;
 }
 
 function flushBlock(target: string[], lines: string[]) {

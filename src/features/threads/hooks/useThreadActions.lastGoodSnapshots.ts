@@ -9,7 +9,10 @@ import {
   stripEmptyClaudeIndexFallbackSummaries,
 } from "./sessionIndexThreadSummaries";
 import { compareThreadSummariesByCreatedAtDesc } from "../utils/threadSummarySort";
-import { loadSidebarSnapshot } from "../utils/sidebarSnapshot";
+import {
+  loadSidebarSnapshot,
+  queueRemoveThreadsFromSidebarSnapshot,
+} from "../utils/sidebarSnapshot";
 
 export type ThreadEngineSource = NonNullable<ThreadSummary["engineSource"]>;
 export type LastGoodThreadSummariesByEngine = Partial<
@@ -428,6 +431,9 @@ export function useThreadActionsLastGoodSnapshots({
 
   const removeThreadFromCachedSummaries = useCallback(
     (workspaceId: string, threadId: string) => {
+      // 持久化快照与内存 refs 同步摘除：否则 partial/degraded 刷新的
+      // last-good floor 会从磁盘副本回灌已删会话（删了又回来的通道之一）。
+      queueRemoveThreadsFromSidebarSnapshot(workspaceId, threadId);
       const filterOutThread = (
         source: Record<string, ThreadSummary[] | undefined>,
       ): ThreadSummary[] => {

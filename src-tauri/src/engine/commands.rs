@@ -9,12 +9,13 @@ use chrono::{
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::io::AsyncWriteExt;
 use tokio::time::timeout;
@@ -29,7 +30,10 @@ use super::codex_prompt_service::{normalize_custom_spec_root, run_codex_prompt_s
 use super::events::{engine_event_to_app_server_event_with_turn_context, EngineEvent};
 use super::grok::resolve_grok_session_id_for_engine_send;
 use super::kimi::resolve_kimi_session_id_for_engine_send;
-use super::pi::resolve_pi_session_id_for_engine_send;
+use super::pi::{
+    is_pi_agent_settled_marker, is_pi_external_wakeup_allowed, is_pi_forwardable_send_turn,
+    resolve_pi_session_id_for_engine_send,
+};
 use super::remote_bridge::{
     call_remote_typed, remote_detect_engines_request, remote_engine_interrupt_request,
     remote_engine_send_message_sync_request,
@@ -1157,19 +1161,43 @@ async fn fetch_opencode_provider_catalog_from_auth_picker(
 }
 
 /// Detect all installed engines and their capabilities
+///
+/// B3 缓存优先：默认（无 force / 无 engines）走 TTL 缓存 + last-good SWR；
+/// `force: true` 全量重探；`engines: ["kimi", ...]` 仅轻量重探指定引擎。
 #[tauri::command]
 pub async fn detect_engines(
+    force: Option<bool>,
+    engines: Option<Vec<EngineType>>,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<Vec<EngineStatus>, String> {
+    let force = force.unwrap_or(false);
     if remote_backend::is_remote_mode(&*state).await {
-        let (method, params) = remote_detect_engines_request();
+        let (method, params) = remote_detect_engines_request(force, engines.as_deref());
         return call_remote_typed(&*state, &app, method, params).await;
     }
     let manager = &state.engine_manager;
     let settings = read_app_settings_snapshot(&state).await;
+    let disabled_engines = crate::engine::detection_disabled_engines(&settings);
+    // B4 逐引擎事件：探测完成即 emit ccgui:engine-status-updated（每引擎每轮
+    // 恰好一次，detectRunId 单调），前端逐项 reveal 不再全量等待。
+    let app_for_events = app.clone();
+    let on_status: Option<crate::engine::status::EngineStatusEventSink> = Some(Arc::new(
+        move |detect_run_id: u64, status: crate::engine::EngineStatus| {
+            let _ = app_for_events.emit(
+                "ccgui:engine-status-updated",
+                serde_json::json!({ "detectRunId": detect_run_id, "status": status }),
+            );
+        },
+    ));
     Ok(manager
-        .detect_engines_with_gates(settings.gemini_enabled)
+        .detect_engines_cached(
+            force,
+            engines.as_deref(),
+            settings.gemini_enabled,
+            &disabled_engines,
+            on_status,
+        )
         .await)
 }
 
@@ -1755,6 +1783,72 @@ fn fan_out_provider_engine_event(
         }
         let _ = app.emit("app-server-event", payload);
     }
+}
+
+/// engine-neutral 预热：对具备 resident 模型的引擎（pi）在用户阅读/打字窗口
+/// 内提前 spawn + handshake，把冷启开销移出发送关键路径。形态对齐
+/// prewarm_codex_disk_runtime（fire-and-forget、调用方对失败静默）。
+/// 返回 true = 执行了预热；false = 引擎不支持或无事可做（no-op 不算错）。
+/// 双轨契约：预热失败只影响本次加速，不影响首条发送的 ensure_resident 主路径。
+#[tauri::command]
+pub async fn engine_prewarm(
+    workspace_id: String,
+    engine: Option<EngineType>,
+    session_id: Option<String>,
+    provider_profile_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    // 远程模式是 daemon 侧运行时，预热是 client-local 优化，不做。
+    if remote_backend::is_remote_mode(&*state).await {
+        return Ok(false);
+    }
+    let manager = &state.engine_manager;
+    let active_engine = manager.get_active_engine().await;
+    let effective_engine = engine.unwrap_or(active_engine);
+    if !matches!(effective_engine, EngineType::Pi) {
+        return Ok(false);
+    }
+    let Some(session_id) = session_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+    else {
+        // pending / 新会话不做预热：send scratch 是每 turn 唯一 turn id，
+        // 预热 resident 无法被 send 命中，只会白起一个进程。
+        return Ok(false);
+    };
+    let workspace_path = {
+        let workspaces = state.workspaces.lock().await;
+        workspaces
+            .get(&workspace_id)
+            .map(|w| std::path::PathBuf::from(&w.path))
+            .ok_or_else(|| "Workspace not found".to_string())?
+    };
+    let effective_provider_profile_id =
+        crate::session_management::resolve_engine_provider_profile_id(
+            state.storage_path.as_path(),
+            &workspace_id,
+            Some(&session_id),
+            "pi",
+            provider_profile_id.as_deref(),
+        )?;
+    let provider_launch_profile =
+        crate::engine::pi_provider_profile::resolve_pi_provider_launch_profile(
+            &workspace_id,
+            effective_provider_profile_id.as_deref(),
+            None,
+        )?;
+    let session = manager
+        .get_or_create_pi_session_for_runtime(
+            &workspace_id,
+            &workspace_path,
+            &provider_launch_profile.runtime_key,
+            provider_launch_profile.home_dir.as_deref(),
+        )
+        .await;
+    session.prewarm_resident(&session_id).await?;
+    Ok(true)
 }
 
 /// Send a message using the active engine
@@ -2877,8 +2971,6 @@ pub async fn engine_send_message(
                         } else {
                             accumulated_agent_text.clone()
                         };
-                        // Always emit agentMessage item/completed so project-memory
-                        // fusion runs after normal TextDelta streaming (Claude-parity).
                         // Use text-lane id so the frontend upserts the streamed bubble.
                         if !completed_text.trim().is_empty() {
                             let completion_item_id =
@@ -3102,6 +3194,16 @@ pub async fn engine_send_message(
                 .or_else(|| provider_binding_lookup_session_id.clone());
             tokio::spawn(async move {
                 let mut render_state = GeminiRenderRoutingState::default();
+                // PI 专属门控状态——与 cc_gui_daemon 的 PI forwarder（daemon_state.rs）
+                // 同一套语义，两份拷贝必须同步演进（dev 模式引擎跑在 app 进程内，
+                // 走的是这份；安装版走 daemon 那份。2026-08-30 实测：仅改 daemon
+                // 导致 dev 全程验证失效）。
+                let mut pending_background_tasks = HashSet::<String>::new();
+                let mut background_task_aliases = HashMap::<String, String>::new();
+                let mut active_external_wakeup_turn_ids = HashSet::<String>::new();
+                let mut pending_external_wakeup = false;
+                let mut primary_run_settled = false;
+                let mut active_forwarded_turn_id = turn_id_for_forwarder.clone();
                 loop {
                     let turn_event = match receiver.recv().await {
                         Ok(event) => event,
@@ -3115,11 +3217,111 @@ pub async fn engine_send_message(
                             continue;
                         }
                     };
-                    if turn_event.turn_id != turn_id_for_forwarder {
+                    let is_external_turn = turn_event.turn_id.starts_with("pi-external-");
+                    let is_known_external_wakeup =
+                        active_external_wakeup_turn_ids.contains(&turn_event.turn_id);
+                    let is_external_wakeup = is_pi_external_wakeup_allowed(
+                        &turn_event.turn_id,
+                        &turn_id_for_forwarder,
+                        &turn_event.event,
+                        !pending_background_tasks.is_empty(),
+                        pending_external_wakeup,
+                        is_known_external_wakeup,
+                    );
+                    // run 归属判定（run_owner 戳）：只转发本 send 自己 run 的
+                    // 原生 turn（primary / {primary}:t{n} 派生）与本 send id 被
+                    // 绑定进其他 run 的 steer turn。别的 send 的 run（含其唤醒/
+                    // 派生 turn）一律拒绝——放行会串台到本 send 的线程，前端单
+                    // activeTurnId 结算守卫错配后永久丢结算（2026-08-30 实证）。
+                    let is_my_run_turn = is_pi_forwardable_send_turn(
+                        &turn_event.run_owner,
+                        &turn_event.turn_id,
+                        &turn_id_for_forwarder,
+                    );
+                    let is_lifecycle_marker = is_pi_agent_settled_marker(&turn_event.event);
+                    if turn_event.turn_id != turn_id_for_forwarder
+                        && !is_my_run_turn
+                        && !is_external_wakeup
+                        && !is_lifecycle_marker
+                    {
                         continue;
+                    }
+                    if is_external_wakeup && !is_known_external_wakeup {
+                        // pending_external_wakeup 保持到 run settle 标记处复位：
+                        // 唤醒 run 自身也是多原生 turn 的（最终汇总在同一个 run
+                        // 的下一个原生 turn 里）。
+                        active_external_wakeup_turn_ids.insert(turn_event.turn_id.clone());
                     }
 
                     let event = turn_event.event;
+                    let event_turn_id = turn_event.turn_id.as_str();
+                    if event_turn_id != active_forwarded_turn_id {
+                        active_forwarded_turn_id = event_turn_id.to_string();
+                        // 每个 PI follow-up 都是独立的 assistant turn：保留单调
+                        // item 计数，只重置 lane 局部状态，避免第二轮锚到第一轮。
+                        render_state.last_render_lane = GeminiRenderLane::Other;
+                        render_state.active_text_item_id = None;
+                        render_state.saw_text_delta = false;
+                        accumulated_agent_text.clear();
+                    }
+                    match &event {
+                        EngineEvent::TurnStarted { .. } => {
+                            // 新 run / 新原生 turn 开始：解除 settled 标记。
+                            primary_run_settled = false;
+                        }
+                        EngineEvent::Raw { .. } if is_pi_agent_settled_marker(&event) => {
+                            primary_run_settled = true;
+                            // run 彻底 settle：唤醒窗口关闭。后续后台任务回收后
+                            // 的下一个唤醒 run 会重新置 true。
+                            pending_external_wakeup = false;
+                        }
+                        EngineEvent::BackgroundTaskStarted { tool_id, .. } => {
+                            pending_background_tasks.insert(tool_id.clone());
+                        }
+                        EngineEvent::BackgroundTaskUpdated {
+                            tool_id,
+                            task,
+                            source,
+                            ..
+                        } => {
+                            if source == "notification" {
+                                pending_external_wakeup = true;
+                            }
+                            let task_id = task.get("id").and_then(Value::as_str);
+                            let status = task
+                                .get("status")
+                                .and_then(Value::as_str)
+                                .unwrap_or("")
+                                .trim()
+                                .to_ascii_lowercase();
+                            let is_terminal_background_status = matches!(
+                                status.as_str(),
+                                "completed" | "failed" | "killed" | "cancelled" | "canceled"
+                            );
+                            if is_terminal_background_status {
+                                if let Some(tool_id) = tool_id {
+                                    pending_background_tasks.remove(tool_id);
+                                }
+                                if let Some(task_id) = task_id {
+                                    pending_background_tasks.remove(task_id);
+                                    if let Some(tool_id) = background_task_aliases.remove(task_id) {
+                                        pending_background_tasks.remove(&tool_id);
+                                    }
+                                }
+                            } else if let Some(task_id) = task_id {
+                                // receipt 通常同时带 tool ID 与后台 task ID；后续
+                                // notification 可能只有 task ID。切换 canonical
+                                // task ID 并保留别名用于终态回收。
+                                if let Some(tool_id) = tool_id {
+                                    pending_background_tasks.remove(tool_id);
+                                    background_task_aliases
+                                        .insert(task_id.to_string(), tool_id.clone());
+                                }
+                                pending_background_tasks.insert(task_id.to_string());
+                            }
+                        }
+                        _ => {}
+                    }
                     if let (
                         Some(binding),
                         EngineEvent::SessionStarted {
@@ -3152,6 +3354,10 @@ pub async fn engine_send_message(
                     let routed_item_id =
                         next_gemini_routed_item_id(&mut render_state, render_lane, &item_id_clone);
 
+                    if let EngineEvent::ToolStarted { .. } = &event {
+                        accumulated_agent_text.clear();
+                    }
+
                     if let EngineEvent::TextDelta { text, .. } = &event {
                         render_state.saw_text_delta = true;
                         accumulated_agent_text.push_str(text);
@@ -3161,25 +3367,24 @@ pub async fn engine_send_message(
                     if let EngineEvent::TurnCompleted { result, .. } = &event {
                         let fallback_text =
                             extract_turn_result_text(result.as_ref()).unwrap_or_default();
-                        let completed_text = if should_prefer_turn_result_text(result.as_ref()) {
-                            fallback_text
-                        } else if accumulated_agent_text.trim().is_empty() {
-                            fallback_text
-                        } else {
+                        let completed_text = if render_state.saw_text_delta {
                             accumulated_agent_text.clone()
+                        } else {
+                            fallback_text
                         };
-                        // Always emit agentMessage item/completed so project-memory
-                        // fusion runs after normal TextDelta streaming (Claude-parity).
                         // Use text-lane id so the frontend upserts the streamed bubble.
                         if !completed_text.trim().is_empty() {
                             let completion_item_id =
-                                gemini_agent_completion_item_id(&render_state, &item_id_clone);
+                                render_state.active_text_item_id.clone().unwrap_or_else(|| {
+                                    format!("{item_id_clone}:pi-turn-{event_turn_id}")
+                                });
                             let synthetic = AppServerEvent {
                                 workspace_id: event.workspace_id().to_string(),
                                 message: json!({
                                     "method": "item/completed",
                                     "params": {
                                         "threadId": &current_thread_id,
+                                        "turnId": event_turn_id,
                                         "item": {
                                             "id": completion_item_id,
                                             "type": "agentMessage",
@@ -3193,12 +3398,25 @@ pub async fn engine_send_message(
                         }
                     }
 
-                    if let Some(payload) = engine_event_to_app_server_event_with_turn_context(
+                    if let Some(mut payload) = engine_event_to_app_server_event_with_turn_context(
                         &event,
                         &current_thread_id,
                         &routed_item_id,
-                        Some(&turn_id_for_forwarder),
+                        Some(event_turn_id),
                     ) {
+                        // Text/reasoning/tool 事件历史上不带 turnId；外部 PI
+                        // follow-up 在原 turn settle 之后到达，前端需要每个事件
+                        // 携带 turn 身份才能通过终态守卫。
+                        if let Some(params) = payload
+                            .message
+                            .get_mut("params")
+                            .and_then(Value::as_object_mut)
+                        {
+                            params.insert(
+                                "turnId".to_string(),
+                                Value::String(event_turn_id.to_string()),
+                            );
+                        }
                         app_server_events.push(payload);
                     }
                     fan_out_provider_engine_event(
@@ -3223,7 +3441,19 @@ pub async fn engine_send_message(
                         }
                     }
 
-                    if is_terminal {
+                    if is_terminal && is_external_turn {
+                        // pending_external_wakeup 保持 true 直到 run settle
+                        // 标记处复位（唤醒 run 自身多原生 turn）。
+                        active_external_wakeup_turn_ids.remove(&turn_event.turn_id);
+                    }
+                    // break 必须等 pump 的 agent_settled 生命周期标记：第一个
+                    // 原生 turn 的 TurnCompleted 后 run 内通常还有后续原生 turn
+                    // （普通多轮工具对话的常态）；后台唤醒的下一个 run 会复位
+                    // 标记。pending 任务全部回收且 run 彻底 settle 才断开。
+                    if primary_run_settled
+                        && pending_background_tasks.is_empty()
+                        && active_external_wakeup_turn_ids.is_empty()
+                    {
                         break;
                     }
                 }
@@ -3742,8 +3972,6 @@ pub async fn engine_send_message(
                         } else {
                             accumulated_agent_text.clone()
                         };
-                        // Always emit agentMessage item/completed so project-memory
-                        // fusion runs after normal TextDelta streaming (Claude-parity).
                         // Use text-lane id so the frontend upserts the streamed bubble.
                         if !completed_text.trim().is_empty() {
                             let completion_item_id =

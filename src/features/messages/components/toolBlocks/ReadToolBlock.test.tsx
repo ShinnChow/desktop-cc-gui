@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  __resetRealtimePerfFlagCacheForTests,
+  LIVE_TOOL_RENDER_BUDGET_FLAG_KEY,
+  resetRealtimePerfFlags,
+} from "../../../threads/utils/realtimePerfFlags";
 import type { ConversationItem } from "../../../../types";
-import { ReadToolBlock } from "./ReadToolBlock";
+import { READ_OUTPUT_MARKDOWN_BUDGET, ReadToolBlock } from "./ReadToolBlock";
 
 function createReadItem(
   id: string,
@@ -23,6 +28,8 @@ function createReadItem(
 describe("ReadToolBlock", () => {
   afterEach(() => {
     cleanup();
+    resetRealtimePerfFlags();
+    __resetRealtimePerfFlagCacheForTests();
   });
 
   it("renders markdown output for markdown file reads", () => {
@@ -140,5 +147,55 @@ describe("ReadToolBlock", () => {
 
     const image = screen.getByRole("img", { name: "screenshot-preview.webp" });
     expect(image.getAttribute("src")).toContain(absolutePath);
+  });
+
+  it("degrades heavy markdown-shaped read output to plain text", () => {
+    const heavyOutput = "## Section\n\n- item\n".repeat(
+      Math.ceil((READ_OUTPUT_MARKDOWN_BUDGET + 1024) / "## Section\n\n- item\n".length),
+    );
+    const item = createReadItem(
+      "tool-read-heavy-markdown",
+      { file_path: "README.md" },
+      heavyOutput,
+    );
+
+    const view = render(<ReadToolBlock item={item} isExpanded={false} onToggle={() => {}} />);
+    fireEvent.click(screen.getByText("tools.readFile"));
+
+    // 超过 64KB 的 markdown 形态输出不进 <Markdown> 编译，走纯文本容器。
+    expect(view.container.querySelector(".read-tool-markdown")).toBeNull();
+    expect(view.container.querySelector(".task-field-content")?.textContent).toContain(
+      "## Section",
+    );
+  });
+
+  it("still renders markdown at the budget boundary", () => {
+    const boundaryOutput = ("## Section\n\n- item\n").repeat(4);
+    const item = createReadItem(
+      "tool-read-boundary-markdown",
+      { file_path: "README.md" },
+      boundaryOutput,
+    );
+
+    const view = render(<ReadToolBlock item={item} isExpanded={false} onToggle={() => {}} />);
+    fireEvent.click(screen.getByText("tools.readFile"));
+    expect(view.container.querySelector(".read-tool-markdown")).toBeTruthy();
+  });
+
+  it("keeps markdown rendering for heavy output when the render budget flag is off", () => {
+    window.localStorage.setItem(LIVE_TOOL_RENDER_BUDGET_FLAG_KEY, "off");
+    __resetRealtimePerfFlagCacheForTests();
+    const heavyOutput = "## Section\n\n- item\n".repeat(
+      Math.ceil((READ_OUTPUT_MARKDOWN_BUDGET + 1024) / "## Section\n\n- item\n".length),
+    );
+    const item = createReadItem(
+      "tool-read-heavy-markdown-flag-off",
+      { file_path: "README.md" },
+      heavyOutput,
+    );
+
+    const view = render(<ReadToolBlock item={item} isExpanded={false} onToggle={() => {}} />);
+    fireEvent.click(screen.getByText("tools.readFile"));
+    expect(view.container.querySelector(".read-tool-markdown")).toBeTruthy();
   });
 });

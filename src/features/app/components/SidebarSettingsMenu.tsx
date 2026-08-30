@@ -18,6 +18,7 @@ import {
   useSidebarSettingsPinnedActions,
   type SidebarSettingsPinnedActionId,
 } from "../hooks/useSidebarSettingsPinnedActions";
+import { SystemProxyIcon } from "./SystemProxyIcon";
 
 type SidebarSettingsMenuProps = {
   isOpen: boolean;
@@ -31,6 +32,10 @@ type SidebarSettingsMenuProps = {
   onOpenSpecHub: () => void;
   onOpenProjectMemory: () => void;
   onOpenSettings: () => void;
+  /** 网络代理抽屉开/关切换（与 pinned 按钮共用；再点一次关闭） */
+  onToggleSystemProxy: () => void;
+  /** 网络代理抽屉当前是否打开，用于菜单项与 pinned 按钮的 active 态 */
+  systemProxyDrawerOpen: boolean;
   onAppModeChange: (mode: AppMode) => void;
   /** 打开侧栏运行时提示面板（入口已收入设置二级菜单，不再外显） */
   onOpenRuntimeNotice?: () => void;
@@ -44,6 +49,8 @@ type SidebarSettingsMenuProps = {
   /** non-macOS：设置菜单「隐藏对话侧边栏」；mac 用 titlebar */
   showHideThreadsSidebar?: boolean;
   onCollapseSidebar?: () => void;
+  /** 设置齿轮悬停提示里展示的快捷键（formatShortcutForPlatform 后的展示值；空则不展示） */
+  openSettingsShortcutLabel?: string | null;
 };
 
 type SettingsMenuAction = {
@@ -67,12 +74,15 @@ export function SidebarSettingsMenu({
   onOpenSpecHub,
   onOpenProjectMemory,
   onOpenSettings,
+  onToggleSystemProxy,
+  systemProxyDrawerOpen,
   onAppModeChange,
   onOpenRuntimeNotice,
   showRuntimeNotice = false,
   runtimeNoticeHasError = false,
   showHideThreadsSidebar = false,
   onCollapseSidebar,
+  openSettingsShortcutLabel,
 }: SidebarSettingsMenuProps) {
   const { pinnedIds, togglePinned } = useSidebarSettingsPinnedActions();
   const atPinLimit = pinnedIds.length >= SIDEBAR_SETTINGS_PINNED_MAX;
@@ -131,6 +141,17 @@ export function SidebarSettingsMenu({
         onAppModeChange(appMode === "gitHistory" ? "chat" : "gitHistory");
       },
       active: appMode === "gitHistory",
+      visible: true,
+    },
+    {
+      id: "system-proxy",
+      label: t("settings.behaviorProxyTitle"),
+      icon: <SystemProxyIcon size={14} aria-hidden />,
+      onSelect: () => {
+        onClose();
+        onToggleSystemProxy();
+      },
+      active: systemProxyDrawerOpen,
       visible: true,
     },
     {
@@ -268,7 +289,11 @@ export function SidebarSettingsMenu({
           type="button"
           className={`sidebar-primary-nav-item sidebar-primary-nav-item-bottom${isOpen ? " is-active" : ""}`}
           onClick={onToggleOpen}
-          title={t("settings.title")}
+          title={
+            openSettingsShortcutLabel
+              ? `${t("settings.title")} (${openSettingsShortcutLabel})`
+              : t("settings.title")
+          }
           aria-label={t("settings.title")}
           aria-expanded={isOpen}
           aria-haspopup="menu"

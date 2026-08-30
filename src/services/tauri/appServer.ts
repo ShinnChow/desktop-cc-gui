@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { EngineModelInfo, EngineStatus, EngineType, SkillInvocation } from "../../types";
 import type { AutoSessionMetadata } from "./sessionManagement";
 import {
@@ -89,12 +90,49 @@ export async function installWebAssetsFromFile(
 /**
  * Detect all installed engines and their status
  */
-export async function detectEngines(): Promise<EngineStatus[]> {
+/**
+ * B5：detect 前端守卫超时。25s 覆盖裁剪后最坏探测链（OpenCode version+help
+ * 20s）+ 余量；超时抛 DetectionTimeoutError，不中止后端（后端跑完经事件收货）。
+ */
+export const ENGINE_DETECT_FRONTEND_TIMEOUT_MS = 25_000;
+
+export class EngineDetectionTimeoutError extends Error {
+  constructor() {
+    super("engine detection frontend guard timed out");
+    this.name = "EngineDetectionTimeoutError";
+  }
+}
+
+export async function detectEngines(
+  options: { force?: boolean; engines?: EngineType[] } = {},
+): Promise<EngineStatus[]> {
+  const payload =
+    options.force || options.engines
+      ? { force: options.force ?? false, engines: options.engines ?? null }
+      : {};
+  const invokePromise = invoke<EngineStatus[]>("detect_engines", payload);
+  const guard = new Promise<never>((_, reject) => {
+    setTimeout(
+      () => reject(new EngineDetectionTimeoutError()),
+      ENGINE_DETECT_FRONTEND_TIMEOUT_MS,
+    );
+  });
   try {
-    const statuses = await invoke<EngineStatus[]>("detect_engines");
+    const statuses = await Promise.race([invokePromise, guard]);
     markDaemonEngineRpcSupported(true);
     return statuses;
   } catch (error) {
+    if (error instanceof EngineDetectionTimeoutError) {
+      // 超时不代表 daemon 不可用：在途 invoke 继续跑完（静默收货，事件会补齐）。
+      void invokePromise
+        .then(() => markDaemonEngineRpcSupported(true))
+        .catch(() => {
+          if (isUnknownMethodError(error, "detect_engines")) {
+            markDaemonEngineRpcSupported(false);
+          }
+        });
+      throw error;
+    }
     if (isUnknownMethodError(error, "detect_engines")) {
       if (!shouldUseWebServiceFallback()) {
         throw error;
@@ -104,6 +142,41 @@ export async function detectEngines(): Promise<EngineStatus[]> {
     }
     throw error;
   }
+}
+
+/**
+ * 逐引擎检测事件（refactor-engine-detection-pipeline B4）：后端每完成一个
+ * 引擎探测即 emit `ccgui:engine-status-updated`（detectRunId 单调递增）。
+ * 前端逐项 reveal，不再等 detect_engines 全量返回。
+ */
+export type EngineStatusUpdatedEvent = {
+  detectRunId: number;
+  status: EngineStatus;
+};
+
+export function subscribeEngineStatusEvents(
+  listener: (event: EngineStatusUpdatedEvent) => void,
+): () => void {
+  let disposed = false;
+  let unlisten: (() => void) | null = null;
+
+  void listen<EngineStatusUpdatedEvent>(
+    "ccgui:engine-status-updated",
+    (event) => {
+      listener(event.payload);
+    },
+  ).then((fn) => {
+    if (disposed) {
+      fn();
+      return;
+    }
+    unlisten = fn;
+  });
+
+  return () => {
+    disposed = true;
+    unlisten?.();
+  };
 }
 
 /**
@@ -342,6 +415,31 @@ export async function engineSendMessage(
       };
     }
     throw error;
+  }
+}
+
+/**
+ * engine-neutral 预热（pi resident）：在用户阅读/打字窗口提前 spawn + handshake。
+ * 双轨契约：失败一律静默返回 null——首条发送仍走 engineSendMessage 全路径，
+ * 预热不引入新失败面（optimize-pi-first-packet-latency 阶段二）。
+ */
+export async function enginePrewarm(
+  workspaceId: string,
+  params: {
+    engine: EngineType;
+    sessionId: string;
+    providerProfileId?: string | null;
+  },
+): Promise<boolean | null> {
+  try {
+    return await invoke<boolean>("engine_prewarm", {
+      workspaceId,
+      engine: params.engine,
+      sessionId: params.sessionId,
+      providerProfileId: params.providerProfileId ?? null,
+    });
+  } catch {
+    return null;
   }
 }
 

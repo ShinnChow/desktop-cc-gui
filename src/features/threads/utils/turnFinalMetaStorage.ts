@@ -5,7 +5,9 @@ import type { ConversationItem } from "../../../types";
 export const TURN_FINAL_META_STORE_KEY = "turnFinalMeta";
 
 /** Soft caps keep the store small; oldest threads/entries are pruned first. */
-export const MAX_TURN_FINAL_META_THREADS = 500;
+// F2c（fix-session-switch-jank-red-lines）：500 线程上限曾把存量堆到 633KB（全 map
+// 随每次 turn 结束全量 stringify）；收敛到 200 只保留近期活跃线程。
+export const MAX_TURN_FINAL_META_THREADS = 200;
 export const MAX_TURN_FINAL_META_ENTRIES_PER_THREAD = 200;
 
 export type TurnFinalMetaRecord = {

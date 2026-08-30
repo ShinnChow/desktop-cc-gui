@@ -2,6 +2,118 @@ use super::*;
 use std::{cell::RefCell, rc::Rc};
 
 #[test]
+fn pi_external_wakeup_notification_is_allowed_after_pending_tasks_clear() {
+    let notification = engine::events::EngineEvent::BackgroundTaskUpdated {
+        workspace_id: "ws-1".to_string(),
+        tool_id: None,
+        task: json!({"id": "task-1", "status": "completed"}),
+        source: "notification".to_string(),
+    };
+
+    assert!(is_pi_external_wakeup_allowed(
+        "pi-external-follow-up",
+        "pi-turn-primary",
+        &notification,
+        false,
+        false,
+        false,
+    ));
+}
+
+#[test]
+fn pi_external_wakeup_without_notification_stays_blocked_after_pending_tasks_clear() {
+    let unrelated = engine::events::EngineEvent::TextDelta {
+        workspace_id: "ws-1".to_string(),
+        text: "unrelated".to_string(),
+    };
+
+    assert!(!is_pi_external_wakeup_allowed(
+        "pi-external-unrelated",
+        "pi-turn-primary",
+        &unrelated,
+        false,
+        false,
+        false,
+    ));
+}
+
+#[test]
+fn pi_forwardable_send_turn_accepts_own_primary_and_derived_ids() {
+    // 实测 pi 0.84.4：run 内每个工具往返都是一个新原生 turn。本 send 的
+    // forwarder 放行 primary 本体与自己 run 的派生 id。
+    let mine = "pi-turn-1111";
+    assert!(is_pi_forwardable_send_turn(mine, mine, mine));
+    assert!(is_pi_forwardable_send_turn(
+        mine,
+        &format!("{mine}:t1"),
+        mine
+    ));
+    assert!(is_pi_forwardable_send_turn(
+        mine,
+        &format!("{mine}:t7"),
+        mine
+    ));
+}
+
+#[test]
+fn pi_forwardable_send_turn_accepts_own_id_bound_into_foreign_run() {
+    // steer 场景：本 send id 被绑定进别的 run（run_owner = 对方 primary），
+    // 回复归属本 send 的线程，waiter 也在本 send 手里 ⇒ 必须放行。
+    let foreign_run = "pi-turn-aaaa";
+    let mine = "pi-turn-1111";
+    assert!(is_pi_forwardable_send_turn(foreign_run, mine, mine));
+}
+
+#[test]
+fn pi_forwardable_send_turn_rejects_foreign_send_runs() {
+    // 同 resident 广播串台防护：别的 send 的 run（其 primary/派生 turn）
+    // 以及陌生 id 一律拒绝——放行会让 A 的 turn 串进 B 的线程，交错结算
+    // 错配后永久丢结算（2026-08-30 响应中卡死实证）。
+    let mine = "pi-turn-1111";
+    let foreign_send = "pi-turn-aaaa";
+    assert!(!is_pi_forwardable_send_turn(
+        foreign_send,
+        &format!("{foreign_send}:t1"),
+        mine
+    ));
+    assert!(!is_pi_forwardable_send_turn(
+        foreign_send,
+        foreign_send,
+        mine
+    ));
+    assert!(!is_pi_forwardable_send_turn(mine, "pi-external-1-1", mine));
+    // 前缀相似但非本 run 的派生 id 不得误放行。
+    assert!(!is_pi_forwardable_send_turn(
+        mine,
+        &format!("{mine}-9999:t1"),
+        mine
+    ));
+}
+
+#[test]
+fn pi_agent_settled_marker_detected_only_for_settled_kind() {
+    let marker = engine::events::EngineEvent::Raw {
+        workspace_id: "ws-1".to_string(),
+        engine: engine::EngineType::Pi,
+        data: json!({"source": "pi_rpc", "kind": "agent_settled"}),
+    };
+    assert!(is_pi_agent_settled_marker(&marker));
+
+    let compaction = engine::events::EngineEvent::Raw {
+        workspace_id: "ws-1".to_string(),
+        engine: engine::EngineType::Pi,
+        data: json!({"source": "pi_rpc", "kind": "compaction_start"}),
+    };
+    assert!(!is_pi_agent_settled_marker(&compaction));
+
+    let completed = engine::events::EngineEvent::TurnCompleted {
+        workspace_id: "ws-1".to_string(),
+        result: None,
+    };
+    assert!(!is_pi_agent_settled_marker(&completed));
+}
+
+#[test]
 fn daemon_active_engine_normalizes_legacy_gemini_to_supported_fallback() {
     let mut settings = AppSettings::default();
     settings.gemini_enabled = true;
