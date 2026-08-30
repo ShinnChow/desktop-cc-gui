@@ -8,7 +8,7 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T19:00:32.076Z
+- Generated at: 2026-08-30T19:15:51.817Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
 - Count: 395
@@ -58,7 +58,6 @@ status: generated
 | `src/features/session-activity/components/WorkspaceSessionActivityPanel.test.tsx` | 2821 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/project_map_api_contracts.rs` | 2793 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/styles/multi-agent.css` | 2789 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
-| `src-tauri/src/git/mod.rs` | 2720 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useQueuedSend.test.tsx` | 2718 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/git/components/GitDiffPanel.tsx` | 2711 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/settings/components/SettingsView.test.tsx` | 2691 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
@@ -70,7 +69,6 @@ status: generated
 | `src/features/settings/components/SettingsView.tsx` | 2611 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/runtime/mod.rs` | 2585 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/local_usage/tests.rs` | 2577 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
-| `src/features/composer/components/Composer.tsx` | 2573 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/bin/cc_gui_daemon.rs` | 2562 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/commands_send.rs` | 2553 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/email/session_continuation.rs` | 2551 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
@@ -113,6 +111,7 @@ status: generated
 | `src/i18n/locales/pt-BR/settings.ts` | 2143 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/i18n/locales/ru/settings.ts` | 2143 | i18n | i18n | P2 | 2600 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/components/GitHistoryPanelDialogs.tsx` | 2076 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
+| `src/features/composer/components/Composer.tsx` | 2070 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/shared_sessions.rs` | 2061 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/shared/codex_core.rs` | 2059 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/shared/workspaces_core.rs` | 2054 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
@@ -368,6 +367,7 @@ status: generated
 | `src/features/project-memory/components/MemoryPickGate.tsx` | 880 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/settings/components/settings-view/sections/WebServiceSettings.test.tsx` | 876 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |
 | `src-tauri/src/computer_use/broker.rs` | 875 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
+| `src-tauri/src/git/tests.rs` | 872 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `scripts/perf-archive-readiness.mjs` | 871 | mjs | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/project-map/utils/incrementalGeneration.ts` | 870 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadMessaging.context-injection.test.tsx` | 869 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |

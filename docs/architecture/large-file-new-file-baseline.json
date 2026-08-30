@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T19:00:32.077Z",
+  "generatedAt": "2026-08-30T19:15:51.818Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -434,16 +434,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src-tauri/src/git/mod.rs",
-      "lines": 2720,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src/features/threads/hooks/useQueuedSend.test.tsx",
       "lines": 2718,
       "type": "ts/tsx",
@@ -550,16 +540,6 @@
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/composer/components/Composer.tsx",
-      "lines": 2573,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -976,6 +956,16 @@
     {
       "path": "src/features/git-history/components/git-history-panel/components/GitHistoryPanelDialogs.tsx",
       "lines": 2076,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/composer/components/Composer.tsx",
+      "lines": 2070,
       "type": "ts/tsx",
       "policyId": "feature-hotpath",
       "priority": "P1",
@@ -3526,6 +3516,16 @@
     {
       "path": "src-tauri/src/computer_use/broker.rs",
       "lines": 875,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/git/tests.rs",
+      "lines": 872,
       "type": "rust",
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
