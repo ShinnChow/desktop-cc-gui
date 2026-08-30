@@ -8,15 +8,15 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T14:45:54.700Z
+- Generated at: 2026-08-30T14:54:59.805Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
-- Count: 385
+- Count: 386
 
 | File | Lines | Type | Policy | Priority | Warn | Fail | Severity | Status | Baseline | Delta |
 |---|---:|---|---|---|---:|---:|---|---|---:|---:|
-| `src-tauri/src/shared_session_v2.rs` | 7685 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/engine/commands.rs` | 5432 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
+| `src-tauri/src/shared_session_v2.rs` | 5349 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
 | `src-tauri/src/bin/cc_gui_daemon/daemon_state.rs` | 5339 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/git-history-panel/components/GitHistoryPanelImpl.tsx` | 4933 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src-tauri/src/shared_runtime_coordinator.rs` | 4864 | rust | bridge-runtime-critical | P0 | 2200 | 800 | fail | captured |  |  |
@@ -259,6 +259,7 @@ status: generated
 | `src-tauri/src/session_index/commands.rs` | 1196 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/git-history/components/GitHistoryWorktreePanel.tsx` | 1190 | ts/tsx | feature-hotpath | P1 | 2400 | 800 | fail | captured |  |  |
 | `src/utils/threadItemsFileChanges.ts` | 1190 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
+| `src-tauri/src/shared_session_v2_shared_interrupt_owner_tests.rs` | 1189 | rust | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/styles/messages.part2.css` | 1165 | css | styles | P1 | 2200 | 800 | fail | captured |  |  |
 | `src/features/status-panel/hooks/useStatusPanelData.ts` | 1149 | ts/tsx | default-source | P1 | 2600 | 800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadsReducer.completed-duplicate.test.ts` | 1137 | ts/tsx | test-files | P2 | 2600 | 800 | fail | captured |  |  |

@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-08-30T14:45:54.703Z",
+  "generatedAt": "2026-08-30T14:54:59.807Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
     {
-      "path": "src-tauri/src/shared_session_v2.rs",
-      "lines": 7685,
+      "path": "src-tauri/src/engine/commands.rs",
+      "lines": 5432,
       "type": "rust",
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
@@ -14,8 +14,8 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src-tauri/src/engine/commands.rs",
-      "lines": 5432,
+      "path": "src-tauri/src/shared_session_v2.rs",
+      "lines": 5349,
       "type": "rust",
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
@@ -2437,6 +2437,16 @@
       "path": "src/utils/threadItemsFileChanges.ts",
       "lines": 1190,
       "type": "ts/tsx",
+      "policyId": "default-source",
+      "priority": "P1",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/shared_session_v2_shared_interrupt_owner_tests.rs",
+      "lines": 1189,
+      "type": "rust",
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,

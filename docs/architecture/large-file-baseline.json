@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-08-30T14:45:24.489Z",
+  "generatedAt": "2026-08-30T14:54:58.959Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
     {
-      "path": "src-tauri/src/shared_session_v2.rs",
-      "lines": 7685,
+      "path": "src-tauri/src/engine/commands.rs",
+      "lines": 5432,
       "type": "rust",
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
@@ -14,8 +14,8 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src-tauri/src/engine/commands.rs",
-      "lines": 5432,
+      "path": "src-tauri/src/shared_session_v2.rs",
+      "lines": 5349,
       "type": "rust",
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
