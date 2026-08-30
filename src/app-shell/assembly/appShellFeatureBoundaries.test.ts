@@ -15,6 +15,8 @@ const FEATURE_SHELL_BRIDGE_ALLOWLIST = new Set([
   "features/session-activity/hooks/useSessionRadarFeed.ts",
   // DSH 切会话回写 composer 选择（c181f935d / ea8fd49ed 引入的既有桥）
   "features/threads/hooks/useThreadActionsResumeThread.ts",
+  // useThreadActionsResumeThread 拆分随迁（同一 DSH 桥，2026-08-31 拆分）
+  "features/threads/hooks/useThreadActionsResumeThread.legacyFallback.ts",
   "features/threads/loaders/dshHistoryLoader.ts",
 ]);
 

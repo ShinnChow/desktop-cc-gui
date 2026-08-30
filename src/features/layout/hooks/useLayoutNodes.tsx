@@ -1,6 +1,5 @@
 import {
   lazy,
-  Profiler,
   Suspense,
   useCallback,
   useEffect,
@@ -13,7 +12,7 @@ import {
 import { useEventCallback } from "../../../utils/useEventCallback";
 import { useSidebarThreadStatusProjection } from "../../threads/hooks/useSidebarThreadStatusProjection";
 import { useTranslation } from "react-i18next";
-import { Sidebar } from "../../app/components/Sidebar";
+import { buildSidebarNode } from "./layoutNodes/sidebarNode";
 import { HomeChat } from "../../home/components/HomeChat";
 import { MainHeader } from "../../app/components/MainHeader";
 import {
@@ -21,7 +20,6 @@ import {
   type CodexProviderProfileSelection,
   type CodexProviderProfileOption,
 } from "../../threads/constants/codexProviderProfiles";
-import { isManagedEngineProviderProfileId } from "../../threads/hooks/sessionLifecycleController";
 import { UpdateToast } from "../../update/components/UpdateToast";
 import { ErrorToasts } from "../../notifications/components/ErrorToasts";
 import { GlobalRuntimeNoticeDock } from "../../notifications/components/GlobalRuntimeNoticeDock";
@@ -67,7 +65,6 @@ import type {
   CustomCommandOption,
   EngineType,
   RequestUserInputRequest,
-  ThreadSummary,
 } from "../../../types";
 import { __profile as threadsRuntimeProfile } from "../../threads/hooks/useThreadsReducer";
 import { getClientStoreSync } from "../../../services/clientStorage";
@@ -86,10 +83,7 @@ import {
   buildCodeAnnotationDedupeKey,
   createCodeAnnotationSelection,
 } from "../../code-annotations/utils/codeAnnotations";
-import type {
-  ConversationEngine,
-  ConversationState,
-} from "../../threads/contracts/conversationCurtainContracts";
+import type { ConversationState } from "../../threads/contracts/conversationCurtainContracts";
 import { resolveDiffPathFromWorkspacePath } from "../../../utils/workspacePaths";
 import { resolvePresentationProfile } from "../../../conversation-presentation/presentationProfile";
 import { appendQueuedHandoffBubbleIfNeeded } from "../../threads/utils/queuedHandoffBubble";
@@ -116,22 +110,13 @@ import {
   stabilizeListByMemberIdentity,
   type ActiveCanvasSnapshot,
 } from "./activeCanvasStore";
-import { ActiveCanvasComposer } from "./activeCanvasComposerNode";
-import { SharedSendStatusBar } from "../../shared-session/components/SharedSendStatusBar";
-import { ProviderContinuationContextCard } from "../../shared-session/components/ProviderContinuationContextCard";
 import { buildProviderContinuationSourceExcerpt } from "../../shared-session/components/providerContinuationSourceExcerpt";
 import { useSharedSendState } from "../../shared-session/runtime/sharedSendStateStore";
 import { useSharedSendStateRestore } from "../../shared-session/runtime/useSharedSendStateRestore";
-import {
-  isComposerInputLocked,
-  isComposerSubmitLocked,
-  isPickerLocked,
-} from "../../shared-session/target/sendStateMachine";
 import { buildShellRuntimeSummary } from "./layoutShellSummary";
-import { buildConversationCanvasNode } from "./conversationCanvasNode";
-import { CollabTimelineWaiting } from "../../multi-agent/components/CollabTimelineWaiting";
+import { buildComposerNode } from "./layoutNodes/composerNode";
+import { buildMessagesNode } from "./layoutNodes/messagesNode";
 import { useCollabUiState } from "../../multi-agent/store/collabUiStore";
-import { SharedProviderRetryHint } from "../../shared-session/provider-retry/SharedProviderRetryHint";
 import { useSharedProviderRetry } from "../../shared-session/provider-retry/useSharedProviderRetry";
 import { resolveIsSharedSession } from "../../shared-session/utils/sharedSessionIdentity";
 import { useLayoutTopbarSessionTabs } from "./useLayoutTopbarSessionTabs";
@@ -184,6 +169,11 @@ import type {
   LayoutNodesResult,
   RightPanelTabSelection,
 } from "./layoutNodesTypes";
+import {
+  collectCanvasChildSubagentThreads,
+  resolveActiveConversationEngine,
+} from "./layoutNodes/engineResolve";
+export { collectCanvasChildSubagentThreads } from "./layoutNodes/engineResolve";
 const EMPTY_COMMANDS: CustomCommandOption[] = [];
 const EMPTY_PROJECT_MAP_IMPACT_INPUT: ProjectMapImpactInput = {
   filePaths: [],
@@ -193,152 +183,6 @@ const EMPTY_PROJECT_MAP_IMPACT_INPUT: ProjectMapImpactInput = {
     fileCount: 0,
   },
 };
-
-function toConversationEngine(
-  engine: EngineType | undefined,
-): ConversationEngine {
-  if (
-    engine === "claude" ||
-    engine === "gemini" ||
-    engine === "grok" ||
-    engine === "kimi" ||
-    engine === "opencode" ||
-    engine === "dsh" ||
-    engine === "qoder" ||
-    engine === "pi"
-  ) {
-    return engine;
-  }
-  return "codex";
-}
-
-function inferConversationEngineFromThreadId(
-  threadId: string | null | undefined,
-): ConversationEngine | null {
-  const normalizedThreadId = threadId?.trim().toLowerCase();
-  if (!normalizedThreadId) {
-    return null;
-  }
-
-  if (
-    normalizedThreadId.startsWith("claude:") ||
-    normalizedThreadId.startsWith("claude-pending-")
-  ) {
-    return "claude";
-  }
-  if (
-    normalizedThreadId.startsWith("gemini:") ||
-    normalizedThreadId.startsWith("gemini-pending-")
-  ) {
-    return "gemini";
-  }
-  if (
-    normalizedThreadId.startsWith("grok:") ||
-    normalizedThreadId.startsWith("grok-pending-")
-  ) {
-    return "grok";
-  }
-  if (
-    normalizedThreadId.startsWith("kimi:") ||
-    normalizedThreadId.startsWith("kimi-pending-")
-  ) {
-    return "kimi";
-  }
-  if (
-    normalizedThreadId.startsWith("pi:") ||
-    normalizedThreadId.startsWith("pi-pending-")
-  ) {
-    return "pi";
-  }
-  if (
-    normalizedThreadId.startsWith("opencode:") ||
-    normalizedThreadId.startsWith("opencode-pending-")
-  ) {
-    return "opencode";
-  }
-  if (
-    normalizedThreadId.startsWith("dsh:") ||
-    normalizedThreadId.startsWith("dsh-pending-")
-  ) {
-    return "dsh";
-  }
-  if (
-    normalizedThreadId.startsWith("qoder:") ||
-    normalizedThreadId.startsWith("qoder-pending-")
-  ) {
-    return "qoder";
-  }
-  if (
-    normalizedThreadId.startsWith("codex:") ||
-    normalizedThreadId.startsWith("codex-pending-")
-  ) {
-    return "codex";
-  }
-
-  return null;
-}
-
-function resolveActiveConversationEngine(
-  activeThreadSummary: ThreadSummary | null,
-  activeThreadId: string | null,
-  selectedEngine: EngineType | undefined,
-): ConversationEngine {
-  const threadEngine =
-    activeThreadSummary?.selectedEngine ??
-    activeThreadSummary?.engineSource ??
-    inferConversationEngineFromThreadId(activeThreadId);
-  return toConversationEngine(threadEngine ?? selectedEngine);
-}
-
-/**
- * 收集当前 canvas 会话的「子代理线程」。
- *
- * - parent 直接挂到 activeId 的行（grok 等 Shared remap 后的子行）
- * - Shared 父：`claude:subagent:{owner}:{agentId}` 行 parentThreadId 为空，
- *   owner 命中该 Shared 的 nativeThreadIds 即视为子代理
- *   （与侧栏树对 claude:subagent id 的解析口径一致）。
- */
-export function collectCanvasChildSubagentThreads(
-  activeId: string | null | undefined,
-  workspaceId: string | null | undefined,
-  threads: readonly ThreadSummary[] | undefined,
-  threadParentById: Record<string, string>,
-  nativeThreadIds: readonly string[] | undefined,
-): ThreadSummary[] {
-  if (!activeId || !workspaceId || !threads) {
-    return [];
-  }
-  const isSharedParent = activeId.startsWith("shared:");
-  const owners = isSharedParent
-    ? (nativeThreadIds ?? []).filter((id) => id.trim().length > 0)
-    : [];
-  return threads.filter((thread) => {
-    // pi fork 派生会话不是子代理：pi 没有 subagent 概念，parentThreadId 在 pi
-    // 语义里是会话分支（fork-to-new-file），分支归属由会话树单独控制，
-    // 不计入子代理（capability-router-allow-engine-branch：pi 分域，见
-    // enhance-pi-native-rpc-session）。
-    if (thread.engineSource === "pi" || thread.id.startsWith("pi:")) {
-      return false;
-    }
-    const parent =
-      thread.parentThreadId ?? threadParentById[thread.id] ?? null;
-    if (parent === activeId) {
-      return true;
-    }
-    if (owners.length === 0) {
-      return false;
-    }
-    return owners.some((owner) => {
-      const bare = owner.startsWith("claude:")
-        ? owner.slice("claude:".length)
-        : owner;
-      return (
-        thread.id.startsWith(`claude:subagent:${owner}:`) ||
-        thread.id.startsWith(`claude:subagent:${bare}:`)
-      );
-    });
-  });
-}
 
 function flattenLayoutNodesOptions(
   options: LayoutNodesOptions,
@@ -775,137 +619,121 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
   // 稳定 sidebar 元素引用，避免 AppLayout memo 因 ReactNode 身份变化而失效。
   // Sidebar 本身已 memo；根链合法更新时若 props 未变则整棵侧栏跳过协调。
   const sidebarNode = useMemo(
-    () => (
-      <Profiler id="sidebar" onRender={handleRuntimeProfileRender}>
-        <Sidebar
-          workspaces={options.workspaces}
-          groupedWorkspaces={options.groupedWorkspaces}
-          hasWorkspaceGroups={options.hasWorkspaceGroups}
-          deletingWorktreeIds={options.deletingWorktreeIds}
-          threadsByWorkspace={options.threadsByWorkspace}
-          activeItems={sidebarActiveItems}
-          threadParentById={options.threadParentById}
-          threadStatusById={sidebarThreadStatusById}
-          runningSessionCountByWorkspaceId={
-            options.runningSessionCountByWorkspaceId
-          }
-          recentSessionCountByWorkspaceId={
-            options.recentCompletedSessionCountByWorkspaceId
-          }
-          hydratedThreadListWorkspaceIds={options.hydratedThreadListWorkspaceIds}
-          threadListLoadingByWorkspace={options.threadListLoadingByWorkspace}
-          threadListPagingByWorkspace={options.threadListPagingByWorkspace}
-          threadListCursorByWorkspace={options.threadListCursorByWorkspace}
-          activeWorkspaceId={options.activeWorkspaceId}
-          activeThreadId={options.activeThreadId}
-          systemProxyEnabled={options.systemProxyEnabled}
-          systemProxyUrl={options.systemProxyUrl}
-          onUpdateSystemProxy={options.onUpdateSystemProxy}
-          accountRateLimits={options.activeRateLimits}
-          usageShowRemaining={options.usageShowRemaining}
-          showProviderLabels={options.showSidebarProviderLabels}
-          defaultVisibleThreadRootCount={options.defaultVisibleThreadRootCount}
-          onChangeDefaultVisibleThreadRootCount={
-            options.onChangeDefaultVisibleThreadRootCount
-          }
-          accountInfo={options.accountInfo}
-          onSwitchAccount={options.onSwitchAccount}
-          onCancelSwitchAccount={options.onCancelSwitchAccount}
-          accountSwitching={options.accountSwitching}
-          onOpenSettings={options.onOpenSettings}
-          onOpenSessionManagement={options.onOpenSessionManagement}
-          onOpenDebug={options.onOpenDebug}
-          showDebugButton={options.showDebugButton}
-          onAddWorkspace={options.onAddWorkspace}
-          onSelectHome={options.onSelectHome}
-          onSelectWorkspace={options.onSelectWorkspace}
-          onReorderWorkspaces={options.onReorderWorkspaces}
-          onConnectWorkspace={options.onConnectWorkspace}
-          onAddAgent={options.onAddAgent}
-          engineOptions={options.engineOptions}
-          onRefreshEngineOptions={options.onRefreshEngineOptions}
-          onAddSharedAgent={options.onAddSharedAgent}
-          onAddWorktreeAgent={options.onAddWorktreeAgent}
-          onAddCloneAgent={options.onAddCloneAgent}
-          onToggleWorkspaceCollapse={options.onToggleWorkspaceCollapse}
-          onSelectThread={options.onSelectThread}
-          onProviderContinuationTargetReady={
-            options.onProviderContinuationTargetReady
-          }
-          onDeleteThread={options.onDeleteThread}
-          onArchiveThread={options.onArchiveThread}
-          deleteConfirmThreadId={options.deleteConfirmThreadId}
-          deleteConfirmWorkspaceId={options.deleteConfirmWorkspaceId}
-          deleteConfirmBusy={options.deleteConfirmBusy}
-          onCancelDeleteConfirm={options.onCancelDeleteConfirm}
-          onConfirmDeleteConfirm={options.onConfirmDeleteConfirm}
-          renameThreadId={options.renameThreadId}
-          renameWorkspaceId={options.renameWorkspaceId}
-          renameName={options.renameName}
-          onRenameChange={options.onRenameChange}
-          onRenameCancel={options.onRenameCancel}
-          onRenameConfirm={options.onRenameConfirm}
-          onSyncThread={options.onSyncThread}
-          pinThread={options.pinThread}
-          unpinThread={options.unpinThread}
-          isThreadPinned={options.isThreadPinned}
-          isThreadAutoNaming={options.isThreadAutoNaming}
-          getPinTimestamp={options.getPinTimestamp}
-          pinnedThreadsVersion={options.pinnedThreadsVersion}
-          onRenameThread={options.onRenameThread}
-          onAutoNameThread={options.onAutoNameThread}
-          onOpenClaudeTui={options.onOpenClaudeTui}
-          onDeleteWorkspace={options.onDeleteWorkspace}
-          onDeleteWorktree={options.onDeleteWorktree}
-          onRenameWorkspaceAlias={options.onRenameWorkspaceAlias}
-          workspaceGroups={options.workspaceGroups}
-          onAssignWorkspaceGroup={options.onAssignWorkspaceGroup}
-          onLoadOlderThreads={options.onLoadOlderThreads}
-          onReloadWorkspaceThreads={options.onReloadWorkspaceThreads}
-          onQuickReloadWorkspaceThreads={options.onQuickReloadWorkspaceThreads}
-          onRequestRootSessionFolderDraft={options.onRequestRootSessionFolderDraft}
-          isExitedSessionsHidden={options.isExitedSessionsHidden}
-          onToggleExitedSessionsHidden={options.onToggleExitedSessionsHidden}
-          rootSessionFolderDraftRequestByWorkspaceId={
-            options.rootSessionFolderDraftRequestByWorkspaceId
-          }
-          workspaceDropTargetRef={options.workspaceDropTargetRef}
-          isWorkspaceDropActive={options.isWorkspaceDropActive}
-          workspaceDropText={options.workspaceDropText}
-          onWorkspaceDragOver={options.onWorkspaceDragOver}
-          onWorkspaceDragEnter={options.onWorkspaceDragEnter}
-          onWorkspaceDragLeave={options.onWorkspaceDragLeave}
-          onWorkspaceDrop={options.onWorkspaceDrop}
-          appMode={options.appMode}
-          onAppModeChange={options.onAppModeChange}
-          onOpenHomeChat={options.onOpenHomeChat}
-          onLockPanel={options.onLockPanel}
-          onOpenProjectMemory={options.onOpenProjectMemory}
-          onOpenReleaseNotes={options.onOpenReleaseNotes}
-          onOpenGlobalSearch={options.onOpenGlobalSearch}
-          onOpenQuickSwitcher={options.onOpenQuickSwitcher}
-          onCollapseSidebar={options.onCollapseSidebar}
-          globalSearchShortcut={options.globalSearchShortcut}
-          openChatShortcut={options.openChatShortcut}
-          openSettingsShortcut={options.openSettingsShortcut}
-          showLoadingProgressDialog={options.showLoadingProgressDialog}
-          hideLoadingProgressDialog={options.hideLoadingProgressDialog}
-          onOpenSpecHub={options.onOpenSpecHub}
-          onOpenWorkspaceHome={options.onOpenWorkspaceHome}
-          showTerminalButton={options.showTerminalButton}
-          isTerminalOpen={options.terminalOpen}
-          onToggleTerminal={options.onToggleTerminal}
-          runtimeNoticeDockNode={sidebarRuntimeNoticeDockNode}
-          onOpenRuntimeNotice={
-            showGlobalRuntimeNoticeDock ? globalRuntimeNoticeDock.expand : undefined
-          }
-          showRuntimeNoticeMenuItem={
-            Boolean(showGlobalRuntimeNoticeDock && !options.isPhone)
-          }
-          runtimeNoticeHasError={globalRuntimeNoticeDock.status === "has-error"}
-        />
-      </Profiler>
-    ),
+    () =>
+      buildSidebarNode({
+        handleRuntimeProfileRender,
+        sidebarActiveItems,
+        sidebarThreadStatusById,
+        sidebarRuntimeNoticeDockNode,
+        showGlobalRuntimeNoticeDock,
+        globalRuntimeNoticeDock,
+        workspaces: options.workspaces,
+        groupedWorkspaces: options.groupedWorkspaces,
+        hasWorkspaceGroups: options.hasWorkspaceGroups,
+        deletingWorktreeIds: options.deletingWorktreeIds,
+        threadsByWorkspace: options.threadsByWorkspace,
+        threadParentById: options.threadParentById,
+        runningSessionCountByWorkspaceId: options.runningSessionCountByWorkspaceId,
+        recentCompletedSessionCountByWorkspaceId: options.recentCompletedSessionCountByWorkspaceId,
+        hydratedThreadListWorkspaceIds: options.hydratedThreadListWorkspaceIds,
+        threadListLoadingByWorkspace: options.threadListLoadingByWorkspace,
+        threadListPagingByWorkspace: options.threadListPagingByWorkspace,
+        threadListCursorByWorkspace: options.threadListCursorByWorkspace,
+        activeWorkspaceId: options.activeWorkspaceId,
+        activeThreadId: options.activeThreadId,
+        systemProxyEnabled: options.systemProxyEnabled,
+        systemProxyUrl: options.systemProxyUrl,
+        onUpdateSystemProxy: options.onUpdateSystemProxy,
+        activeRateLimits: options.activeRateLimits,
+        usageShowRemaining: options.usageShowRemaining,
+        showSidebarProviderLabels: options.showSidebarProviderLabels,
+        defaultVisibleThreadRootCount: options.defaultVisibleThreadRootCount,
+        onChangeDefaultVisibleThreadRootCount: options.onChangeDefaultVisibleThreadRootCount,
+        accountInfo: options.accountInfo,
+        onSwitchAccount: options.onSwitchAccount,
+        onCancelSwitchAccount: options.onCancelSwitchAccount,
+        accountSwitching: options.accountSwitching,
+        onOpenSettings: options.onOpenSettings,
+        onOpenSessionManagement: options.onOpenSessionManagement,
+        onOpenDebug: options.onOpenDebug,
+        showDebugButton: options.showDebugButton,
+        onAddWorkspace: options.onAddWorkspace,
+        onSelectHome: options.onSelectHome,
+        onSelectWorkspace: options.onSelectWorkspace,
+        onReorderWorkspaces: options.onReorderWorkspaces,
+        onConnectWorkspace: options.onConnectWorkspace,
+        onAddAgent: options.onAddAgent,
+        engineOptions: options.engineOptions,
+        onRefreshEngineOptions: options.onRefreshEngineOptions,
+        onAddSharedAgent: options.onAddSharedAgent,
+        onAddWorktreeAgent: options.onAddWorktreeAgent,
+        onAddCloneAgent: options.onAddCloneAgent,
+        onToggleWorkspaceCollapse: options.onToggleWorkspaceCollapse,
+        onSelectThread: options.onSelectThread,
+        onProviderContinuationTargetReady: options.onProviderContinuationTargetReady,
+        onDeleteThread: options.onDeleteThread,
+        onArchiveThread: options.onArchiveThread,
+        deleteConfirmThreadId: options.deleteConfirmThreadId,
+        deleteConfirmWorkspaceId: options.deleteConfirmWorkspaceId,
+        deleteConfirmBusy: options.deleteConfirmBusy,
+        onCancelDeleteConfirm: options.onCancelDeleteConfirm,
+        onConfirmDeleteConfirm: options.onConfirmDeleteConfirm,
+        renameThreadId: options.renameThreadId,
+        renameWorkspaceId: options.renameWorkspaceId,
+        renameName: options.renameName,
+        onRenameChange: options.onRenameChange,
+        onRenameCancel: options.onRenameCancel,
+        onRenameConfirm: options.onRenameConfirm,
+        onSyncThread: options.onSyncThread,
+        pinThread: options.pinThread,
+        unpinThread: options.unpinThread,
+        isThreadPinned: options.isThreadPinned,
+        isThreadAutoNaming: options.isThreadAutoNaming,
+        getPinTimestamp: options.getPinTimestamp,
+        pinnedThreadsVersion: options.pinnedThreadsVersion,
+        onRenameThread: options.onRenameThread,
+        onAutoNameThread: options.onAutoNameThread,
+        onOpenClaudeTui: options.onOpenClaudeTui,
+        onDeleteWorkspace: options.onDeleteWorkspace,
+        onDeleteWorktree: options.onDeleteWorktree,
+        onRenameWorkspaceAlias: options.onRenameWorkspaceAlias,
+        workspaceGroups: options.workspaceGroups,
+        onAssignWorkspaceGroup: options.onAssignWorkspaceGroup,
+        onLoadOlderThreads: options.onLoadOlderThreads,
+        onReloadWorkspaceThreads: options.onReloadWorkspaceThreads,
+        onQuickReloadWorkspaceThreads: options.onQuickReloadWorkspaceThreads,
+        onRequestRootSessionFolderDraft: options.onRequestRootSessionFolderDraft,
+        isExitedSessionsHidden: options.isExitedSessionsHidden,
+        onToggleExitedSessionsHidden: options.onToggleExitedSessionsHidden,
+        rootSessionFolderDraftRequestByWorkspaceId: options.rootSessionFolderDraftRequestByWorkspaceId,
+        workspaceDropTargetRef: options.workspaceDropTargetRef,
+        isWorkspaceDropActive: options.isWorkspaceDropActive,
+        workspaceDropText: options.workspaceDropText,
+        onWorkspaceDragOver: options.onWorkspaceDragOver,
+        onWorkspaceDragEnter: options.onWorkspaceDragEnter,
+        onWorkspaceDragLeave: options.onWorkspaceDragLeave,
+        onWorkspaceDrop: options.onWorkspaceDrop,
+        appMode: options.appMode,
+        onAppModeChange: options.onAppModeChange,
+        onOpenHomeChat: options.onOpenHomeChat,
+        onLockPanel: options.onLockPanel,
+        onOpenProjectMemory: options.onOpenProjectMemory,
+        onOpenReleaseNotes: options.onOpenReleaseNotes,
+        onOpenGlobalSearch: options.onOpenGlobalSearch,
+        onOpenQuickSwitcher: options.onOpenQuickSwitcher,
+        onCollapseSidebar: options.onCollapseSidebar,
+        globalSearchShortcut: options.globalSearchShortcut,
+        openChatShortcut: options.openChatShortcut,
+        openSettingsShortcut: options.openSettingsShortcut,
+        showLoadingProgressDialog: options.showLoadingProgressDialog,
+        hideLoadingProgressDialog: options.hideLoadingProgressDialog,
+        onOpenSpecHub: options.onOpenSpecHub,
+        onOpenWorkspaceHome: options.onOpenWorkspaceHome,
+        showTerminalButton: options.showTerminalButton,
+        terminalOpen: options.terminalOpen,
+        onToggleTerminal: options.onToggleTerminal,
+        isPhone: options.isPhone,
+      }),
     [
       globalRuntimeNoticeDock.expand,
       globalRuntimeNoticeDock.status,
@@ -1362,96 +1190,47 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
 
   const messagesNode = useMemo(
     () =>
-      buildConversationCanvasNode({
-        isProviderContinuation:
-          activeThreadSummary?.originKind === "provider-continuation",
-        timelineTrailingNode: (
-          <>
-            <CollabTimelineWaiting
-              workspaceId={options.activeWorkspaceId}
-              threadId={options.activeThreadId ?? null}
-            />
-            <SharedProviderRetryHint
-              workspaceId={options.activeWorkspaceId}
-              threadId={options.activeThreadId ?? null}
-            />
-          </>
-        ),
-        continuationContextNode:
-          activeThreadSummary?.originKind === "provider-continuation" ? (
-            <ProviderContinuationContextCard
-              thread={activeThreadSummary}
-              source={continuationContext?.source ?? null}
-              sourceExcerpt={continuationContext?.sourceExcerpt ?? null}
-              onOpenSource={continuationContext?.onOpenSource ?? null}
-            />
-          ) : null,
-        messagesProps: {
-          items: EMPTY_ACTIVE_CANVAS_ITEMS,
-          threadId: null,
-          workspaceId: null,
-          workspacePath: null,
-          openTargets: options.openAppTargets,
-          selectedOpenAppId: options.selectedOpenAppId,
-          showMessageAnchors,
-          codeBlockCopyUseModifier: options.codeBlockCopyUseModifier,
-          userInputRequests: [],
-          approvals: [],
-          workspaces: options.workspaces,
-          onUserInputSubmit: options.handleUserInputSubmit,
-          onUserInputDismiss: options.handleUserInputDismiss,
-          onRecoverThreadRuntime: options.onRecoverThreadRuntime,
-          onRecoverThreadRuntimeAndResend:
-            options.onRecoverThreadRuntimeAndResend,
-          onThreadRecoveryFork: options.onThreadRecoveryFork,
-          onForkFromMessage: onForkFromMessage
-            ? handleOpenForkConfirmFromMessage
-            : undefined,
-          onRewindFromMessage: options.onRewind
-            ? handleOpenRewindDialogFromMessage
-            : undefined,
-          onApprovalDecision: options.handleApprovalDecision,
-          onApprovalBatchAccept: options.handleApprovalBatchAccept,
-          onApprovalRemember: options.handleApprovalRemember,
-          conversationState: null,
-          presentationProfile,
-          activeEngine: conversationEngine,
-          claudeThinkingVisible,
-          activeCollaborationModeId: options.selectedCollaborationModeId,
-          plan: null,
-          isPlanMode: options.isPlanMode,
-          isPlanProcessing: false,
-          onOpenDiffPath: handleOpenDiffPath,
-          onPreviewFileDiff: handlePreviewFileDiff,
-          onOpenPlanPanel: options.onOpenPlanPanel,
-          onExitPlanModeExecute: options.handleExitPlanModeExecute,
-          onOpenWorkspaceFile: options.onOpenFile,
-          onCaptureNote: handleCaptureWorkspaceNote,
-          agentTaskScrollRequest: options.agentTaskScrollRequest,
-          isThinking: false,
-          isHistoryLoading: false,
-          historyRecoveryFailureReason: null,
-          onRetryHistory: options.onRecoverThreadRuntime
-            ? handleRetryHistory
-            : undefined,
-          isContextCompacting: false,
-          proxyEnabled: options.systemProxyEnabled,
-          proxyUrl: options.systemProxyUrl,
-          processingStartedAt: null,
-          lastDurationMs: null,
-          heartbeatPulse: 0,
-          codexSilentSuspectedAt: null,
-        },
-        forkConfirmDialogProps: {
-          userMessageId: forkConfirmUserMessageId,
-          onCancel: handleCancelForkConfirm,
-          onConfirm: handleConfirmForkFromMessage,
-          showProviderSelector: conversationEngine === "codex",
-          defaultProviderProfileId:
-            activeThreadSummary?.providerProfileId ??
-            CODEX_DISK_PROVIDER_PROFILE_ID,
-          providerProfiles: codexForkProviderProfiles,
-        },
+      buildMessagesNode({
+        activeThreadSummary,
+        continuationContext,
+        showMessageAnchors,
+        onForkFromMessage,
+        handleOpenForkConfirmFromMessage,
+        handleOpenRewindDialogFromMessage,
+        presentationProfile,
+        conversationEngine,
+        claudeThinkingVisible,
+        handleOpenDiffPath,
+        handlePreviewFileDiff,
+        handleCaptureWorkspaceNote,
+        handleRetryHistory,
+        forkConfirmUserMessageId,
+        handleCancelForkConfirm,
+        handleConfirmForkFromMessage,
+        codexForkProviderProfiles,
+        activeWorkspaceId: options.activeWorkspaceId,
+        activeThreadId: options.activeThreadId,
+        openAppTargets: options.openAppTargets,
+        selectedOpenAppId: options.selectedOpenAppId,
+        codeBlockCopyUseModifier: options.codeBlockCopyUseModifier,
+        workspaces: options.workspaces,
+        handleUserInputSubmit: options.handleUserInputSubmit,
+        handleUserInputDismiss: options.handleUserInputDismiss,
+        onRecoverThreadRuntime: options.onRecoverThreadRuntime,
+        onRecoverThreadRuntimeAndResend: options.onRecoverThreadRuntimeAndResend,
+        onThreadRecoveryFork: options.onThreadRecoveryFork,
+        onRewind: options.onRewind,
+        handleApprovalDecision: options.handleApprovalDecision,
+        handleApprovalBatchAccept: options.handleApprovalBatchAccept,
+        handleApprovalRemember: options.handleApprovalRemember,
+        selectedCollaborationModeId: options.selectedCollaborationModeId,
+        isPlanMode: options.isPlanMode,
+        onOpenPlanPanel: options.onOpenPlanPanel,
+        handleExitPlanModeExecute: options.handleExitPlanModeExecute,
+        onOpenFile: options.onOpenFile,
+        agentTaskScrollRequest: options.agentTaskScrollRequest,
+        systemProxyEnabled: options.systemProxyEnabled,
+        systemProxyUrl: options.systemProxyUrl,
       }),
     [
       options.systemProxyEnabled,
@@ -1766,223 +1545,144 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
       externalNoteCardRequest: ComposerNoteCardSelectionRequest | null = null,
       createSessionTargetPicker: boolean = false,
     ) =>
-    options.showComposer ? (
-      <Profiler id="composer" onRender={handleRuntimeProfileRender}>
-        {/*
-          SharedSendStatusBar 与无协作 Shared 一致：贴在 Composer 输入区底部集群。
-          放在 ActiveCanvasComposer 之后，避免协作 sticky 卡把状态条夹在中间。
-        */}
-        <ActiveCanvasComposer
-          items={EMPTY_ACTIVE_CANVAS_ITEMS}
-          activeThreadId={null}
-          threadItemsByThread={{}}
-          threadParentById={options.threadParentById}
-          threadStatusById={{}}
-          onSend={options.onSend}
-          onQueue={options.onQueue}
-          onRequestContextCompaction={options.onRequestContextCompaction}
-          onStop={options.onStop}
-          completionEmailSelected={options.completionEmailSelected}
-          completionEmailDisabled={options.completionEmailDisabled}
-          onToggleCompletionEmail={options.onToggleCompletionEmail}
-          onRewind={options.onRewind}
-          rewindDialogRequest={rewindDialogRequest}
-          onRewindDialogRequestConsumed={handleRewindDialogRequestConsumed}
-          canStop={options.canStop}
-          disabled={
-            options.isReviewing ||
-            (!createSessionTargetPicker &&
-              isComposerInputLocked(sharedSendState))
-          }
-          submitDisabled={
-            !createSessionTargetPicker &&
-            isComposerSubmitLocked(sharedSendState)
-          }
-          contextUsage={null}
-          contextDualViewEnabled={options.contextDualViewEnabled}
-          codexAutoCompactionEnabled={options.codexAutoCompactionEnabled}
-          codexAutoCompactionThresholdPercent={
-            options.codexAutoCompactionThresholdPercent
-          }
-          onCodexAutoCompactionSettingsChange={
-            options.onCodexAutoCompactionSettingsChange
-          }
-          isContextCompacting={activeThreadStatus?.isContextCompacting ?? false}
-          codexCompactionLifecycleState={
-            activeThreadStatus?.codexCompactionLifecycleState ?? "idle"
-          }
-          codexCompactionSource={
-            activeThreadStatus?.codexCompactionSource ?? null
-          }
-          codexCompactionCompletedAt={
-            activeThreadStatus?.codexCompactionCompletedAt ?? null
-          }
-          lastTokenUsageUpdatedAt={
-            activeThreadStatus?.lastTokenUsageUpdatedAt ?? null
-          }
-          accountRateLimits={null}
-          usageShowRemaining={options.usageShowRemaining}
-          onRefreshAccountRateLimits={options.onRefreshAccountRateLimits}
-          queuedMessages={options.activeQueue}
-          userInputRequests={[]}
-          onJumpToUserInputRequest={handleJumpToUserInputRequest}
-          runtimeLifecycleState={composerRuntimeLifecycleState}
-          sendLabel={
-            options.composerSendLabel ??
-            ((isSharedSession &&
-              (sharedSendState === "running" ||
-                sharedSendState === "settling")) ||
-            (options.isProcessing && !options.steerEnabled)
-              ? t("messages.queue")
-              : t("messages.send"))
-          }
-          steerEnabled={options.steerEnabled}
-          isProcessing={options.isProcessing}
-          onDraftChange={options.onDraftChange}
-          attachedImages={options.activeImages}
-          onPickImages={options.onPickImages}
-          onAttachImages={options.onAttachImages}
-          onRemoveImage={options.onRemoveImage}
-          intentCanvasAttachments={options.pendingIntentCanvasDocuments}
-          onRemoveIntentCanvasAttachment={options.onRemovePendingIntentCanvas}
-          prefillDraft={options.prefillDraft}
-          onPrefillHandled={options.onPrefillHandled}
-          insertText={options.insertText}
-          onInsertHandled={options.onInsertHandled}
-          onEditQueued={options.onEditQueued}
-          onDeleteQueued={options.onDeleteQueued}
-          onFuseQueued={options.onFuseQueued}
-          canFuseQueuedMessages={options.canFuseActiveQueue}
-          fuseDisabledReasonKey={options.fuseDisabledReasonKey ?? null}
-          fusingQueuedMessageId={options.activeFusingMessageId}
-          collaborationModes={options.collaborationModes}
-          collaborationModesEnabled={options.collaborationModesEnabled}
-          selectedCollaborationModeId={options.selectedCollaborationModeId}
-          onSelectCollaborationMode={options.onSelectCollaborationMode}
-          isSharedSession={isSharedSession && !createSessionTargetPicker}
-          createSessionTargetPicker={createSessionTargetPicker}
-          onCreationTargetEngineChange={
-            createSessionTargetPicker
-              ? setHomeCreationTargetEngine
-              : undefined
-          }
-          sharedTargetPickerLocked={
-            !createSessionTargetPicker && isPickerLocked(sharedSendState)
-          }
-          engines={options.engines}
-          selectedEngine={options.selectedEngine}
-          onSelectEngine={options.onSelectEngine}
-          models={options.models}
-          providerModelCatalogs={options.providerModelCatalogs}
-          providerProfileId={
-            isManagedEngineProviderProfileId(
-              activeThreadSummary?.providerProfileId,
-            )
-              ? activeThreadSummary?.providerProfileId
-              : null
-          }
-          providerProfileName={activeThreadSummary?.providerProfileName ?? null}
-          dshAgentPreset={activeThreadSummary?.dshAgentPreset ?? null}
-          selectedModelId={options.selectedModelId}
-          onSelectModel={options.onSelectModel}
-          reasoningOptions={options.reasoningOptions}
-          selectedEffort={options.selectedEffort}
-          onSelectEffort={options.onSelectEffort}
-          reasoningSupported={options.reasoningSupported}
-          onResolvedAlwaysThinkingChange={handleResolvedAlwaysThinkingChange}
-          opencodeAgents={options.opencodeAgents}
-          selectedOpenCodeAgent={options.selectedOpenCodeAgent}
-          onSelectOpenCodeAgent={options.onSelectOpenCodeAgent}
-          selectedAgent={composerSelectedAgent}
-          onAgentSelect={options.onSelectAgent}
-          onOpenAgentSettings={options.onOpenAgentSettings}
-          onOpenPromptSettings={options.onOpenPromptSettings}
-          onOpenModelSettings={options.onOpenModelSettings}
-          onOpenCliSettings={options.onOpenCliSettings}
-          onRefreshModelConfig={options.onRefreshModelConfig}
-          isModelConfigRefreshing={options.isModelConfigRefreshing}
-          opencodeVariantOptions={options.opencodeVariantOptions}
-          selectedOpenCodeVariant={options.selectedOpenCodeVariant}
-          onSelectOpenCodeVariant={options.onSelectOpenCodeVariant}
-          accessMode={options.accessMode}
-          onSelectAccessMode={options.onSelectAccessMode}
-          skills={options.skills}
-          customSkillDirectories={options.customSkillDirectories}
-          prompts={options.prompts}
-          commands={composerCommands}
-          files={options.files}
-          directories={options.directories}
-          textareaRef={options.textareaRef}
-          editorSettings={options.composerEditorSettings}
-          sendShortcut={options.composerSendShortcut}
-          interruptShortcutLabel={options.composerInterruptShortcutLabel}
-          textareaHeight={options.textareaHeight}
-          onTextareaHeightChange={options.onTextareaHeightChange}
-          onOpenSkillsSettings={options.onOpenSkillsSettings}
-          onOpenExperimentalSettings={options.onOpenExperimentalSettings}
-          activeFilePath={options.activeComposerFilePath}
-          activeFileLineRange={options.activeComposerFileLineRange}
-          fileReferenceMode={options.fileReferenceMode}
-          activeWorkspaceId={options.activeWorkspaceId}
-          activeWorkspaceName={options.activeWorkspace?.name ?? null}
-          activeWorkspacePath={options.activeWorkspace?.path ?? null}
-          branchControl={branchControlEnabled ? composerBranchControl : null}
-          // 首页（branchControlEnabled=false）的分支/指示器行由 HomeChat 自行渲染
-          footerUsageIndicatorEnabled={branchControlEnabled}
-          rewindWorkspaceGitState={rewindWorkspaceGitState}
-          plan={options.plan}
-          isPlanMode={options.isPlanMode}
-          onOpenDiffPath={handleComposerOpenDiffPath}
-          gitChangedFiles={
-            // 非 git 仓库时传 null，退回 tool 统计；空数组表示 clean working tree
-            options.gitStatus.error === "not a git repository"
-              ? null
-              : options.gitStatus.files
-          }
-          isGitRepository={options.gitStatus.error !== "not a git repository"}
-          onRequestGitStatusRefresh={options.queueGitStatusRefresh}
-          onRevertFile={options.onRevertGitFile}
-          onRevertAllFiles={options.onRevertGitPaths}
-          showStatusPanelToggleOverride={false}
-          statusPanelExpandedOverride={false}
-          onToggleStatusPanelOverride={undefined}
-          selectedCodeAnnotations={selectedCodeAnnotations}
-          onRemoveCodeAnnotation={handleRemoveCodeAnnotation}
-          onClearCodeAnnotations={handleClearCodeAnnotations}
-          externalNoteCardSelectionRequest={externalNoteCardRequest}
-          reviewPrompt={options.reviewPrompt}
-          onReviewPromptClose={options.onReviewPromptClose}
-          onReviewPromptShowPreset={options.onReviewPromptShowPreset}
-          onReviewPromptChoosePreset={options.onReviewPromptChoosePreset}
-          highlightedPresetIndex={options.highlightedPresetIndex}
-          onReviewPromptHighlightPreset={options.onReviewPromptHighlightPreset}
-          highlightedBranchIndex={options.highlightedBranchIndex}
-          onReviewPromptHighlightBranch={options.onReviewPromptHighlightBranch}
-          highlightedCommitIndex={options.highlightedCommitIndex}
-          onReviewPromptHighlightCommit={options.onReviewPromptHighlightCommit}
-          onReviewPromptKeyDown={options.onReviewPromptKeyDown}
-          onReviewPromptSelectBranch={options.onReviewPromptSelectBranch}
-          onReviewPromptSelectBranchAtIndex={
-            options.onReviewPromptSelectBranchAtIndex
-          }
-          onReviewPromptConfirmBranch={options.onReviewPromptConfirmBranch}
-          onReviewPromptSelectCommit={options.onReviewPromptSelectCommit}
-          onReviewPromptSelectCommitAtIndex={
-            options.onReviewPromptSelectCommitAtIndex
-          }
-          onReviewPromptConfirmCommit={options.onReviewPromptConfirmCommit}
-          onReviewPromptUpdateCustomInstructions={
-            options.onReviewPromptUpdateCustomInstructions
-          }
-          onReviewPromptConfirmCustom={options.onReviewPromptConfirmCustom}
-        />
-        <SharedSendStatusBar
-          workspaceId={options.activeWorkspaceId ?? null}
-          threadId={options.activeThreadId ?? null}
-          isSharedSession={isSharedSession && !createSessionTargetPicker}
-        />
-      </Profiler>
-    ) : null,
+      buildComposerNode({
+        branchControlEnabled,
+        externalNoteCardRequest,
+        createSessionTargetPicker,
+        handleRuntimeProfileRender,
+        rewindDialogRequest,
+        handleRewindDialogRequestConsumed,
+        isSharedSession,
+        sharedSendState,
+        activeThreadStatus,
+        handleJumpToUserInputRequest,
+        composerRuntimeLifecycleState,
+        t,
+        composerSelectedAgent,
+        composerBranchControl,
+        rewindWorkspaceGitState,
+        handleComposerOpenDiffPath,
+        selectedCodeAnnotations,
+        handleRemoveCodeAnnotation,
+        handleClearCodeAnnotations,
+        setHomeCreationTargetEngine,
+        activeThreadSummary,
+        composerCommands,
+        handleResolvedAlwaysThinkingChange,
+        showComposer: options.showComposer,
+        threadParentById: options.threadParentById,
+        onSend: options.onSend,
+        onQueue: options.onQueue,
+        onRequestContextCompaction: options.onRequestContextCompaction,
+        onStop: options.onStop,
+        completionEmailSelected: options.completionEmailSelected,
+        completionEmailDisabled: options.completionEmailDisabled,
+        onToggleCompletionEmail: options.onToggleCompletionEmail,
+        onRewind: options.onRewind,
+        canStop: options.canStop,
+        isReviewing: options.isReviewing,
+        contextDualViewEnabled: options.contextDualViewEnabled,
+        codexAutoCompactionEnabled: options.codexAutoCompactionEnabled,
+        codexAutoCompactionThresholdPercent: options.codexAutoCompactionThresholdPercent,
+        onCodexAutoCompactionSettingsChange: options.onCodexAutoCompactionSettingsChange,
+        usageShowRemaining: options.usageShowRemaining,
+        onRefreshAccountRateLimits: options.onRefreshAccountRateLimits,
+        activeQueue: options.activeQueue,
+        composerSendLabel: options.composerSendLabel,
+        isProcessing: options.isProcessing,
+        steerEnabled: options.steerEnabled,
+        onDraftChange: options.onDraftChange,
+        activeImages: options.activeImages,
+        onPickImages: options.onPickImages,
+        onAttachImages: options.onAttachImages,
+        onRemoveImage: options.onRemoveImage,
+        pendingIntentCanvasDocuments: options.pendingIntentCanvasDocuments,
+        onRemovePendingIntentCanvas: options.onRemovePendingIntentCanvas,
+        prefillDraft: options.prefillDraft,
+        onPrefillHandled: options.onPrefillHandled,
+        insertText: options.insertText,
+        onInsertHandled: options.onInsertHandled,
+        onEditQueued: options.onEditQueued,
+        onDeleteQueued: options.onDeleteQueued,
+        onFuseQueued: options.onFuseQueued,
+        canFuseActiveQueue: options.canFuseActiveQueue,
+        fuseDisabledReasonKey: options.fuseDisabledReasonKey,
+        activeFusingMessageId: options.activeFusingMessageId,
+        collaborationModes: options.collaborationModes,
+        collaborationModesEnabled: options.collaborationModesEnabled,
+        selectedCollaborationModeId: options.selectedCollaborationModeId,
+        onSelectCollaborationMode: options.onSelectCollaborationMode,
+        engines: options.engines,
+        selectedEngine: options.selectedEngine,
+        onSelectEngine: options.onSelectEngine,
+        models: options.models,
+        providerModelCatalogs: options.providerModelCatalogs,
+        selectedModelId: options.selectedModelId,
+        onSelectModel: options.onSelectModel,
+        reasoningOptions: options.reasoningOptions,
+        selectedEffort: options.selectedEffort,
+        onSelectEffort: options.onSelectEffort,
+        reasoningSupported: options.reasoningSupported,
+        opencodeAgents: options.opencodeAgents,
+        selectedOpenCodeAgent: options.selectedOpenCodeAgent,
+        onSelectOpenCodeAgent: options.onSelectOpenCodeAgent,
+        onSelectAgent: options.onSelectAgent,
+        onOpenAgentSettings: options.onOpenAgentSettings,
+        onOpenPromptSettings: options.onOpenPromptSettings,
+        onOpenModelSettings: options.onOpenModelSettings,
+        onOpenCliSettings: options.onOpenCliSettings,
+        onRefreshModelConfig: options.onRefreshModelConfig,
+        isModelConfigRefreshing: options.isModelConfigRefreshing,
+        opencodeVariantOptions: options.opencodeVariantOptions,
+        selectedOpenCodeVariant: options.selectedOpenCodeVariant,
+        onSelectOpenCodeVariant: options.onSelectOpenCodeVariant,
+        accessMode: options.accessMode,
+        onSelectAccessMode: options.onSelectAccessMode,
+        skills: options.skills,
+        customSkillDirectories: options.customSkillDirectories,
+        prompts: options.prompts,
+        files: options.files,
+        directories: options.directories,
+        textareaRef: options.textareaRef,
+        composerEditorSettings: options.composerEditorSettings,
+        composerSendShortcut: options.composerSendShortcut,
+        composerInterruptShortcutLabel: options.composerInterruptShortcutLabel,
+        textareaHeight: options.textareaHeight,
+        onTextareaHeightChange: options.onTextareaHeightChange,
+        onOpenSkillsSettings: options.onOpenSkillsSettings,
+        onOpenExperimentalSettings: options.onOpenExperimentalSettings,
+        activeComposerFilePath: options.activeComposerFilePath,
+        activeComposerFileLineRange: options.activeComposerFileLineRange,
+        fileReferenceMode: options.fileReferenceMode,
+        activeWorkspaceId: options.activeWorkspaceId,
+        activeWorkspace: options.activeWorkspace,
+        plan: options.plan,
+        isPlanMode: options.isPlanMode,
+        gitStatus: options.gitStatus,
+        queueGitStatusRefresh: options.queueGitStatusRefresh,
+        onRevertGitFile: options.onRevertGitFile,
+        onRevertGitPaths: options.onRevertGitPaths,
+        reviewPrompt: options.reviewPrompt,
+        onReviewPromptClose: options.onReviewPromptClose,
+        onReviewPromptShowPreset: options.onReviewPromptShowPreset,
+        onReviewPromptChoosePreset: options.onReviewPromptChoosePreset,
+        highlightedPresetIndex: options.highlightedPresetIndex,
+        onReviewPromptHighlightPreset: options.onReviewPromptHighlightPreset,
+        highlightedBranchIndex: options.highlightedBranchIndex,
+        onReviewPromptHighlightBranch: options.onReviewPromptHighlightBranch,
+        highlightedCommitIndex: options.highlightedCommitIndex,
+        onReviewPromptHighlightCommit: options.onReviewPromptHighlightCommit,
+        onReviewPromptKeyDown: options.onReviewPromptKeyDown,
+        onReviewPromptSelectBranch: options.onReviewPromptSelectBranch,
+        onReviewPromptSelectBranchAtIndex: options.onReviewPromptSelectBranchAtIndex,
+        onReviewPromptConfirmBranch: options.onReviewPromptConfirmBranch,
+        onReviewPromptSelectCommit: options.onReviewPromptSelectCommit,
+        onReviewPromptSelectCommitAtIndex: options.onReviewPromptSelectCommitAtIndex,
+        onReviewPromptConfirmCommit: options.onReviewPromptConfirmCommit,
+        onReviewPromptUpdateCustomInstructions: options.onReviewPromptUpdateCustomInstructions,
+        onReviewPromptConfirmCustom: options.onReviewPromptConfirmCustom,
+        activeThreadId: options.activeThreadId,
+      }),
     [
       options.showComposer,
       options.threadParentById,
