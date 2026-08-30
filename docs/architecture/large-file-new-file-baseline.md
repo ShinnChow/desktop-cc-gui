@@ -8,7 +8,7 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-30T16:39:09.424Z
+- Generated at: 2026-08-30T16:40:21.213Z
 - Scope: new-file
 - Policy version: 2026-08-30.policy-v5
 - Count: 389
