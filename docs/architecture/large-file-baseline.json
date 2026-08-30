@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T15:10:12.612Z",
+  "generatedAt": "2026-08-30T15:21:23.931Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -391,16 +391,6 @@
       "priority": "P1",
       "warnThreshold": 2400,
       "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src-tauri/src/skills_hub.rs",
-      "lines": 3062,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
       "thresholdSource": "policy"
     },
     {
