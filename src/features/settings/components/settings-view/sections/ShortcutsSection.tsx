@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import Search from "lucide-react/dist/esm/icons/search";
+import type { AppSettings } from "@/types";
 import {
+  buildShortcutValue,
   formatShortcutForPlatform,
   getDefaultInterruptShortcut,
   splitShortcutForPlatform,
@@ -13,8 +15,10 @@ import type {
   ShortcutSettingKey,
 } from "../settingsViewShortcuts";
 import {
+  buildShortcutDrafts,
   shortcutActions,
   shortcutCategoryDefinitions,
+  shortcutDraftKeyBySetting,
 } from "../settingsViewShortcuts";
 
 function resolveDefaultShortcut(action: ShortcutActionMetadata): string | null {
@@ -78,24 +82,19 @@ function ShortcutKeys({
 type ShortcutsSectionProps = {
   active: boolean;
   t: (key: string) => string;
-  shortcutDrafts: ShortcutDrafts;
-  handleShortcutKeyDown: (
-    event: KeyboardEvent<HTMLElement>,
-    setting: ShortcutSettingKey,
-  ) => void;
-  updateShortcut: (
-    setting: ShortcutSettingKey,
-    value: string | null,
-  ) => Promise<void>;
+  appSettings: AppSettings;
+  onUpdateAppSettings: (next: AppSettings) => Promise<void>;
 };
 
 export function ShortcutsSection({
   active,
   t,
-  shortcutDrafts,
-  handleShortcutKeyDown,
-  updateShortcut,
+  appSettings,
+  onUpdateAppSettings,
 }: ShortcutsSectionProps) {
+  const [shortcutDrafts, setShortcutDrafts] = useState<ShortcutDrafts>(() =>
+    buildShortcutDrafts(appSettings),
+  );
   const [query, setQuery] = useState("");
   const [selectedSetting, setSelectedSetting] =
     useState<ShortcutSettingKey | null>(null);
@@ -130,6 +129,51 @@ export function ShortcutsSection({
         .filter((group) => group.items.length > 0),
     [t],
   );
+
+  useEffect(() => {
+    setShortcutDrafts(buildShortcutDrafts(appSettings));
+  }, [appSettings]);
+
+  const updateShortcut = async (
+    key: ShortcutSettingKey,
+    value: string | null,
+  ) => {
+    const draftKey = shortcutDraftKeyBySetting[key];
+    setShortcutDrafts((prev) => ({
+      ...prev,
+      [draftKey]: value ?? "",
+    }));
+    await onUpdateAppSettings({
+      ...appSettings,
+      [key]: value,
+    });
+  };
+
+  const handleShortcutKeyDown = (
+    event: KeyboardEvent<HTMLElement>,
+    key: ShortcutSettingKey,
+  ) => {
+    if (event.key === "Tab" && key !== "composerCollaborationShortcut") {
+      return;
+    }
+    if (event.key === "Tab" && !event.shiftKey) {
+      return;
+    }
+    event.preventDefault();
+    if (event.key === "Backspace" || event.key === "Delete") {
+      void updateShortcut(key, null);
+      return;
+    }
+    const value = buildShortcutValue(event.nativeEvent);
+    if (!value) {
+      return;
+    }
+    // Blur after a successful capture so the recorder exits recording mode
+    // and the recorded value shows immediately.
+    const target = event.currentTarget;
+    void updateShortcut(key, value);
+    target.blur();
+  };
 
   if (!active) {
     return null;
