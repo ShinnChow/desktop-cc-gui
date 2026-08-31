@@ -7,7 +7,7 @@ import { useGitHistoryPanelBranchCompareHandlers } from "./useGitHistoryPanelBra
 import { useGitHistoryPanelBranchContextMenu } from "./useGitHistoryPanelBranchContextMenu";
 import { useGitHistoryPanelCreatePrHandlers } from "./useGitHistoryPanelCreatePrHandlers";
 import { useGitHistoryPanelSyncPushPreviewHandlers } from "./useGitHistoryPanelSyncPushPreviewHandlers";
-import type { GitHistoryPanelInteractionScope } from "../components/GitHistoryPanelImpl";
+import type { GitHistoryPanelInteractionScope } from "../components/GitHistoryPanelTypes";
 import {
   estimateGitHistoryCommitRowHeight,
   type CommitActionId,

@@ -3,7 +3,7 @@ import {
   type GitOperationToken,
 } from "../GitOperationTokens";
 import { resolveGitPullExplanation } from "../../utils/gitPullExplanation";
-import type { GitHistoryPanelViewScope } from "../GitHistoryPanelImpl";
+import type { GitHistoryPanelViewScope } from "../GitHistoryPanelTypes";
 
 export function renderGitHistoryPullDialog(scope: GitHistoryPanelViewScope) {
   const {

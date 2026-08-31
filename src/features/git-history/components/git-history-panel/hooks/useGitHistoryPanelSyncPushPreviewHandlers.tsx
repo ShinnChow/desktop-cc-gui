@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import type { GitHistoryPanelInteractionScope } from "../components/GitHistoryPanelImpl";
+import type { GitHistoryPanelInteractionScope } from "../components/GitHistoryPanelTypes";
 
 type SyncPushPreviewHandlersScope = Pick<
   GitHistoryPanelInteractionScope,

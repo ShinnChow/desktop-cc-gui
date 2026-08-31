@@ -1,4 +1,4 @@
-import type { GitHistoryPanelViewScope } from "../GitHistoryPanelImpl";
+import type { GitHistoryPanelViewScope } from "../GitHistoryPanelTypes";
 
 export function renderGitHistoryResetDialog(scope: GitHistoryPanelViewScope) {
   const {

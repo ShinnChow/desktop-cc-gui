@@ -2,7 +2,7 @@ import {
   GitOperationTokens,
   type GitOperationToken,
 } from "../GitOperationTokens";
-import type { GitHistoryPanelViewScope } from "../GitHistoryPanelImpl";
+import type { GitHistoryPanelViewScope } from "../GitHistoryPanelTypes";
 
 const SYNC_COMMAND_TOKENS: GitOperationToken[] = [
   { kind: "command", value: "git pull" },

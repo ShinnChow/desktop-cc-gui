@@ -2,7 +2,7 @@ import {
   GitOperationTokens,
   type GitOperationToken,
 } from "../GitOperationTokens";
-import type { GitHistoryPanelViewScope } from "../GitHistoryPanelImpl";
+import type { GitHistoryPanelViewScope } from "../GitHistoryPanelTypes";
 import { isPushTargetHistoryMatch } from "../../utils/pushTargetHistory";
 
 export function renderGitHistoryPushDialog(scope: GitHistoryPanelViewScope) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import type { GitPrWorkflowDefaults } from "../../../../../types";
 import { copyTextToClipboard } from "../../../../../utils/clipboard";
-import type { GitHistoryPanelInteractionScope } from "../components/GitHistoryPanelImpl";
+import type { GitHistoryPanelInteractionScope } from "../components/GitHistoryPanelTypes";
 
 type CreatePrHandlersScope = Pick<
   GitHistoryPanelInteractionScope,
