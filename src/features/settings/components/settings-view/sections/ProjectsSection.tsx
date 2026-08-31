@@ -1,5 +1,6 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useState } from "react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import { ask, open } from "@tauri-apps/plugin-dialog";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { WorkspaceGroup, WorkspaceInfo } from "@/types";
+import type { AppSettings, WorkspaceGroup, WorkspaceInfo } from "@/types";
 import { isDefaultWorkspacePath } from "@/features/workspaces/utils/defaultWorkspace";
 
 type GroupedWorkspace = {
@@ -33,23 +34,12 @@ type GroupedWorkspace = {
 type ProjectsSectionProps = {
   active: boolean;
   t: (key: string) => string;
-  createGroupOpen: boolean;
-  setCreateGroupOpen: (open: boolean) => void;
-  newGroupName: string;
-  setNewGroupName: (name: string) => void;
-  canCreateGroup: boolean;
-  handleCreateGroup: () => Promise<void>;
-  groupError: string | null;
+  appSettings: AppSettings;
+  onUpdateAppSettings: (next: AppSettings) => Promise<void>;
+  onCreateWorkspaceGroup: (name: string) => Promise<WorkspaceGroup | null>;
+  onRenameWorkspaceGroup: (id: string, name: string) => Promise<boolean | null>;
+  onDeleteWorkspaceGroup: (id: string) => Promise<boolean | null>;
   workspaceGroups: WorkspaceGroup[];
-  handleDragEnd: (result: DropResult) => void;
-  renamingGroupId: string | null;
-  setRenamingGroupId: (id: string | null) => void;
-  groupDrafts: Record<string, string>;
-  setGroupDrafts: Dispatch<SetStateAction<Record<string, string>>>;
-  handleRenameGroup: (group: WorkspaceGroup) => Promise<void>;
-  handleChooseGroupCopiesFolder: (group: WorkspaceGroup) => Promise<void>;
-  handleClearGroupCopiesFolder: (group: WorkspaceGroup) => Promise<void>;
-  handleDeleteGroup: (group: WorkspaceGroup) => Promise<void>;
   groupedWorkspaces: GroupedWorkspace[];
   onAssignWorkspaceGroup: (
     workspaceId: string,
@@ -63,29 +53,158 @@ type ProjectsSectionProps = {
 export function ProjectsSection({
   active,
   t,
-  createGroupOpen,
-  setCreateGroupOpen,
-  newGroupName,
-  setNewGroupName,
-  canCreateGroup,
-  handleCreateGroup,
-  groupError,
+  appSettings,
+  onUpdateAppSettings,
+  onCreateWorkspaceGroup,
+  onRenameWorkspaceGroup,
+  onDeleteWorkspaceGroup,
   workspaceGroups,
-  handleDragEnd,
-  renamingGroupId,
-  setRenamingGroupId,
-  groupDrafts,
-  setGroupDrafts,
-  handleRenameGroup,
-  handleChooseGroupCopiesFolder,
-  handleClearGroupCopiesFolder,
-  handleDeleteGroup,
   groupedWorkspaces,
   onAssignWorkspaceGroup,
   ungroupedLabel,
   onMoveWorkspace,
   onDeleteWorkspace,
 }: ProjectsSectionProps) {
+  const [groupDrafts, setGroupDrafts] = useState<Record<string, string>>({});
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setGroupDrafts((prev) => {
+      const next: Record<string, string> = {};
+      workspaceGroups.forEach((group) => {
+        next[group.id] = prev[group.id] ?? group.name;
+      });
+      return next;
+    });
+  }, [workspaceGroups]);
+
+  const trimmedGroupName = newGroupName.trim();
+  const canCreateGroup = Boolean(trimmedGroupName);
+
+  const handleCreateGroup = async () => {
+    setGroupError(null);
+    try {
+      const created = await onCreateWorkspaceGroup(newGroupName);
+      if (created) {
+        setNewGroupName("");
+        setCreateGroupOpen(false);
+      }
+    } catch (error) {
+      setGroupError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleRenameGroup = async (group: WorkspaceGroup) => {
+    const draft = groupDrafts[group.id] ?? "";
+    const trimmed = draft.trim();
+    if (!trimmed || trimmed === group.name) {
+      setGroupDrafts((prev) => ({
+        ...prev,
+        [group.id]: group.name,
+      }));
+      return;
+    }
+    setGroupError(null);
+    try {
+      await onRenameWorkspaceGroup(group.id, trimmed);
+    } catch (error) {
+      setGroupError(error instanceof Error ? error.message : String(error));
+      setGroupDrafts((prev) => ({
+        ...prev,
+        [group.id]: group.name,
+      }));
+    }
+  };
+
+  const updateGroupCopiesFolder = async (
+    groupId: string,
+    copiesFolder: string | null,
+  ) => {
+    setGroupError(null);
+    try {
+      await onUpdateAppSettings({
+        ...appSettings,
+        workspaceGroups: appSettings.workspaceGroups.map((entry) =>
+          entry.id === groupId ? { ...entry, copiesFolder } : entry,
+        ),
+      });
+    } catch (error) {
+      setGroupError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleChooseGroupCopiesFolder = async (group: WorkspaceGroup) => {
+    const selection = await open({ multiple: false, directory: true });
+    if (!selection || Array.isArray(selection)) {
+      return;
+    }
+    await updateGroupCopiesFolder(group.id, selection);
+  };
+
+  const handleClearGroupCopiesFolder = async (group: WorkspaceGroup) => {
+    if (!group.copiesFolder) {
+      return;
+    }
+    await updateGroupCopiesFolder(group.id, null);
+  };
+
+  const handleDeleteGroup = async (group: WorkspaceGroup) => {
+    const groupProjects =
+      groupedWorkspaces.find((entry) => entry.id === group.id)?.workspaces ??
+      [];
+    const detail =
+      groupProjects.length > 0
+        ? `\n\n${t("settings.deleteGroupWarning")} "${ungroupedLabel}".`
+        : "";
+    const confirmed = await ask(
+      `${t("common.delete")} "${group.name}"?${detail}`,
+      {
+        title: t("settings.deleteGroupTitle"),
+        kind: "warning",
+        okLabel: t("common.delete"),
+        cancelLabel: t("common.cancel"),
+      },
+    );
+    if (!confirmed) {
+      return;
+    }
+    setGroupError(null);
+    try {
+      await onDeleteWorkspaceGroup(group.id);
+    } catch (error) {
+      setGroupError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) {
+      return;
+    }
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+    if (sourceIndex === destinationIndex) {
+      return;
+    }
+
+    const newGroups = Array.from(workspaceGroups);
+    const [moved] = newGroups.splice(sourceIndex, 1);
+    newGroups.splice(destinationIndex, 0, moved);
+
+    // Update sortOrder based on the new index to persist the order
+    const updatedGroups = newGroups.map((group, index) => ({
+      ...group,
+      sortOrder: index,
+    }));
+
+    void onUpdateAppSettings({
+      ...appSettings,
+      workspaceGroups: updatedGroups,
+    });
+  };
+
   if (!active) {
     return null;
   }

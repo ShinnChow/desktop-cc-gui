@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 
-import { determineHardDebtStatus, loadPolicyConfig, resolvePolicy, scanLargeFiles } from "./check-large-files.mjs";
+import { determineHardDebtStatus, isBlockingLargeFileFinding, loadPolicyConfig, resolvePolicy, scanLargeFiles } from "./check-large-files.mjs";
 
 async function withTempDir(run) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "large-file-governance-"));
@@ -1052,3 +1052,73 @@ function expectPaths(paths) {
     "scripts/check-heavy-test-noise.mjs",
   ]);
 }
+
+test("strictReduction reclassifies retained hard debt as blocking", async () => {
+  await withTempDir(async (root) => {
+    const policyConfig = criticalPolicyConfig({ exactPaths: ["src/services/tauri.ts"] });
+    policyConfig.policies[0].strictReduction = true;
+    await writeJson(root, "policy.json", policyConfig);
+    await writeJson(
+      root,
+      "baseline.json",
+      baselineConfig({ entries: [criticalBaselineEntry("src/services/tauri.ts")] }),
+    );
+
+    await writeLines(path.join(root, "src/services/tauri.ts"), 9);
+
+    const scan = await scanLargeFiles({
+      root,
+      policyFile: "policy.json",
+      baselineFile: "baseline.json",
+      threshold: 3000,
+      mode: "report",
+      markdownOutput: null,
+      baselineOutput: null,
+      scope: "fail",
+    });
+
+    assert.equal(scan.results.length, 1);
+    assert.equal(scan.results[0]?.status, "retained");
+    assert.equal(scan.results[0]?.strictReduction, true);
+    assert.equal(isBlockingLargeFileFinding(scan.results[0]), true);
+  });
+});
+
+test("retained hard debt stays non-blocking without strictReduction", async () => {
+  await withTempDir(async (root) => {
+    await writeJson(root, "policy.json", criticalPolicyConfig({ exactPaths: ["src/services/tauri.ts"] }));
+    await writeJson(
+      root,
+      "baseline.json",
+      baselineConfig({ entries: [criticalBaselineEntry("src/services/tauri.ts")] }),
+    );
+
+    await writeLines(path.join(root, "src/services/tauri.ts"), 9);
+
+    const scan = await scanLargeFiles({
+      root,
+      policyFile: "policy.json",
+      baselineFile: "baseline.json",
+      threshold: 3000,
+      mode: "report",
+      markdownOutput: null,
+      baselineOutput: null,
+      scope: "fail",
+    });
+
+    assert.equal(scan.results.length, 1);
+    assert.equal(scan.results[0]?.status, "retained");
+    assert.equal(scan.results[0]?.strictReduction, false);
+    assert.equal(isBlockingLargeFileFinding(scan.results[0]), false);
+  });
+});
+
+test("loadPolicyConfig rejects a non-boolean strictReduction", async () => {
+  await withTempDir(async (root) => {
+    const policyConfig = criticalPolicyConfig({ exactPaths: ["src/services/tauri.ts"] });
+    policyConfig.policies[0].strictReduction = "yes";
+    await writeJson(root, "policy.json", policyConfig);
+
+    await assert.rejects(() => loadPolicyConfig(root, "policy.json"), /strictReduction/);
+  });
+});

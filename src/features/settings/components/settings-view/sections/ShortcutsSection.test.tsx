@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AppSettings } from "@/types";
 import { getDefaultInterruptShortcut } from "@/utils/shortcuts";
 import {
-  buildShortcutDrafts,
   shortcutActions,
   type ShortcutSettingKey,
 } from "../settingsViewShortcuts";
@@ -12,21 +12,31 @@ import { ShortcutsSection } from "./ShortcutsSection";
 afterEach(cleanup);
 
 function renderSection(
-  overrides?: Partial<Parameters<typeof ShortcutsSection>[0]>,
+  overrides: {
+    appSettings?: Partial<AppSettings>;
+    onUpdateAppSettings?: (next: AppSettings) => Promise<void>;
+  } = {},
 ) {
   const settings = Object.fromEntries(
     shortcutActions.map((action) => [action.setting, action.defaultShortcut]),
   ) as Record<ShortcutSettingKey, string | null>;
-  return render(
+  const onUpdateAppSettings =
+    overrides.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
+  // Shortcut key records structurally satisfy the AppSettings fields the
+  // section reads; the rest of AppSettings is irrelevant to this subtree.
+  const appSettings = {
+    ...settings,
+    ...overrides.appSettings,
+  } as unknown as AppSettings;
+  const view = render(
     <ShortcutsSection
       active
       t={(key) => key}
-      shortcutDrafts={buildShortcutDrafts(settings)}
-      handleShortcutKeyDown={vi.fn()}
-      updateShortcut={vi.fn().mockResolvedValue(undefined)}
-      {...overrides}
+      appSettings={appSettings}
+      onUpdateAppSettings={onUpdateAppSettings}
     />,
   );
+  return { onUpdateAppSettings, ...view };
 }
 
 describe("ShortcutsSection", () => {
@@ -131,15 +141,15 @@ describe("ShortcutsSection", () => {
   });
 
   it("resets only non-default shortcuts when reset-all is clicked", async () => {
-    const updateShortcut = vi.fn().mockResolvedValue(undefined);
+    const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
     const settings = Object.fromEntries(
       shortcutActions.map((action) => [action.setting, action.defaultShortcut]),
     ) as Record<ShortcutSettingKey, string | null>;
     settings.interruptShortcut = getDefaultInterruptShortcut();
     settings.openSettingsShortcut = "cmd+alt+o";
     const { container } = renderSection({
-      shortcutDrafts: buildShortcutDrafts(settings),
-      updateShortcut,
+      appSettings: settings as unknown as Partial<AppSettings>,
+      onUpdateAppSettings,
     });
 
     const resetAll = container.querySelector<HTMLButtonElement>(
@@ -148,13 +158,15 @@ describe("ShortcutsSection", () => {
     expect(resetAll).toBeTruthy();
     fireEvent.click(resetAll!);
 
-    await waitFor(() => expect(updateShortcut).toHaveBeenCalledTimes(1));
-    expect(updateShortcut).toHaveBeenCalledWith("openSettingsShortcut", "cmd+,");
+    await waitFor(() => expect(onUpdateAppSettings).toHaveBeenCalledTimes(1));
+    expect(onUpdateAppSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ openSettingsShortcut: "cmd+," }),
+    );
   });
 
-  it("enters recording mode on recorder focus and forwards keydown capture", () => {
-    const handleShortcutKeyDown = vi.fn();
-    const { container } = renderSection({ handleShortcutKeyDown });
+  it("enters recording mode on recorder focus and persists the captured shortcut", async () => {
+    const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
+    const { container } = renderSection({ onUpdateAppSettings });
 
     const recorder = container.querySelector<HTMLElement>(
       ".settings-shortcuts-recorder",
@@ -168,7 +180,13 @@ describe("ShortcutsSection", () => {
     expect(recorder?.textContent).toContain("settings.pressShortcutPrompt");
 
     fireEvent.keyDown(recorder!, { key: "k", metaKey: true });
-    expect(handleShortcutKeyDown).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onUpdateAppSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toggleLeftConversationSidebarShortcut: "cmd+k",
+        }),
+      );
+    });
 
     fireEvent.blur(recorder!);
     expect(recorder?.className).not.toContain(
@@ -176,9 +194,9 @@ describe("ShortcutsSection", () => {
     );
   });
 
-  it("cancels recording on Escape without forwarding to the capture handler", () => {
-    const handleShortcutKeyDown = vi.fn();
-    const { container } = renderSection({ handleShortcutKeyDown });
+  it("cancels recording on Escape without persisting a shortcut", () => {
+    const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
+    const { container } = renderSection({ onUpdateAppSettings });
 
     const recorder = container.querySelector<HTMLElement>(
       ".settings-shortcuts-recorder",
@@ -191,7 +209,7 @@ describe("ShortcutsSection", () => {
     });
     recorder!.dispatchEvent(event);
 
-    expect(handleShortcutKeyDown).not.toHaveBeenCalled();
+    expect(onUpdateAppSettings).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);
   });
 });

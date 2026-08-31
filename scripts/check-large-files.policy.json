@@ -54,7 +54,7 @@
     },
     {
       "id": "settings-view-sections",
-      "description": "Settings view sections regrew after the 2026-07 split (SessionManagementSection 2547->2648); hold them below the feature-hotpath gate.",
+      "description": "Settings view sections regrew after the 2026-07 split (SessionManagementSection 2547->2648); hold them below the feature-hotpath gate. strictReduction enabled 2026-08-31 after Wave5 A2 brought the group to zero retained hard debt; retained entries now block.",
       "priority": "P1",
       "warnThreshold": 1500,
       "failThreshold": 2000,
@@ -62,7 +62,8 @@
         "prefixes": [
           "src/features/settings/components/settings-view/sections/"
         ]
-      }
+      },
+      "strictReduction": true
     },
     {
       "id": "feature-hotpath",

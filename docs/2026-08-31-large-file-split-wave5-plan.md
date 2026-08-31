@@ -167,3 +167,38 @@ created: 2026-08-31
 - 波末：两道 baseline 重生成 + gate 绿 + 删 tsbuildinfo tsc 零 error。
 
 **教训增补**：⑧ #[path] 加载的测试文件内再声明 child mod 必须继续显式 #[path]（裸 mod 触发 E0583）；⑨ 并行代理共享 target 时 cargo check exit 101 / 引用未落盘文件 E0583 为 transient，hub 协调后重跑即可。
+### 波 3（2026-08-31 第三会话，4 代理并行，落地 1 commit）
+
+- **B5 claude_history**：2881→30 壳 + 三族平铺（filter 1822 / loader 700 / delete 376）；17 处机械 pub(crate) 为唯一偏差；cargo test 61 passed/9 failed 前后逐字相同（9 个为既有失败名单，panic 签名逐字一致）。
+- **B6 pi.rs**：3201→68 壳 + engine/pi/ 12 子模块（session_rpc 1330/session_send 584/stream_lines 250/background_tasks 188/session 160/session_interrupt 132 等）；Dual-Path Gate 判定函数集（is_pi_external_wakeup_allowed 等 5 件）单实现落 gates.rs 原路径重导出，dev/daemon 两转发器调用点零改动；110 处 pub(crate) 前缀为唯一偏差；cargo test lib 242+daemon 150 前后一致。
+- **A4 FileTreePanel**：2622→1188（硬底测算 ~1180，memo 推导链 ~250 性能敏感区未动，拍板接受）；新建 fileTreeContextMenu 481（deps 29 名逐字留调用点、menu item id 集合比对一致）+ useFileTreeLazyChildren 275 + useFileTreePreviewPopover 296 + useFileTreeItemOperations 753；59/59 测试前后一致。
+- **C1 GitHistoryPanelImpl**：3662→1932（<2000 ✓）；11 个同目录 hook（deps 对象模式，DataLoading 先例）；4 锚点原地不动，两 scope bag 与 HEAD 逐字节一致；两治理脚本绿；git-history 测试 8 failed/202 passed 前后逐字相同（8 个为既有 GitHistoryWorktreePanel）。
+- 波末：两道 baseline 重生成 + gate 绿 + 删 tsbuildinfo tsc 零 error。
+- 事故登记：波中仓内出现 0 字节杂散 src-tauri/src/bin/cc_gui_daemon/main.rs（duplicate bin 阻塞 manifest 解析），B6 移至 /tmp 恢复；来源未定位（非 B5/B6 任务内容），后续波次留意。
+### 波 4（2026-08-31 第三会话，2 代理 + 主会话 C2，落地 1 commit）
+
+- **B7 runtime/mod.rs**：2585→62 壳 + 5 子模块（manager 2112/entry 324/coordinator 101/end_context 30/consts 8）；94 处 pub(super) 为唯一偏差（逐行断言纯前缀插入）；cargo test 203 passed/3 failed 前后一致（3 个环境性失败为基线既有）。治理豁免登记：runtime/manager.rs 2112 行为新文件 >800，触发 new-file ratchet，同 PR 重生成 new-file baseline 收口（逐字搬运的 struct+impl 单块无法再切，属豁免情形）。
+- **A5 SettingsView**：2611→1625（纪律④硬底 ~1650 拍板接受；fail>2000 闸门过）。状态下沉四域（外观→BasicAppearanceSection 1525→1789 / open apps→OpenAppsSection 799→936 / 分组→ProjectsSection 417→536 / 快捷键→ShortcutsSection 330→374）；8 同构 doctor 回调收敛 useDoctorRunner 注册表泛型 117；死 picker ~41 行删（计划明确例外）。测试先行：+useDoctorRunner.test 9 个 +BasicAppearanceSection.test 5 个直渲染；关联测试 1 failed/256 passed 前后同（RuntimePoolSection 既有），零新增。lazy/Suspense 边界与 SettingsViewProps 导出面零改动。
+- **C2 治理收尾（主会话）**：
+  - scanner 加可选 `strictReduction` 布尔字段（policy 校验 + 两个 classify 返回点挂旗 + isBlockingLargeFileFinding 把 retained+strictReduction 重分类为阻塞）；isBlockingLargeFileFinding 升 export；+3 个 parser 测试（retained 阻塞/未启用不阻塞/非布尔拒绝），node --test 0 fail。
+  - 启用面评估落地：bridge-runtime-critical（status.rs 3020 retained）与 feature-hotpath（useThreadMessaging 2819 / GitHistoryPanelView 3012 retained）仍有存量 retained，启用即红，**未启用**；settings-view-sections 组 retained 清零（A2 后），**已启用** strictReduction（防 2547→2648 反弹前科）。
+  - workflow 加 `pull_request` trigger（hard-gate job 三 OS 矩阵 + mode=fail 既有步骤直接成为 PR blocker；advisory watch 保持 schedule/dispatch 限定）。
+  - 教训⑩：给 scanner 测试文件加用例会撞 new-file ratchet（1054→1124 超 allowance 50）——治理脚本自身的测试增长需同 PR 重生成 new-file baseline。
+- 波末：两道 baseline 重生成 + gate 绿（strictReduction 启用后仍绿）+ near-threshold 绿 + 删 tsbuildinfo tsc 零 error。
+
+### Wave 5 收官指标（2026-08-31 第三会话末实测）
+
+| 指标 | Wave 5 前 | Wave 5 后 | 主计划起点（08-30） |
+|---|---:|---:|---:|
+| 源码 >2000 行（非测试） | 60 | **49** | ~80 |
+| SessionManagementSection | 2648 | 1758 | — |
+| useAppServerEvents | 1981 | 442 | 3818 |
+| GitHistoryPanelImpl | 3662 | 1932 | 4933 |
+| 全仓最大源码 | 3662（GitHistoryPanelImpl） | **3170**（daemon_state/git.rs） | 7685 |
+| bridge-runtime-critical >2600 | 6 个 | **1 个**（status.rs 3020） | — |
+| gate（三道 baseline） | 绿 | 绿 | — |
+| tsc 全仓 | 零 error | 零 error | — |
+
+**W5-A 验收**：dispatcher 四族落地 ✓；F3 面板四件 <2000：SessionManagementSection 1758 ✓ / FileViewPanel 2023（拍板值，硬底已算）⚠ / FileTreePanel 1188 ✓ / SettingsView 1625（拍板值）✓ 闸门过；源码 >2000 ≤50 ✓（49）。
+**W5-B 验收**：bridge-runtime-critical 区 app_server_cli 2458 / grok_history 1836 / claude_history 30 / pi 68 / local_usage 1103 / runtime 62 全部 ≤2600 ✓；browser_agent 3224→mod.rs 57 ✓。残余：engine/status.rs 3020（Wave 6 候选）。
+**W5-C 验收**：GitHistoryPanelImpl <2000 ✓（1932）；strictReduction + PR trigger 落地 ✓；源码 >2000 进入 40 区间 ✓（49）。
