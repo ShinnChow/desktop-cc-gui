@@ -49,7 +49,4 @@ export function createDomainEventGovernanceConsumer(
   });
 }
 
-export const domainEventGovernanceConsumerInternals = {
-  buildTerminalTurnKey,
-  isTerminalTurnEvent,
-};
+

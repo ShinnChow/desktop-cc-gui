@@ -20,7 +20,6 @@ export {
   findReleaseIndex,
   normalizeReleaseVersion,
   parseChangelogEntries,
-  type ReleaseNotesCatalogItem,
   type ReleaseNotesEntry,
 } from "../utils/changelogParser";
 

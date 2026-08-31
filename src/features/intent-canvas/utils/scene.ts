@@ -477,18 +477,7 @@ function buildGraphSeedSkeleton(seedSemanticGraphs: CanvasSemanticGraph[] | unde
   ];
 }
 
-export function getIntentCanvasGraphGeneratedElementIds(graph: CanvasSemanticGraph): string[] {
-  const ids = new Set<string>();
-  graph.nodes.forEach((node) => {
-    ids.add(createSeedShapeId("node", `${graph.graphId}-${node.id}`));
-    ids.add(createSeedShapeId("node-text", `${graph.graphId}-${node.id}`));
-  });
-  graph.edges.forEach((edge) => {
-    ids.add(createSeedShapeId("edge", `${graph.graphId}-${edge.id}`));
-    ids.add(createSeedShapeId("edge-label", `${graph.graphId}-${edge.id}-${edge.label ?? edge.relationKind}`));
-  });
-  return Array.from(ids);
-}
+
 
 function createElementId(index: number): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {

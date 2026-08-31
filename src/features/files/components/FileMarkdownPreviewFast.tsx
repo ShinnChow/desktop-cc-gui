@@ -6,6 +6,4 @@
 export {
   FileMarkdownPreview as FileMarkdownPreviewFast,
 } from "./FileMarkdownPreviewRouter";
-export type {
-  FileMarkdownPreviewProps as FileMarkdownPreviewFastProps,
-} from "./FileMarkdownPreviewRouter";
+

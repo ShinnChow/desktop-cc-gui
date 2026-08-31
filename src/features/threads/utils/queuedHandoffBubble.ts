@@ -14,11 +14,7 @@ type MessageConversationItem = Extract<ConversationItem, { kind: "message" }>;
 type UserConversationMessage = MessageConversationItem & { role: "user" };
 
 export type QueuedHandoffBubble = UserConversationMessage;
-export {
-  areSameUserImages,
-  normalizeComparableUserText,
-  normalizeUserImages,
-} from "../assembly/conversationNormalization";
+
 
 export function isOptimisticUserMessageId(id: string): boolean {
   return id.startsWith(OPTIMISTIC_USER_ITEM_PREFIX);

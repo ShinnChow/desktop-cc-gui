@@ -193,21 +193,7 @@ export async function deleteCodexSession(workspaceId: string, sessionId: string)
     sessionId,
   });
 }
-export async function deleteCodexSessions(workspaceId: string, sessionIds: string[]) {
-  return invoke<{
-    results: Array<{
-      sessionId: string;
-      deleted: boolean;
-      deletedCount: number;
-      method: "filesystem";
-      archivedBeforeDelete?: boolean;
-      error?: string | null;
-    }>;
-  }>("delete_codex_sessions", {
-    workspaceId,
-    sessionIds,
-  });
-}
+
 export async function deleteOpenCodeSession(workspaceId: string, sessionId: string) {
   try {
     return await invoke<{ deleted: boolean; method: "cli" | "filesystem" }>(
@@ -232,17 +218,10 @@ const claudeSessionListCache = createAsyncResultCache<ClaudeSessionListResult>({
   ttlMs: CLAUDE_SESSION_LIST_CACHE_TTL_MS,
 });
 
-export function invalidateClaudeSessionListCache(workspacePath?: string): void {
-  // Limit is part of key; path-scoped clears currently wipe the whole map
-  // (small cache; exact prefix iteration is not worth the complexity yet).
-  void workspacePath;
-  claudeSessionListCache.clear();
-}
+
 
 /** @internal */
-export function resetClaudeSessionListCacheForTests(): void {
-  claudeSessionListCache.clear();
-}
+
 
 function claudeSessionListCacheKey(
   workspacePath: string,
@@ -475,17 +454,7 @@ export async function loadQoderSession(
   });
 }
 
-export async function deleteQoderSession(
-  workspacePath: string,
-  sessionId: string,
-  providerProfileId?: string | null,
-): Promise<void> {
-  return invoke<void>("delete_qoder_session", {
-    workspacePath,
-    sessionId,
-    providerProfileId: providerProfileId ?? null,
-  });
-}
+
 
 /**
  * Delete a Kimi CLI session (remove session file from disk).
@@ -562,12 +531,7 @@ export async function loadDshSession(
 /**
  * Archive a DSH session via the host.
  */
-export async function deleteDshSession(workspacePath: string, sessionId: string): Promise<void> {
-  return invoke<void>("delete_dsh_session", {
-    workspacePath,
-    sessionId,
-  });
-}
+
 
 /**
  * Fork a completed DSH session. Incomplete turns fail closed.

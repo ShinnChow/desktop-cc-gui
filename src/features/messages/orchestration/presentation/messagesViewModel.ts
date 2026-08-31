@@ -300,9 +300,7 @@ export function buildMessagesScrollKey(
   return `${scrollKeyForItems(items)}-${activeUserInputRequestId ?? "no-input"}`;
 }
 
-export function isMessagesScrollNearBottom(node: HTMLDivElement, thresholdPx: number) {
-  return node.scrollHeight - node.scrollTop - node.clientHeight <= thresholdPx;
-}
+
 
 export function resolveActiveMessageAnchor(
   container: HTMLDivElement | null,

@@ -117,9 +117,7 @@ export function classifyMessageMarkdownPrecomputeThreshold(
     : "below-threshold";
 }
 
-export function shouldPrecomputeMessageMarkdown(source: string) {
-  return classifyMessageMarkdownPrecomputeThreshold(source) !== "below-threshold";
-}
+
 
 export function createMessageMarkdownPrecomputeRequest(input: {
   messageId: string;

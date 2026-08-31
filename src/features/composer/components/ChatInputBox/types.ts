@@ -43,16 +43,7 @@ export interface Attachment {
 /**
  * Code snippet (from editor selection)
  */
-export interface CodeSnippet {
-  /** Unique identifier */
-  id: string;
-  /** File path (relative) */
-  filePath: string;
-  /** Start line number */
-  startLine?: number;
-  /** End line number */
-  endLine?: number;
-}
+
 
 /**
  * Image media type constants
@@ -470,14 +461,7 @@ export const REASONING_LEVELS: ReasoningInfo[] = [
 /**
  * Usage information
  */
-export interface UsageInfo {
-  /** Usage percentage (0-100) */
-  percentage: number;
-  /** Used amount */
-  used?: number;
-  /** Total amount */
-  total?: number;
-}
+
 
 export type ContextCompactionState = 'idle' | 'compacting' | 'compacted';
 export type CodexCompactionSource = 'auto' | 'manual';

@@ -161,25 +161,7 @@ export function deleteSelection(element?: HTMLElement | null): boolean {
  * @param element - The contenteditable element
  * @returns The character offset from the start, or -1 if cursor is not in element
  */
-export function getCursorOffset(element: HTMLElement): number {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return -1;
 
-  const range = selection.getRangeAt(0);
-
-  // Verify cursor is within the element
-  if (!element.contains(range.startContainer)) {
-    return -1;
-  }
-
-  // Create a range from start of element to cursor position
-  const preCaretRange = document.createRange();
-  preCaretRange.selectNodeContents(element);
-  preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-  // Get text content length of the range (this is the character offset)
-  return preCaretRange.toString().length;
-}
 
 /**
  * Set cursor position by character offset in a contenteditable element

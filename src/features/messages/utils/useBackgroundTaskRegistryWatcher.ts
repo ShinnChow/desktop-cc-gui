@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { readWorkspaceFile } from "../../../services/tauri/workspaceFiles";
-import { revealInFileManager } from "../../../services/tauri/workspaceRuntime";
+
 import {
   applyBackgroundTaskUpdate,
   getBackgroundTaskUpdateSink,
@@ -355,8 +355,4 @@ export function useBackgroundTaskRegistryWatcherForRunningThreads(
 }
 
 /** 3.2 面板「查看日志」：reveal 输出文件；日志字节内容 tail 归 P2 2.3。 */
-export async function revealBackgroundTaskLog(
-  outputPath: string,
-): Promise<void> {
-  await revealInFileManager(outputPath);
-}
+

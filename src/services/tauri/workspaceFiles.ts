@@ -127,12 +127,7 @@ export async function getWorkspaceDirectoryChildren(
   });
 }
 
-export async function listExternalAbsoluteDirectoryChildren(workspaceId: string, path: string) {
-  return invoke<WorkspaceFilesResponse>("list_external_absolute_directory_children", {
-    workspaceId,
-    path,
-  });
-}
+
 
 export async function searchWorkspaceText(
   workspaceId: string,
@@ -329,9 +324,7 @@ export type WorkspaceFileOperationResult = {
   kind: WorkspaceFileItemKind;
 };
 
-export async function copyWorkspaceItem(workspaceId: string, path: string): Promise<string> {
-  return invoke("copy_workspace_item", { workspaceId, path });
-}
+
 
 export async function duplicateWorkspaceItem(workspaceId: string, path: string): Promise<WorkspaceFileOperationResult> {
   return invoke<WorkspaceFileOperationResult>("duplicate_workspace_item", { workspaceId, path });
@@ -361,17 +354,7 @@ export async function renameWorkspaceItem(
   });
 }
 
-export async function pasteExternalWorkspaceItems(
-  workspaceId: string,
-  sourcePaths: string[],
-  targetDirectory: string,
-): Promise<WorkspaceFileOperationResult[]> {
-  return invoke<WorkspaceFileOperationResult[]>("paste_external_workspace_items", {
-    workspaceId,
-    sourcePaths,
-    targetDirectory,
-  });
-}
+
 
 export async function configureDetachedExternalChangeMonitor(
   workspaceId: string,

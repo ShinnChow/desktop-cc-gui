@@ -21,8 +21,7 @@ export const DEFAULT_MEMORY_PICK_EMPTY_NOTICE_COPY: MemoryPickEmptyNoticeCopy = 
 };
 
 /** @deprecated 使用 DEFAULT_MEMORY_PICK_EMPTY_NOTICE_COPY */
-export const DEFAULT_MEMORY_PICK_EMPTY_TOAST_COPY =
-  DEFAULT_MEMORY_PICK_EMPTY_NOTICE_COPY;
+
 
 /**
  * 将 emptyReason 解析为时间线展示正文；ok 返回 null。

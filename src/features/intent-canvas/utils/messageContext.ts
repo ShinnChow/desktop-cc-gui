@@ -120,6 +120,4 @@ export function parseIntentCanvasContextSummaries(text: string): IntentCanvasCon
   return summaries;
 }
 
-export function parseIntentCanvasContextSummary(text: string): IntentCanvasContextSummary | null {
-  return parseIntentCanvasContextSummaries(text)[0] ?? null;
-}
+

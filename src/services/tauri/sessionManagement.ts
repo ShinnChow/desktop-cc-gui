@@ -1,8 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
-  AutoSessionCreatedBy,
   AutoSessionMetadata,
-  AutoSessionVisibility,
   WorkspaceSessionAttributionMode,
 } from "../../types";
 
@@ -103,9 +101,7 @@ export type NativeProviderContinuationResponse = {
 };
 
 export type {
-  AutoSessionCreatedBy,
   AutoSessionMetadata,
-  AutoSessionVisibility,
 };
 
 export type WorkspaceSessionSourceCompleteness =

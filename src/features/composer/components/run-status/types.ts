@@ -5,4 +5,4 @@ export type RunStatusSection =
   | "edit"
   | "backgroundTask";
 
-export type RunStatusPillId = RunStatusSection;
+

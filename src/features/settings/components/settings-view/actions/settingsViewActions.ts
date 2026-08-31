@@ -1,4 +1,4 @@
-import type { AppSettings, OpenAppTarget, WorkspaceInfo } from "@/types";
+import type { AppSettings, OpenAppTarget } from "@/types";
 
 export type ComposerPreset = AppSettings["composerEditorPreset"];
 
@@ -70,20 +70,6 @@ export const createOpenAppId = () => {
   return `open-app-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-export const normalizeOverrideValue = (value: string): string | null => {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-};
 
-export const buildWorkspaceOverrideDrafts = (
-  projects: WorkspaceInfo[],
-  prev: Record<string, string>,
-  getValue: (workspace: WorkspaceInfo) => string | null | undefined,
-): Record<string, string> => {
-  const next: Record<string, string> = {};
-  projects.forEach((workspace) => {
-    const existing = prev[workspace.id];
-    next[workspace.id] = existing ?? getValue(workspace) ?? "";
-  });
-  return next;
-};
+
+

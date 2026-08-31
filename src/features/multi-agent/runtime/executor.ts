@@ -1098,8 +1098,4 @@ export async function hydrateAgentProjection(
   return projection;
 }
 
-export function isActiveAgentProjection(
-  projection: AgentProjectionV1 | null | undefined,
-): boolean {
-  return Boolean(projection && !isTerminalAgentStatus(projection.status));
-}
+

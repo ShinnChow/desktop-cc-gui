@@ -123,9 +123,4 @@ export async function readScriptEvidence(
   return evidence;
 }
 
-export const scriptEvidenceReaderInternals = {
-  KNOWN_HARNESS_SCRIPTS,
-  VERIFICATION_SCRIPT_PATTERNS,
-  parsePackageScripts,
-  selectVerificationScripts,
-};
+

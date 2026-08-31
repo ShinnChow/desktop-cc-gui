@@ -55,6 +55,4 @@ export function isCollabWorkerNativeThreadId(
 }
 
 /** 测试探测 */
-export function __debugCollabWorkerRawHideIds(): string[] {
-  return Array.from(rawIds);
-}
+

@@ -65,12 +65,7 @@ function incrementPersistGeneration(
 }
 
 /** 清理指定 thread 的代次记录（thread 关闭/删除时调用）。 */
-export function clearPersistGeneration(
-  workspaceId: string,
-  threadId: string,
-): void {
-  persistGenerations.delete(persistGenerationKeyOf(workspaceId, threadId));
-}
+
 
 /**
  * In-flight persist 计数：乐观更新后到 persist settle 前 > 0。

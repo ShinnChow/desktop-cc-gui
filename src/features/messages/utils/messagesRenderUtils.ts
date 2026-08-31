@@ -1,9 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { ConversationItem } from "../../../types";
-import type {
-  ConversationEngine,
-  ConversationState,
-} from "../../threads/contracts/conversationCurtainContracts";
+import type { ConversationEngine } from "../../threads/contracts/conversationCurtainContracts";
 import type { PresentationProfile } from "../../../conversation-presentation/presentationProfile";
 import { groupToolItems } from "./groupToolItems";
 import {
@@ -24,7 +21,7 @@ import {
 import { buildConversationItem } from "../../../utils/threadItems";
 import { inferMutatingFileChangesFromCommand } from "../../../utils/threadItemsFileChanges";
 
-export const SCROLL_THRESHOLD_PX = 120;
+
 export const OPENCODE_NON_STREAMING_HINT_DELAY_MS = 12_000;
 const MESSAGES_PERF_DEBUG_FLAG_KEY = "ccgui.debug.messages.perf";
 const CLAUDE_HIDE_REASONING_MODULE_FLAG_KEY = "ccgui.claude.hideReasoningModule";
@@ -172,22 +169,7 @@ export function toConversationEngine(engine: MessagesEngine): ConversationEngine
   return "codex";
 }
 
-export function resolveRenderableItems({
-  legacyItems,
-  legacyThreadId: _legacyThreadId,
-  legacyWorkspaceId: _legacyWorkspaceId,
-  conversationState,
-}: {
-  legacyItems: ConversationItem[];
-  legacyThreadId: string | null;
-  legacyWorkspaceId: string | null;
-  conversationState: ConversationState | null;
-}) {
-  if (!conversationState) {
-    return legacyItems;
-  }
-  return conversationState.items;
-}
+
 
 export function normalizeMessageImageSrc(path: string) {
   if (!path) {
@@ -329,18 +311,7 @@ export function buildAssistantFinalBoundaryMetaText(options: {
 }
 
 /** @deprecated Alias kept for call sites that still use the object helper name. */
-export function buildAssistantFinalBoundaryMeta(options: {
-  finalDurationMs?: number;
-  finalInputTokens?: number;
-  finalOutputTokens?: number;
-  finalCompletedAt?: number;
-  t: TranslateFn;
-}) {
-  return {
-    text: buildAssistantFinalBoundaryMetaText(options),
-    tokenTooltip: null as string | null,
-  };
-}
+
 
 export function scrollKeyForItems(items: ConversationItem[]) {
   if (!items.length) {

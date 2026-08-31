@@ -78,11 +78,7 @@ export function resolveThreadScopedCollaborationModeSync({
   };
 }
 
-export type ThreadCompletionTracker = {
-  isProcessing: boolean;
-  lastDurationMs: number | null;
-  lastAgentTimestamp: number;
-};
+
 
 export function extractFirstUserInputAnswer(response: RequestUserInputResponse): string | null {
   const entries = Object.values(response.answers ?? {});

@@ -300,6 +300,4 @@ export function mergeTurnTargetBadgesIntoItems(
   return changed ? nextItems : items;
 }
 
-export function resetTurnTargetBadgeStorageForTests(): void {
-  writeClientStoreValue("threads", TURN_TARGET_BADGE_STORE_KEY, {});
-}
+

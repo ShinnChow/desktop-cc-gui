@@ -10,58 +10,9 @@ export type InclusionState = "all" | "none" | "partial";
 
 export const normalizeDiffPath = normalizeGitPath;
 
-function isPathInScope(path: string, scopePath?: string | null) {
-  const normalizedPath = normalizeDiffPath(path);
-  const normalizedScope = normalizeDiffPath(scopePath ?? "");
-  if (!normalizedScope) {
-    return true;
-  }
-  return (
-    normalizedPath === normalizedScope ||
-    normalizedPath.startsWith(`${normalizedScope}/`)
-  );
-}
 
-export function getInclusionStateForScope(
-  includedPaths: string[],
-  excludedPaths: string[],
-  partialPaths: string[] = [],
-  scopePath?: string | null,
-): InclusionState {
-  let includedCount = 0;
-  let excludedCount = 0;
-  let partialCount = 0;
 
-  for (const path of includedPaths) {
-    if (isPathInScope(path, scopePath)) {
-      includedCount += 1;
-    }
-  }
-  for (const path of excludedPaths) {
-    if (isPathInScope(path, scopePath)) {
-      excludedCount += 1;
-    }
-  }
-  for (const path of partialPaths) {
-    if (isPathInScope(path, scopePath)) {
-      partialCount += 1;
-    }
-  }
 
-  if (includedCount === 0 && excludedCount === 0 && partialCount === 0) {
-    return "none";
-  }
-  if (partialCount > 0) {
-    return "partial";
-  }
-  if (includedCount === 0) {
-    return "none";
-  }
-  if (excludedCount === 0) {
-    return "all";
-  }
-  return "partial";
-}
 
 export function getFileInclusionState(
   path: string,

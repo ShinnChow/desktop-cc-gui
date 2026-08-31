@@ -64,11 +64,7 @@ export function shouldHidePlaceholderNativeDraftFromSidebar(params: {
   return isWeakSessionDisplayTitle(params.displayName);
 }
 
-export function isEmptyClaudeIndexFallbackTitle(
-  value: string | null | undefined,
-): boolean {
-  return isEmptyNativeIndexFallbackTitle(value);
-}
+
 
 function isEmptyNativeIndexFallbackSummary(summary: {
   engineSource?: ThreadSummary["engineSource"];
@@ -343,18 +339,7 @@ export function stripEmptyClaudeIndexFallbackSummaries(
   return changed ? next : summaries;
 }
 
-export function filterSessionIndexRowsByEngine(
-  rows: SessionIndexRow[],
-  engine: string,
-): SessionIndexRow[] {
-  const wanted = engine.trim().toLowerCase();
-  if (!wanted) {
-    return [];
-  }
-  return rows.filter(
-    (row) => String(row.engine ?? "").trim().toLowerCase() === wanted,
-  );
-}
+
 
 function summaryEngineKey(summary: ThreadSummary): string {
   const id = String(summary.id ?? "").trim();

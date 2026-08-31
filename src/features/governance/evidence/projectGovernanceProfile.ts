@@ -500,10 +500,4 @@ export function createGovernanceConfigTemplate() {
   );
 }
 
-export const projectGovernanceProfileInternals = {
-  SCRIPT_TO_GATE,
-  WORKFLOW_TO_GATE,
-  detectEcosystems,
-  detectGates,
-  parsePackageScripts,
-};
+

@@ -211,7 +211,4 @@ export function useOpenAppTargetHealth(options: UseOpenAppTargetHealthOptions): 
   };
 }
 
-export function __resetOpenAppTargetHealthCacheForTests(): void {
-  sessionPresetProbeCache = null;
-  sessionPresetProbeInFlight = null;
-}
+

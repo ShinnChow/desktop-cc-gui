@@ -203,27 +203,6 @@ export function usePublishHostSlice<K extends AppShellHostSliceName>(
   }, [bus, key, value]);
 }
 
-export function useHostSlice<K extends AppShellHostSliceName>(
-  key: K,
-): NonNullable<AppShellHostSnapshot[K]> {
-  const bus = useAppShellHostBus();
-  const slice = useSyncExternalStore(
-    (onStoreChange) => bus.subscribe(key, onStoreChange),
-    () => bus.get(key),
-  );
-  return (slice ?? {}) as NonNullable<AppShellHostSnapshot[K]>;
-}
-
-export function useOptionalHostSlice<K extends AppShellHostSliceName>(
-  key: K,
-): AppShellHostSnapshot[K] {
-  const bus = useAppShellHostBus();
-  return useSyncExternalStore(
-    (onStoreChange) => bus.subscribe(key, onStoreChange),
-    () => bus.get(key),
-  );
-}
-
 /**
  * useHostFields 的容错变体：AppShellHostBusProvider 之外（独立测试挂载、
  * 非 app-shell 宿主的渲染树）返回全 undefined 字段而非抛错——消费方按
@@ -267,24 +246,6 @@ export function useHostFields<
       return next;
     },
   ) as Record<F[number], unknown>;
-}
-
-export function useHostSelector<T>(
-  select: (snapshot: AppShellHostSnapshot) => T,
-): T {
-  const bus = useAppShellHostBus();
-  const selectedRef = useRef<T | typeof UNSET>(UNSET);
-  return useSyncExternalStore(
-    (onStoreChange) => bus.subscribe('*', onStoreChange),
-    () => {
-      const next = select(bus.getSnapshot());
-      if (selectedRef.current !== UNSET && Object.is(selectedRef.current, next)) {
-        return selectedRef.current;
-      }
-      selectedRef.current = next;
-      return next;
-    },
-  );
 }
 
 export function useHostSnapshot(): AppShellHostSnapshot {

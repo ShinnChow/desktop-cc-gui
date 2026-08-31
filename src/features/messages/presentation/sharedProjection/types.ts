@@ -30,13 +30,7 @@ export type SharedProjectionItem = {
 };
 
 /** 投影 checkpoint（与 `shared_projection_checkpoint` 表行对齐）。 */
-export type SharedProjectionCheckpoint = {
-  sessionId: string;
-  projectionName: string;
-  projectionVersion: number;
-  throughSequence: number;
-  payloadJson: string;
-};
+
 
 /** Shadow 对比 mismatch 分类。 */
 export type SharedProjectionMismatchKind = "shadowOnly" | "legacyOnly" | "contentMismatch";

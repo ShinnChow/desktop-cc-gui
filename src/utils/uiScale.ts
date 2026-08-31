@@ -12,7 +12,7 @@
 export const UI_SCALE_LOCKED = true;
 export const UI_SCALE_MIN = 1;
 export const UI_SCALE_MAX = 1;
-export const UI_SCALE_STEP = 0.1;
+
 export const UI_SCALE_DEFAULT = 1;
 
 /** Settings UI presets retired — only identity remains. */
@@ -30,15 +30,9 @@ export function sanitizeUiScale(_value: number) {
   return UI_SCALE_DEFAULT;
 }
 
-export function formatUiScale(value: number) {
-  return clampUiScale(value).toFixed(1);
-}
 
-export function isUiScalePreset(value: number): boolean {
-  return UI_SCALE_PRESETS.some(
-    (preset) => Math.abs(preset - value) < UI_SCALE_PRESET_EPS,
-  );
-}
+
+
 
 /** Match a stored scale to a preset option value when close enough. */
 export function matchUiScalePreset(value: number): number | null {

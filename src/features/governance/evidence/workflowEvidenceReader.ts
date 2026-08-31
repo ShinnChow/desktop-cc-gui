@@ -38,6 +38,4 @@ export function readWorkflowEvidence(
   ];
 }
 
-export const workflowEvidenceReaderInternals = {
-  GOVERNANCE_WORKFLOWS,
-};
+

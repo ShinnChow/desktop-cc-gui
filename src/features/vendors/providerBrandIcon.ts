@@ -13,7 +13,7 @@ import moonshotIcon from "@lobehub/icons-static-svg/icons/moonshot.svg";
 import opencodeIcon from "@lobehub/icons-static-svg/icons/opencode.svg";
 import openaiIcon from "@lobehub/icons-static-svg/icons/openai.svg";
 import openrouterIcon from "@lobehub/icons-static-svg/icons/openrouter-color.svg";
-import qwenIcon from "@lobehub/icons-static-svg/icons/qwen-color.svg";
+
 import xiaomimimoIcon from "@lobehub/icons-static-svg/icons/xiaomimimo.svg";
 import zhipuIcon from "@lobehub/icons-static-svg/icons/zhipu-color.svg";
 
@@ -47,7 +47,7 @@ export const PROVIDER_BRAND_ICON_SRC: Record<ProviderBrandVendor, string> = {
 };
 
 export const ANTHROPIC_BRAND_ICON_SRC = anthropicIcon;
-export const QWEN_BRAND_ICON_SRC = qwenIcon;
+
 
 /**
  * 白色主体字形、为深色品牌底设计的图标(当前仅 kimi-color.svg:白 K + 蓝点)。

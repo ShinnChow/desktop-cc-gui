@@ -1,4 +1,4 @@
-export { useTriggerDetection, getRectAtCharOffset } from './useTriggerDetection.js';
+
 export { useCompletionDropdown } from './useCompletionDropdown.js';
 export { useCompletionTriggerDetection } from './useCompletionTriggerDetection.js';
 export { useTextContent } from './useTextContent.js';
@@ -17,6 +17,10 @@ export { useControlledValueSync } from './useControlledValueSync.js';
 export { useAttachmentHandlers } from './useAttachmentHandlers.js';
 export { useChatInputImperativeHandle } from './useChatInputImperativeHandle.js';
 export { useSpaceKeyListener } from './useSpaceKeyListener.js';
-export { useResizableChatInputBox, computeResize } from './useResizableChatInputBox.js';
+export {
+  useResizableChatInputBox,
+} from './useResizableChatInputBox.js';
 export { useInlineHistoryCompletion } from '../../../hooks/useInlineHistoryCompletion.js';
-export { useUndoRedoHistory, createUndoRedoHistory } from './useUndoRedoHistory.js';
+export {
+  useUndoRedoHistory,
+} from './useUndoRedoHistory.js';

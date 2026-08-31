@@ -559,23 +559,7 @@ export type ProjectMapRelationshipRelationType =
 
 export type ProjectMapRelationshipSourceKind = "deterministic";
 
-export type ProjectMapRelationshipManifest = {
-  schemaVersion: 1;
-  storageKey: string;
-  workspaceId: string;
-  workspacePath: string;
-  projectName: string;
-  scannedRoot: string;
-  gitCommonRoot: string | null;
-  gitCommitHash: string | null;
-  generatedAt: string;
-  scanRunId: string;
-  fileCount: number;
-  relationCount: number;
-  ignoredCount: number;
-  repairIssueCount: number;
-  source: "deterministic-scan";
-};
+
 
 export type ProjectMapRelationshipEvidence = {
   path: string;
@@ -679,11 +663,7 @@ export type ProjectMapRelationshipRepairIssue = {
   action?: "repaired" | "quarantined" | "ignored";
 };
 
-export type ProjectMapRelationshipRepairSummary = {
-  schemaVersion: 1;
-  generatedAt: string;
-  issues: ProjectMapRelationshipRepairIssue[];
-};
+
 
 export type ProjectMapRelationshipImpactSummary = {
   schemaVersion: 1;

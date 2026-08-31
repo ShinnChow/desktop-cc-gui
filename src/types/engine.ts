@@ -68,27 +68,12 @@ export type EngineStatus = {
 /**
  * Engine configuration options
  */
-export type EngineConfig = {
-  binPath: string | null;
-  homeDir: string | null;
-  customArgs: string | null;
-};
+
 
 /**
  * Parameters for sending a message to an engine
  */
-export type EngineSendMessageParams = {
-  text: string;
-  model: string | null;
-  images: string[] | null;
-  continueSession: boolean;
-  sessionId: string | null;
-  forkSessionId?: string | null;
-  accessMode: string | null;
-  agent?: string | null;
-  variant?: string | null;
-  dshAgentPreset?: string | null;
-};
+
 
 /**
  * Unified engine event types for streaming

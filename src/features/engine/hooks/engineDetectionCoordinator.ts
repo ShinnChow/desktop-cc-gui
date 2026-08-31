@@ -11,7 +11,6 @@
 
 import {
   detectEngines,
-  EngineDetectionTimeoutError,
 } from "../../../services/tauri/appServer";
 import type { EngineStatus, EngineType } from "../../../types";
 
@@ -65,8 +64,6 @@ export function requestEngineDetection(
 }
 
 /** 仅供测试：清空在途请求。 */
-export function resetEngineDetectionCoordinatorForTests(): void {
-  inflight = null;
-}
 
-export { EngineDetectionTimeoutError };
+
+

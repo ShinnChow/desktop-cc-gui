@@ -47,13 +47,7 @@ export type SessionIndexListPage = {
   visibility?: SharedNativeVisibilityProjection | null;
 };
 
-export type SessionIndexSyncReport = {
-  upserted: number;
-  engines: string[];
-  durationMs: number;
-  partialSource?: string | null;
-  skippedFresh: boolean;
-};
+
 
 export async function listSessionIndexForWorkspace(
   workspaceId: string,
@@ -76,19 +70,7 @@ export async function listSessionIndexForWorkspace(
   });
 }
 
-export async function syncSessionIndexForWorkspace(
-  workspaceId: string,
-  options?: {
-    limit?: number | null;
-    force?: boolean | null;
-  },
-): Promise<SessionIndexSyncReport> {
-  return invoke<SessionIndexSyncReport>("sync_session_index_for_workspace", {
-    workspaceId,
-    limit: options?.limit ?? null,
-    force: options?.force ?? false,
-  });
-}
+
 
 /** Soft-invalidate SQLite source freshness so next list/sync rescans engines. */
 export async function invalidateSessionIndexForWorkspace(

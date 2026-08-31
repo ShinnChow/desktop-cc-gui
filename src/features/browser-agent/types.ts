@@ -131,10 +131,7 @@ export type UpdateBrowserSessionRequest = {
   diagnosticMessage?: string | null;
 };
 
-export type BrowserSessionCleanupResult = {
-  removedSessionIds: string[];
-  retainedSessionCount: number;
-};
+
 
 export type BrowserTabContextMenuTheme = {
   colorScheme: "light" | "dark";
@@ -773,27 +770,9 @@ export type BrowserActionResult = {
   preview?: BrowserActionPreview | null;
 };
 
-export type BrowserEvidenceRecord = {
-  evidenceId: string;
-  browserSessionId: string;
-  snapshotId: string;
-  workspaceId: string;
-  url: string;
-  title: string | null;
-  capturedAt: number;
-  expiresAt: number;
-  state: "available" | "stale" | "expired" | "degraded" | "deleted" | "unsupported";
-  summary: string;
-  privacy: BrowserPrivacyReport;
-  freshness?: BrowserSnapshotFreshness;
-  diagnostics?: BrowserDiagnostic[];
-  codeCandidates?: BrowserCodeCandidate[];
-};
 
-export type BrowserEvidenceCleanupResult = {
-  removedEvidenceIds: string[];
-  retainedEvidenceCount: number;
-};
+
+
 
 export type BrowserProviderRouteDecision = {
   requestedCapability:

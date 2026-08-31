@@ -16,14 +16,7 @@ export const COMMIT_MESSAGE_MENU_ENGINES = ["codex", "claude"] as const satisfie
  * 可见 quick option 的配置来源：persisted engine 必须仍在当前 menu catalog
  * 且允许执行；legacy/retired engine 不得绕过显式选择入口。
  */
-export function readExecutableCommitMessageConfig(): LastCommitMessageConfig | null {
-  const config = readLastCommitMessageConfig();
-  return config &&
-    COMMIT_MESSAGE_MENU_ENGINES.some((engine) => engine === config.engine) &&
-    isEngineExecutionEnabled(config.engine)
-    ? config
-    : null;
-}
+
 
 export const COMMIT_MESSAGE_PICKER_MENU_SIZE = {
   width: 296,

@@ -188,12 +188,7 @@ export async function createGitPrWorkflow(workspaceId: string, options: CreateGi
   });
 }
 
-export async function resolveGitCommitRef(workspace_id: string, target: string): Promise<string> {
-  return invoke("resolve_git_commit_ref", {
-    workspaceId: workspace_id,
-    target,
-  });
-}
+
 
 export async function getGitCommitDetails(
   workspace_id: string,
@@ -478,22 +473,9 @@ export async function getGitBranchCompareCommits(workspaceId: string, targetBran
   });
 }
 
-export async function getGitBranchDiffBetweenBranches(workspaceId: string, fromBranch: string, toBranch: string): Promise<GitCommitDiff[]> {
-  return invoke<GitCommitDiff[]>("get_git_branch_diff_between_branches", {
-    workspaceId,
-    fromBranch,
-    toBranch,
-  });
-}
 
-export async function getGitBranchDiffFileBetweenBranches(workspaceId: string, fromBranch: string, toBranch: string, path: string): Promise<GitCommitDiff> {
-  return invoke<GitCommitDiff>("get_git_branch_file_diff_between_branches", {
-    workspaceId,
-    fromBranch,
-    toBranch,
-    path,
-  });
-}
+
+
 
 export async function getGitWorktreeDiffAgainstBranch(workspaceId: string, branch: string): Promise<GitCommitDiff[]> {
   return invoke<GitCommitDiff[]>("get_git_worktree_diff_against_branch", {

@@ -88,4 +88,4 @@ export const SPEC_HUB_VISIBLE_COPY_KEYS = [
   "specHub.placeholder.notAvailable",
 ] as const;
 
-export type SpecHubVisibleCopyKey = (typeof SPEC_HUB_VISIBLE_COPY_KEYS)[number];
+

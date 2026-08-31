@@ -7,29 +7,7 @@ export type BudgetStore = {
   list(): readonly SessionBudgetConfig[];
 };
 
-export function createBudgetStore(
-  seed: readonly SessionBudgetConfig[] = [],
-): BudgetStore {
-  const configs = new Map<string, SessionBudgetConfig>();
-  for (const config of seed) {
-    configs.set(config.sessionId, config);
-  }
 
-  return {
-    get(sessionId) {
-      return configs.get(sessionId) ?? null;
-    },
-    set(config) {
-      configs.set(config.sessionId, config);
-    },
-    remove(sessionId) {
-      configs.delete(sessionId);
-    },
-    list() {
-      return Array.from(configs.values());
-    },
-  };
-}
 
 export type MonthlyBudgetStore = {
   get(): MonthlyBudgetConfig;

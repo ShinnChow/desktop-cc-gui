@@ -276,13 +276,7 @@ export function isPendingThreadId(threadId: string): boolean {
   );
 }
 
-export function selectReplacementThreadSummary(params: {
-  staleThreadId: string;
-  summaries: ThreadSummary[];
-  staleSummary?: ThreadSummary;
-}): ThreadSummary | null {
-  return selectReplacementThreadDecision(params).summary ?? null;
-}
+
 
 export function selectReplacementThreadDecision(params: {
   staleThreadId: string;
@@ -571,12 +565,7 @@ function scoreReplacementThreadCandidateDetailed(
   return { score, featureSignals };
 }
 
-function scoreReplacementThreadCandidate(
-  entry: ThreadSummary,
-  staleSummary?: ThreadSummary,
-): number {
-  return scoreReplacementThreadCandidateDetailed(entry, staleSummary).score;
-}
+
 
 function resolveReplacementRecoveryConfidence(score: number, scoreGap: number): number {
   if (score >= 130 && scoreGap >= 50) {
@@ -612,19 +601,7 @@ export function listReplacementThreadCandidates(params: {
   });
 }
 
-export function scoreReplacementThreadCandidates(params: {
-  staleThreadId: string;
-  summaries: ThreadSummary[];
-  staleSummary?: ThreadSummary;
-}): Array<{ entry: ThreadSummary; score: number }> {
-  const staleSummary =
-    params.staleSummary ??
-    params.summaries.find((entry) => entry.id === params.staleThreadId);
-  return listReplacementThreadCandidates(params).map((entry) => ({
-    entry,
-    score: scoreReplacementThreadCandidate(entry, staleSummary),
-  }));
-}
+
 
 export function scoreDetailedReplacementThreadCandidates(params: {
   staleThreadId: string;

@@ -370,15 +370,4 @@ export async function readGateArtifactEvidence(
   return evidence;
 }
 
-export const gateArtifactEvidenceReaderInternals = {
-  ARTIFACT_STALE_AFTER_MS,
-  GATE_ARTIFACT_ADAPTER_ID,
-  HEAVY_TEST_NOISE_ARTIFACT,
-  HEAVY_TEST_NOISE_REPORT_PARSER_ID,
-  LARGE_FILE_GATE_ARTIFACT,
-  LARGE_FILE_NEAR_THRESHOLD_ARTIFACT,
-  LARGE_FILE_REPORT_PARSER_ID,
-  createSha256Digest,
-  normalizeArtifactStatus,
-  resolveArtifactFreshness,
-};
+

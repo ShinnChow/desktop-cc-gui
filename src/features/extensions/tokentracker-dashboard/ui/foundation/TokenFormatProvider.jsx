@@ -88,4 +88,4 @@ export function TokenFormatModeOverride({ children, mode }) {
   return <TokenFormatContext.Provider value={value}>{children}</TokenFormatContext.Provider>;
 }
 
-export { TOKEN_FORMAT_MODES };
+

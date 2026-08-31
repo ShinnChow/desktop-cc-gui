@@ -105,14 +105,7 @@ export function getQuickSwitcherRecentFilesSnapshot(): RecentFilesByWorkspace {
   );
 }
 
-export function getQuickSwitcherRecentFiles(
-  workspaceId: string | null | undefined,
-): QuickSwitcherRecentFile[] {
-  if (!workspaceId) {
-    return [];
-  }
-  return getQuickSwitcherRecentFilesSnapshot()[workspaceId] ?? [];
-}
+
 
 export function projectQuickSwitcherRecentFileGroups(
   recentFilesByWorkspace: RecentFilesByWorkspace,

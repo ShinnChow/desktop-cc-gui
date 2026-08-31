@@ -27,26 +27,9 @@ export async function deleteAgentConfig(id: string): Promise<boolean> {
   return invoke<boolean>("agent_delete", { id });
 }
 
-export async function getSelectedAgentConfig(): Promise<{
-  selectedAgentId: string | null;
-  agent: AgentConfig | null;
-}> {
-  return invoke<{ selectedAgentId: string | null; agent: AgentConfig | null }>(
-    "agent_get_selected",
-  );
-}
 
-export async function setSelectedAgentConfig(agentId: string | null): Promise<{
-  success: boolean;
-  agent: AgentConfig | null;
-}> {
-  return invoke<{ success: boolean; agent: AgentConfig | null }>(
-    "agent_set_selected",
-    {
-      agentId,
-    },
-  );
-}
+
+
 
 export async function exportAgentConfigs(
   agentIds: string[],

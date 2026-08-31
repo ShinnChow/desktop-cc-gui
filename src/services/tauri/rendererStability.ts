@@ -71,17 +71,7 @@ export type RendererHeartbeatStatus = {
   nativeHookSupport: RendererPlatformHookSupport[];
 };
 
-export type RendererStabilitySnapshot = {
-  statuses: RendererHeartbeatStatus[];
-  watchdogDiagnostics: Array<{
-    timestamp: number;
-    appScope: string;
-    label: "renderer.heartbeat_missed";
-    missedByMs: number;
-    thresholdMs: number;
-  }>;
-  nativeHookSupport: RendererPlatformHookSupport[];
-};
+
 
 export async function recordRendererHeartbeat(
   input: RendererHeartbeatInput,
@@ -92,9 +82,4 @@ export async function recordRendererHeartbeat(
   return invoke<RendererHeartbeatStatus>("record_renderer_heartbeat", { input });
 }
 
-export async function getRendererStabilitySnapshot(): Promise<RendererStabilitySnapshot | null> {
-  if (!isTauri()) {
-    return null;
-  }
-  return invoke<RendererStabilitySnapshot>("get_renderer_stability_snapshot");
-}
+

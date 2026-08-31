@@ -2,7 +2,7 @@ import type { EngineType } from "../../../types";
 import type { AgentExecutionTarget, AgentStageBinding } from "../types";
 import { maT } from "../utils/i18n";
 
-export type ReasoningEffortLevel = string;
+
 
 /** 本段启动时如何消费已成功前序产出（仅 stages[index≥1] 生效）。 */
 export type UpstreamFeedMode = "summary" | "full";

@@ -323,14 +323,7 @@ export function buildBrowserSelectedElementPreviews(
     .map((annotation) => buildBrowserSelectedElementPreviewFromAnnotation(attachment, annotation));
 }
 
-export function buildBrowserSelectedElementPreview(
-  attachment: Pick<
-    BrowserEvidenceAttachmentLike,
-    "title" | "url" | "annotations" | "primaryContent" | "visibleTextExcerpt" | "readableBlocks"
-  >,
-): BrowserSelectedElementPreview | null {
-  return buildBrowserSelectedElementPreviews(attachment)[0] ?? null;
-}
+
 
 function buildSection(
   sectionId: string,
@@ -516,29 +509,7 @@ export function buildBrowserEvidenceViewModel(
   };
 }
 
-export function buildBrowserEvidenceCopyText(
-  viewModel: BrowserEvidenceViewModel,
-  sectionId?: keyof BrowserEvidenceViewModel,
-): string {
-  const section = sectionId ? viewModel[sectionId] : null;
-  if (section && typeof section === "object" && "copySafeText" in section) {
-    return section.copySafeText;
-  }
-  return [
-    viewModel.selectedElements.map((item) => item.copySafeText).join("\n\n"),
-    viewModel.overview.copySafeText,
-    viewModel.primaryContent.copySafeText,
-    viewModel.readableBlocks.copySafeText,
-    viewModel.interactiveElements.copySafeText,
-    viewModel.visualEvidence.copySafeText,
-    viewModel.annotations.copySafeText,
-    viewModel.codeCandidates.copySafeText,
-    viewModel.diagnostics.copySafeText,
-    viewModel.privacyBudget.copySafeText,
-  ]
-    .filter((value) => value.trim().length > 0)
-    .join("\n\n");
-}
+
 
 export function buildBrowserEvidenceViewModelFromTaskRunEvidence(
   evidence: TaskRunBrowserEvidenceRef,

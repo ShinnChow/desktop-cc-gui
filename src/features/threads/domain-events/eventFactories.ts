@@ -1,8 +1,8 @@
-import type { ThreadTokenUsage } from "../../../types";
+
 import { assertIsoTimestamp, freezeDomainEvent } from "./events/base";
 import type { DomainEvent, DomainEventType } from "./eventTypes";
 
-type CommonInput = Omit<DomainEvent, "type">;
+
 type FactoryInput<T extends DomainEventType> = Omit<Extract<DomainEvent, { type: T }>, "type">;
 
 function createEvent<T extends DomainEventType>(
@@ -64,5 +64,5 @@ export const domainEventFactories = {
   },
 };
 
-export type DomainEventFactoryCommonInput = CommonInput;
-export type DomainEventUsageInput = ThreadTokenUsage;
+
+

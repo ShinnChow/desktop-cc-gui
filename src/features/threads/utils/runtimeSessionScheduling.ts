@@ -126,10 +126,7 @@ export type RuntimeOutputViewportPriority = {
   estimatedRenderCost: number | null;
 };
 
-export const emptyRuntimeOutputBufferState: RuntimeOutputBufferState = {
-  events: [],
-  consumedEventIds: new Set<string>(),
-};
+
 
 export function createRuntimeOutputBufferState(
   events: RuntimeOutputBufferEvent[] = [],

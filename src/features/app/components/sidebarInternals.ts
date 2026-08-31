@@ -277,7 +277,7 @@ export function filterClaudeLiveSubagentSourceItems(
 }
 
 /** @deprecated 别名：历史命名保留，逻辑已跨引擎 */
-export const filterLiveSubagentSourceItems = filterClaudeLiveSubagentSourceItems;
+
 
 /**
  * 在会话列表中为当前父会话注入 live 子代理行（pending + 已有真实子会话的 parent 链接投影）。
@@ -466,4 +466,4 @@ export function buildClaudeLiveSubagentRows(
 }
 
 /** @deprecated 别名：历史命名保留，逻辑已跨引擎 */
-export const buildLiveSubagentRows = buildClaudeLiveSubagentRows;
+
