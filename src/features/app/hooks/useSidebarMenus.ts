@@ -1858,6 +1858,14 @@ export function useSidebarMenus({
             ...createRowPinMeta("rename-workspace-alias"),
             onSelect: () => onRenameWorkspaceAlias(workspace),
           },
+          {
+            id: "remove-workspace",
+            label: t("sidebar.removeWorkspace"),
+            iconKind: "remove",
+            tone: "danger",
+            ...createRowPinMeta("remove-workspace"),
+            onSelect: () => onDeleteWorkspace(workspaceId),
+          },
           ...(canAssignWorkspaceGroup && onAssignWorkspaceGroup
             ? [
                 {
@@ -1890,14 +1898,6 @@ export function useSidebarMenus({
                 },
               ]
             : []),
-          {
-            id: "remove-workspace",
-            label: t("sidebar.removeWorkspace"),
-            iconKind: "remove",
-            tone: "danger",
-            ...createRowPinMeta("remove-workspace"),
-            onSelect: () => onDeleteWorkspace(workspaceId),
-          },
           {
             id: "new-worktree-agent",
             label: t("sidebar.newWorktreeAgent"),
