@@ -1,28 +1,8 @@
 {
-  "generatedAt": "2026-08-30T20:56:44.363Z",
+  "generatedAt": "2026-08-31T00:31:29.858Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
-    {
-      "path": "src-tauri/src/shared_session_v2.rs",
-      "lines": 5349,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/git-history/components/git-history-panel/components/GitHistoryPanelImpl.tsx",
-      "lines": 4933,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
     {
       "path": "src/features/app/hooks/useAppServerEvents.test.tsx",
       "lines": 4327,
@@ -54,26 +34,6 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src/features/threads/hooks/useThreadMessaging.ts",
-      "lines": 4025,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src-tauri/src/session_management.rs",
-      "lines": 4008,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
-      "thresholdSource": "policy"
-    },
-    {
       "path": "src/features/composer/components/ChatInputBox/selectors/ModelSelect.test.tsx",
       "lines": 3679,
       "type": "ts/tsx",
@@ -81,6 +41,16 @@
       "priority": "P2",
       "warnThreshold": 2600,
       "failThreshold": 3000,
+      "thresholdSource": "policy"
+    },
+    {
+      "path": "src/features/git-history/components/git-history-panel/components/GitHistoryPanelImpl.tsx",
+      "lines": 3662,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 2800,
       "thresholdSource": "policy"
     },
     {
@@ -114,52 +84,12 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src/features/threads/hooks/useThreadsReducer.ts",
-      "lines": 3506,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src-tauri/src/engine/claude.rs",
-      "lines": 3430,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/git-history/components/git-history-panel/components/GitHistoryPanelView.tsx",
-      "lines": 3425,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
-      "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
       "path": "src/styles/sidebar.css",
       "lines": 3409,
       "type": "css",
       "policyId": "styles",
       "priority": "P1",
       "warnThreshold": 2200,
-      "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/threads/hooks/useThreads.ts",
-      "lines": 3385,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
       "failThreshold": 2800,
       "thresholdSource": "policy"
     },
@@ -324,6 +254,16 @@
       "thresholdSource": "policy"
     },
     {
+      "path": "src/features/git-history/components/git-history-panel/components/GitHistoryPanelView.tsx",
+      "lines": 3012,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 2800,
+      "thresholdSource": "policy"
+    },
+    {
       "path": "src/styles/file-view-panel.css",
       "lines": 2980,
       "type": "css",
@@ -344,23 +284,13 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src/features/git-history/components/git-history-panel/hooks/useGitHistoryPanelInteractions.tsx",
-      "lines": 2878,
+      "path": "src/features/threads/hooks/useThreadMessaging.ts",
+      "lines": 2819,
       "type": "ts/tsx",
       "policyId": "feature-hotpath",
       "priority": "P1",
       "warnThreshold": 2400,
       "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src-tauri/src/shared_runtime_coordinator.rs",
-      "lines": 2670,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
       "thresholdSource": "policy"
     },
     {

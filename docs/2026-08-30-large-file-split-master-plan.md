@@ -359,6 +359,21 @@ open-app 探测簇(722 行,高度自包含)→ `workspaces/open_app.rs`(~750);wo
 
 **下会话入口**：在途两项验证收尾 → Wave 2 剩余（A4 收尾、B4 续、C1 reducer 二期、C2 messaging 主干）→ Wave 3 剩余（R2 claude.rs、R3 v2 主体、R4 coordinator 主体、R5 session_management、R6 shared_sessions 主体）→ F2 GitDiffPanel 续 → F4 useThreads → Wave 4 git-history。
 
+### 2026-08-31 执行记录（第二会话，18 个 commit 落在 feat/code-quality-optimization）
+
+**已完成（逐字搬运 + 基线对比零新增失败 + 收口 gate 绿）**：
+- Wave 2 收尾：B4 二期 useLayoutNodes 2935→2543（gitDiffPanelNode/panelNodes/chromeNodes 三段；deps 310 行逐字留 hook 是硬底）；B4 三期 layoutNodesSection 2531→2182（七组 options 全抽 builder，457 引用名 bag 硬底 ~2170，经拍板接受 2182）；C1 useThreadsReducer 二期 3506→1924（六块 reduceXxx）；C2 useThreadMessaging 4600→2819 全六段（memoryPick/types/pickGate/squadRequest/sharedSend/nativeResolve，SharedSendContext 与 NativeResolveContext 参数对象化每次调用现构未缓存）
+- Wave 3 全量：R2 claude.rs 3430→426（五子模块）；R3 shared_session_v2 5349→870（五域子模块+聚合层，7 个命令随域迁移 glob 重导出）；R4 coordinator 2670→1280（ingress/canonical_blocks/identity）；R5 session_management 4008→317（五平铺子模块，20 引用方零改动）；R6 shared_sessions 2061→954（四子模块）
+- F2 续：GitDiffPanel 2711→2146（contextMenus + useGitDiffPreview）
+- F4：useThreads 3385→2446（memoryCapture/autoNaming/completionEmail 三域；refs 内核留壳）
+- Wave 4 四步全落地：Dialogs 2076→48 编排器（四 dialog 族）；Interactions 2878→2236（PR 创建 + sync/push preview 两组）；View 3425→2988（branchDiff 段）；Impl 4933→3662（两个 scope 类型 895 行迁出 GitHistoryPanelTypes 破倒置 + 数据加载段 371 行抽出）；4 锚点函数原地不动，两治理脚本绿
+
+**实测指标（2026-08-31 第二会话末）**：>2000 行 87（107→95→87）；>800 行 349；全仓最大源码文件 GitHistoryPanelImpl 3663（原 7685）；全仓最大文件为测试 useAppServerEvents.test 4328；tsc 全仓零 error；check:large-files:gate 绿（含 new-file baseline 重生成）
+
+**教训增补**：④ options/builder 段拆分的行数硬底 = 字面量行数 − 搬出行数 + bag 逐名列举行数（457 名 ≈ 163 行），评估目标时先算这笔账；⑤ 并行子代理可行（本会话 9 代理并行落地 18 commit），关键是文件不重叠 + 禁 git 写操作 + 基线对比用「先跑记录失败名单」而非 stash；⑥ new-file ratchet 需跑 `check:large-files:new-file-baseline` 单独重生成（与主 baseline 是两个文件），漏跑 gate 以 status=new 阻塞。
+
+**下会话入口**：长尾滚动机制（near-threshold top-N）；已知大文件余量：GitHistoryPanelImpl 3663 / useAppServerEvents 1981(一期后)/ dispatcher 二期 / SessionManagementSection 2648 / SettingsView / FileViewPanel / FileTreePanel / Rust 长尾（app_server_cli 3306 / browser_agent 3224 / local_usage 3169 / claude_history 2881 / grok_history 2620 / runtime/mod 2585）。既有存量失败清单（与拆分无关，勿顺手修）：useThreadMessaging.test 4 个、useThreadsReducer 系 5 文件、GitHistoryWorktreePanel.test 8 个、T3.7 useEngineAvailabilityProjection 治理违规。
+
 - 每 wave 末:重生成 baseline,`git diff docs/architecture/large-file-baseline.json` 随 PR 提交,PR 描述说明;
 - 追踪指标(写进每 wave 收尾 PR):>2000 行文件数、>800 行文件数、全仓最大文件行数、P0 区超阈值文件数;
 - 目标曲线:107 → 92(W1)→ 55(W2)→ 10(W3)→ 登记豁免制(W4);
