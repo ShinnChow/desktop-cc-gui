@@ -372,7 +372,7 @@ open-app 探测簇(722 行,高度自包含)→ `workspaces/open_app.rs`(~750);wo
 
 **教训增补**：④ options/builder 段拆分的行数硬底 = 字面量行数 − 搬出行数 + bag 逐名列举行数（457 名 ≈ 163 行），评估目标时先算这笔账；⑤ 并行子代理可行（本会话 9 代理并行落地 18 commit），关键是文件不重叠 + 禁 git 写操作 + 基线对比用「先跑记录失败名单」而非 stash；⑥ new-file ratchet 需跑 `check:large-files:new-file-baseline` 单独重生成（与主 baseline 是两个文件），漏跑 gate 以 status=new 阻塞。
 
-**下会话入口**：长尾滚动机制（near-threshold top-N）；已知大文件余量：GitHistoryPanelImpl 3663 / useAppServerEvents 1981(一期后)/ dispatcher 二期 / SessionManagementSection 2648 / SettingsView / FileViewPanel / FileTreePanel / Rust 长尾（app_server_cli 3306 / browser_agent 3224 / local_usage 3169 / claude_history 2881 / grok_history 2620 / runtime/mod 2585）。既有存量失败清单（与拆分无关，勿顺手修）：useThreadMessaging.test 4 个、useThreadsReducer 系 5 文件、GitHistoryWorktreePanel.test 8 个、T3.7 useEngineAvailabilityProjection 治理违规。
+**下会话入口**：后续执行转 `docs/2026-08-31-large-file-split-wave5-plan.md`（Wave 5 详细计划）。长尾滚动机制（near-threshold top-N）；已知大文件余量：GitHistoryPanelImpl 3663 / useAppServerEvents 1981(一期后)/ dispatcher 二期 / SessionManagementSection 2648 / SettingsView / FileViewPanel / FileTreePanel / Rust 长尾（app_server_cli 3306 / browser_agent 3224 / local_usage 3169 / claude_history 2881 / grok_history 2620 / runtime/mod 2585）。既有存量失败清单（与拆分无关，勿顺手修）：useThreadMessaging.test 4 个、useThreadsReducer 系 5 文件、GitHistoryWorktreePanel.test 8 个、T3.7 useEngineAvailabilityProjection 治理违规。
 
 - 每 wave 末:重生成 baseline,`git diff docs/architecture/large-file-baseline.json` 随 PR 提交,PR 描述说明;
 - 追踪指标(写进每 wave 收尾 PR):>2000 行文件数、>800 行文件数、全仓最大文件行数、P0 区超阈值文件数;

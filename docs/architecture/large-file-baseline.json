@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-31T00:31:29.858Z",
+  "generatedAt": "2026-08-31T03:56:18.803Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -101,16 +101,6 @@
       "priority": "P2",
       "warnThreshold": 2600,
       "failThreshold": 3000,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src-tauri/src/backend/app_server_cli.rs",
-      "lines": 3306,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
       "thresholdSource": "policy"
     },
     {
@@ -291,26 +281,6 @@
       "priority": "P1",
       "warnThreshold": 2400,
       "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/settings/components/settings-view/sections/SessionManagementSection.tsx",
-      "lines": 2648,
-      "type": "ts/tsx",
-      "policyId": "settings-view-sections",
-      "priority": "P1",
-      "warnThreshold": 1500,
-      "failThreshold": 2000,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src-tauri/src/engine/grok_history.rs",
-      "lines": 2620,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
       "thresholdSource": "policy"
     }
   ]
