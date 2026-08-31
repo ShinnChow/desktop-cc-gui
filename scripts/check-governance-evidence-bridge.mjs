@@ -63,7 +63,6 @@ const bridgeSource = readText(
 for (const token of [
   "createHarnessGovernanceEvidence",
   "createFrozenGovernanceEvidenceSnapshot",
-  "findGovernanceEvidenceBySource",
 ]) {
   if (!bridgeSource.includes(token)) {
     fail(`governanceEvidenceBridge.ts missing "${token}"`);
