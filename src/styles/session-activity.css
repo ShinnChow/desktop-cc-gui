@@ -592,7 +592,8 @@
   padding: 8px 2px;
 }
 
-.session-activity-radar-list {
+.session-activity-radar-list,
+.session-activity-radar-date-group-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -604,7 +605,8 @@
   gap: 8px;
 }
 
-.session-activity-radar-date-group-header {
+.session-activity-radar-date-group-header,
+.session-activity-radar-row-shell {
   position: relative;
 }
 
@@ -712,16 +714,6 @@
 :root[data-theme="light"] .session-activity-radar-delete-icon-button:hover:not(:disabled) {
   background: transparent;
   color: #b91c1c;
-}
-
-.session-activity-radar-date-group-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.session-activity-radar-row-shell {
-  position: relative;
 }
 
 .session-activity-radar-row {
@@ -1278,7 +1270,8 @@
   color: #d9b86c;
 }
 
-.session-activity-kind-fileChange {
+.session-activity-kind-fileChange,
+.session-activity-file-stats .is-add {
   color: #7cd992;
 }
 
@@ -1338,7 +1331,8 @@
   color: var(--color-info, var(--color-tool-icon, #0078d4));
 }
 
-.session-activity-event.is-expanded .session-activity-card-meta {
+.session-activity-event.is-expanded .session-activity-card-meta,
+.session-activity-event:not(.is-expanded) .session-activity-card-meta {
   flex: 0 0 auto;
   max-width: 46%;
   white-space: nowrap;
@@ -1346,12 +1340,6 @@
 
 .session-activity-event:not(.is-expanded) .session-activity-card-title {
   flex: 1 1 auto;
-}
-
-.session-activity-event:not(.is-expanded) .session-activity-card-meta {
-  flex: 0 0 auto;
-  max-width: 46%;
-  white-space: nowrap;
 }
 
 .session-activity-card-meta {
@@ -1428,10 +1416,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.session-activity-file-stats .is-add {
-  color: #7cd992;
-}
-
 .session-activity-file-stats .is-del {
   color: #ff8d88;
 }
@@ -1496,11 +1480,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.session-activity-turn-artifacts-stats .is-add {
+.session-activity-turn-artifacts-stats .is-add,
+.session-activity-file-row-stats .is-add {
   color: var(--session-activity-file-row-add-color);
 }
 
-.session-activity-turn-artifacts-stats .is-del {
+.session-activity-turn-artifacts-stats .is-del,
+.session-activity-file-row-stats .is-del {
   color: var(--session-activity-file-row-del-color);
 }
 
@@ -1706,7 +1692,8 @@
   outline-offset: 2px;
 }
 
-.session-activity-semantic-evidence-more {
+.session-activity-semantic-evidence-more,
+.session-activity-semantic-source {
   color: color-mix(in srgb, var(--text-muted) 72%, var(--session-activity-semantic-accent));
 }
 
@@ -1718,10 +1705,6 @@
   border-radius: 999px;
   color: color-mix(in srgb, var(--text-muted) 62%, var(--session-activity-semantic-accent));
   background: var(--session-activity-semantic-accent-soft);
-}
-
-.session-activity-semantic-source {
-  color: color-mix(in srgb, var(--text-muted) 72%, var(--session-activity-semantic-accent));
 }
 
 .session-activity-file-row {
@@ -1791,14 +1774,6 @@
   font-size: var(--session-activity-caption-font-size);
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   font-variant-numeric: tabular-nums;
-}
-
-.session-activity-file-row-stats .is-add {
-  color: var(--session-activity-file-row-add-color);
-}
-
-.session-activity-file-row-stats .is-del {
-  color: var(--session-activity-file-row-del-color);
 }
 
 .session-activity-file-row-action {

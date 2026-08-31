@@ -97,7 +97,8 @@
   margin-bottom: 10px;
 }
 
-.task-field:last-child {
+.task-field:last-child,
+.read-tool-markdown > :last-child {
   margin-bottom: 0;
 }
 
@@ -144,10 +145,6 @@
 .read-tool-markdown pre,
 .read-tool-markdown blockquote {
   margin-top: 0;
-}
-
-.read-tool-markdown > :last-child {
-  margin-bottom: 0;
 }
 
 /* 工具标题样式 */

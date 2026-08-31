@@ -75,7 +75,8 @@
   cursor: pointer;
 }
 
-.composer-queue-menu:hover {
+.composer-queue-menu:hover,
+.composer-attachment-remove:hover {
   color: var(--text-stronger);
 }
 
@@ -185,7 +186,13 @@
   scrollbar-width: none;
 }
 
-.composer-input-footer-left::-webkit-scrollbar {
+.composer-input-footer-left::-webkit-scrollbar,
+.composer-inline-select-trigger::before,
+.composer-inline-select-trigger [data-slot="select-icon"],
+[data-slot="select-popup"]:has(.composer-inline-select-popup)
+  [data-slot="select-scroll-up-arrow"],
+[data-slot="select-popup"]:has(.composer-inline-select-popup)
+  [data-slot="select-scroll-down-arrow"] {
   display: none;
 }
 
@@ -273,7 +280,8 @@
   line-height: 1;
 }
 
-.composer-plan-mode-switch {
+.composer-plan-mode-switch,
+.composer-settings-link-icon {
   flex: 0 0 auto;
 }
 
@@ -329,20 +337,14 @@
   outline: none !important;
 }
 
-.composer-inline-select-trigger::before {
-  display: none !important;
-}
-
-.composer-inline-select-trigger [data-slot="select-icon"] {
-  display: none !important;
-}
-
 .composer-inline-select-trigger [data-slot="select-icon"] svg {
   width: 13px;
   height: 13px;
 }
 
-.composer-inline-select-trigger[data-popup-open] [data-slot="select-icon"] {
+.composer-inline-select-trigger[data-popup-open] [data-slot="select-icon"],
+.composer-link-button:hover,
+:root[data-theme="light"] .composer-action:hover {
   color: var(--text-strong);
 }
 
@@ -363,13 +365,6 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-}
-
-[data-slot="select-popup"]:has(.composer-inline-select-popup)
-  [data-slot="select-scroll-up-arrow"],
-[data-slot="select-popup"]:has(.composer-inline-select-popup)
-  [data-slot="select-scroll-down-arrow"] {
-  display: none;
 }
 
 [data-slot="select-popup"]:has(.composer-inline-select-popup) > div {
@@ -694,10 +689,6 @@
   text-decoration: underline;
 }
 
-.composer-link-button:hover {
-  color: var(--text-strong);
-}
-
 .composer-collaboration-hint {
   display: inline-flex;
   align-items: center;
@@ -741,10 +732,6 @@
   text-decoration: underline;
   text-decoration-style: dashed;
   text-underline-offset: 2px;
-}
-
-.composer-settings-link-icon {
-  flex: 0 0 auto;
 }
 
 .composer-attachments {
@@ -812,7 +799,8 @@
   flex: 0 0 auto;
 }
 
-.composer-attachment-thumb img {
+.composer-attachment-thumb img,
+.composer-note-card-picker-thumb img {
   display: block;
   width: 100%;
   height: 100%;
@@ -835,11 +823,8 @@
   display: inline-flex;
 }
 
-.composer-attachment-remove:hover {
-  color: var(--text-stronger);
-}
-
-.composer-attachment-remove:disabled {
+.composer-attachment-remove:disabled,
+.composer-mode-badge:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -880,11 +865,6 @@
     transparent
   );
   color: color-mix(in srgb, var(--accent-primary, #2563eb) 78%, white 22%);
-}
-
-.composer-mode-badge:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .composer-action {
@@ -992,17 +972,14 @@
   transition: width 0.2s ease;
 }
 
-.composer-usage-reset {
+.composer-usage-reset,
+.composer-memory-picker-count {
   font-size: 10px;
   color: var(--text-muted);
 }
 
 :root[data-theme="light"] .composer-action {
   border-color: var(--border-strong);
-  color: var(--text-strong);
-}
-
-:root[data-theme="light"] .composer-action:hover {
   color: var(--text-strong);
 }
 
@@ -1149,14 +1126,7 @@
   color: var(--text-fainter);
 }
 
-.composer-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: var(--surface-control-disabled);
-  color: var(--text-fainter);
-  border-color: var(--border-subtle);
-}
-
+.composer-action:disabled,
 .composer-action.is-disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -1254,11 +1224,6 @@
   color: var(--text-strong);
 }
 
-.composer-memory-picker-count {
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
 .composer-memory-picker-card {
   display: flex;
   align-items: flex-start;
@@ -1306,13 +1271,6 @@
   flex: 0 0 auto;
   background: color-mix(in srgb, var(--surface-card) 84%, transparent);
   border: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent);
-}
-
-.composer-note-card-picker-thumb img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .composer-memory-picker-card-main {

@@ -148,7 +148,8 @@
 }
 
 .workspace-note-cards-icon-action:hover,
-.workspace-note-cards-search button:hover {
+.workspace-note-cards-search button:hover,
+.workspace-note-cards-card:hover {
   background: var(--surface-hover, var(--note-card-surface-muted));
 }
 
@@ -164,7 +165,8 @@
   outline-offset: 2px;
 }
 
-.workspace-note-cards-danger {
+.workspace-note-cards-danger,
+.workspace-note-cards-save-status.is-error {
   color: var(--note-card-danger);
 }
 
@@ -173,7 +175,8 @@
   cursor: default;
 }
 
-.workspace-note-cards-toolbar {
+.workspace-note-cards-toolbar,
+.workspace-note-cards-card-head {
   gap: 8px;
   min-width: 0;
 }
@@ -217,7 +220,8 @@
   background: var(--note-card-surface-muted);
 }
 
-.workspace-note-cards-search:focus-within {
+.workspace-note-cards-search:focus-within,
+.workspace-note-cards-title-input:focus-visible {
   border-color: color-mix(in srgb, var(--note-card-accent) 70%, var(--note-card-border));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--note-card-accent) 12%, transparent);
 }
@@ -279,10 +283,6 @@
   contain-intrinsic-size: auto 76px;
 }
 
-.workspace-note-cards-card:hover {
-  background: var(--surface-hover, var(--note-card-surface-muted));
-}
-
 .workspace-note-cards-card.is-selected {
   background: color-mix(in srgb, var(--note-card-accent) 10%, transparent);
   box-shadow: inset 2px 0 0 var(--note-card-accent);
@@ -300,11 +300,6 @@
   text-align: left;
   cursor: pointer;
   border-radius: 3px;
-}
-
-.workspace-note-cards-card-head {
-  gap: 8px;
-  min-width: 0;
 }
 
 .workspace-note-cards-card-head strong {
@@ -510,11 +505,6 @@
   font-size: 12px;
 }
 
-.workspace-note-cards-title-input:focus-visible {
-  border-color: color-mix(in srgb, var(--note-card-accent) 70%, var(--note-card-border));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--note-card-accent) 12%, transparent);
-}
-
 .workspace-note-cards-rich-input {
   flex: 1 1 auto;
   min-height: 0;
@@ -570,10 +560,6 @@
 
 .workspace-note-cards-save-status.is-dirty {
   color: var(--note-card-text-strong);
-}
-
-.workspace-note-cards-save-status.is-error {
-  color: var(--note-card-danger);
 }
 
 .workspace-note-cards-preview-card {
@@ -666,7 +652,8 @@
     border-bottom: 1px solid var(--note-card-border);
   }
 
-  .workspace-note-cards-primary-action span {
+  .workspace-note-cards-primary-action span,
+.workspace-note-cards-reference-action span {
     display: none;
   }
 
@@ -682,10 +669,6 @@
 
   .workspace-note-cards-collection-switch {
     width: 100%;
-  }
-
-  .workspace-note-cards-reference-action span {
-    display: none;
   }
 }
 

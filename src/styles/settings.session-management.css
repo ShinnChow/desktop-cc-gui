@@ -29,7 +29,8 @@
   min-width: 0;
 }
 
-.settings-project-sessions-title-wrap h3 {
+.settings-project-sessions-title-wrap h3,
+.settings-project-sessions-notice {
   margin: 0;
 }
 
@@ -66,7 +67,8 @@
   min-width: 0;
 }
 
-.settings-project-sessions-attribution-title-row {
+.settings-project-sessions-attribution-title-row,
+.settings-project-sessions--redesign .settings-project-sessions-attribution-summary-main {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -300,7 +302,8 @@
   padding: 4px 0 8px 10px;
 }
 
-.settings-project-sessions-folder-draft-actions {
+.settings-project-sessions-folder-draft-actions,
+.settings-project-sessions-detail-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -411,7 +414,9 @@
   user-select: none;
 }
 
-.settings-project-sessions-advanced summary::-webkit-details-marker {
+.settings-project-sessions-advanced summary::-webkit-details-marker,
+.settings-project-sessions--redesign .settings-project-sessions-attribution-summary::-webkit-details-marker,
+.settings-project-sessions--redesign .settings-project-sessions-lead {
   display: none;
 }
 
@@ -506,10 +511,6 @@
   background: color-mix(in srgb, var(--project-session-danger) 18%, transparent);
   border-color: color-mix(in srgb, var(--project-session-danger) 65%, var(--project-session-border));
   color: var(--text-strong);
-}
-
-.settings-project-sessions-notice {
-  margin: 0;
 }
 
 .settings-project-sessions-list {
@@ -607,13 +608,15 @@
 
 .settings-project-sessions-detail-toggle:hover,
 .settings-project-sessions-detail-toggle[aria-expanded="true"],
-.settings-project-sessions-curtain-toggle:hover {
+.settings-project-sessions-curtain-toggle:hover,
+.settings-session-curtain-icon-btn:hover:not(:disabled) {
   background: transparent;
   color: var(--text-strong);
 }
 
 .settings-project-sessions-detail-toggle:focus-visible,
-.settings-project-sessions-curtain-toggle:focus-visible {
+.settings-project-sessions-curtain-toggle:focus-visible,
+.settings-session-curtain-icon-btn:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--project-session-accent-text) 48%, transparent);
   outline-offset: 2px;
 }
@@ -626,12 +629,6 @@
   display: grid;
   gap: 8px;
   padding: 8px 10px;
-}
-
-.settings-project-sessions-detail-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
 .settings-project-sessions-detail-grid {
@@ -654,7 +651,8 @@
 }
 
 @media (max-width: 960px) {
-  .settings-project-sessions-shell {
+  .settings-project-sessions-shell,
+.settings-project-sessions-filterbar {
     grid-template-columns: 1fr;
   }
 
@@ -684,10 +682,6 @@
 
   .settings-project-sessions-attribution-toggle [role="radio"] {
     flex: 1 1 220px;
-  }
-
-  .settings-project-sessions-filterbar {
-    grid-template-columns: 1fr;
   }
 
   .settings-project-sessions-advanced,
@@ -843,16 +837,6 @@
   justify-content: center;
   cursor: pointer;
   padding: 0;
-}
-
-.settings-session-curtain-icon-btn:hover:not(:disabled) {
-  background: transparent;
-  color: var(--text-strong);
-}
-
-.settings-session-curtain-icon-btn:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--project-session-accent-text) 48%, transparent);
-  outline-offset: 2px;
 }
 
 .settings-session-curtain-icon-btn:disabled {
@@ -1051,7 +1035,8 @@
   cursor: pointer;
 }
 
-.settings-project-sessions--redesign .settings-project-sessions-ghost-btn:hover:not(:disabled) {
+.settings-project-sessions--redesign .settings-project-sessions-ghost-btn:hover:not(:disabled),
+.settings-project-sessions--redesign .settings-project-sessions-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--surface-control) 40%, transparent);
 }
 
@@ -1261,10 +1246,6 @@
   gap: 5px;
 }
 
-.settings-project-sessions--redesign .settings-project-sessions-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--surface-control) 40%, transparent);
-}
-
 .settings-project-sessions--redesign .settings-project-sessions-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -1297,19 +1278,11 @@
 }
 
 @media (max-width: 980px) {
-  .settings-project-sessions--redesign .settings-project-sessions-attribution-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-project-sessions--redesign .settings-project-sessions-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-project-sessions--redesign .settings-project-sessions-filterbar {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-project-sessions--redesign .settings-project-sessions-attribution-toggle {
+  .settings-project-sessions--redesign .settings-project-sessions-attribution-panel,
+.settings-project-sessions--redesign .settings-project-sessions-shell,
+.settings-project-sessions--redesign .settings-project-sessions-filterbar,
+.settings-project-sessions--redesign .settings-project-sessions-attribution-toggle,
+.settings-project-sessions--redesign .settings-project-sessions-topbar {
     grid-template-columns: 1fr;
   }
 }
@@ -1351,17 +1324,6 @@
   gap: 4px;
   padding: 10px 14px;
   user-select: none;
-}
-
-.settings-project-sessions--redesign .settings-project-sessions-attribution-summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings-project-sessions--redesign .settings-project-sessions-attribution-summary-main {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .settings-project-sessions--redesign .settings-project-sessions-attribution-summary-hint {
@@ -1485,14 +1447,7 @@
   margin: 10px 14px;
 }
 
-.settings-project-sessions--redesign .settings-project-sessions-lead {
-  display: none; /* description already on page head; reduce noise */
-}
-
 @media (max-width: 980px) {
-  .settings-project-sessions--redesign .settings-project-sessions-topbar {
-    grid-template-columns: 1fr;
-  }
 
   .settings-project-sessions--redesign .settings-project-sessions-header-actions {
     justify-self: start;

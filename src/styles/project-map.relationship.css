@@ -184,7 +184,8 @@
   white-space: nowrap;
 }
 
-.project-map-relationship-inspector-evidence span {
+.project-map-relationship-inspector-evidence span,
+.project-map-relationship-inspector-relation-group button span {
   color: var(--project-map-accent);
   font-size: 9px;
   font-weight: 820;
@@ -231,10 +232,7 @@
   text-align: left;
 }
 
-.project-map-relationship-inspector-relation-group button {
-  cursor: pointer;
-}
-
+.project-map-relationship-inspector-relation-group button,
 .project-map-relationship-inspector-chip-list button {
   cursor: pointer;
 }
@@ -242,13 +240,6 @@
 .project-map-relationship-inspector-relation-group button.is-active {
   border-color: color-mix(in srgb, var(--project-map-accent) 58%, transparent);
   background: color-mix(in srgb, var(--project-map-accent) 12%, var(--project-map-surface));
-}
-
-.project-map-relationship-inspector-relation-group button span {
-  color: var(--project-map-accent);
-  font-size: 9px;
-  font-weight: 820;
-  text-transform: uppercase;
 }
 
 .project-map-relationship-inspector-relation-group button strong,

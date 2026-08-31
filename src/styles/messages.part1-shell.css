@@ -120,7 +120,9 @@
   overflow-wrap: anywhere;
 }
 
-.messages-lightweight-mode-banner-copy > span:last-child {
+.messages-lightweight-mode-banner-copy > span:last-child,
+.messages-lightweight-row-summary-main > .messages-lightweight-row-summary-title,
+.messages-lightweight-row-summary-main > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -176,13 +178,6 @@
   align-items: baseline;
   gap: 7px;
   min-width: 0;
-}
-
-.messages-lightweight-row-summary-main > .messages-lightweight-row-summary-title,
-.messages-lightweight-row-summary-main > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 @media (max-width: 720px) {

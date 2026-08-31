@@ -48,7 +48,8 @@
   color: var(--text-strong);
 }
 
-.curated-section-title-icon > svg {
+.curated-section-title-icon > svg,
+.curated-section-row-icon > svg {
   width: 16px;
   height: 16px;
 }
@@ -155,11 +156,6 @@
   height: 18px;
   color: var(--text-strong);
   flex-shrink: 0;
-}
-
-.curated-section-row-icon > svg {
-  width: 16px;
-  height: 16px;
 }
 
 .curated-section-row-name {

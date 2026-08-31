@@ -65,7 +65,9 @@
   background: color-mix(in srgb, var(--status-warning) 9%, transparent);
 }
 
-.fvp-navigation-status-action {
+.fvp-navigation-status-action,
+.fvp-navigation-install-provider,
+.fvp-navigation-install-label {
   color: var(--text-strong);
   font-weight: 600;
 }
@@ -97,16 +99,6 @@
 .fvp-navigation-install-hint {
   display: grid;
   gap: 4px;
-}
-
-.fvp-navigation-install-provider {
-  color: var(--text-strong);
-  font-weight: 600;
-}
-
-.fvp-navigation-install-label {
-  color: var(--text-strong);
-  font-weight: 600;
 }
 
 .fvp-navigation-install-command-row {
@@ -454,20 +446,8 @@
   pointer-events: none;
 }
 
-.fvp-layout-toggle {
-  min-width: 20px;
-  min-height: 18px;
-  justify-content: center;
-  padding: 2px 5px;
-}
-
-.fvp-maximize-toggle {
-  min-width: 20px;
-  min-height: 18px;
-  justify-content: center;
-  padding: 2px 5px;
-}
-
+.fvp-layout-toggle,
+.fvp-maximize-toggle,
 .fvp-find-toggle {
   min-width: 20px;
   min-height: 18px;

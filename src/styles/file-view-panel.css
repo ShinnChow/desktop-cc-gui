@@ -92,7 +92,16 @@
   height: 100%;
 }
 
-.fvp-tab.is-active .fvp-tab-icon {
+.fvp-tab.is-active .fvp-tab-icon,
+.fvp-code-line:hover .fvp-line-annotation-button,
+.fvp-line-annotation-button:focus-visible,
+.fvp-markdown-annotatable-block:hover .fvp-markdown-annotation-button,
+.fvp-markdown-annotatable-block:focus-within .fvp-markdown-annotation-button,
+.fvp-markdown-annotation-button:hover,
+.fvp-markdown-annotation-button:focus-visible,
+.fvp-fast-markdown-annotation-button[data-active="true"],
+.fvp-fast-markdown-annotation-button:hover,
+.fvp-fast-markdown-annotation-button:focus-visible {
   opacity: 1;
 }
 
@@ -374,7 +383,8 @@
   color: var(--border-accent, #6bb3f0);
 }
 
-.fvp-git-blame-toggle.is-error {
+.fvp-git-blame-toggle.is-error,
+.fvp-error {
   color: var(--text-danger, #f87171);
 }
 
@@ -395,10 +405,6 @@
   font-size: 13px;
   color: var(--text-muted);
   text-align: center;
-}
-
-.fvp-error {
-  color: var(--text-danger, #f87171);
 }
 
 /* ── Image preview ── */
@@ -571,11 +577,6 @@
   transition: opacity 0.12s ease, background 0.12s ease;
 }
 
-.fvp-code-line:hover .fvp-line-annotation-button,
-.fvp-line-annotation-button:focus-visible {
-  opacity: 1;
-}
-
 .fvp-annotation-trigger {
   min-height: 28px;
   padding: 0 10px;
@@ -584,7 +585,9 @@
 }
 
 .fvp-line-annotation-button:hover,
-.fvp-annotation-trigger:hover {
+.fvp-annotation-trigger:hover,
+.fvp-annotation-draft-actions button:hover:not(:disabled),
+.fvp-annotation-submit:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--text-faint) 34%, var(--border-subtle));
   background: color-mix(in srgb, var(--surface-hover) 68%, transparent);
   color: var(--text-stronger);
@@ -752,12 +755,6 @@
   box-shadow: none;
 }
 
-.fvp-annotation-draft-actions button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--text-faint) 34%, var(--border-subtle));
-  background: color-mix(in srgb, var(--surface-hover) 68%, transparent);
-  color: var(--text-stronger);
-}
-
 .fvp-annotation-submit {
   border: 1px solid color-mix(in srgb, var(--border-subtle) 88%, transparent);
   border-radius: 8px;
@@ -773,12 +770,6 @@
     opacity 140ms ease,
     background 140ms ease,
     border-color 140ms ease;
-}
-
-.fvp-annotation-submit:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--text-faint) 34%, var(--border-subtle));
-  background: color-mix(in srgb, var(--surface-hover) 68%, transparent);
-  color: var(--text-stronger);
 }
 
 .fvp-annotation-submit:disabled {
@@ -818,27 +809,32 @@
 .fvp-line-text .token.comment,
 .fvp-line-text .token.prolog,
 .fvp-line-text .token.doctype,
-.fvp-line-text .token.cdata {
+.fvp-line-text .token.cdata,
+.fvp-file-markdown-codeblock :is(.token.comment, .token.prolog, .token.doctype, .token.cdata) {
   color: var(--theme-syntax-comment, var(--fvp-token-comment));
 }
 
-.fvp-line-text .token.punctuation {
+.fvp-line-text .token.punctuation,
+.fvp-file-markdown-codeblock .token.punctuation {
   color: var(--theme-syntax-punctuation, var(--fvp-token-punctuation));
 }
 
 .fvp-line-text .token.property,
 .fvp-line-text .token.constant,
 .fvp-line-text .token.symbol,
-.fvp-line-text .token.deleted {
+.fvp-line-text .token.deleted,
+.fvp-file-markdown-codeblock :is(.token.property, .token.constant, .token.symbol, .token.deleted) {
   color: var(--theme-syntax-property, var(--fvp-token-property));
 }
 
-.fvp-line-text .token.tag {
+.fvp-line-text .token.tag,
+.fvp-file-markdown-codeblock .token.tag {
   color: var(--theme-syntax-tag, var(--fvp-token-property));
 }
 
 .fvp-line-text .token.boolean,
-.fvp-line-text .token.number {
+.fvp-line-text .token.number,
+.fvp-file-markdown-codeblock :is(.token.boolean, .token.number) {
   color: var(--theme-syntax-number, var(--fvp-token-number));
 }
 
@@ -847,25 +843,29 @@
 .fvp-line-text .token.string,
 .fvp-line-text .token.char,
 .fvp-line-text .token.builtin,
-.fvp-line-text .token.inserted {
+.fvp-line-text .token.inserted,
+.fvp-file-markdown-codeblock :is(.token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted) {
   color: var(--theme-syntax-string, var(--fvp-token-string));
 }
 
 .fvp-line-text .token.operator,
 .fvp-line-text .token.entity,
 .fvp-line-text .token.url,
-.fvp-line-text .token.variable {
+.fvp-line-text .token.variable,
+.fvp-file-markdown-codeblock :is(.token.operator, .token.entity, .token.url, .token.variable) {
   color: var(--theme-syntax-operator, var(--fvp-token-operator));
 }
 
 .fvp-line-text .token.atrule,
 .fvp-line-text .token.attr-value,
-.fvp-line-text .token.keyword {
+.fvp-line-text .token.keyword,
+.fvp-file-markdown-codeblock :is(.token.atrule, .token.attr-value, .token.keyword) {
   color: var(--theme-syntax-keyword, var(--fvp-token-keyword));
 }
 
 .fvp-line-text .token.function,
-.fvp-line-text .token.class-name {
+.fvp-line-text .token.class-name,
+.fvp-file-markdown-codeblock :is(.token.function, .token.class-name) {
   color: var(--theme-syntax-function, var(--fvp-token-function));
 }
 
@@ -913,7 +913,9 @@
   color: var(--fvp-reader-text);
 }
 
-.fvp-structured-preview-section {
+.fvp-structured-preview-section,
+.fvp-structured-preview-code,
+.fvp-structured-preview-stack {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -927,15 +929,13 @@
   line-height: 1.55;
 }
 
-.fvp-structured-preview-notes p {
+.fvp-structured-preview-notes p,
+.fvp-document-preview-article :where(p, ul, ol, blockquote, table),
+.fvp-file-markdown-math-block .katex-display,
+.fvp-file-markdown-frontmatter-row dt,
+.fvp-file-markdown-frontmatter-row dd,
+.fvp-file-markdown-mermaid-body > pre {
   margin: 0;
-}
-
-.fvp-structured-preview-code,
-.fvp-structured-preview-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .fvp-structured-preview-code-label {
@@ -1100,10 +1100,7 @@
   align-items: start;
 }
 
-.fvp-preview-shell.is-outline-collapsed {
-  grid-template-columns: minmax(0, 1fr);
-}
-
+.fvp-preview-shell.is-outline-collapsed,
 .fvp-preview-shell.is-markdown-outline-collapsed {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -1169,7 +1166,8 @@
   background: color-mix(in srgb, var(--surface-hover) 70%, transparent);
 }
 
-.fvp-preview-toolbar-button:disabled {
+.fvp-preview-toolbar-button:disabled,
+.fvp-cm .cm-file-git-blame-inline-details.is-stale {
   opacity: 0.45;
 }
 
@@ -1313,7 +1311,8 @@
   letter-spacing: 0.02em;
 }
 
-.fvp-preview-outline-actions {
+.fvp-preview-outline-actions,
+.file-compare-column-actions {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1589,10 +1588,6 @@
   line-height: 1.7;
 }
 
-.fvp-document-preview-article :where(p, ul, ol, blockquote, table) {
-  margin: 0;
-}
-
 .fvp-document-preview-article :where(h1, h2, h3, h4, h5, h6) {
   margin: 0;
   color: var(--text-stronger);
@@ -1691,13 +1686,6 @@
     transform 140ms ease;
 }
 
-.fvp-markdown-annotatable-block:hover .fvp-markdown-annotation-button,
-.fvp-markdown-annotatable-block:focus-within .fvp-markdown-annotation-button,
-.fvp-markdown-annotation-button:hover,
-.fvp-markdown-annotation-button:focus-visible {
-  opacity: 1;
-}
-
 .fvp-markdown-annotation-button:hover {
   border-color: color-mix(in srgb, var(--text-faint) 34%, var(--border-subtle));
   background: color-mix(in srgb, var(--surface-hover) 68%, var(--surface-panel));
@@ -1777,12 +1765,6 @@
 .fvp-fast-markdown-annotation-button {
   pointer-events: auto;
   z-index: 3;
-}
-
-.fvp-fast-markdown-annotation-button[data-active="true"],
-.fvp-fast-markdown-annotation-button:hover,
-.fvp-fast-markdown-annotation-button:focus-visible {
-  opacity: 1;
 }
 
 .fvp-fast-markdown-annotation-inline {
@@ -1884,10 +1866,6 @@
   text-align: center;
 }
 
-.fvp-file-markdown-math-block .katex-display {
-  margin: 0;
-}
-
 .fvp-file-markdown-frontmatter {
   margin: 0 0 16px;
   padding: 10px 12px;
@@ -1916,11 +1894,6 @@
   gap: 10px;
   align-items: baseline;
   line-height: 1.35;
-}
-
-.fvp-file-markdown-frontmatter-row dt,
-.fvp-file-markdown-frontmatter-row dd {
-  margin: 0;
 }
 
 .fvp-file-markdown-frontmatter-row dt {
@@ -1967,11 +1940,7 @@
   padding-left: 0.04em;
 }
 
-.fvp-file-markdown :where(li)::marker {
-  color: var(--fvp-markdown-list-marker);
-  font-weight: 600;
-}
-
+.fvp-file-markdown :where(li)::marker,
 .fvp-file-markdown :where(ol > li)::marker {
   color: var(--fvp-markdown-list-marker);
   font-weight: 600;
@@ -2102,42 +2071,6 @@
   color: var(--fvp-reader-text);
 }
 
-.fvp-file-markdown-codeblock :is(.token.comment, .token.prolog, .token.doctype, .token.cdata) {
-  color: var(--theme-syntax-comment, var(--fvp-token-comment));
-}
-
-.fvp-file-markdown-codeblock .token.punctuation {
-  color: var(--theme-syntax-punctuation, var(--fvp-token-punctuation));
-}
-
-.fvp-file-markdown-codeblock :is(.token.property, .token.constant, .token.symbol, .token.deleted) {
-  color: var(--theme-syntax-property, var(--fvp-token-property));
-}
-
-.fvp-file-markdown-codeblock .token.tag {
-  color: var(--theme-syntax-tag, var(--fvp-token-property));
-}
-
-.fvp-file-markdown-codeblock :is(.token.boolean, .token.number) {
-  color: var(--theme-syntax-number, var(--fvp-token-number));
-}
-
-.fvp-file-markdown-codeblock :is(.token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted) {
-  color: var(--theme-syntax-string, var(--fvp-token-string));
-}
-
-.fvp-file-markdown-codeblock :is(.token.operator, .token.entity, .token.url, .token.variable) {
-  color: var(--theme-syntax-operator, var(--fvp-token-operator));
-}
-
-.fvp-file-markdown-codeblock :is(.token.atrule, .token.attr-value, .token.keyword) {
-  color: var(--theme-syntax-keyword, var(--fvp-token-keyword));
-}
-
-.fvp-file-markdown-codeblock :is(.token.function, .token.class-name) {
-  color: var(--theme-syntax-function, var(--fvp-token-function));
-}
-
 .fvp-file-markdown-mermaid {
   overflow-anchor: none;
 }
@@ -2149,10 +2082,6 @@
 .fvp-file-markdown-mermaid-body {
   min-height: 160px;
   overflow-anchor: none;
-}
-
-.fvp-file-markdown-mermaid-body > pre {
-  margin: 0;
 }
 
 .fvp-file-markdown-mermaid-tabs {
@@ -2461,10 +2390,6 @@
   white-space: nowrap;
 }
 
-.fvp-cm .cm-file-git-blame-inline-details.is-stale {
-  opacity: 0.45;
-}
-
 .fvp-cm .cm-activeLineGutter {
   background: color-mix(in srgb, var(--surface-active) 24%, transparent);
 }
@@ -2700,7 +2625,8 @@
   box-shadow: inset 3px 0 0 color-mix(in srgb, #3fb950 88%, var(--text-strong));
 }
 
-.fvp-cm .cm-line.cm-git-modified-line {
+.fvp-cm .cm-line.cm-git-modified-line,
+.file-compare-cm .cm-line.cm-git-modified-line {
   background: color-mix(in srgb, #6bb3f0 14%, transparent);
   box-shadow: inset 3px 0 0 color-mix(in srgb, #6bb3f0 88%, var(--text-strong));
 }
@@ -2713,7 +2639,8 @@
   );
 }
 
-.fvp-cm .cm-line.cm-activeLine.cm-git-modified-line {
+.fvp-cm .cm-line.cm-activeLine.cm-git-modified-line,
+.file-compare-cm .cm-line.cm-activeLine.cm-git-modified-line {
   background: color-mix(
     in srgb,
     color-mix(in srgb, #6bb3f0 14%, transparent) 72%,
@@ -2850,12 +2777,6 @@
   white-space: nowrap;
 }
 
-.file-compare-column-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .file-compare-dirty {
   width: 8px;
   height: 8px;
@@ -2885,7 +2806,8 @@
 .file-compare-editor,
 .file-compare-editor .fvp-editor,
 .file-compare-editor .file-compare-cm,
-.file-compare-editor .cm-editor {
+.file-compare-editor .cm-editor,
+.file-compare-cm .cm-scroller {
   min-height: 0;
   height: 100%;
 }
@@ -2902,11 +2824,6 @@
   line-height: 1.55;
   color: var(--text-primary);
   background: var(--surface-card);
-}
-
-.file-compare-cm .cm-scroller {
-  min-height: 0;
-  height: 100%;
 }
 
 .file-compare-cm .cm-file-compare-line-gap {
@@ -2930,19 +2847,6 @@
     ),
     color-mix(in srgb, #6bb3f0 6%, transparent);
   box-shadow: inset 3px 0 0 color-mix(in srgb, #6bb3f0 68%, transparent);
-}
-
-.file-compare-cm .cm-line.cm-git-modified-line {
-  background: color-mix(in srgb, #6bb3f0 14%, transparent);
-  box-shadow: inset 3px 0 0 color-mix(in srgb, #6bb3f0 88%, var(--text-strong));
-}
-
-.file-compare-cm .cm-line.cm-activeLine.cm-git-modified-line {
-  background: color-mix(
-    in srgb,
-    color-mix(in srgb, #6bb3f0 14%, transparent) 72%,
-    var(--surface-active) 28%
-  );
 }
 
 .file-compare-column.is-diff-deletion

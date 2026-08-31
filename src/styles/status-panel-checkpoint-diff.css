@@ -34,7 +34,8 @@
   flex-direction: column;
 }
 
-.checkpoint-diff-sidebar-title-row {
+.checkpoint-diff-sidebar-title-row,
+.editable-diff-review-sidebar-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -42,7 +43,8 @@
   margin-bottom: 10px;
 }
 
-.checkpoint-diff-sidebar-title {
+.checkpoint-diff-sidebar-title,
+.editable-diff-review-sidebar-title {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -50,14 +52,16 @@
   color: var(--text-faint);
 }
 
-.checkpoint-diff-sidebar-count {
+.checkpoint-diff-sidebar-count,
+.editable-diff-review-sidebar-count {
   font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.checkpoint-diff-sidebar-list {
+.checkpoint-diff-sidebar-list,
+.editable-diff-review-sidebar-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -80,12 +84,14 @@
   text-align: left;
 }
 
-.checkpoint-diff-sidebar-item:hover {
+.checkpoint-diff-sidebar-item:hover,
+.editable-diff-review-sidebar-item:hover {
   background: var(--surface-hover);
   cursor: pointer;
 }
 
-.checkpoint-diff-sidebar-item.is-active {
+.checkpoint-diff-sidebar-item.is-active,
+.editable-diff-review-sidebar-item.is-active {
   border-color: color-mix(
     in srgb,
     var(--accent-primary, #2563eb) 45%,
@@ -94,7 +100,8 @@
   background: color-mix(in srgb, var(--surface-card) 92%, transparent);
 }
 
-.checkpoint-diff-sidebar-name {
+.checkpoint-diff-sidebar-name,
+.editable-diff-review-sidebar-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -115,11 +122,13 @@
   font-size: 11px;
 }
 
-.checkpoint-diff-sidebar-stats .is-add {
+.checkpoint-diff-sidebar-stats .is-add,
+.editable-diff-review-sidebar-stats .is-add {
   color: #89d185;
 }
 
-.checkpoint-diff-sidebar-stats .is-del {
+.checkpoint-diff-sidebar-stats .is-del,
+.editable-diff-review-sidebar-stats .is-del {
   color: #d19a66;
 }
 
@@ -131,7 +140,12 @@
   overflow: hidden;
 }
 
-.checkpoint-diff-viewer > .diff-viewer-frame {
+.checkpoint-diff-viewer > .diff-viewer-frame,
+.editable-diff-review-main > .diff-viewer-frame,
+.editable-diff-review-main > .fvp,
+.editable-diff-review-main > .editable-diff-review-viewer,
+.editable-diff-review-main > .editable-diff-compare,
+.editable-diff-review-viewer > .diff-viewer-frame {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -228,10 +242,7 @@
 }
 
 .editable-diff-review-surface.is-toolbar-inline-actions
-  .editable-diff-review-toolbar-actions {
-  display: contents;
-}
-
+  .editable-diff-review-toolbar-actions,
 .git-history-diff-modal-actions > .editable-diff-review-toolbar-actions {
   display: contents;
 }
@@ -288,24 +299,9 @@
   flex-direction: column;
 }
 
-.editable-diff-review-main > .diff-viewer-frame,
-.editable-diff-review-main > .fvp,
-.editable-diff-review-main > .editable-diff-review-viewer,
-.editable-diff-review-main > .editable-diff-compare {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-}
-
 .editable-diff-review-viewer {
   display: flex;
   flex-direction: column;
-}
-
-.editable-diff-review-viewer > .diff-viewer-frame {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
 }
 
 .editable-diff-review-viewer.is-toolbar-only {
@@ -389,38 +385,6 @@
   flex-direction: column;
 }
 
-.editable-diff-review-sidebar-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.editable-diff-review-sidebar-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.editable-diff-review-sidebar-count {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.editable-diff-review-sidebar-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 0;
-  flex: 1;
-  overflow: auto;
-}
-
 .editable-diff-review-sidebar-item {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
@@ -435,44 +399,13 @@
   text-align: left;
 }
 
-.editable-diff-review-sidebar-item:hover {
-  background: var(--surface-hover);
-  cursor: pointer;
-}
-
-.editable-diff-review-sidebar-item.is-active {
-  border-color: color-mix(
-    in srgb,
-    var(--accent-primary, #2563eb) 45%,
-    var(--border-subtle)
-  );
-  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
-}
-
 .editable-diff-review-sidebar-icon {
   display: inline-flex;
   align-items: center;
-}
-
-.editable-diff-review-sidebar-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .editable-diff-review-sidebar-stats {
   display: inline-flex;
   gap: 6px;
   font-size: 11px;
-}
-
-.editable-diff-review-sidebar-stats .is-add {
-  color: #89d185;
-}
-
-.editable-diff-review-sidebar-stats .is-del {
-  color: #d19a66;
 }

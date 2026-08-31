@@ -54,12 +54,7 @@
   min-height: 0;
 }
 
-.compact-git-list {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
+.compact-git-list,
 .compact-git-viewer {
   flex: 1;
   min-height: 0;

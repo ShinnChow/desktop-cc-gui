@@ -45,10 +45,7 @@
 }
 
 /* Drop grey control fills inside compact path dialog — border-only, match card surface. */
-.vendor-dialog-md .settings-input {
-  background: transparent;
-}
-
+.vendor-dialog-md .settings-input,
 .vendor-dialog-md .settings-input:focus {
   background: transparent;
 }
@@ -152,7 +149,8 @@
   line-height: 1;
 }
 
-.vendor-dialog-close:hover {
+.vendor-dialog-close:hover,
+.vendor-advanced summary:hover {
   color: var(--text-primary);
 }
 
@@ -317,7 +315,9 @@
   box-sizing: border-box;
 }
 
-.vendor-input:focus {
+.vendor-input:focus,
+.vendor-json-editor:focus,
+.vendor-code-editor:focus {
   border-color: var(--text-accent);
 }
 
@@ -366,12 +366,18 @@
   cursor: pointer;
 }
 
-.vendor-model-fetch button:hover:not(:disabled) {
+.vendor-model-fetch button:hover:not(:disabled),
+.vendor-official-config-pane-action-btn:hover:not(:disabled),
+.vendor-json-toolbar button:hover,
+.vendor-codex-sensitive-toggle:hover,
+.vendor-cc-switch-import-tool-btn:hover:not(:disabled) {
   color: var(--text-primary);
   border-color: var(--border-stronger);
 }
 
-.vendor-model-fetch button:disabled {
+.vendor-model-fetch button:disabled,
+.vendor-json-toolbar button:disabled,
+.vendor-cc-switch-import-tool-btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -393,10 +399,6 @@
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
-}
-
-.vendor-advanced summary:hover {
-  color: var(--text-primary);
 }
 
 .vendor-json-section {
@@ -431,7 +433,9 @@
   }
 }
 
-.vendor-official-config-dialog-body .vendor-json-section {
+.vendor-official-config-dialog-body .vendor-json-section,
+.vendor-codex-official-dialog-body .vendor-json-section,
+.vendor-official-config-copy {
   min-width: 0;
 }
 
@@ -447,7 +451,8 @@
   background: color-mix(in srgb, var(--surface-card-strong) 55%, transparent);
 }
 
-.vendor-official-config-pane-header {
+.vendor-official-config-pane-header,
+.vendor-codex-pane-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -455,7 +460,8 @@
   min-width: 0;
 }
 
-.vendor-official-config-pane-meta {
+.vendor-official-config-pane-meta,
+.vendor-codex-pane-meta {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -464,7 +470,8 @@
   gap: 8px;
 }
 
-.vendor-official-config-pane-title {
+.vendor-official-config-pane-title,
+.vendor-codex-pane-title {
   flex-shrink: 0;
   color: var(--text-primary);
   font-size: 13px;
@@ -473,7 +480,8 @@
   white-space: nowrap;
 }
 
-.vendor-official-config-pane-path {
+.vendor-official-config-pane-path,
+.vendor-codex-pane-path {
   display: inline-block;
   min-width: 0;
   overflow: hidden;
@@ -488,7 +496,8 @@
   padding: 0;
 }
 
-.vendor-official-config-pane-actions {
+.vendor-official-config-pane-actions,
+.vendor-codex-pane-actions {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
@@ -503,11 +512,6 @@
   padding: 3px 8px;
   font-size: 11px;
   cursor: pointer;
-}
-
-.vendor-official-config-pane-action-btn:hover:not(:disabled) {
-  color: var(--text-primary);
-  border-color: var(--border-stronger);
 }
 
 .vendor-official-config-pane-action-btn:disabled {
@@ -526,7 +530,9 @@
  * min-height alone lets the editor grow with content → wheel does nothing.
  */
 .vendor-official-config-dialog-body .vendor-official-json-editor,
-.vendor-official-config-dialog-body .vendor-official-code-editor {
+.vendor-official-config-dialog-body .vendor-official-code-editor,
+.vendor-codex-official-dialog-body .vendor-official-json-editor,
+.vendor-codex-official-dialog-body .vendor-official-code-editor {
   height: clamp(280px, 48vh, 560px);
   min-height: clamp(280px, 48vh, 560px);
   max-height: clamp(280px, 48vh, 560px);
@@ -539,7 +545,8 @@
   max-height: clamp(320px, 52vh, 640px);
 }
 
-.vendor-official-config-dialog-body > .vendor-json-error {
+.vendor-official-config-dialog-body > .vendor-json-error,
+.vendor-codex-official-dialog-body > .vendor-json-error {
   grid-column: 1 / -1;
 }
 
@@ -549,69 +556,6 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   gap: 18px;
-}
-
-.vendor-codex-official-dialog-body .vendor-json-section {
-  min-width: 0;
-}
-
-.vendor-codex-pane-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-}
-
-.vendor-codex-pane-meta {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 8px;
-}
-
-.vendor-codex-pane-title {
-  flex-shrink: 0;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.35;
-  white-space: nowrap;
-}
-
-.vendor-codex-pane-path {
-  display: inline-block;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-tertiary, var(--text-secondary));
-  font-size: 11px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 0;
-}
-
-.vendor-codex-pane-actions {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-}
-
-.vendor-codex-official-dialog-body .vendor-official-json-editor,
-.vendor-codex-official-dialog-body .vendor-official-code-editor {
-  height: clamp(280px, 48vh, 560px);
-  min-height: clamp(280px, 48vh, 560px);
-  max-height: clamp(280px, 48vh, 560px);
-}
-
-.vendor-codex-official-dialog-body > .vendor-json-error {
-  grid-column: 1 / -1;
 }
 
 .vendor-official-json-heading {
@@ -675,16 +619,6 @@
   color: var(--text-secondary);
   font-size: 11px;
   cursor: pointer;
-}
-
-.vendor-json-toolbar button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.vendor-json-toolbar button:hover {
-  color: var(--text-primary);
-  border-color: var(--border-stronger);
 }
 
 .vendor-json-editor,
@@ -787,10 +721,6 @@ pre.vendor-official-code-editor {
 }
 
 /* Ordinary vendor textareas keep accent focus; official CodeMirror host does not */
-.vendor-json-editor:focus,
-.vendor-code-editor:focus {
-  border-color: var(--text-accent);
-}
 
 .vendor-json-editor.vendor-official-json-editor:focus,
 .vendor-json-editor.vendor-official-json-editor:focus-within,
@@ -902,10 +832,6 @@ pre.vendor-official-code-editor {
 .vendor-official-config-main {
   gap: 10px;
   color: var(--text-primary);
-}
-
-.vendor-official-config-copy {
-  min-width: 0;
 }
 
 .vendor-official-config-actions {
@@ -1100,7 +1026,8 @@ pre.vendor-official-code-editor {
   color: var(--text-accent);
 }
 
-.vendor-codex-global-config-header-actions {
+.vendor-codex-global-config-header-actions,
+.vendor-cc-switch-import-toolbar-actions {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1114,11 +1041,6 @@ pre.vendor-official-code-editor {
   padding: 3px 8px;
   font-size: 11px;
   cursor: pointer;
-}
-
-.vendor-codex-sensitive-toggle:hover {
-  color: var(--text-primary);
-  border-color: var(--border-stronger);
 }
 
 .vendor-codex-global-config-body {
@@ -1148,7 +1070,8 @@ pre.vendor-official-code-editor {
   width: min(880px, 92vw);
 }
 
-.vendor-cc-switch-import-heading {
+.vendor-cc-switch-import-heading,
+.vendor-cc-switch-import-row-main {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1210,12 +1133,6 @@ pre.vendor-official-code-editor {
   color: var(--text-secondary);
 }
 
-.vendor-cc-switch-import-toolbar-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .vendor-cc-switch-import-tool-btn {
   display: inline-flex;
   align-items: center;
@@ -1227,16 +1144,6 @@ pre.vendor-official-code-editor {
   color: var(--text-secondary);
   font-size: 11px;
   cursor: pointer;
-}
-
-.vendor-cc-switch-import-tool-btn:hover:not(:disabled) {
-  color: var(--text-primary);
-  border-color: var(--border-stronger);
-}
-
-.vendor-cc-switch-import-tool-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .vendor-cc-switch-import-list {
@@ -1307,7 +1214,8 @@ pre.vendor-official-code-editor {
   border-bottom: 1px solid var(--border-muted);
 }
 
-.vendor-cc-switch-import-row.selected {
+.vendor-cc-switch-import-row.selected,
+.vendor-cc-switch-import-row:hover {
   background: var(--surface-hover);
 }
 
@@ -1354,20 +1262,9 @@ pre.vendor-official-code-editor {
   border-bottom: none;
 }
 
-.vendor-cc-switch-import-row:hover {
-  background: var(--surface-hover);
-}
-
 .vendor-cc-switch-import-row.imported {
   cursor: default;
   opacity: 0.65;
-}
-
-.vendor-cc-switch-import-row-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
 }
 
 .vendor-cc-switch-import-row-title {

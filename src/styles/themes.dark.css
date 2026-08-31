@@ -237,11 +237,7 @@
 
 /* Native select/option dark mode fix (Windows WebView2) */
 select,
-select option {
-  background-color: #1e1e1e;
-  color: #e6e7ea;
-}
-
+select option,
 :root[data-theme="dark"] select,
 :root[data-theme="dark"] select option {
   background-color: #1e1e1e;

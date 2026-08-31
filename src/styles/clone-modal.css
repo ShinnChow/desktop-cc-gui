@@ -82,7 +82,8 @@
   height: 0;
 }
 
-.clone-modal-folder-row {
+.clone-modal-folder-row,
+.clone-modal-suggested-row {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -97,12 +98,6 @@
 .clone-modal-suggested-label {
   font-size: 11px;
   color: var(--text-faint);
-}
-
-.clone-modal-suggested-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
 }
 
 .clone-modal-suggested-path {

@@ -131,7 +131,8 @@
   cursor: pointer;
   font-family: inherit;
 }
-.pi-btn-plain:hover {
+.pi-btn-plain:hover,
+.pi-tree-node:hover {
   background: var(--surface-hover);
 }
 .pi-stat-row {
@@ -256,9 +257,6 @@ body.pi-tree-dock-resizing * {
   border-radius: 8px;
   cursor: default;
 }
-.pi-tree-node:hover {
-  background: var(--surface-hover);
-}
 .pi-tree-node .txt {
   flex: 1;
   min-width: 0;
@@ -316,7 +314,8 @@ body.pi-tree-dock-resizing * {
   justify-content: center;
 }
 .pi-tree-node:hover .fork-btn,
-.pi-tree-node.focused .fork-btn {
+.pi-tree-node.focused .fork-btn,
+.pi-tree-cell.active .pi-tree-track {
   opacity: 1;
 }
 /* lane 轨道格子：实线连续贯穿（node/line 都铺轨，点盖在轨上） */
@@ -349,9 +348,6 @@ body.pi-tree-dock-resizing * {
   transform: translateX(-50%);
   background: var(--lane-color, var(--border-strong));
   opacity: 0.75;
-}
-.pi-tree-cell.active .pi-tree-track {
-  opacity: 1;
 }
 .pi-tree-links {
   position: absolute;

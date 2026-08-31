@@ -55,7 +55,8 @@ html[data-theme="light"] .mref-model-card {
   gap: 12px 16px;
 }
 
-.mref-model-card__status-copy {
+.mref-model-card__status-copy,
+.mref-model-card__toggle-copy {
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -90,11 +91,6 @@ html[data-theme="light"] .mref-model-card {
   align-items: center;
   justify-content: space-between;
   gap: 12px 16px;
-}
-
-.mref-model-card__toggle-copy {
-  min-width: 0;
-  flex: 1 1 auto;
 }
 
 .mref-model-card__toggle-hint {
@@ -169,10 +165,6 @@ html[data-theme="light"] .mref-switch__thumb {
   left: 2px;
 }
 
-.mref-switch input:checked + .mref-switch__track .mref-switch__thumb {
-  transform: translateX(18px);
-}
-
 .mref-switch input:focus-visible + .mref-switch__track {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-primary) 22%, transparent);
 }
@@ -224,10 +216,7 @@ html[data-theme="light"] .mref-preview__toggle {
   flex: 1 1 auto;
 }
 
-.mref-preview__heading {
-  margin-bottom: 0;
-}
-
+.mref-preview__heading,
 .mref-preview__intro {
   margin-bottom: 0;
 }
@@ -429,7 +418,8 @@ html[data-theme="light"] .mref-preview__mock {
   box-sizing: border-box;
 }
 
-.mref-preview__idx {
+.mref-preview__idx,
+.mref-preview__inject-rows li span:first-child {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -525,11 +515,6 @@ html[data-theme="light"] .mref-preview__mock {
   min-width: 0;
 }
 
-.mref-preview__inject-rows li span:first-child {
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-}
-
 .mref-preview__inject-rows li {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -537,10 +522,7 @@ html[data-theme="light"] .mref-preview__mock {
 }
 
 /* 挑选示意：策略与列表同一行不换列时压缩；窄屏再叠 */
-.mref-preview__pick-body {
-  min-width: 0;
-}
-
+.mref-preview__pick-body,
 .mref-preview__list,
 .mref-preview__strategy {
   min-width: 0;
