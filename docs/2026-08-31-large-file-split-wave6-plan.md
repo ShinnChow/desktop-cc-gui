@@ -133,4 +133,27 @@ created: 2026-08-31
 - **治理动作**：feature-hotpath retained 清零 → policy.json 启用 strictReduction（第三组，三组全启用达成）；两道 baseline 同 PR 重生成（覆盖 C3 三件 >800 豁免）；gate 绿；删 tsbuildinfo tsc 零 error；清掉 W6C3 tsc -b 误产的 vite.config.js/.d.ts 杂散。
 - 新教训：⑭ 子代理验证 tsc 禁用 `tsc -b` 模式（会 emit vite.config.js/.d.ts 入仓）；只用 `npx tsc --noEmit`。
 
-（波 3 待回填）
+### 波 3（2026-08-31 本会话，3 代理并行，落地 1 commit）
+
+- **W6-C5 Messages.live-behavior.test**：3606→6 族切片（最大 live-follow 1663）+ TestSetup 130；65 个 it/it.each 块逐字节校验；既有 10 failed/58 passed 前后逐字一致（auto-follow/RO 追底族，pre-existing，勿顺手修）。
+- **W6-C6 tauri.test**：3508→4 族切片（git 491/commands 1075/sessions 1030/engines 892）+ tauriTestSetup 70；145 it 多重集逐字节一致；145 passed/0 failed 前后一致。教训补强：setup 的 vi.mock 依赖 import 求值顺序，setup import 必须置于被测模块 import 之前。
+- **W6-D2 project_map_api_contracts.rs**：2793→2539 ✓（出 warn 线）+ project_map_api_contracts_java_schema.rs 259（Java schema 域 9 fn 平铺）；9 处 pub(super) bump 唯一偏差；cargo test project_map 23 passed 前后逐名一致；check 全 target 0 error。
+- 波末：两道 baseline 重生成 + gate 绿 + 删 tsbuildinfo tsc 零 error。
+
+### Wave 6 收官指标（2026-08-31 本会话末实测）
+
+| 指标 | Wave 6 前 | Wave 6 后 | 主计划起点（08-30） |
+|---|---:|---:|---:|
+| 源码 >2000 行（非测试非 css） | 49 | **47** | ~80 |
+| 全仓最大源码 | 3170（daemon_state/git.rs） | **2562**（cc_gui_daemon.rs） | 7685 |
+| bridge-runtime-critical retained | 1（status.rs） | **0**（strictReduction 已启用） | — |
+| feature-hotpath retained | 2 | **0**（strictReduction 已启用） | — |
+| 测试 >2000 | 27 | **18**（目标 ≤20 ✓） | — |
+| strictReduction 启用组 | 1（settings-view-sections） | **3 组全启用** | — |
+| gate / tsc | 绿 / 零 error | 绿 / 零 error | — |
+
+**W6-A 验收**：status.rs 70 ≤2600 ✓；bridge-runtime-critical strictReduction 启用 ✓。
+**W6-B 验收**：GitHistoryPanelView 2340 / useThreadMessaging 2384 均 ≤2800 ✓；feature-hotpath strictReduction 启用 ✓。
+**W6-C 验收**：6 件 >3000 孤儿测试全部切片落地（C1-C6）；测试 >2000 降至 18 ≤20 ✓。
+**W6-D 验收**：daemon_state/git.rs 1536 <3000 ✓；project_map_api_contracts.rs 2539 <2600 ✓。
+**收官理想态达成**：strictReduction 三组全启用，retained 仅剩 styles（5 css）与 test-files（7 测试）两非 strict 组存量，大文件治理进入「存量清零」轨道。

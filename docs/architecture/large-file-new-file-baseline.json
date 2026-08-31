@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-31T08:14:36.007Z",
+  "generatedAt": "2026-08-31T08:31:49.040Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -10,26 +10,6 @@
       "policyId": "styles",
       "priority": "P1",
       "warnThreshold": 2200,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/messages/components/Messages.live-behavior.test.tsx",
-      "lines": 3606,
-      "type": "ts/tsx",
-      "policyId": "test-files",
-      "priority": "P2",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/services/tauri.test.ts",
-      "lines": 3508,
-      "type": "ts/tsx",
-      "policyId": "test-files",
-      "priority": "P2",
-      "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -164,16 +144,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src-tauri/src/project_map_api_contracts.rs",
-      "lines": 2793,
-      "type": "rust",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src/styles/multi-agent.css",
       "lines": 2789,
       "type": "css",
@@ -237,6 +207,16 @@
       "path": "src/features/layout/hooks/useLayoutNodes.tsx",
       "lines": 2543,
       "type": "ts/tsx",
+      "policyId": "default-source",
+      "priority": "P1",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/project_map_api_contracts.rs",
+      "lines": 2539,
+      "type": "rust",
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
@@ -1280,6 +1260,16 @@
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
       "warnThreshold": 2200,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/messages/components/Messages.live-follow.test.tsx",
+      "lines": 1663,
+      "type": "ts/tsx",
+      "policyId": "test-files",
+      "priority": "P2",
+      "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -2634,6 +2624,16 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
+      "path": "src/services/tauri.commands.test.ts",
+      "lines": 1075,
+      "type": "ts/tsx",
+      "policyId": "test-files",
+      "priority": "P2",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
       "path": "src/features/composer/components/ChatInputBox/types.ts",
       "lines": 1068,
       "type": "ts/tsx",
@@ -2739,6 +2739,16 @@
       "type": "rust",
       "policyId": "default-source",
       "priority": "P1",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/services/tauri.sessions.test.ts",
+      "lines": 1030,
+      "type": "ts/tsx",
+      "policyId": "test-files",
+      "priority": "P2",
       "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
@@ -3436,6 +3446,16 @@
     {
       "path": "src/features/messages/components/Messages.runtime-reconnect.test.tsx",
       "lines": 894,
+      "type": "ts/tsx",
+      "policyId": "test-files",
+      "priority": "P2",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/services/tauri.engines.test.ts",
+      "lines": 892,
       "type": "ts/tsx",
       "policyId": "test-files",
       "priority": "P2",

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-31T08:14:34.802Z",
+  "generatedAt": "2026-08-31T08:31:48.100Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -11,26 +11,6 @@
       "priority": "P1",
       "warnThreshold": 2200,
       "failThreshold": 2800,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/messages/components/Messages.live-behavior.test.tsx",
-      "lines": 3606,
-      "type": "ts/tsx",
-      "policyId": "test-files",
-      "priority": "P2",
-      "warnThreshold": 2600,
-      "failThreshold": 3000,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/services/tauri.test.ts",
-      "lines": 3508,
-      "type": "ts/tsx",
-      "policyId": "test-files",
-      "priority": "P2",
-      "warnThreshold": 2600,
-      "failThreshold": 3000,
       "thresholdSource": "policy"
     },
     {
