@@ -3,7 +3,7 @@ use super::*;
 const GIT_STATUS_DIFF_STATS_FILE_LIMIT: usize = 120;
 const GIT_STATUS_DIFF_STATS_MAX_FILE_BYTES: u64 = 256 * 1024;
 
-fn build_pr_precheck_failure(reason: String, command: &str) -> GitPrWorkflowResult {
+pub(super) fn build_pr_precheck_failure(reason: String, command: &str) -> GitPrWorkflowResult {
     GitPrWorkflowResult {
         ok: false,
         status: "failed".to_string(),
@@ -26,7 +26,7 @@ fn build_pr_precheck_failure(reason: String, command: &str) -> GitPrWorkflowResu
     }
 }
 
-fn open_repository_at_root(repo_root: &Path) -> Result<git2::Repository, String> {
+pub(super) fn open_repository_at_root(repo_root: &Path) -> Result<git2::Repository, String> {
     git2::Repository::open_ext(
         repo_root,
         git2::RepositoryOpenFlags::NO_SEARCH,
@@ -139,13 +139,13 @@ fn status_for_delta(status: git2::Delta) -> &'static str {
     }
 }
 
-fn trim_optional(value: Option<String>) -> Option<String> {
+pub(super) fn trim_optional(value: Option<String>) -> Option<String> {
     value
         .map(|entry| entry.trim().to_string())
         .filter(|entry| !entry.is_empty())
 }
 
-fn normalize_local_branch_ref(value: &str) -> String {
+pub(super) fn normalize_local_branch_ref(value: &str) -> String {
     value
         .trim()
         .trim_start_matches("refs/heads/")
@@ -153,7 +153,7 @@ fn normalize_local_branch_ref(value: &str) -> String {
         .to_string()
 }
 
-fn parse_remote_branch(name: &str) -> Option<(String, String)> {
+pub(super) fn parse_remote_branch(name: &str) -> Option<(String, String)> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
         return None;
@@ -201,7 +201,7 @@ fn first_line_or_empty(content: &str) -> String {
     content.lines().next().unwrap_or("").trim().to_string()
 }
 
-fn csv_values(input: Option<String>) -> Vec<String> {
+pub(super) fn csv_values(input: Option<String>) -> Vec<String> {
     trim_optional(input)
         .map(|raw| {
             raw.split(',')
@@ -213,7 +213,7 @@ fn csv_values(input: Option<String>) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn parse_repo_owner(repo: &str) -> Option<String> {
+pub(super) fn parse_repo_owner(repo: &str) -> Option<String> {
     repo.split('/').next().map(str::trim).and_then(|entry| {
         if entry.is_empty() {
             None
@@ -223,7 +223,7 @@ fn parse_repo_owner(repo: &str) -> Option<String> {
     })
 }
 
-fn normalize_remote_target_branch(remote: &str, raw: &str) -> String {
+pub(super) fn normalize_remote_target_branch(remote: &str, raw: &str) -> String {
     let trimmed = raw.trim();
     let without_refs = trimmed
         .strip_prefix("refs/remotes/")
@@ -237,7 +237,7 @@ fn normalize_remote_target_branch(remote: &str, raw: &str) -> String {
         .to_string()
 }
 
-const BRANCH_UPDATE_STATUS_SUCCESS: &str = "success";
+pub(super) const BRANCH_UPDATE_STATUS_SUCCESS: &str = "success";
 const BRANCH_UPDATE_STATUS_NO_OP: &str = "no-op";
 const BRANCH_UPDATE_STATUS_BLOCKED: &str = "blocked";
 const BRANCH_UPDATE_REASON_ALREADY_UP_TO_DATE: &str = "already_up_to_date";
@@ -247,9 +247,9 @@ const BRANCH_UPDATE_REASON_DIVERGED: &str = "diverged";
 const BRANCH_UPDATE_REASON_OCCUPIED_WORKTREE: &str = "occupied_worktree";
 const BRANCH_UPDATE_REASON_STALE_REF: &str = "stale_ref";
 
-struct LocalBranchUpdateState {
-    branch_name: String,
-    is_current: bool,
+pub(super) struct LocalBranchUpdateState {
+    pub(super) branch_name: String,
+    pub(super) is_current: bool,
     local_oid: git2::Oid,
     upstream_name: Option<String>,
     upstream_remote: Option<String>,
@@ -258,7 +258,7 @@ struct LocalBranchUpdateState {
     behind: usize,
 }
 
-fn branch_update_result(
+pub(super) fn branch_update_result(
     branch_name: &str,
     status: &str,
     reason: Option<&str>,
@@ -274,7 +274,7 @@ fn branch_update_result(
     }
 }
 
-fn no_upstream_branch_update_result(branch_name: &str) -> GitBranchUpdateResult {
+pub(super) fn no_upstream_branch_update_result(branch_name: &str) -> GitBranchUpdateResult {
     branch_update_result(
         branch_name,
         BRANCH_UPDATE_STATUS_BLOCKED,
@@ -284,7 +284,7 @@ fn no_upstream_branch_update_result(branch_name: &str) -> GitBranchUpdateResult 
     )
 }
 
-fn branch_update_has_upstream(state: &LocalBranchUpdateState) -> bool {
+pub(super) fn branch_update_has_upstream(state: &LocalBranchUpdateState) -> bool {
     matches!(state.upstream_name.as_deref(), Some(name) if !name.trim().is_empty())
         && matches!(state.upstream_remote.as_deref(), Some(name) if !name.trim().is_empty())
         && state.upstream_oid.is_some()
@@ -305,7 +305,7 @@ fn current_local_branch(repo_root: &Path) -> Result<Option<String>, String> {
         .filter(|name| !name.is_empty()))
 }
 
-fn load_local_branch_update_state(
+pub(super) fn load_local_branch_update_state(
     repo_root: &Path,
     branch_name: &str,
 ) -> Result<LocalBranchUpdateState, String> {
@@ -413,7 +413,7 @@ fn is_stale_update_ref_error(raw: &str, branch_name: &str) -> bool {
         && normalized.contains("expected")
 }
 
-async fn update_non_current_local_branch(
+pub(super) async fn update_non_current_local_branch(
     repo_root: &Path,
     branch_name: &str,
 ) -> Result<GitBranchUpdateResult, String> {
@@ -568,7 +568,7 @@ async fn update_non_current_local_branch(
     ))
 }
 
-fn parse_git_error_detail(stdout: &[u8], stderr: &[u8], fallback: &str) -> String {
+pub(super) fn parse_git_error_detail(stdout: &[u8], stderr: &[u8], fallback: &str) -> String {
     let stderr = String::from_utf8_lossy(stderr);
     let stdout = String::from_utf8_lossy(stdout);
     let detail = if stderr.trim().is_empty() {
@@ -583,14 +583,14 @@ fn parse_git_error_detail(stdout: &[u8], stderr: &[u8], fallback: &str) -> Strin
     }
 }
 
-fn extract_pr_url(stdout: &str) -> Option<String> {
+pub(super) fn extract_pr_url(stdout: &str) -> Option<String> {
     stdout
         .split_whitespace()
         .find(|entry| entry.starts_with("https://github.com/") && entry.contains("/pull/"))
         .map(ToOwned::to_owned)
 }
 
-fn extract_pr_number(pr_url: &str) -> Option<u64> {
+pub(super) fn extract_pr_number(pr_url: &str) -> Option<u64> {
     pr_url
         .trim_end_matches('/')
         .split('/')
@@ -598,7 +598,7 @@ fn extract_pr_number(pr_url: &str) -> Option<u64> {
         .and_then(|value| value.parse::<u64>().ok())
 }
 
-fn parse_pr_diff_text(diff_text: &str) -> Vec<GitHubPullRequestDiff> {
+pub(super) fn parse_pr_diff_text(diff_text: &str) -> Vec<GitHubPullRequestDiff> {
     let mut results = Vec::<GitHubPullRequestDiff>::new();
     let mut current_path = String::new();
     let mut current_status = "M".to_string();
@@ -652,7 +652,7 @@ fn parse_pr_diff_text(diff_text: &str) -> Vec<GitHubPullRequestDiff> {
     results
 }
 
-fn parse_patch_diff_entries(diff_text: &str) -> Vec<GitCommitDiff> {
+pub(super) fn parse_patch_diff_entries(diff_text: &str) -> Vec<GitCommitDiff> {
     let mut results = Vec::<GitCommitDiff>::new();
     let mut current_path = String::new();
     let mut current_status = "M".to_string();
@@ -709,7 +709,7 @@ fn parse_patch_diff_entries(diff_text: &str) -> Vec<GitCommitDiff> {
     results
 }
 
-fn expand_daemon_git_action_paths(
+pub(super) fn expand_daemon_git_action_paths(
     repo_root: &Path,
     paths: &[String],
     layer: crate::git_utils::GitStatusLayer,
@@ -726,7 +726,7 @@ fn expand_daemon_git_action_paths(
     expanded
 }
 
-async fn run_daemon_git_command_with_paths(
+pub(super) async fn run_daemon_git_command_with_paths(
     repo_root: &PathBuf,
     prefix: &[&str],
     paths: &[String],
@@ -741,7 +741,7 @@ async fn run_daemon_git_command_with_paths(
     Ok(())
 }
 
-fn infer_remote_head_branch(repo: &git2::Repository, remote_name: &str) -> Option<String> {
+pub(super) fn infer_remote_head_branch(repo: &git2::Repository, remote_name: &str) -> Option<String> {
     let remote_head_ref = format!("refs/remotes/{remote_name}/HEAD");
     let reference = repo.find_reference(&remote_head_ref).ok()?;
     let target = reference.symbolic_target()?;
@@ -759,12 +759,12 @@ impl DaemonState {
             .ok_or_else(|| "workspace not found".to_string())
     }
 
-    async fn git_repo_root(&self, workspace_id: &str) -> Result<PathBuf, String> {
+    pub(super) async fn git_repo_root(&self, workspace_id: &str) -> Result<PathBuf, String> {
         let entry = self.workspace_entry(workspace_id).await?;
         crate::git_utils::resolve_git_root(&entry)
     }
 
-    async fn git_repo_root_for_scope(
+    pub(super) async fn git_repo_root_for_scope(
         &self,
         workspace_id: &str,
         repository_root: Option<&str>,
@@ -1513,1640 +1513,6 @@ impl DaemonState {
             }
             Err(_) => Ok(None),
         }
-    }
-
-    pub(crate) async fn stage_git_file(
-        &self,
-        workspace_id: String,
-        path: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let paths = crate::git_utils::git_action_paths_for_file(
-            &repo_root,
-            &path,
-            crate::git_utils::GitStatusLayer::Workdir,
-        );
-        if paths.is_empty() {
-            return Err("path is required".to_string());
-        }
-        for path in paths {
-            git_core::run_git_command(&repo_root, &["add", "-A", "--", &path]).await?;
-        }
-        Ok(())
-    }
-
-    pub(crate) async fn stage_git_all(
-        &self,
-        workspace_id: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        git_core::run_git_command(&repo_root, &["add", "-A"]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn unstage_git_file(
-        &self,
-        workspace_id: String,
-        path: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let paths = crate::git_utils::git_action_paths_for_file(
-            &repo_root,
-            &path,
-            crate::git_utils::GitStatusLayer::Index,
-        );
-        if paths.is_empty() {
-            return Err("path is required".to_string());
-        }
-        for path in paths {
-            git_core::run_git_command(&repo_root, &["restore", "--staged", "--", &path]).await?;
-        }
-        Ok(())
-    }
-
-    pub(crate) async fn unstage_git_all(
-        &self,
-        workspace_id: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        git_core::run_git_command(&repo_root, &["restore", "--staged", "--", "."]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn unstage_git_paths(
-        &self,
-        workspace_id: String,
-        paths: Vec<String>,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let expanded = expand_daemon_git_action_paths(
-            &repo_root,
-            &paths,
-            crate::git_utils::GitStatusLayer::Index,
-        );
-        run_daemon_git_command_with_paths(&repo_root, &["restore", "--staged", "--"], &expanded)
-            .await
-    }
-
-    pub(crate) async fn revert_git_file(
-        &self,
-        workspace_id: String,
-        path: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let paths = crate::git_utils::git_action_paths_for_file(
-            &repo_root,
-            &path,
-            crate::git_utils::GitStatusLayer::Workdir,
-        );
-        if paths.is_empty() {
-            return Err("path is required".to_string());
-        }
-        for path in paths {
-            // Unstaged discard restores the working tree from the index, not HEAD.
-            if git_core::run_git_command(&repo_root, &["restore", "--worktree", "--", &path])
-                .await
-                .is_err()
-            {
-                git_core::run_git_command(&repo_root, &["clean", "-f", "--", &path]).await?;
-            }
-        }
-        Ok(())
-    }
-
-    pub(crate) async fn revert_git_paths(
-        &self,
-        workspace_id: String,
-        paths: Vec<String>,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let expanded = expand_daemon_git_action_paths(
-            &repo_root,
-            &paths,
-            crate::git_utils::GitStatusLayer::Workdir,
-        );
-        if expanded.is_empty() {
-            return Err("path is required".to_string());
-        }
-        let _ = run_daemon_git_command_with_paths(
-            &repo_root,
-            &["restore", "--worktree", "--"],
-            &expanded,
-        )
-        .await;
-        // Match single-file semantics: clean only when needed, and never fail the batch
-        // solely because a tracked path is not cleanable.
-        for path in &expanded {
-            let _ = git_core::run_git_command(&repo_root, &["clean", "-f", "--", path]).await;
-        }
-        Ok(())
-    }
-
-    pub(crate) async fn revert_git_all(
-        &self,
-        workspace_id: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        git_core::run_git_command(
-            &repo_root,
-            &["restore", "--staged", "--worktree", "--", "."],
-        )
-        .await?;
-        git_core::run_git_command(&repo_root, &["clean", "-f", "-d"]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn commit_git(
-        &self,
-        workspace_id: String,
-        message: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let message = message.trim();
-        if message.is_empty() {
-            return Err("message is required".to_string());
-        }
-        git_core::run_git_command(&repo_root, &["commit", "-m", message]).await?;
-        Ok(())
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn push_git(
-        &self,
-        workspace_id: String,
-        remote: Option<String>,
-        branch: Option<String>,
-        force_with_lease: Option<bool>,
-        push_tags: Option<bool>,
-        run_hooks: Option<bool>,
-        push_to_gerrit: Option<bool>,
-        topic: Option<String>,
-        reviewers: Option<String>,
-        cc: Option<String>,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let mut args = vec!["push".to_string()];
-        if !run_hooks.unwrap_or(true) {
-            args.push("--no-verify".to_string());
-        }
-        if force_with_lease.unwrap_or(false) {
-            args.push("--force-with-lease".to_string());
-        }
-        if push_tags.unwrap_or(false) {
-            args.push("--follow-tags".to_string());
-        }
-
-        let target_remote = trim_optional(remote);
-        let target_branch = trim_optional(branch).map(|value| normalize_local_branch_ref(&value));
-        if push_to_gerrit.unwrap_or(false) {
-            let remote_name = target_remote.unwrap_or_else(|| "origin".to_string());
-            let branch_name = if let Some(branch_name) = target_branch {
-                Some(branch_name)
-            } else {
-                git_core::run_git_command(&repo_root, &["branch", "--show-current"])
-                    .await
-                    .ok()
-                    .and_then(|raw| trim_optional(Some(raw)))
-            }
-            .ok_or_else(|| "Branch is required for Gerrit push.".to_string())?;
-            let mut refspec = format!("HEAD:refs/for/{branch_name}");
-            let mut params = Vec::new();
-            if let Some(topic_name) = trim_optional(topic) {
-                params.push(format!("topic={topic_name}"));
-            }
-            for reviewer in csv_values(reviewers) {
-                params.push(format!("r={reviewer}"));
-            }
-            for cc_member in csv_values(cc) {
-                params.push(format!("cc={cc_member}"));
-            }
-            if !params.is_empty() {
-                refspec.push('%');
-                refspec.push_str(&params.join(","));
-            }
-            args.push(remote_name);
-            args.push(refspec);
-        } else {
-            if let Some(remote_name) = target_remote {
-                args.push(remote_name);
-            }
-            if let Some(branch_name) = target_branch {
-                args.push(format!("HEAD:{branch_name}"));
-            }
-        }
-
-        git_core::run_git_command_owned(repo_root, args).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn pull_git(
-        &self,
-        workspace_id: String,
-        remote: Option<String>,
-        branch: Option<String>,
-        strategy: Option<String>,
-        no_commit: Option<bool>,
-        no_verify: Option<bool>,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let mut args = vec!["pull".to_string()];
-        if let Some(strategy_flag) = trim_optional(strategy) {
-            match strategy_flag.as_str() {
-                "--rebase" | "--ff-only" | "--no-ff" | "--squash" => args.push(strategy_flag),
-                _ => return Err("Unsupported pull strategy option.".to_string()),
-            }
-        }
-        if no_commit.unwrap_or(false) {
-            args.push("--no-commit".to_string());
-        }
-        if no_verify.unwrap_or(false) {
-            args.push("--no-verify".to_string());
-        }
-        if let Some(remote_name) = trim_optional(remote) {
-            args.push(remote_name);
-            if let Some(branch_name) = trim_optional(branch) {
-                args.push(normalize_local_branch_ref(&branch_name));
-            }
-        } else if let Some(branch_name) = trim_optional(branch) {
-            args.push("origin".to_string());
-            args.push(normalize_local_branch_ref(&branch_name));
-        }
-        git_core::run_git_command_owned(repo_root, args).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn sync_git(
-        &self,
-        workspace_id: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        self.pull_git(
-            workspace_id.clone(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            repository_root.clone(),
-        )
-        .await?;
-        self.push_git(
-            workspace_id,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            repository_root,
-        )
-        .await?;
-        Ok(())
-    }
-
-    pub(crate) async fn git_pull(&self, workspace_id: String) -> Result<(), String> {
-        self.pull_git(workspace_id, None, None, None, None, None, None)
-            .await
-    }
-
-    pub(crate) async fn git_push(&self, workspace_id: String) -> Result<(), String> {
-        self.push_git(
-            workspace_id,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await
-    }
-
-    pub(crate) async fn git_sync(&self, workspace_id: String) -> Result<(), String> {
-        self.sync_git(workspace_id, None).await
-    }
-
-    pub(crate) async fn git_fetch(
-        &self,
-        workspace_id: String,
-        remote: Option<String>,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        if let Some(remote_name) = trim_optional(remote) {
-            git_core::run_git_command(&repo_root, &["fetch", remote_name.as_str()]).await?;
-        } else {
-            git_core::run_git_command(&repo_root, &["fetch", "--all"]).await?;
-        }
-        Ok(())
-    }
-
-    pub(crate) async fn update_git_branch(
-        &self,
-        workspace_id: String,
-        branch_name: String,
-        repository_root: Option<String>,
-    ) -> Result<GitBranchUpdateResult, String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let normalized_branch = normalize_local_branch_ref(&branch_name);
-        if normalized_branch.is_empty() {
-            return Err("Branch name cannot be empty.".to_string());
-        }
-
-        let branch_state = load_local_branch_update_state(&repo_root, normalized_branch.as_str())?;
-        if !branch_update_has_upstream(&branch_state) {
-            return Ok(no_upstream_branch_update_result(
-                branch_state.branch_name.as_str(),
-            ));
-        }
-        if branch_state.is_current {
-            git_core::run_git_command(&repo_root, &["pull"]).await?;
-            return Ok(branch_update_result(
-                branch_state.branch_name.as_str(),
-                BRANCH_UPDATE_STATUS_SUCCESS,
-                None,
-                format!("Updated current branch '{}'.", branch_state.branch_name),
-                None,
-            ));
-        }
-
-        update_non_current_local_branch(&repo_root, branch_state.branch_name.as_str()).await
-    }
-
-    pub(crate) async fn cherry_pick_commit(
-        &self,
-        workspace_id: String,
-        commit_hash: String,
-    ) -> Result<(), String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let commit_hash = commit_hash.trim();
-        if commit_hash.is_empty() {
-            return Err("commit hash is required".to_string());
-        }
-        git_core::run_git_command(&repo_root, &["cherry-pick", commit_hash]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn revert_commit(
-        &self,
-        workspace_id: String,
-        commit_hash: String,
-    ) -> Result<(), String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let commit_hash = commit_hash.trim();
-        if commit_hash.is_empty() {
-            return Err("commit hash is required".to_string());
-        }
-        git_core::run_git_command(&repo_root, &["revert", "--no-edit", commit_hash]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn reset_git_commit(
-        &self,
-        workspace_id: String,
-        commit_hash: String,
-        mode: String,
-    ) -> Result<(), String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let commit_hash = commit_hash.trim();
-        if commit_hash.is_empty() {
-            return Err("commit hash is required".to_string());
-        }
-        let mode_flag = match mode.trim().to_ascii_lowercase().as_str() {
-            "soft" => "--soft",
-            "hard" => "--hard",
-            "keep" => "--keep",
-            _ => "--mixed",
-        };
-        git_core::run_git_command(&repo_root, &["reset", mode_flag, commit_hash]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn list_git_branches(
-        &self,
-        workspace_id: String,
-        repository_root: Option<String>,
-    ) -> Result<Value, String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        if !crate::git_utils::path_has_git_repository_marker(&repo_root) {
-            return Ok(json!({
-                "branches": [],
-                "localBranches": [],
-                "remoteBranches": [],
-                "currentBranch": null,
-                "repositoryState": "not_git_repository",
-                "diagnostic": {
-                    "kind": "neutral_non_repository",
-                    "reason": "missing_git_marker",
-                    "workspaceId": workspace_id,
-                    "pathKind": "workspace_path"
-                }
-            }));
-        }
-        let repo = open_repository_at_root(&repo_root)?;
-        let current_branch = repo
-            .head()
-            .ok()
-            .filter(|head| head.is_branch())
-            .and_then(|head| head.shorthand().map(|name| name.to_string()));
-
-        let mut branches = Vec::<BranchInfo>::new();
-        let mut local_branches = Vec::<GitBranchListItem>::new();
-        let local_refs = repo
-            .branches(Some(git2::BranchType::Local))
-            .map_err(|error| error.to_string())?;
-        for branch_result in local_refs {
-            let (branch, _) = branch_result.map_err(|error| error.to_string())?;
-            let name = branch.name().ok().flatten().unwrap_or("").to_string();
-            if name.is_empty() {
-                continue;
-            }
-            let local_oid = branch.get().target();
-            let last_commit = local_oid
-                .and_then(|oid| repo.find_commit(oid).ok())
-                .map(|commit| commit.time().seconds())
-                .unwrap_or(0);
-            let mut ahead = 0usize;
-            let mut behind = 0usize;
-            let mut upstream = None;
-            if let Ok(upstream_branch) = branch.upstream() {
-                let upstream_ref = upstream_branch.get();
-                upstream = upstream_ref
-                    .shorthand()
-                    .map(|name| name.to_string())
-                    .or_else(|| upstream_ref.name().map(|name| name.to_string()));
-                if let (Some(local_oid), Some(upstream_oid)) = (local_oid, upstream_ref.target()) {
-                    if let Ok((ahead_count, behind_count)) =
-                        repo.graph_ahead_behind(local_oid, upstream_oid)
-                    {
-                        ahead = ahead_count;
-                        behind = behind_count;
-                    }
-                }
-            }
-
-            branches.push(BranchInfo {
-                name: name.clone(),
-                last_commit,
-            });
-            local_branches.push(GitBranchListItem {
-                name: name.clone(),
-                is_current: current_branch.as_deref() == Some(name.as_str()),
-                is_remote: false,
-                remote: None,
-                last_commit,
-                head_sha: local_oid.map(|oid| oid.to_string()),
-                ahead,
-                behind,
-                upstream,
-            });
-        }
-        branches.sort_by(|left, right| right.last_commit.cmp(&left.last_commit));
-        local_branches.sort_by(|left, right| left.name.cmp(&right.name));
-
-        let mut remote_branches = Vec::<GitBranchListItem>::new();
-        let remote_refs = repo
-            .branches(Some(git2::BranchType::Remote))
-            .map_err(|error| error.to_string())?;
-        for branch_result in remote_refs {
-            let (branch, _) = branch_result.map_err(|error| error.to_string())?;
-            let name = branch.name().ok().flatten().unwrap_or("").to_string();
-            if name.is_empty() || name.ends_with("/HEAD") {
-                continue;
-            }
-            let (remote, _) =
-                parse_remote_branch(&name).unwrap_or_else(|| ("origin".to_string(), name.clone()));
-            let last_commit = branch
-                .get()
-                .target()
-                .and_then(|oid| repo.find_commit(oid).ok())
-                .map(|commit| commit.time().seconds())
-                .unwrap_or(0);
-            remote_branches.push(GitBranchListItem {
-                name,
-                is_current: false,
-                is_remote: true,
-                remote: Some(remote),
-                last_commit,
-                head_sha: branch.get().target().map(|oid| oid.to_string()),
-                ahead: 0,
-                behind: 0,
-                upstream: None,
-            });
-        }
-        remote_branches.sort_by(|left, right| left.name.cmp(&right.name));
-
-        Ok(json!({
-            "branches": branches,
-            "localBranches": local_branches,
-            "remoteBranches": remote_branches,
-            "currentBranch": current_branch,
-            "repositoryState": "git_repository"
-        }))
-    }
-
-    pub(crate) async fn checkout_git_branch(
-        &self,
-        workspace_id: String,
-        name: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let trimmed = name.trim();
-        if trimmed.is_empty() {
-            return Err("Branch name cannot be empty.".to_string());
-        }
-        match git_core::run_git_command(&repo_root, &["checkout", trimmed]).await {
-            Ok(_) => Ok(()),
-            Err(first_error) => {
-                if trimmed.contains('/') {
-                    let local = trimmed.split('/').next_back().unwrap_or(trimmed);
-                    git_core::run_git_command(
-                        &repo_root,
-                        &["checkout", "-b", local, "--track", trimmed],
-                    )
-                    .await
-                    .map(|_| ())
-                    .map_err(|_| first_error)
-                } else {
-                    Err(first_error)
-                }
-            }
-        }
-    }
-
-    pub(crate) async fn create_git_branch(
-        &self,
-        workspace_id: String,
-        name: String,
-        repository_root: Option<String>,
-    ) -> Result<(), String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let name = normalize_local_branch_ref(&name);
-        if name.is_empty() {
-            return Err("Branch name cannot be empty.".to_string());
-        }
-        git_core::run_git_command(&repo_root, &["checkout", "-b", &name]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn create_git_branch_from_branch(
-        &self,
-        workspace_id: String,
-        name: String,
-        source_branch: String,
-    ) -> Result<(), String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let name = normalize_local_branch_ref(&name);
-        let source_branch = source_branch.trim().to_string();
-        if name.is_empty() || source_branch.is_empty() {
-            return Err("Branch name and source branch are required.".to_string());
-        }
-        git_core::run_git_command(
-            &repo_root,
-            &["checkout", "-b", &name, source_branch.as_str()],
-        )
-        .await?;
-        Ok(())
-    }
-
-    pub(crate) async fn create_git_branch_from_commit(
-        &self,
-        workspace_id: String,
-        name: String,
-        commit_hash: String,
-    ) -> Result<(), String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let name = normalize_local_branch_ref(&name);
-        let commit_hash = commit_hash.trim().to_string();
-        if name.is_empty() || commit_hash.is_empty() {
-            return Err("Branch name and commit hash are required.".to_string());
-        }
-        git_core::run_git_command(&repo_root, &["checkout", "-b", &name, commit_hash.as_str()])
-            .await?;
-        Ok(())
-    }
-
-    pub(crate) async fn delete_git_branch(
-        &self,
-        workspace_id: String,
-        name: String,
-        force: Option<bool>,
-    ) -> Result<(), String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let name = normalize_local_branch_ref(&name);
-        if name.is_empty() {
-            return Err("Branch name cannot be empty.".to_string());
-        }
-        let flag = if force.unwrap_or(false) { "-D" } else { "-d" };
-        git_core::run_git_command(&repo_root, &["branch", flag, &name]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn rename_git_branch(
-        &self,
-        workspace_id: String,
-        old_name: String,
-        new_name: String,
-    ) -> Result<(), String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let old_name = normalize_local_branch_ref(&old_name);
-        let new_name = normalize_local_branch_ref(&new_name);
-        if old_name.is_empty() || new_name.is_empty() {
-            return Err("Both old and new branch names are required.".to_string());
-        }
-        git_core::run_git_command(&repo_root, &["branch", "-m", &old_name, &new_name]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn merge_git_branch(
-        &self,
-        workspace_id: String,
-        name: String,
-    ) -> Result<(), String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let branch_name = name.trim();
-        if branch_name.is_empty() {
-            return Err("Branch name cannot be empty.".to_string());
-        }
-        git_core::run_git_command(&repo_root, &["merge", branch_name]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn rebase_git_branch(
-        &self,
-        workspace_id: String,
-        onto_branch: String,
-    ) -> Result<(), String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let branch_name = onto_branch.trim();
-        if branch_name.is_empty() {
-            return Err("Target branch cannot be empty.".to_string());
-        }
-        git_core::run_git_command(&repo_root, &["rebase", branch_name]).await?;
-        Ok(())
-    }
-
-    pub(crate) async fn get_git_push_preview(
-        &self,
-        workspace_id: String,
-        remote: String,
-        branch: String,
-        limit: Option<usize>,
-        repository_root: Option<String>,
-    ) -> Result<GitPushPreviewResponse, String> {
-        let repo_root = self
-            .git_repo_root_for_scope(&workspace_id, repository_root.as_deref())
-            .await?;
-        let target_remote = remote.trim();
-        if target_remote.is_empty() {
-            return Err("Remote is required for push preview.".to_string());
-        }
-        let normalized_target_branch = normalize_remote_target_branch(target_remote, &branch);
-        if normalized_target_branch.is_empty() {
-            return Err("Target branch is required for push preview.".to_string());
-        }
-        let repo = open_repository_at_root(&repo_root)?;
-        let source_oid = repo
-            .head()
-            .ok()
-            .and_then(|head| head.target())
-            .ok_or_else(|| "HEAD does not point to a commit.".to_string())?;
-        let source_branch = git_core::run_git_command(&repo_root, &["branch", "--show-current"])
-            .await
-            .ok()
-            .and_then(|value| trim_optional(Some(value)))
-            .unwrap_or_else(|| "HEAD".to_string());
-        let target_ref = format!("refs/remotes/{target_remote}/{normalized_target_branch}");
-        let target_oid = repo.refname_to_id(&target_ref).ok();
-
-        let max_items = limit.unwrap_or(120).clamp(1, 500);
-        let mut revwalk = repo.revwalk().map_err(|error| error.to_string())?;
-        revwalk
-            .set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)
-            .map_err(|error| error.to_string())?;
-        revwalk
-            .push(source_oid)
-            .map_err(|error| error.to_string())?;
-        if let Some(oid) = target_oid {
-            revwalk.hide(oid).map_err(|error| error.to_string())?;
-        }
-
-        let mut commits = Vec::<GitHistoryCommit>::new();
-        let mut has_more = false;
-        for oid_result in revwalk {
-            if commits.len() >= max_items {
-                has_more = true;
-                break;
-            }
-            let oid = oid_result.map_err(|error| error.to_string())?;
-            let commit = repo.find_commit(oid).map_err(|error| error.to_string())?;
-            let sha = commit.id().to_string();
-            commits.push(GitHistoryCommit {
-                short_sha: sha.chars().take(7).collect(),
-                sha,
-                summary: commit.summary().unwrap_or("").to_string(),
-                message: commit.message().unwrap_or("").to_string(),
-                author: commit.author().name().unwrap_or("").to_string(),
-                author_email: commit.author().email().unwrap_or("").to_string(),
-                timestamp: commit.time().seconds(),
-                parents: commit
-                    .parents()
-                    .map(|parent| parent.id().to_string())
-                    .collect(),
-                refs: Vec::new(),
-                file_path: None,
-            });
-        }
-
-        Ok(GitPushPreviewResponse {
-            source_branch,
-            target_remote: target_remote.to_string(),
-            target_branch: normalized_target_branch,
-            target_ref,
-            target_found: target_oid.is_some(),
-            has_more,
-            commits,
-        })
-    }
-
-    pub(crate) async fn get_git_pr_workflow_defaults(
-        &self,
-        workspace_id: String,
-    ) -> Result<GitPrWorkflowDefaults, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let repo = open_repository_at_root(&repo_root)?;
-        let head_branch = git_core::run_git_command(&repo_root, &["branch", "--show-current"])
-            .await
-            .ok()
-            .and_then(|value| trim_optional(Some(value)))
-            .unwrap_or_default();
-        let origin_repo = git_core::run_git_command(&repo_root, &["remote", "get-url", "origin"])
-            .await
-            .ok()
-            .and_then(|url| crate::git_utils::parse_github_repo(&url));
-        let upstream_repo =
-            git_core::run_git_command(&repo_root, &["remote", "get-url", "upstream"])
-                .await
-                .ok()
-                .and_then(|url| crate::git_utils::parse_github_repo(&url))
-                .or(origin_repo.clone())
-                .unwrap_or_default();
-        let base_branch = infer_remote_head_branch(&repo, "upstream")
-            .or_else(|| infer_remote_head_branch(&repo, "origin"))
-            .unwrap_or_else(|| "main".to_string());
-        let head_owner = origin_repo
-            .as_ref()
-            .and_then(|repo_name| parse_repo_owner(repo_name))
-            .or_else(|| parse_repo_owner(&upstream_repo))
-            .unwrap_or_default();
-        let title = repo
-            .head()
-            .ok()
-            .and_then(|head| head.peel_to_commit().ok())
-            .and_then(|commit| {
-                commit
-                    .summary()
-                    .map(str::trim)
-                    .filter(|summary| !summary.is_empty())
-                    .map(ToOwned::to_owned)
-            })
-            .unwrap_or_else(|| format!("chore(git): create pr for {head_branch}"));
-        let body = format!(
-            "## Summary\n- Compare `{head_branch}` against `{base_branch}`\n\n## Validation\n- [ ] Local checks passed"
-        );
-        let comment_body = parse_repo_owner(&upstream_repo)
-            .map(|owner| format!("@{owner} 麻烦审批，已完成验证。"))
-            .unwrap_or_else(|| "@maintainer 麻烦审批，已完成验证。".to_string());
-        let disabled_reason = if head_branch.trim().is_empty() {
-            Some("Current branch is unavailable (detached HEAD or no local branch).".to_string())
-        } else if upstream_repo.trim().is_empty() {
-            Some("No GitHub remote detected. Configure upstream/origin remote first.".to_string())
-        } else if head_owner.trim().is_empty() {
-            Some("Cannot infer fork owner from origin remote URL.".to_string())
-        } else {
-            None
-        };
-        Ok(GitPrWorkflowDefaults {
-            upstream_repo,
-            base_branch,
-            head_owner,
-            head_branch,
-            title,
-            body,
-            comment_body,
-            can_create: disabled_reason.is_none(),
-            disabled_reason,
-        })
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn create_git_pr_workflow(
-        &self,
-        workspace_id: String,
-        upstream_repo: String,
-        base_branch: String,
-        head_owner: String,
-        head_branch: String,
-        title: String,
-        body: Option<String>,
-        comment_after_create: Option<bool>,
-        comment_body: Option<String>,
-        allow_large_range: Option<bool>,
-        confirmed_range_fingerprint: Option<String>,
-    ) -> Result<GitPrWorkflowResult, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let upstream_repo = upstream_repo.trim().to_string();
-        let base_branch = base_branch.trim().to_string();
-        let head_owner = head_owner.trim().to_string();
-        let head_branch = head_branch.trim().to_string();
-        let title = title.trim().to_string();
-        if upstream_repo.is_empty()
-            || base_branch.is_empty()
-            || head_owner.is_empty()
-            || head_branch.is_empty()
-            || title.is_empty()
-        {
-            return Err("Missing required PR workflow fields.".to_string());
-        }
-
-        let fetch_command = format!("git fetch upstream {base_branch}");
-        if let Err(reason) = git_core::run_git_command_owned_non_interactive(
-            repo_root.clone(),
-            vec![
-                "fetch".to_string(),
-                "upstream".to_string(),
-                base_branch.clone(),
-            ],
-        )
-        .await
-        {
-            return Ok(build_pr_precheck_failure(reason, &fetch_command));
-        }
-        let base_ref = format!("upstream/{base_branch}");
-        let revision_output = match git_core::run_git_command_owned_non_interactive(
-            repo_root.clone(),
-            vec![
-                "rev-parse".to_string(),
-                base_ref.clone(),
-                "HEAD".to_string(),
-            ],
-        )
-        .await
-        {
-            Ok(output) => output,
-            Err(reason) => {
-                return Ok(build_pr_precheck_failure(
-                    reason,
-                    "git rev-parse upstream/<base> HEAD",
-                ));
-            }
-        };
-        let Some(range_fingerprint) =
-            git_pr_range_gate::parse_pr_range_fingerprint(&revision_output)
-        else {
-            return Ok(build_pr_precheck_failure(
-                "Unable to resolve the current PR range fingerprint.".to_string(),
-                "git rev-parse upstream/<base> HEAD",
-            ));
-        };
-        let range_ref = format!("{base_ref}...HEAD");
-        let range_output = match git_core::run_git_command_owned_non_interactive(
-            repo_root.clone(),
-            vec!["diff".to_string(), "--name-only".to_string(), range_ref],
-        )
-        .await
-        {
-            Ok(output) => output,
-            Err(reason) => {
-                return Ok(build_pr_precheck_failure(
-                    reason,
-                    "git diff --name-only upstream/<base>...HEAD",
-                ));
-            }
-        };
-        let changed_paths = range_output
-            .lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty())
-            .map(ToOwned::to_owned)
-            .collect::<Vec<_>>();
-        match git_pr_range_gate::evaluate_pr_range_gate(
-            &changed_paths,
-            allow_large_range.unwrap_or(false),
-            confirmed_range_fingerprint.as_deref(),
-            &range_fingerprint,
-        ) {
-            git_pr_range_gate::PrRangeGateDecision::Pass { .. } => {}
-            git_pr_range_gate::PrRangeGateDecision::ConfirmationRequired {
-                category,
-                reason,
-                range_gate,
-            } => {
-                return Ok(GitPrWorkflowResult {
-                    ok: false,
-                    status: "failed".to_string(),
-                    message: reason.clone(),
-                    error_category: Some(category),
-                    next_action_hint: Some(
-                        "Review the large PR range, then confirm once to continue.".to_string(),
-                    ),
-                    pr_url: None,
-                    pr_number: None,
-                    existing_pr: None,
-                    retry_command: None,
-                    range_gate: Some(range_gate),
-                    stages: vec![GitPrWorkflowStage {
-                        key: "precheck".to_string(),
-                        status: "failed".to_string(),
-                        detail: reason,
-                        command: Some("git diff --name-only upstream/<base>...HEAD".to_string()),
-                        stdout: None,
-                        stderr: None,
-                    }],
-                });
-            }
-            git_pr_range_gate::PrRangeGateDecision::Blocked { category, reason } => {
-                return Ok(GitPrWorkflowResult {
-                    ok: false,
-                    status: "failed".to_string(),
-                    message: reason.clone(),
-                    error_category: Some(category),
-                    next_action_hint: Some(
-                        "Fix branch base/range first, then retry PR workflow.".to_string(),
-                    ),
-                    pr_url: None,
-                    pr_number: None,
-                    existing_pr: None,
-                    retry_command: None,
-                    range_gate: None,
-                    stages: vec![GitPrWorkflowStage {
-                        key: "precheck".to_string(),
-                        status: "failed".to_string(),
-                        detail: reason,
-                        command: Some("git diff --name-only upstream/<base>...HEAD".to_string()),
-                        stdout: None,
-                        stderr: None,
-                    }],
-                });
-            }
-        }
-
-        let body_text = trim_optional(body).unwrap_or_default();
-        let head_ref = format!("{head_owner}:{head_branch}");
-        let mut args = vec![
-            "pr".to_string(),
-            "create".to_string(),
-            "--repo".to_string(),
-            upstream_repo.clone(),
-            "--base".to_string(),
-            base_branch.clone(),
-            "--head".to_string(),
-            head_ref.clone(),
-            "--title".to_string(),
-            title.clone(),
-        ];
-        if body_text.is_empty() {
-            args.push("--fill".to_string());
-        } else {
-            args.push("--body".to_string());
-            args.push(body_text.clone());
-        }
-        let output = crate::utils::async_command("gh")
-            .args(args.iter().map(String::as_str))
-            .current_dir(&repo_root)
-            .output()
-            .await
-            .map_err(|error| format!("Failed to run gh: {error}"))?;
-
-        if !output.status.success() {
-            let detail = parse_git_error_detail(
-                &output.stdout,
-                &output.stderr,
-                "GitHub CLI command failed.",
-            );
-            return Ok(GitPrWorkflowResult {
-                ok: false,
-                status: "failed".to_string(),
-                message: detail.clone(),
-                error_category: Some("gh_pr_create".to_string()),
-                next_action_hint: Some("Check gh auth/repo permissions, then retry.".to_string()),
-                pr_url: None,
-                pr_number: None,
-                existing_pr: None,
-                retry_command: Some(format!(
-                    "gh pr create --repo {} --base {} --head {} --title {:?}",
-                    upstream_repo, base_branch, head_ref, title
-                )),
-                range_gate: None,
-                stages: vec![GitPrWorkflowStage {
-                    key: "create-pr".to_string(),
-                    status: "failed".to_string(),
-                    detail: "Create pull request".to_string(),
-                    command: Some("gh pr create".to_string()),
-                    stdout: Some(String::from_utf8_lossy(&output.stdout).to_string()),
-                    stderr: Some(String::from_utf8_lossy(&output.stderr).to_string()),
-                }],
-            });
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let mut stages = vec![GitPrWorkflowStage {
-            key: "create-pr".to_string(),
-            status: "ok".to_string(),
-            detail: "Create pull request".to_string(),
-            command: Some("gh pr create".to_string()),
-            stdout: Some(stdout.clone()),
-            stderr: Some(String::from_utf8_lossy(&output.stderr).to_string()),
-        }];
-
-        let pr_url = extract_pr_url(&stdout);
-        let pr_number = pr_url.as_deref().and_then(extract_pr_number);
-
-        if comment_after_create.unwrap_or(false) {
-            if let (Some(number), Some(comment_text)) = (pr_number, trim_optional(comment_body)) {
-                let comment_output = crate::utils::async_command("gh")
-                    .args([
-                        "pr",
-                        "comment",
-                        &number.to_string(),
-                        "--repo",
-                        &upstream_repo,
-                        "--body",
-                        &comment_text,
-                    ])
-                    .current_dir(&repo_root)
-                    .output()
-                    .await
-                    .map_err(|error| format!("Failed to run gh: {error}"))?;
-                let comment_ok = comment_output.status.success();
-                stages.push(GitPrWorkflowStage {
-                    key: "comment".to_string(),
-                    status: if comment_ok {
-                        "ok".to_string()
-                    } else {
-                        "failed".to_string()
-                    },
-                    detail: "Comment on pull request".to_string(),
-                    command: Some("gh pr comment".to_string()),
-                    stdout: Some(String::from_utf8_lossy(&comment_output.stdout).to_string()),
-                    stderr: Some(String::from_utf8_lossy(&comment_output.stderr).to_string()),
-                });
-            }
-        }
-
-        Ok(GitPrWorkflowResult {
-            ok: true,
-            status: "ok".to_string(),
-            message: "Pull request created.".to_string(),
-            error_category: None,
-            next_action_hint: None,
-            pr_url,
-            pr_number,
-            existing_pr: None,
-            retry_command: None,
-            range_gate: None,
-            stages,
-        })
-    }
-
-    pub(crate) async fn get_github_issues(
-        &self,
-        workspace_id: String,
-    ) -> Result<GitHubIssuesResponse, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let repo_name = git_core::run_git_command(&repo_root, &["remote", "get-url", "origin"])
-            .await
-            .ok()
-            .and_then(|url| crate::git_utils::parse_github_repo(&url))
-            .ok_or_else(|| "Unable to resolve GitHub repository from origin remote.".to_string())?;
-        let output = crate::utils::async_command("gh")
-            .args([
-                "issue",
-                "list",
-                "--repo",
-                &repo_name,
-                "--limit",
-                "50",
-                "--json",
-                "number,title,url,updatedAt",
-            ])
-            .current_dir(&repo_root)
-            .output()
-            .await
-            .map_err(|error| format!("Failed to run gh: {error}"))?;
-        if !output.status.success() {
-            return Err(parse_git_error_detail(
-                &output.stdout,
-                &output.stderr,
-                "GitHub CLI command failed.",
-            ));
-        }
-        let issues: Vec<GitHubIssue> =
-            serde_json::from_slice(&output.stdout).map_err(|error| error.to_string())?;
-        Ok(GitHubIssuesResponse {
-            total: issues.len(),
-            issues,
-        })
-    }
-
-    pub(crate) async fn get_github_pull_requests(
-        &self,
-        workspace_id: String,
-    ) -> Result<GitHubPullRequestsResponse, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let repo_name = git_core::run_git_command(&repo_root, &["remote", "get-url", "origin"])
-            .await
-            .ok()
-            .and_then(|url| crate::git_utils::parse_github_repo(&url))
-            .ok_or_else(|| "Unable to resolve GitHub repository from origin remote.".to_string())?;
-        let output = crate::utils::async_command("gh")
-            .args([
-                "pr",
-                "list",
-                "--repo",
-                &repo_name,
-                "--state",
-                "open",
-                "--limit",
-                "50",
-                "--json",
-                "number,title,url,updatedAt,createdAt,body,headRefName,baseRefName,isDraft,author",
-            ])
-            .current_dir(&repo_root)
-            .output()
-            .await
-            .map_err(|error| format!("Failed to run gh: {error}"))?;
-        if !output.status.success() {
-            return Err(parse_git_error_detail(
-                &output.stdout,
-                &output.stderr,
-                "GitHub CLI command failed.",
-            ));
-        }
-        let pull_requests: Vec<GitHubPullRequest> =
-            serde_json::from_slice(&output.stdout).map_err(|error| error.to_string())?;
-        Ok(GitHubPullRequestsResponse {
-            total: pull_requests.len(),
-            pull_requests,
-        })
-    }
-
-    pub(crate) async fn get_github_pull_request_diff(
-        &self,
-        workspace_id: String,
-        pr_number: u64,
-    ) -> Result<Vec<GitHubPullRequestDiff>, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let repo_name = git_core::run_git_command(&repo_root, &["remote", "get-url", "origin"])
-            .await
-            .ok()
-            .and_then(|url| crate::git_utils::parse_github_repo(&url))
-            .ok_or_else(|| "Unable to resolve GitHub repository from origin remote.".to_string())?;
-        let output = crate::utils::async_command("gh")
-            .args([
-                "pr",
-                "diff",
-                &pr_number.to_string(),
-                "--repo",
-                &repo_name,
-                "--color",
-                "never",
-            ])
-            .current_dir(&repo_root)
-            .output()
-            .await
-            .map_err(|error| format!("Failed to run gh: {error}"))?;
-        if !output.status.success() {
-            return Err(parse_git_error_detail(
-                &output.stdout,
-                &output.stderr,
-                "GitHub CLI command failed.",
-            ));
-        }
-        Ok(parse_pr_diff_text(&String::from_utf8_lossy(&output.stdout)))
-    }
-
-    pub(crate) async fn get_github_pull_request_comments(
-        &self,
-        workspace_id: String,
-        pr_number: u64,
-    ) -> Result<Vec<GitHubPullRequestComment>, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let repo_name = git_core::run_git_command(&repo_root, &["remote", "get-url", "origin"])
-            .await
-            .ok()
-            .and_then(|url| crate::git_utils::parse_github_repo(&url))
-            .ok_or_else(|| "Unable to resolve GitHub repository from origin remote.".to_string())?;
-        let comments_endpoint =
-            format!("/repos/{repo_name}/issues/{pr_number}/comments?per_page=30");
-        let jq_filter = r#"[.[] | {id, body, createdAt: .created_at, url: .html_url, author: (if .user then {login: .user.login} else null end)}]"#;
-        let output = crate::utils::async_command("gh")
-            .args(["api", &comments_endpoint, "--jq", jq_filter])
-            .current_dir(&repo_root)
-            .output()
-            .await
-            .map_err(|error| format!("Failed to run gh: {error}"))?;
-        if !output.status.success() {
-            return Err(parse_git_error_detail(
-                &output.stdout,
-                &output.stderr,
-                "GitHub CLI command failed.",
-            ));
-        }
-        let comments: Vec<GitHubPullRequestComment> =
-            serde_json::from_slice(&output.stdout).map_err(|error| error.to_string())?;
-        Ok(comments)
-    }
-
-    pub(crate) async fn get_git_branch_compare_commits(
-        &self,
-        workspace_id: String,
-        target_branch: String,
-        current_branch: String,
-        limit: Option<usize>,
-    ) -> Result<GitBranchCompareCommitSets, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let target_branch = target_branch.trim().to_string();
-        let current_branch = current_branch.trim().to_string();
-        if target_branch.is_empty() || current_branch.is_empty() {
-            return Err("Branch name cannot be empty.".to_string());
-        }
-        if target_branch == current_branch {
-            return Ok(GitBranchCompareCommitSets {
-                target_only_commits: Vec::new(),
-                current_only_commits: Vec::new(),
-            });
-        }
-        let max_items = limit.unwrap_or(200).clamp(1, 500);
-        let target_only_raw = git_core::run_git_command(
-            &repo_root,
-            &[
-                "log",
-                "--format=%H%x1f%an%x1f%ae%x1f%ct%x1f%s%x1f%B%x1e",
-                &target_branch.to_string(),
-                &format!("^{current_branch}"),
-                "-n",
-                &max_items.to_string(),
-            ],
-        )
-        .await
-        .unwrap_or_default();
-        let current_only_raw = git_core::run_git_command(
-            &repo_root,
-            &[
-                "log",
-                "--format=%H%x1f%an%x1f%ae%x1f%ct%x1f%s%x1f%B%x1e",
-                &current_branch.to_string(),
-                &format!("^{target_branch}"),
-                "-n",
-                &max_items.to_string(),
-            ],
-        )
-        .await
-        .unwrap_or_default();
-
-        let parse_commits = |raw: &str| -> Vec<GitHistoryCommit> {
-            raw.split('\x1e')
-                .filter_map(|record| {
-                    let record = record.trim();
-                    if record.is_empty() {
-                        return None;
-                    }
-                    let mut parts = record.split('\x1f');
-                    let sha = parts.next()?.trim().to_string();
-                    let author = parts.next().unwrap_or("").trim().to_string();
-                    let author_email = parts.next().unwrap_or("").trim().to_string();
-                    let timestamp = parts
-                        .next()
-                        .and_then(|v| v.trim().parse::<i64>().ok())
-                        .unwrap_or(0);
-                    let summary = parts.next().unwrap_or("").trim().to_string();
-                    let message = parts.next().unwrap_or("").trim().to_string();
-                    Some(GitHistoryCommit {
-                        short_sha: sha.chars().take(7).collect(),
-                        sha,
-                        summary,
-                        message,
-                        author,
-                        author_email,
-                        timestamp,
-                        parents: Vec::new(),
-                        refs: Vec::new(),
-                        file_path: None,
-                    })
-                })
-                .collect()
-        };
-        Ok(GitBranchCompareCommitSets {
-            target_only_commits: parse_commits(&target_only_raw),
-            current_only_commits: parse_commits(&current_only_raw),
-        })
-    }
-
-    pub(crate) async fn get_git_branch_diff_between_branches(
-        &self,
-        workspace_id: String,
-        from_branch: String,
-        to_branch: String,
-    ) -> Result<Vec<GitCommitDiff>, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let from_branch = from_branch.trim().to_string();
-        let to_branch = to_branch.trim().to_string();
-        if from_branch.is_empty() || to_branch.is_empty() {
-            return Err("Branch name cannot be empty.".to_string());
-        }
-        if from_branch == to_branch {
-            return Ok(Vec::new());
-        }
-        let output = crate::utils::async_command(
-            crate::utils::resolve_git_binary()
-                .map_err(|error| format!("Failed to run git: {error}"))?,
-        )
-        .args([
-            "diff",
-            "--name-status",
-            "--find-renames",
-            from_branch.as_str(),
-            to_branch.as_str(),
-        ])
-        .current_dir(&repo_root)
-        .env("PATH", crate::utils::git_env_path())
-        .output()
-        .await
-        .map_err(|error| format!("Failed to run git: {error}"))?;
-        if !output.status.success() {
-            return Err(parse_git_error_detail(
-                &output.stdout,
-                &output.stderr,
-                "Git diff command failed.",
-            ));
-        }
-        let mut results = Vec::<GitCommitDiff>::new();
-        for raw_line in String::from_utf8_lossy(&output.stdout).lines() {
-            let line = raw_line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            let mut parts = line.split('\t');
-            let raw_status = parts.next().unwrap_or("").trim();
-            if raw_status.is_empty() {
-                continue;
-            }
-            let status = raw_status.chars().next().unwrap_or('M').to_string();
-            let path = if raw_status.starts_with('R') || raw_status.starts_with('C') {
-                parts.nth(1)
-            } else {
-                parts.next()
-            };
-            let Some(path) = path else {
-                continue;
-            };
-            if path.trim().is_empty() {
-                continue;
-            }
-            results.push(GitCommitDiff {
-                path: normalize_git_path(path),
-                status,
-                diff: String::new(),
-                is_binary: false,
-                is_image: false,
-                old_image_data: None,
-                new_image_data: None,
-                old_image_mime: None,
-                new_image_mime: None,
-            });
-        }
-        Ok(results)
-    }
-
-    pub(crate) async fn get_git_branch_file_diff_between_branches(
-        &self,
-        workspace_id: String,
-        from_branch: String,
-        to_branch: String,
-        path: String,
-    ) -> Result<GitCommitDiff, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let from_branch = from_branch.trim().to_string();
-        let to_branch = to_branch.trim().to_string();
-        let normalized_path = normalize_git_path(&path);
-        if from_branch.is_empty() || to_branch.is_empty() || normalized_path.trim().is_empty() {
-            return Err("Invalid branch or path.".to_string());
-        }
-        let output = crate::utils::async_command(
-            crate::utils::resolve_git_binary()
-                .map_err(|error| format!("Failed to run git: {error}"))?,
-        )
-        .args([
-            "diff",
-            "--no-color",
-            "--find-renames",
-            from_branch.as_str(),
-            to_branch.as_str(),
-            "--",
-            normalized_path.as_str(),
-        ])
-        .current_dir(&repo_root)
-        .env("PATH", crate::utils::git_env_path())
-        .output()
-        .await
-        .map_err(|error| format!("Failed to run git: {error}"))?;
-        if !output.status.success() {
-            return Err(parse_git_error_detail(
-                &output.stdout,
-                &output.stderr,
-                "Git diff command failed.",
-            ));
-        }
-        let mut entries = parse_patch_diff_entries(&String::from_utf8_lossy(&output.stdout));
-        if let Some(entry) = entries.pop() {
-            return Ok(entry);
-        }
-        Ok(GitCommitDiff {
-            path: normalized_path,
-            status: "M".to_string(),
-            diff: String::new(),
-            is_binary: false,
-            is_image: false,
-            old_image_data: None,
-            new_image_data: None,
-            old_image_mime: None,
-            new_image_mime: None,
-        })
-    }
-
-    pub(crate) async fn get_git_worktree_diff_against_branch(
-        &self,
-        workspace_id: String,
-        branch: String,
-    ) -> Result<Vec<GitCommitDiff>, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let branch_name = branch.trim().to_string();
-        if branch_name.is_empty() {
-            return Err("Branch name cannot be empty.".to_string());
-        }
-        let output = crate::utils::async_command(
-            crate::utils::resolve_git_binary()
-                .map_err(|error| format!("Failed to run git: {error}"))?,
-        )
-        .args([
-            "diff",
-            "--name-status",
-            "--find-renames",
-            branch_name.as_str(),
-        ])
-        .current_dir(&repo_root)
-        .env("PATH", crate::utils::git_env_path())
-        .output()
-        .await
-        .map_err(|error| format!("Failed to run git: {error}"))?;
-        if !output.status.success() {
-            return Err(parse_git_error_detail(
-                &output.stdout,
-                &output.stderr,
-                "Git diff command failed.",
-            ));
-        }
-        let mut results = Vec::<GitCommitDiff>::new();
-        for raw_line in String::from_utf8_lossy(&output.stdout).lines() {
-            let line = raw_line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            let mut parts = line.split('\t');
-            let raw_status = parts.next().unwrap_or("").trim();
-            if raw_status.is_empty() {
-                continue;
-            }
-            let status = raw_status.chars().next().unwrap_or('M').to_string();
-            let path = if raw_status.starts_with('R') || raw_status.starts_with('C') {
-                parts.nth(1)
-            } else {
-                parts.next()
-            };
-            let Some(path) = path else {
-                continue;
-            };
-            if path.trim().is_empty() {
-                continue;
-            }
-            results.push(GitCommitDiff {
-                path: normalize_git_path(path),
-                status,
-                diff: String::new(),
-                is_binary: false,
-                is_image: false,
-                old_image_data: None,
-                new_image_data: None,
-                old_image_mime: None,
-                new_image_mime: None,
-            });
-        }
-        Ok(results)
-    }
-
-    pub(crate) async fn get_git_worktree_file_diff_against_branch(
-        &self,
-        workspace_id: String,
-        branch: String,
-        path: String,
-    ) -> Result<GitCommitDiff, String> {
-        let repo_root = self.git_repo_root(&workspace_id).await?;
-        let branch_name = branch.trim().to_string();
-        let normalized_path = normalize_git_path(&path);
-        if branch_name.is_empty() || normalized_path.trim().is_empty() {
-            return Err("Invalid branch or path.".to_string());
-        }
-        let output = crate::utils::async_command(
-            crate::utils::resolve_git_binary()
-                .map_err(|error| format!("Failed to run git: {error}"))?,
-        )
-        .args([
-            "diff",
-            "--no-color",
-            "--find-renames",
-            branch_name.as_str(),
-            "--",
-            normalized_path.as_str(),
-        ])
-        .current_dir(&repo_root)
-        .env("PATH", crate::utils::git_env_path())
-        .output()
-        .await
-        .map_err(|error| format!("Failed to run git: {error}"))?;
-        if !output.status.success() {
-            return Err(parse_git_error_detail(
-                &output.stdout,
-                &output.stderr,
-                "Git diff command failed.",
-            ));
-        }
-        let mut entries = parse_patch_diff_entries(&String::from_utf8_lossy(&output.stdout));
-        if let Some(entry) = entries.pop() {
-            return Ok(entry);
-        }
-        Ok(GitCommitDiff {
-            path: normalized_path,
-            status: "M".to_string(),
-            diff: String::new(),
-            is_binary: false,
-            is_image: false,
-            old_image_data: None,
-            new_image_data: None,
-            old_image_mime: None,
-            new_image_mime: None,
-        })
     }
 }
 

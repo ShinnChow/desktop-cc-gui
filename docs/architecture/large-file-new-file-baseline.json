@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-31T07:39:52.137Z",
+  "generatedAt": "2026-08-31T08:14:36.007Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -10,26 +10,6 @@
       "policyId": "styles",
       "priority": "P1",
       "warnThreshold": 2200,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/composer/components/ChatInputBox/selectors/ModelSelect.test.tsx",
-      "lines": 3679,
-      "type": "ts/tsx",
-      "policyId": "test-files",
-      "priority": "P2",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/app/components/Sidebar.test.tsx",
-      "lines": 3620,
-      "type": "ts/tsx",
-      "policyId": "test-files",
-      "priority": "P2",
-      "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -89,16 +69,6 @@
       "type": "ts/tsx",
       "policyId": "test-files",
       "priority": "P2",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src-tauri/src/bin/cc_gui_daemon/daemon_state/git.rs",
-      "lines": 3170,
-      "type": "rust",
-      "policyId": "default-source",
-      "priority": "P1",
       "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
@@ -190,16 +160,6 @@
       "policyId": "test-files",
       "priority": "P2",
       "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/threads/hooks/useThreadMessaging.ts",
-      "lines": 2819,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -400,6 +360,16 @@
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/threads/hooks/useThreadMessaging.ts",
+      "lines": 2384,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -1504,6 +1474,16 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
+      "path": "src-tauri/src/bin/cc_gui_daemon/daemon_state/git.rs",
+      "lines": 1536,
+      "type": "rust",
+      "policyId": "default-source",
+      "priority": "P1",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
       "path": "src-tauri/src/codex/doctor.rs",
       "lines": 1523,
       "type": "rust",
@@ -2269,6 +2249,16 @@
       "type": "rust",
       "policyId": "default-source",
       "priority": "P1",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/composer/components/ChatInputBox/selectors/ModelSelect.main.test.tsx",
+      "lines": 1194,
+      "type": "ts/tsx",
+      "policyId": "test-files",
+      "priority": "P2",
       "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
@@ -3056,6 +3046,16 @@
     {
       "path": "src/app-shell/domains/modelSelection.test.ts",
       "lines": 958,
+      "type": "ts/tsx",
+      "policyId": "test-files",
+      "priority": "P2",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/composer/components/ChatInputBox/selectors/ModelSelect.emptyChannel.test.tsx",
+      "lines": 956,
       "type": "ts/tsx",
       "policyId": "test-files",
       "priority": "P2",
@@ -3906,6 +3906,16 @@
     {
       "path": "src/features/threads/adapters/realtimeAdapters.test.ts",
       "lines": 816,
+      "type": "ts/tsx",
+      "policyId": "test-files",
+      "priority": "P2",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/composer/components/ChatInputBox/selectors/ModelSelect.atomicTargetGroups.test.tsx",
+      "lines": 815,
       "type": "ts/tsx",
       "policyId": "test-files",
       "priority": "P2",

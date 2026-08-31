@@ -115,4 +115,22 @@ created: 2026-08-31
 
 ## 8. 执行记录
 
-（待回填：每 PR 行数对照 + 指标曲线 + strictReduction 启用时间 + 新教训）
+### 波 1（2026-08-31 本会话，4 代理并行，落地 1 commit 46bfa275d）
+
+- **W6-A status.rs**：3020→70 壳 + engine/status/ 11 子模块（catalog 531/orchestration 554/pi 452/opencode 304/claude 266/qoder 244/kimi 184/probe 172/grok 142/gemini 110/codex 39）；11 个显式 #[path] mod 声明 + 穷尽 pub use（catalog/probe 用 pub(crate) use 避 glob-visibility 警告）；80 处 pub(crate) bump（74 item + ClaudeModelOverrides 6 字段，E0451）为唯一偏差，逐字性经 112 顶层 item 脚本化比对；判定函数单实现留 engine::status 原路径，dev/daemon 双转发器零改动；cargo test status 78+76 passed 前后一致，lib + daemon bin check 双 0 error。
+- **W6-B1 GitHistoryPanelView**：3012→2340 ✓（≤2800）；拆出 CreatePrDialog 714 + CreatePrPreviewCard 296，Pick<Scope, 71/29 名> 收窄 props，deps 72 名逐字留调用点，renderGitHistoryPanelView 锚点原地；测试 8 failed/202 passed 前后逐字一致（8 个 GitHistoryWorktreePanel 既有）；两 git-history 治理脚本绿。
+- **W6-C1 useAppServerEvents.test**：4327→8 族切片（最大 761）+ TestSetup 70；74 it 逐字迁移，describe 包装名保留测试全名不变；setup 内 mount 改 createElement（.ts 无 JSX，脚手架非用例文本）；目录失败名单 5 条（compaction 3 + routing 1 + sidebarPinned 1）前后逐字一致。
+- **W6-C2 useThreadMessaging.test**：4101→8 族切片（最大 702）+ TestSetup 22；114 it 双向逐字节一致；既有 4 失败前后逐字一致；vi.mock 顺序敏感——setup import 须置顶。
+- **治理动作**：bridge-runtime-critical retained 清零 → policy.json 启用 strictReduction（第二组）；两道 baseline 同 PR 重生成；gate 绿；删 tsbuildinfo tsc 零 error；无 0 字节杂散文件。
+- 新教训：⑬ 并行代理共享 eval 内核可变状态污染再现（B1 lines 变量被 C2 覆盖），靠 git show 只读取 pristine + 唯一变量名恢复——纪律⑦须强调「唯一变量名」而不只是「独立临时文件」。
+
+### 波 2（2026-08-31 本会话，4 代理并行，落地 1 commit）
+
+- **W6-B2 useThreadMessaging**：2819→2384 ✓（≤2800）。三刀逐字搬运：① 七引擎 pending-session 缓存 if 块 291 行 → 新文件 threadMessagingPendingSessionCache.ts 361（PendingSessionCacheContext 参数对象化，仿 NativeResolveContext 先例）；② realSessionId 三元链 72 行 → threadMessagingNativeResolve.ts +108；③ spec-root probe/codex hint/explore 卡注入 114 行 → threadMessagingSpecRoot.ts +155。deps 数组逐字未动；liveAssistant/liveItemDelta wiring 不在拆动区。失败名单 12 failed/173 passed 前后逐字一致（4 族既有 + context-injection 8 既有）。
+- **W6-C3 ModelSelect.test**：3679→6 族切片（最大 1194）+ TestSetup 57；83 用例逐字节迁移；目录 156 passed/0 failed 前后一致。3 片 >800（1194/956/815，单 describe 族不可再切）登记豁免，new-file baseline 同 PR 重生成覆盖。实际路径在 ChatInputBox/selectors/ 下（任务书路径已由 find 校准）。
+- **W6-C4 Sidebar.test**：3620→6 族切片（最大 756）+ TestSetup 40；66 passed + 1 failed（engine refresh 菜单按钮，拆前既有、前后逐字一致）；目录另有 session-folders 3 个既有失败零交集。
+- **W6-D1 daemon_state/git.rs**：3170→1536 ✓（<3000 出 fail 线）+ 5 平铺模块（git_pr 576/git_compare 344/git_branches 275/git_sync 273/git_staging 186）；27 处 pub(super) bump 为唯一偏差；无 include_str! 自引用命中；cargo test --bin cc_gui_daemon git 34 passed 前后逐名一致；cargo check 全 target 0 error。
+- **治理动作**：feature-hotpath retained 清零 → policy.json 启用 strictReduction（第三组，三组全启用达成）；两道 baseline 同 PR 重生成（覆盖 C3 三件 >800 豁免）；gate 绿；删 tsbuildinfo tsc 零 error；清掉 W6C3 tsc -b 误产的 vite.config.js/.d.ts 杂散。
+- 新教训：⑭ 子代理验证 tsc 禁用 `tsc -b` 模式（会 emit vite.config.js/.d.ts 入仓）；只用 `npx tsc --noEmit`。
+
+（波 3 待回填）

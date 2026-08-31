@@ -1,4 +1,8 @@
 import type { EngineType } from "../../../types";
+import type { MutableRefObject } from "react";
+import type { TFunction } from "i18next";
+import type { ConversationItem, WorkspaceInfo } from "../../../types";
+import type { UseThreadMessagingOptions } from "./threadMessagingTypes";
 import {
   getWorkspaceFiles as getWorkspaceFilesService,
   listExternalSpecTree as listExternalSpecTreeService,
@@ -212,4 +216,155 @@ export function buildCodexTextWithSpecRootPriority(
     return `[System] ${systemHint}\n${trimmedText}`;
   }
   return `[System] ${systemHint}\n[User Input] ${trimmedText}`;
+}
+
+export type SessionSpecSendContext = {
+  sessionSpecLinkByThreadRef: MutableRefObject<
+    Map<string, SessionSpecLinkContext>
+  >;
+  onDebug: UseThreadMessagingOptions["onDebug"];
+  dispatch: UseThreadMessagingOptions["dispatch"];
+  getCustomName: UseThreadMessagingOptions["getCustomName"];
+  t: TFunction;
+};
+
+export async function probeSessionSpecLinkForSend(
+  ctx: SessionSpecSendContext,
+  args: {
+    workspace: WorkspaceInfo;
+    threadId: string;
+    resolvedEngine: EngineType;
+    threadItems: ConversationItem[];
+    customSpecRoot: string | null;
+    finalText: string;
+  },
+): Promise<{
+  sessionSpecLink: SessionSpecLinkContext | null;
+  codexEffectiveText: string;
+}> {
+  const { sessionSpecLinkByThreadRef, onDebug, dispatch, getCustomName, t } =
+    ctx;
+  const {
+    workspace,
+    threadId,
+    resolvedEngine,
+    threadItems,
+    customSpecRoot,
+    finalText,
+  } = args;
+  const sessionSpecKey = `${workspace.id}:${threadId}`;
+  let sessionSpecLink =
+    sessionSpecLinkByThreadRef.current.get(sessionSpecKey) ?? null;
+  const shouldProbeSessionSpecLink =
+    shouldProbeSessionSpecForEngine(resolvedEngine) &&
+    Boolean(customSpecRoot) &&
+    (threadItems.length === 0 || !sessionSpecLink);
+  if (shouldProbeSessionSpecLink && customSpecRoot) {
+    const probeStartAt = Date.now();
+    sessionSpecLink = await probeSessionSpecLinkWithTimeout(
+      workspace.id,
+      workspace.path,
+      "custom",
+      customSpecRoot,
+    );
+    const probeDurationMs = Date.now() - probeStartAt;
+    sessionSpecLinkByThreadRef.current.set(
+      sessionSpecKey,
+      sessionSpecLink,
+    );
+    onDebug?.({
+      id: `${Date.now()}-spec-root-probe`,
+      timestamp: Date.now(),
+      source: "client",
+      label: "specRoot/probe",
+      payload: {
+        workspaceId: workspace.id,
+        threadId,
+        engine: resolvedEngine,
+        source: "custom",
+        rootPath: customSpecRoot,
+        status: sessionSpecLink.status,
+        reason: sessionSpecLink.reason,
+        durationMs: probeDurationMs,
+      },
+    });
+  }
+  const shouldInjectSpecRootHintInPrompt =
+    resolvedEngine === "codex" &&
+    Boolean(sessionSpecLink) &&
+    threadItems.length === 0;
+  const codexEffectiveText =
+    shouldInjectSpecRootHintInPrompt && sessionSpecLink
+      ? buildCodexTextWithSpecRootPriority(finalText, sessionSpecLink)
+      : finalText;
+  const shouldInjectSpecRootCard =
+    resolvedEngine === "codex" &&
+    Boolean(sessionSpecLink) &&
+    threadItems.length === 0;
+  if (shouldInjectSpecRootCard && sessionSpecLink) {
+    const statusLabel = sessionSpecLink.status;
+    const priorityDetail =
+      sessionSpecLink.status === "visible"
+        ? t("threads.specRootContext.priorityDetail")
+        : "Linked root is not usable. Resolve link before relying on fallback inference.";
+    const entries: {
+      kind: "read" | "search" | "list" | "run";
+      label: string;
+      detail?: string;
+    }[] = [
+      {
+        kind: "list",
+        label: t("threads.specRootContext.activeRoot"),
+        detail: sessionSpecLink.rootPath,
+      },
+      {
+        kind: "list",
+        label: "Probe status",
+        detail: statusLabel,
+      },
+      {
+        kind: "read",
+        label: t("threads.specRootContext.priorityLabel"),
+        detail: priorityDetail,
+      },
+    ];
+    if (sessionSpecLink.reason) {
+      entries.push({
+        kind: "read",
+        label: "Failure reason",
+        detail: sessionSpecLink.reason,
+      });
+    }
+    if (sessionSpecLink.status !== "visible") {
+      entries.push(
+        {
+          kind: "run",
+          label: "/spec-root rebind",
+          detail: "Rebind to latest Spec Hub path and re-probe.",
+        },
+        {
+          kind: "run",
+          label: "/spec-root default",
+          detail:
+            "Restore workspace default openspec path and re-probe.",
+        },
+      );
+    }
+    dispatch({
+      type: "upsertItem",
+      workspaceId: workspace.id,
+      threadId,
+      item: {
+        id: `spec-root-context-${threadId}`,
+        kind: "explore",
+        status: "explored",
+        title: t("threads.specRootContext.title"),
+        collapsible: true,
+        mergeKey: "spec-root-context",
+        entries,
+      },
+      hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
+    });
+  }
+  return { sessionSpecLink, codexEffectiveText };
 }

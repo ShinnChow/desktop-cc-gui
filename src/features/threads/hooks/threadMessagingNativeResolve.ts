@@ -17,6 +17,8 @@ import {
   resolveCollaborationModeIdFromPayload,
 } from "./threadMessagingHelpers";
 import { normalizeEngineScopedEffort } from "./messageRuntimeController";
+import { isClaudeForkThreadId } from "../utils/claudeForkThread";
+import { parseQoderSessionIdentity } from "../utils/qoderSessionIdentity";
 import type {
   SendMessageOptions,
   UseThreadMessagingOptions,
@@ -327,4 +329,110 @@ export function recordNativeSendTurnTarget(args: {
   });
   recordNativeTurnTarget(workspace.id, threadId, nativeTurnExecutionSnapshot);
   appendTurnTargetBadge(threadId, nativeTurnExecutionSnapshot);
+}
+
+export type NativeRealSessionContext = {
+  geminiSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
+  grokSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
+  kimiSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
+  dshSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
+  piSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
+  qoderSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
+  getThreadProviderProfileId: UseThreadMessagingOptions["getThreadProviderProfileId"];
+};
+
+export function resolveNativeRealSessionId(
+  ctx: NativeRealSessionContext,
+  args: {
+    resolvedEngine: EngineType;
+    threadId: string;
+    isClaudeSession: boolean;
+    isOpenCodeSession: boolean;
+    workspace: WorkspaceInfo;
+  },
+): string | null {
+  const {
+    geminiSessionIdByPendingThreadRef,
+    grokSessionIdByPendingThreadRef,
+    kimiSessionIdByPendingThreadRef,
+    dshSessionIdByPendingThreadRef,
+    piSessionIdByPendingThreadRef,
+    qoderSessionIdByPendingThreadRef,
+    getThreadProviderProfileId,
+  } = ctx;
+  const { resolvedEngine, threadId, isClaudeSession, isOpenCodeSession, workspace } =
+    args;
+  const realSessionId =
+    resolvedEngine === "claude" && isClaudeSession
+      ? threadId.slice("claude:".length)
+      : resolvedEngine === "claude" && isClaudeForkThreadId(threadId)
+        ? null
+        : resolvedEngine === "claude" &&
+            threadId.startsWith("claude-pending-")
+          ? null
+          : resolvedEngine === "gemini" &&
+              threadId.startsWith("gemini:")
+            ? threadId.slice("gemini:".length)
+            : resolvedEngine === "gemini" &&
+                threadId.startsWith("gemini-pending-")
+              ? (geminiSessionIdByPendingThreadRef.current.get(
+                  threadId,
+                ) ?? null)
+              : resolvedEngine === "grok" &&
+                  threadId.startsWith("grok:")
+                ? threadId.slice("grok:".length)
+                : resolvedEngine === "grok" &&
+                    threadId.startsWith("grok-pending-")
+                  ? (grokSessionIdByPendingThreadRef.current.get(
+                      threadId,
+                    ) ?? null)
+                  : resolvedEngine === "kimi" &&
+                      threadId.startsWith("kimi:")
+                    ? threadId.slice("kimi:".length)
+                    : resolvedEngine === "kimi" &&
+                        threadId.startsWith("kimi-pending-")
+                      ? (kimiSessionIdByPendingThreadRef.current.get(
+                          threadId,
+                        ) ?? null)
+                      : resolvedEngine === "dsh" &&
+                          threadId.startsWith("dsh:")
+                        ? threadId.slice("dsh:".length)
+                        : resolvedEngine === "dsh" &&
+                            threadId.startsWith("dsh-pending-")
+                          ? (dshSessionIdByPendingThreadRef.current.get(
+                              threadId,
+                            ) ?? null)
+                          : resolvedEngine === "pi" &&
+                              threadId.startsWith("pi:")
+                            ? threadId.slice("pi:".length)
+                            : resolvedEngine === "pi" &&
+                                threadId.startsWith("pi-pending-")
+                              ? (piSessionIdByPendingThreadRef.current.get(
+                                  threadId,
+                                ) ?? null)
+                              : resolvedEngine === "qoder" &&
+                                  threadId.startsWith("qoder:")
+                                ? (() => {
+                                    const threadProviderProfileId =
+                                      getThreadProviderProfileId?.(
+                                        workspace.id,
+                                        threadId,
+                                      ) ?? null;
+                                    const identity =
+                                      parseQoderSessionIdentity(
+                                        threadId,
+                                        threadProviderProfileId,
+                                      );
+                                    return identity?.rawSessionId ?? null;
+                                  })()
+                                : resolvedEngine === "qoder" &&
+                                    threadId.startsWith("qoder-pending-")
+                                  ? (qoderSessionIdByPendingThreadRef.current.get(
+                                      threadId,
+                                    ) ?? null)
+                              : resolvedEngine === "opencode" &&
+                                  isOpenCodeSession
+                                ? threadId.slice("opencode:".length)
+                                : null;
+  return realSessionId;
 }

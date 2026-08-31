@@ -11,18 +11,11 @@ import type {
 } from "../../../types";
 import {
   extractClaudeForkParentSessionId,
-  isClaudeForkThreadId,
 } from "../utils/claudeForkThread";
 import { emitMessagesForcePinBottom } from "../../../live-canvas/liveCanvasControls";
 import {
   sendUserMessage as sendUserMessageService,
   engineSendMessage as engineSendMessageService,
-  listGeminiSessions as listGeminiSessionsService,
-  listGrokSessions as listGrokSessionsService,
-  listKimiSessions as listKimiSessionsService,
-  listPiSessions as listPiSessionsService,
-  listQoderSessions as listQoderSessionsService,
-  invalidateSessionIndexForWorkspace as invalidateSessionIndexForWorkspaceService,
 } from "../../../services/tauri";
 import { rememberRuntimeReceipt } from "../utils/runtimeModelReceipt";
 import { subscribeMultiAgentConversationItems } from "../../multi-agent/runtime/conversationBridge";
@@ -56,9 +49,11 @@ import { emitMemoryPickTelemetry } from "../../project-memory/memoryPick/memoryP
 import { resolvePickSemanticContext } from "./threadMessagingMemoryPick";
 import {
   recordNativeSendTurnTarget,
+  resolveNativeRealSessionId,
   runNativeSendResolve,
   type NativeResolveContext,
 } from "./threadMessagingNativeResolve";
+import { cachePendingEngineSessionFromResponse } from "./threadMessagingPendingSessionCache";
 import { runMemoryPickGate } from "./threadMessagingPickGate";
 import {
   acquireSharedSendAdmission,
@@ -101,24 +96,15 @@ import {
   rewriteClaudePlaywrightAlias,
 } from "../utils/claudeMcpRuntimeSnapshot";
 import {
-  buildCodexTextWithSpecRootPriority,
-  probeSessionSpecLinkWithTimeout,
   resolveWorkspaceSpecRoot,
-  shouldProbeSessionSpecForEngine,
   type SessionSpecLinkContext,
+  probeSessionSpecLinkForSend,
 } from "./threadMessagingSpecRoot";
 import {
-  extractSessionIdFromEngineSendResponse,
   isCodexMissingThreadBindingError,
   isRecoverableCodexThreadBindingError,
   classifyTurnStartReasonCode,
   mapNetworkErrorToUserMessage,
-  collectOccupiedGrokSessionIds,
-  pickLikelyGeminiSessionId,
-  pickLikelyGrokSessionId,
-  pickLikelyKimiSessionId,
-  pickLikelyPiSessionId,
-  pickLikelyQoderSessionId,
   primeThreadStreamLatencyForSend,
   resolveRecoverableCodexFirstPacketTimeout,
 } from "./threadMessagingHelpers";
@@ -141,7 +127,6 @@ import {
 import { formatBrowserContextPromptOnce } from "../../browser-agent";
 import {
   buildLocalizedMemoryScoutPreviewText,
-  extractClaudeCandidateSessionId,
   withMemoryScoutTimeout,
 } from "./messageRuntimeController";
 import { useCodexMessageRecovery } from "./useCodexMessageRecovery";
@@ -1376,193 +1361,42 @@ export function useThreadMessaging({
           const isOpenCodeSession = threadId.startsWith("opencode:");
           const cliEngine = resolvedEngine === "codex" ? null : resolvedEngine;
           const threadItems = itemsByThread[threadId] ?? [];
-          const sessionSpecKey = `${workspace.id}:${threadId}`;
           const customSpecRoot = resolveWorkspaceSpecRoot(workspace.id);
-          let sessionSpecLink =
-            sessionSpecLinkByThreadRef.current.get(sessionSpecKey) ?? null;
-          const shouldProbeSessionSpecLink =
-            shouldProbeSessionSpecForEngine(resolvedEngine) &&
-            Boolean(customSpecRoot) &&
-            (threadItems.length === 0 || !sessionSpecLink);
-          if (shouldProbeSessionSpecLink && customSpecRoot) {
-            const probeStartAt = Date.now();
-            sessionSpecLink = await probeSessionSpecLinkWithTimeout(
-              workspace.id,
-              workspace.path,
-              "custom",
-              customSpecRoot,
-            );
-            const probeDurationMs = Date.now() - probeStartAt;
-            sessionSpecLinkByThreadRef.current.set(
-              sessionSpecKey,
-              sessionSpecLink,
-            );
-            onDebug?.({
-              id: `${Date.now()}-spec-root-probe`,
-              timestamp: Date.now(),
-              source: "client",
-              label: "specRoot/probe",
-              payload: {
-                workspaceId: workspace.id,
-                threadId,
-                engine: resolvedEngine,
-                source: "custom",
-                rootPath: customSpecRoot,
-                status: sessionSpecLink.status,
-                reason: sessionSpecLink.reason,
-                durationMs: probeDurationMs,
-              },
-            });
-          }
-          const shouldInjectSpecRootHintInPrompt =
-            resolvedEngine === "codex" &&
-            Boolean(sessionSpecLink) &&
-            threadItems.length === 0;
-          const codexEffectiveText =
-            shouldInjectSpecRootHintInPrompt && sessionSpecLink
-              ? buildCodexTextWithSpecRootPriority(finalText, sessionSpecLink)
-              : finalText;
-          const shouldInjectSpecRootCard =
-            resolvedEngine === "codex" &&
-            Boolean(sessionSpecLink) &&
-            threadItems.length === 0;
-          if (shouldInjectSpecRootCard && sessionSpecLink) {
-            const statusLabel = sessionSpecLink.status;
-            const priorityDetail =
-              sessionSpecLink.status === "visible"
-                ? t("threads.specRootContext.priorityDetail")
-                : "Linked root is not usable. Resolve link before relying on fallback inference.";
-            const entries: {
-              kind: "read" | "search" | "list" | "run";
-              label: string;
-              detail?: string;
-            }[] = [
-              {
-                kind: "list",
-                label: t("threads.specRootContext.activeRoot"),
-                detail: sessionSpecLink.rootPath,
-              },
-              {
-                kind: "list",
-                label: "Probe status",
-                detail: statusLabel,
-              },
-              {
-                kind: "read",
-                label: t("threads.specRootContext.priorityLabel"),
-                detail: priorityDetail,
-              },
-            ];
-            if (sessionSpecLink.reason) {
-              entries.push({
-                kind: "read",
-                label: "Failure reason",
-                detail: sessionSpecLink.reason,
-              });
-            }
-            if (sessionSpecLink.status !== "visible") {
-              entries.push(
-                {
-                  kind: "run",
-                  label: "/spec-root rebind",
-                  detail: "Rebind to latest Spec Hub path and re-probe.",
-                },
-                {
-                  kind: "run",
-                  label: "/spec-root default",
-                  detail:
-                    "Restore workspace default openspec path and re-probe.",
-                },
-              );
-            }
-            dispatch({
-              type: "upsertItem",
-              workspaceId: workspace.id,
+          const { codexEffectiveText } = await probeSessionSpecLinkForSend(
+            {
+              sessionSpecLinkByThreadRef,
+              onDebug,
+              dispatch,
+              getCustomName,
+              t,
+            },
+            {
+              workspace,
               threadId,
-              item: {
-                id: `spec-root-context-${threadId}`,
-                kind: "explore",
-                status: "explored",
-                title: t("threads.specRootContext.title"),
-                collapsible: true,
-                mergeKey: "spec-root-context",
-                entries,
-              },
-              hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
-            });
-          }
-          const realSessionId =
-            resolvedEngine === "claude" && isClaudeSession
-              ? threadId.slice("claude:".length)
-              : resolvedEngine === "claude" && isClaudeForkThreadId(threadId)
-                ? null
-                : resolvedEngine === "claude" &&
-                    threadId.startsWith("claude-pending-")
-                  ? null
-                  : resolvedEngine === "gemini" &&
-                      threadId.startsWith("gemini:")
-                    ? threadId.slice("gemini:".length)
-                    : resolvedEngine === "gemini" &&
-                        threadId.startsWith("gemini-pending-")
-                      ? (geminiSessionIdByPendingThreadRef.current.get(
-                          threadId,
-                        ) ?? null)
-                      : resolvedEngine === "grok" &&
-                          threadId.startsWith("grok:")
-                        ? threadId.slice("grok:".length)
-                        : resolvedEngine === "grok" &&
-                            threadId.startsWith("grok-pending-")
-                          ? (grokSessionIdByPendingThreadRef.current.get(
-                              threadId,
-                            ) ?? null)
-                          : resolvedEngine === "kimi" &&
-                              threadId.startsWith("kimi:")
-                            ? threadId.slice("kimi:".length)
-                            : resolvedEngine === "kimi" &&
-                                threadId.startsWith("kimi-pending-")
-                              ? (kimiSessionIdByPendingThreadRef.current.get(
-                                  threadId,
-                                ) ?? null)
-                              : resolvedEngine === "dsh" &&
-                                  threadId.startsWith("dsh:")
-                                ? threadId.slice("dsh:".length)
-                                : resolvedEngine === "dsh" &&
-                                    threadId.startsWith("dsh-pending-")
-                                  ? (dshSessionIdByPendingThreadRef.current.get(
-                                      threadId,
-                                    ) ?? null)
-                                  : resolvedEngine === "pi" &&
-                                      threadId.startsWith("pi:")
-                                    ? threadId.slice("pi:".length)
-                                    : resolvedEngine === "pi" &&
-                                        threadId.startsWith("pi-pending-")
-                                      ? (piSessionIdByPendingThreadRef.current.get(
-                                          threadId,
-                                        ) ?? null)
-                                      : resolvedEngine === "qoder" &&
-                                          threadId.startsWith("qoder:")
-                                        ? (() => {
-                                            const threadProviderProfileId =
-                                              getThreadProviderProfileId?.(
-                                                workspace.id,
-                                                threadId,
-                                              ) ?? null;
-                                            const identity =
-                                              parseQoderSessionIdentity(
-                                                threadId,
-                                                threadProviderProfileId,
-                                              );
-                                            return identity?.rawSessionId ?? null;
-                                          })()
-                                        : resolvedEngine === "qoder" &&
-                                            threadId.startsWith("qoder-pending-")
-                                          ? (qoderSessionIdByPendingThreadRef.current.get(
-                                              threadId,
-                                            ) ?? null)
-                                      : resolvedEngine === "opencode" &&
-                                          isOpenCodeSession
-                                        ? threadId.slice("opencode:".length)
-                                        : null;
+              resolvedEngine,
+              threadItems,
+              customSpecRoot,
+              finalText,
+            },
+          );
+          const realSessionId = resolveNativeRealSessionId(
+            {
+              geminiSessionIdByPendingThreadRef,
+              grokSessionIdByPendingThreadRef,
+              kimiSessionIdByPendingThreadRef,
+              dshSessionIdByPendingThreadRef,
+              piSessionIdByPendingThreadRef,
+              qoderSessionIdByPendingThreadRef,
+              getThreadProviderProfileId,
+            },
+            {
+              resolvedEngine,
+              threadId,
+              isClaudeSession,
+              isOpenCodeSession,
+              workspace,
+            },
+          );
           const shouldAttachCliSpecRootHint =
             realSessionId === null && Boolean(customSpecRoot);
 
@@ -1778,297 +1612,28 @@ export function useThreadMessaging({
               return;
             }
 
-            if (
-              resolvedEngine === "claude" &&
-              threadId.startsWith("claude-pending-")
-            ) {
-              const candidateSessionId =
-                extractClaudeCandidateSessionId(response);
-              if (candidateSessionId) {
-                claudeCandidateSessionIdByPendingThreadRef.current.set(
-                  threadId,
-                  candidateSessionId,
-                );
-              }
-              claudePendingThreadAwaitingNativeSessionRef.current.add(threadId);
-              onDebug?.({
-                id: `${Date.now()}-client-claude-session-await-native`,
-                timestamp: Date.now(),
-                source: "client",
-                label: "thread/session awaiting native confirmation",
-                payload: {
-                  workspaceId: workspace.id,
-                  threadId,
-                  sessionId: candidateSessionId,
-                  source: "engineSendMessageResponse",
-                },
-              });
-            }
-            if (
-              resolvedEngine === "gemini" &&
-              threadId.startsWith("gemini-pending-")
-            ) {
-              let responseSessionId =
-                extractSessionIdFromEngineSendResponse(response);
-              if (!responseSessionId) {
-                const workspacePath = workspace.path?.trim();
-                if (workspacePath) {
-                  try {
-                    const sessions = await listGeminiSessionsService(
-                      workspacePath,
-                      6,
-                    );
-                    responseSessionId = pickLikelyGeminiSessionId(
-                      sessions,
-                      sendRequestedAt - 120_000,
-                    );
-                  } catch {
-                    responseSessionId = null;
-                  }
-                }
-              }
-              if (responseSessionId) {
-                geminiSessionIdByPendingThreadRef.current.set(
-                  threadId,
-                  responseSessionId,
-                );
-                onDebug?.({
-                  id: `${Date.now()}-client-gemini-session-cache`,
-                  timestamp: Date.now(),
-                  source: "client",
-                  label: "thread/session cached",
-                  payload: {
-                    workspaceId: workspace.id,
-                    threadId,
-                    sessionId: responseSessionId,
-                    source: "geminiSessionListFallback",
-                  },
-                });
-              }
-            }
-            if (
-              resolvedEngine === "grok" &&
-              threadId.startsWith("grok-pending-")
-            ) {
-              let responseSessionId =
-                extractSessionIdFromEngineSendResponse(response);
-              if (!responseSessionId) {
-                const workspacePath = workspace.path?.trim();
-                if (workspacePath) {
-                  try {
-                    const occupancy = collectOccupiedGrokSessionIds({
-                      itemsByThread,
-                      pendingSessionIdByThread:
-                        grokSessionIdByPendingThreadRef.current,
-                      currentThreadId: threadId,
-                    });
-                    if (!occupancy.hasOtherPendingWithItems) {
-                      const sessions = await listGrokSessionsService(
-                        workspacePath,
-                        6,
-                      );
-                      responseSessionId = pickLikelyGrokSessionId(
-                        sessions,
-                        sendRequestedAt - 120_000,
-                        occupancy.occupiedSessionIds,
-                      );
-                    }
-                  } catch {
-                    responseSessionId = null;
-                  }
-                }
-              }
-              if (responseSessionId) {
-                grokSessionIdByPendingThreadRef.current.set(
-                  threadId,
-                  responseSessionId,
-                );
-                onDebug?.({
-                  id: `${Date.now()}-client-grok-session-cache`,
-                  timestamp: Date.now(),
-                  source: "client",
-                  label: "thread/session cached",
-                  payload: {
-                    workspaceId: workspace.id,
-                    threadId,
-                    sessionId: responseSessionId,
-                    source: "grokSessionListFallback",
-                  },
-                });
-              }
-            }
-            if (
-              resolvedEngine === "kimi" &&
-              threadId.startsWith("kimi-pending-")
-            ) {
-              let responseSessionId =
-                extractSessionIdFromEngineSendResponse(response);
-              if (!responseSessionId) {
-                const workspacePath = workspace.path?.trim();
-                if (workspacePath) {
-                  try {
-                    const sessions = await listKimiSessionsService(
-                      workspacePath,
-                      6,
-                    );
-                    responseSessionId = pickLikelyKimiSessionId(
-                      sessions,
-                      sendRequestedAt - 120_000,
-                    );
-                  } catch {
-                    responseSessionId = null;
-                  }
-                }
-              }
-              if (responseSessionId) {
-                kimiSessionIdByPendingThreadRef.current.set(
-                  threadId,
-                  responseSessionId,
-                );
-                onDebug?.({
-                  id: `${Date.now()}-client-kimi-session-cache`,
-                  timestamp: Date.now(),
-                  source: "client",
-                  label: "thread/session cached",
-                  payload: {
-                    workspaceId: workspace.id,
-                    threadId,
-                    sessionId: responseSessionId,
-                    source: "kimiSessionListFallback",
-                  },
-                });
-              }
-            }
-            if (
-              resolvedEngine === "dsh" &&
-              threadId.startsWith("dsh-pending-")
-            ) {
-              const rawSessionId =
-                extractSessionIdFromEngineSendResponse(response);
-              const responseSessionId = rawSessionId?.startsWith("dsh:")
-                ? rawSessionId.slice("dsh:".length)
-                : rawSessionId;
-              if (responseSessionId) {
-                dshSessionIdByPendingThreadRef.current.set(
-                  threadId,
-                  responseSessionId,
-                );
-                onDebug?.({
-                  id: `${Date.now()}-client-dsh-session-cache`,
-                  timestamp: Date.now(),
-                  source: "client",
-                  label: "thread/session cached",
-                  payload: {
-                    workspaceId: workspace.id,
-                    threadId,
-                    sessionId: responseSessionId,
-                    source: "engineSendMessageResponse",
-                  },
-                });
-              }
-            }
-            if (
-              resolvedEngine === "pi" &&
-              threadId.startsWith("pi-pending-")
-            ) {
-              let responseSessionId =
-                extractSessionIdFromEngineSendResponse(response);
-              if (!responseSessionId) {
-                const workspacePath = workspace.path?.trim();
-                if (workspacePath) {
-                  try {
-                    const sessions = await listPiSessionsService(
-                      workspacePath,
-                      6,
-                    );
-                    responseSessionId = pickLikelyPiSessionId(
-                      sessions,
-                      sendRequestedAt - 120_000,
-                    );
-                  } catch {
-                    responseSessionId = null;
-                  }
-                }
-              }
-              if (responseSessionId) {
-                piSessionIdByPendingThreadRef.current.set(
-                  threadId,
-                  responseSessionId,
-                );
-                if (
-                  typeof invalidateSessionIndexForWorkspaceService === "function"
-                ) {
-                  void invalidateSessionIndexForWorkspaceService(
-                    workspace.id,
-                  ).catch(() => undefined);
-                }
-                onDebug?.({
-                  id: `${Date.now()}-client-pi-session-cache`,
-                  timestamp: Date.now(),
-                  source: "client",
-                  label: "thread/session cached",
-                  payload: {
-                    workspaceId: workspace.id,
-                    threadId,
-                    sessionId: responseSessionId,
-                    source: "piSessionListFallback",
-                  },
-                });
-              }
-            }
-            if (
-              resolvedEngine === "qoder" &&
-              threadId.startsWith("qoder-pending-")
-            ) {
-              const responseIdentity = parseQoderSessionIdentity(
-                extractSessionIdFromEngineSendResponse(response),
+            await cachePendingEngineSessionFromResponse(
+              {
+                claudeCandidateSessionIdByPendingThreadRef,
+                claudePendingThreadAwaitingNativeSessionRef,
+                geminiSessionIdByPendingThreadRef,
+                grokSessionIdByPendingThreadRef,
+                kimiSessionIdByPendingThreadRef,
+                dshSessionIdByPendingThreadRef,
+                piSessionIdByPendingThreadRef,
+                qoderSessionIdByPendingThreadRef,
+                onDebug,
+              },
+              {
+                resolvedEngine,
+                threadId,
+                response,
+                workspace,
+                sendRequestedAt,
+                itemsByThread,
                 providerProfileId,
-              );
-              let responseSessionId = responseIdentity?.rawSessionId ?? null;
-              if (!responseSessionId) {
-                const workspacePath = workspace.path?.trim();
-                if (workspacePath) {
-                  try {
-                    const sessions = await listQoderSessionsService(
-                      workspacePath,
-                      6,
-                      providerProfileId,
-                    );
-                    responseSessionId = pickLikelyQoderSessionId(
-                      sessions,
-                      sendRequestedAt - 120_000,
-                    );
-                  } catch {
-                    responseSessionId = null;
-                  }
-                }
-              }
-              if (responseSessionId) {
-                qoderSessionIdByPendingThreadRef.current.set(
-                  threadId,
-                  responseSessionId,
-                );
-                if (
-                  typeof invalidateSessionIndexForWorkspaceService === "function"
-                ) {
-                  void invalidateSessionIndexForWorkspaceService(
-                    workspace.id,
-                  ).catch(() => undefined);
-                }
-                onDebug?.({
-                  id: `${Date.now()}-client-qoder-session-cache`,
-                  timestamp: Date.now(),
-                  source: "client",
-                  label: "thread/session cached",
-                  payload: {
-                    workspaceId: workspace.id,
-                    threadId,
-                    sessionId: responseSessionId,
-                    source: "qoderSessionListFallback",
-                  },
-                });
-              }
-            }
+              },
+            );
 
             // Extract turn ID - streaming events will handle the rest
             const result = (response?.result ?? response) as Record<
