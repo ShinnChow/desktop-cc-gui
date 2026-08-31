@@ -116,11 +116,16 @@
 }
 
 .spec-hub-surface.is-changes-collapsed .spec-hub-grid.is-control-collapsed:not(.is-artifact-maximized),
-.detached-spec-hub-window.spec-hub-surface.is-changes-collapsed .spec-hub-grid {
+.detached-spec-hub-window.spec-hub-surface.is-changes-collapsed .spec-hub-grid,
+.spec-hub-surface.is-outline-collapsed .spec-hub-artifact-content,
+.detached-spec-hub-window.spec-hub-surface.is-changes-collapsed .spec-hub-grid.is-control-collapsed:not(.is-artifact-maximized) {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.spec-hub-surface.is-changes-collapsed .spec-hub-changes {
+.spec-hub-surface.is-changes-collapsed .spec-hub-changes,
+.spec-hub-surface.is-outline-collapsed .spec-hub-reader-outline-host,
+.detached-spec-hub-window .spec-hub-header-icon-action.is-chat,
+.detached-spec-hub-window .spec-hub-artifacts .spec-hub-panel-compact-action {
   display: none;
 }
 
@@ -137,10 +142,6 @@
   grid-template-columns: minmax(0, 1fr) var(--spec-hub-outline-width, 296px);
   grid-template-rows: repeat(3, min-content) minmax(0, 1fr);
   overflow: hidden;
-}
-
-.spec-hub-surface.is-outline-collapsed .spec-hub-artifact-content {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .spec-hub-surface .spec-hub-artifact-content > :not(.spec-hub-artifact-body):not(.spec-hub-reader-outline-host) {
@@ -197,10 +198,6 @@
   grid-column: 2;
   min-width: 0;
   min-height: 0;
-}
-
-.spec-hub-surface.is-outline-collapsed .spec-hub-reader-outline-host {
-  display: none;
 }
 
 .spec-hub-surface .spec-hub-reader-outline {
@@ -288,14 +285,6 @@
   min-height: 0;
 }
 
-.detached-spec-hub-window .spec-hub-header-icon-action.is-chat {
-  display: none;
-}
-
-.detached-spec-hub-window .spec-hub-artifacts .spec-hub-panel-compact-action {
-  display: none;
-}
-
 .detached-spec-hub-window.spec-hub-surface .spec-hub-grid {
   grid-template-columns:
     var(--spec-hub-changes-width, clamp(220px, 18vw, 280px))
@@ -309,10 +298,6 @@
 
 .detached-spec-hub-window.spec-hub-surface.is-changes-collapsed .spec-hub-grid {
   grid-template-columns: minmax(0, 1fr) clamp(320px, 24vw, 380px);
-}
-
-.detached-spec-hub-window.spec-hub-surface.is-changes-collapsed .spec-hub-grid.is-control-collapsed:not(.is-artifact-maximized) {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .detached-spec-hub-window .spec-hub-artifact-content {

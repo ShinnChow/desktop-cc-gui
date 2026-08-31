@@ -202,10 +202,7 @@
   color: var(--text-stronger);
 }
 
-.git-history-commit-context-item:hover:not(:disabled) .git-history-commit-context-item-icon {
-  color: var(--text-stronger);
-}
-
+.git-history-commit-context-item:hover:not(:disabled) .git-history-commit-context-item-icon,
 .git-history-commit-context-item:hover:not(:disabled) .git-history-commit-context-item-chevron {
   color: var(--text-stronger);
 }

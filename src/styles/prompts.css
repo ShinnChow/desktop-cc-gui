@@ -2,7 +2,8 @@
   gap: 12px;
 }
 
-.prompt-panel-meta {
+.prompt-panel-meta,
+.prompt-hint {
   font-size: 11px;
   color: var(--text-faint);
 }
@@ -27,7 +28,8 @@
   color: var(--text-muted);
 }
 
-.prompt-section-add svg {
+.prompt-section-add svg,
+.prompt-action-menu svg {
   width: 14px;
   height: 14px;
 }
@@ -70,11 +72,6 @@
   color: var(--text-subtle);
 }
 
-.prompt-hint {
-  font-size: 11px;
-  color: var(--text-faint);
-}
-
 .prompt-actions {
   display: flex;
   align-items: center;
@@ -102,11 +99,6 @@
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-.prompt-action-menu svg {
-  width: 14px;
-  height: 14px;
 }
 
 .prompt-delete-confirm {

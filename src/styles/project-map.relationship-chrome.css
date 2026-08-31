@@ -184,7 +184,8 @@
   font-size: 11px;
 }
 
-.project-map-relationship-dashboard-rule strong {
+.project-map-relationship-dashboard-rule strong,
+.project-map-relationship-view-switch button.is-active {
   color: var(--project-map-text-strong);
 }
 
@@ -300,10 +301,6 @@
   background: var(--project-map-accent);
   content: "";
   transition: transform 140ms ease;
-}
-
-.project-map-relationship-view-switch button.is-active {
-  color: var(--project-map-text-strong);
 }
 
 .project-map-relationship-view-switch button.is-active::after {

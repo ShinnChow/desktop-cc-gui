@@ -139,7 +139,10 @@
   overflow: auto;
 }
 
-.file-history-diff .editable-diff-compare .file-compare-column {
+.file-history-diff .editable-diff-compare .file-compare-column,
+.file-history-diff .file-compare-editor,
+.file-history-diff .file-compare-editor .file-compare-cm,
+.file-history-diff .file-compare-editor .cm-editor {
   min-width: 0;
 }
 
@@ -167,12 +170,6 @@
 .file-history-vertical-resizer:focus-visible::after,
 body[data-file-history-column-resizing="true"] .file-history-vertical-resizer::after {
   background: color-mix(in srgb, var(--accent-primary, #2563eb) 72%, transparent);
-}
-
-.file-history-diff .file-compare-editor,
-.file-history-diff .file-compare-editor .file-compare-cm,
-.file-history-diff .file-compare-editor .cm-editor {
-  min-width: 0;
 }
 
 /* ponytail: allow long lines to scroll inside the CodeMirror pane instead of
@@ -231,16 +228,13 @@ body[data-file-history-column-resizing="true"] .file-history-vertical-resizer::a
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  .file-history-vertical-resizer {
+  .file-history-vertical-resizer,
+.file-history-diff .read-only-compare-resizer {
     display: none;
   }
 
   .file-history-diff .editable-diff-compare-columns.is-resizable {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .file-history-diff .read-only-compare-resizer {
-    display: none;
   }
 
   .file-history-heading span {

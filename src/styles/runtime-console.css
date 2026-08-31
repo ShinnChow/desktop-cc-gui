@@ -109,17 +109,15 @@
 }
 
 .runtime-console-status.is-starting,
-.runtime-console-status.is-running {
+.runtime-console-status.is-running,
+.runtime-console-exit.is-ok {
   border-bottom-color: #22c55e;
   color: #22c55e;
 }
 
-.runtime-console-status.is-error {
-  border-bottom-color: #ef4444;
-  color: #ef4444;
-}
-
-.runtime-console-status.is-stopped {
+.runtime-console-status.is-error,
+.runtime-console-status.is-stopped,
+.runtime-console-exit.is-fail {
   border-bottom-color: #ef4444;
   color: #ef4444;
 }
@@ -134,16 +132,6 @@
   font-size: 11px;
   line-height: 1.3;
   background: transparent;
-}
-
-.runtime-console-exit.is-ok {
-  border-bottom-color: #22c55e;
-  color: #22c55e;
-}
-
-.runtime-console-exit.is-fail {
-  border-bottom-color: #ef4444;
-  color: #ef4444;
 }
 
 .runtime-console-truncated {
@@ -241,10 +229,7 @@
   flex: 0 1 auto;
 }
 
-.runtime-console-select-wrap-preset {
-  width: 146px;
-}
-
+.runtime-console-select-wrap-preset,
 .runtime-console-select-wrap-goal {
   width: 146px;
 }
@@ -289,7 +274,9 @@
   justify-content: center !important;
 }
 
-.runtime-console-select-trigger-goal.is-compact [data-slot="select-value"] {
+.runtime-console-select-trigger-goal.is-compact [data-slot="select-value"],
+[data-slot="select-popup"]:has(.runtime-console-select-list) [data-slot="select-scroll-up-arrow"],
+[data-slot="select-popup"]:has(.runtime-console-select-list) [data-slot="select-scroll-down-arrow"] {
   display: none;
 }
 
@@ -362,11 +349,6 @@
   opacity: 0.45;
 }
 
-[data-slot="select-popup"]:has(.runtime-console-select-list) [data-slot="select-scroll-up-arrow"],
-[data-slot="select-popup"]:has(.runtime-console-select-list) [data-slot="select-scroll-down-arrow"] {
-  display: none;
-}
-
 [data-slot="select-popup"]:has(.runtime-console-select-list) > div {
   border: 1px solid #d6dbe3 !important;
   background: #f7f8fa !important;
@@ -389,7 +371,9 @@
 }
 
 :root[data-theme="dark"] .runtime-console-select-trigger:focus-visible,
-:root[data-theme="dim"] .runtime-console-select-trigger:focus-visible {
+:root[data-theme="dim"] .runtime-console-select-trigger:focus-visible,
+:root[data-theme="dark"] .runtime-console-command-input:focus,
+:root[data-theme="dim"] .runtime-console-command-input:focus {
   border-bottom-color: #60a5fa !important;
   box-shadow: inset 0 -2px 0 rgba(96, 165, 250, 0.72) !important;
 }
@@ -447,7 +431,8 @@
     background: transparent !important;
   }
 
-  :root:not([data-theme]) .runtime-console-select-trigger:focus-visible {
+  :root:not([data-theme]) .runtime-console-select-trigger:focus-visible,
+:root:not([data-theme]) .runtime-console-command-input:focus {
     border-bottom-color: #60a5fa !important;
     box-shadow: inset 0 -2px 0 rgba(96, 165, 250, 0.72) !important;
   }
@@ -516,21 +501,10 @@
   background: transparent;
 }
 
-:root[data-theme="dark"] .runtime-console-command-input:focus,
-:root[data-theme="dim"] .runtime-console-command-input:focus {
-  border-bottom-color: #60a5fa;
-  box-shadow: inset 0 -2px 0 rgba(96, 165, 250, 0.72);
-}
-
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .runtime-console-command-input {
     border-bottom-color: #334155;
     background: transparent;
-  }
-
-  :root:not([data-theme]) .runtime-console-command-input:focus {
-    border-bottom-color: #60a5fa;
-    box-shadow: inset 0 -2px 0 rgba(96, 165, 250, 0.72);
   }
 }
 
@@ -645,11 +619,8 @@
 }
 
 @media (max-width: 980px) {
-  .runtime-console-select-wrap-preset {
-    width: 116px;
-  }
-
-  .runtime-console-select-wrap-goal {
+  .runtime-console-select-wrap-preset,
+.runtime-console-select-wrap-goal {
     width: 116px;
   }
 }

@@ -56,7 +56,9 @@
   transform: rotate(180deg);
 }
 
-.git-history-project-value {
+.git-history-project-value,
+.git-history-worktree-summary-branch strong,
+.git-history-worktree-summary-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -199,7 +201,8 @@
   color: var(--foreground, var(--text-primary));
 }
 
-.git-history-toolbar-worktree.is-clean {
+.git-history-toolbar-worktree.is-clean,
+.git-history-worktree-file-stats .is-sep {
   color: var(--text-muted);
 }
 
@@ -369,7 +372,8 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   color: var(--text-secondary);
 }
 
-.git-history-overview-working-tree.is-dirty {
+.git-history-overview-working-tree.is-dirty,
+.git-history-worktree-status.is-dirty {
   color: #fca5a5;
 }
 
@@ -460,10 +464,6 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   color: var(--text-secondary);
 }
 
-.git-history-worktree-status.is-dirty {
-  color: #fca5a5;
-}
-
 .git-history-worktree-list-toggle {
   width: fit-content;
 }
@@ -551,7 +551,8 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
 }
 
 .git-history-worktree-generate:disabled,
-.git-history-worktree-commit-btn:disabled {
+.git-history-worktree-commit-btn:disabled,
+.git-history-worktree-action:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -613,7 +614,8 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   color: var(--text-secondary);
 }
 
-.git-history-worktree-section-actions {
+.git-history-worktree-section-actions,
+.git-history-worktree-file-actions {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -659,14 +661,6 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   align-items: center;
   color: var(--text-primary);
   flex: 1 1 auto;
-}
-
-.git-history-worktree-summary-branch strong,
-.git-history-worktree-summary-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .git-history-worktree-summary-label {
@@ -762,7 +756,8 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   font-weight: var(--git-filetree-name-font-weight);
 }
 
-.git-history-worktree-folder-row:hover {
+.git-history-worktree-folder-row:hover,
+.git-history-worktree-file-row:hover {
   background: var(--git-filetree-row-hover-bg);
 }
 
@@ -783,7 +778,8 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   flex-shrink: 0;
 }
 
-.git-history-worktree-folder-icon svg {
+.git-history-worktree-folder-icon svg,
+.git-history-worktree-file-icon svg {
   width: 16px;
   height: 16px;
 }
@@ -806,10 +802,6 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   background: transparent;
   color: var(--text-primary);
   position: relative;
-}
-
-.git-history-worktree-file-row:hover {
-  background: var(--git-filetree-row-hover-bg);
 }
 
 .git-history-worktree-file-row.is-clickable {
@@ -844,11 +836,6 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.git-history-worktree-file-icon svg {
-  width: 16px;
-  height: 16px;
 }
 
 .git-history-worktree-file-path {
@@ -905,19 +892,9 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   color: var(--status-error);
 }
 
-.git-history-worktree-file-stats .is-sep {
-  color: var(--text-muted);
-}
-
 .git-history-worktree-file-row .diff-row-meta {
   grid-column: 4;
   gap: 8px;
-}
-
-.git-history-worktree-file-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .git-history-worktree-row-selection {
@@ -1004,10 +981,7 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
   will-change: transform;
 }
 
-.git-history-worktree-generate--loading {
-  opacity: 1;
-}
-
+.git-history-worktree-generate--loading,
 .git-history-worktree-generate--loading:disabled {
   opacity: 1;
 }
@@ -1026,9 +1000,4 @@ body[data-git-history-column-resizing="true"] .git-history-vertical-resizer::aft
 .git-history-worktree-action-unstage:hover:not(:disabled),
 .git-history-worktree-action-discard:hover:not(:disabled) {
   color: #f87171;
-}
-
-.git-history-worktree-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }

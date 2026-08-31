@@ -91,12 +91,14 @@
   flex-shrink: 0;
 }
 
-.sidebar-settings-button:hover {
+.sidebar-settings-button:hover,
+.sidebar-terminal-button:hover {
   background: transparent;
   color: var(--text-strong);
 }
 
-.sidebar-settings-label {
+.sidebar-settings-label,
+.sidebar-terminal-label {
   display: block;
 }
 
@@ -117,17 +119,8 @@
   flex-shrink: 0;
 }
 
-.sidebar-terminal-button:hover {
-  background: transparent;
-  color: var(--text-strong);
-}
-
 .sidebar-terminal-button.is-active {
   color: var(--text-stronger);
-}
-
-.sidebar-terminal-label {
-  display: block;
 }
 
 .sidebar-section-header {

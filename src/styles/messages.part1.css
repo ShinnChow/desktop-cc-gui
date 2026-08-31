@@ -11,11 +11,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .working-spinner {
-    animation: none;
-  }
-
-  .working-spinner-dash circle {
+  .working-spinner,
+.working-spinner-dash circle {
     animation: none;
   }
 }
@@ -127,10 +124,7 @@
 
 .message-turn-runtime-receipt.is-open,
 .message-turn-runtime-receipt:hover,
-.message-turn-runtime-receipt:focus-visible {
-  color: var(--text-strong, inherit);
-}
-
+.message-turn-runtime-receipt:focus-visible,
 .message-turn-runtime-receipt.is-open .message-turn-runtime-receipt-arrow,
 .message-turn-runtime-receipt:hover .message-turn-runtime-receipt-arrow,
 .message-turn-runtime-receipt:focus-visible .message-turn-runtime-receipt-arrow {
@@ -183,7 +177,8 @@
   color: var(--text-faint, var(--text-muted));
 }
 
-.message-turn-runtime-receipt-panel > div > div {
+.message-turn-runtime-receipt-panel > div > div,
+.message-code-annotation-context-meta {
   display: grid;
   gap: 2px;
   min-width: 0;
@@ -608,7 +603,8 @@
   color: var(--text-secondary);
 }
 
-.message-runtime-recovery-card.is-transient .message-runtime-recovery-description {
+.message-runtime-recovery-card.is-transient .message-runtime-recovery-description,
+.tool-meta-path {
   color: var(--text-muted);
 }
 
@@ -641,7 +637,8 @@
   white-space: nowrap;
 }
 
-.message-runtime-recovery-button-icon {
+.message-runtime-recovery-button-icon,
+.search-tool-inline-title .explore-inline-detail {
   flex: 0 0 auto;
 }
 
@@ -737,7 +734,8 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 42%, transparent);
 }
 
-.message-user-agent-rail.is-open .message-agent-icon-button {
+.message-user-agent-rail.is-open .message-agent-icon-button,
+.message-agent-reveal.is-visible {
   opacity: 1;
 }
 
@@ -764,10 +762,6 @@
   transform: none;
   pointer-events: auto;
   transition: none;
-}
-
-.message-agent-reveal.is-visible {
-  opacity: 1;
 }
 
 .message-agent-tag-text {
@@ -898,7 +892,8 @@
     drop-shadow(0 0 0.55px color-mix(in srgb, #000000 45%, transparent));
 }
 
-.user-reference-card-meta {
+.user-reference-card-meta,
+.user-file-reference-meta {
   display: inline-flex;
   flex-direction: column;
   min-width: 0;
@@ -957,13 +952,6 @@
 .user-file-reference-icon .file-icon {
   width: 16px;
   height: 16px;
-}
-
-.user-file-reference-meta {
-  display: inline-flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.15;
 }
 
 .user-file-reference-name {
@@ -1033,7 +1021,8 @@
   transition: transform 0.2s;
 }
 
-.user-collapsible-toggle .codicon.is-expanded {
+.user-collapsible-toggle .codicon.is-expanded,
+.message-code-annotation-context-toggle-icon.is-expanded {
   transform: rotate(180deg);
 }
 
@@ -1290,7 +1279,9 @@
   color: var(--text-muted);
 }
 
-.memory-context-summary-record-list {
+.memory-context-summary-record-list,
+.memory-inject-detail-section,
+.message-code-annotation-context-list {
   display: grid;
   gap: 6px;
 }
@@ -1539,7 +1530,9 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
     opacity 160ms ease;
 }
 
-.memory-inject-summary-toggle.is-collapsed .memory-inject-summary-chevron {
+.memory-inject-summary-toggle.is-collapsed .memory-inject-summary-chevron,
+.tool-group-collapsed .tool-group-chevron,
+.tool-group:not(.tool-group-collapsed) .tool-group-chevron {
   transform: rotate(0deg);
 }
 
@@ -1616,7 +1609,8 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
   cursor: pointer;
 }
 
-.memory-inject-rec-title:hover {
+.memory-inject-rec-title:hover,
+.memory-inject-rec-detail:hover {
   text-decoration: underline;
   color: var(--text-primary);
 }
@@ -1633,11 +1627,6 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
-}
-
-.memory-inject-rec-detail:hover {
-  text-decoration: underline;
-  color: var(--text-primary);
 }
 
 .memory-inject-rec-detail.is-static {
@@ -1797,11 +1786,6 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
   max-height: min(80vh, calc(100dvh - 32px));
 }
 
-.memory-inject-detail-section {
-  display: grid;
-  gap: 6px;
-}
-
 .memory-inject-detail-text {
   margin: 0;
   font-size: 13px;
@@ -1858,11 +1842,13 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
   line-height: 1.55;
 }
 
-.memory-context-payload-markdown > :first-child {
+.memory-context-payload-markdown > :first-child,
+.tool-group-body .tool-block:first-child {
   margin-top: 0;
 }
 
-.memory-context-payload-markdown > :last-child {
+.memory-context-payload-markdown > :last-child,
+.tool-group-body .tool-block:last-child {
   margin-bottom: 0;
 }
 
@@ -2029,15 +2015,6 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
   transition: transform 0.18s ease;
 }
 
-.message-code-annotation-context-toggle-icon.is-expanded {
-  transform: rotate(180deg);
-}
-
-.message-code-annotation-context-list {
-  display: grid;
-  gap: 6px;
-}
-
 .message-code-annotation-context-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -2064,12 +2041,6 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
 .message-code-annotation-context-icon .file-icon svg {
   width: 14px;
   height: 14px;
-}
-
-.message-code-annotation-context-meta {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
 }
 
 .message-code-annotation-context-reference {
@@ -2425,7 +2396,9 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
   color: var(--text-stronger);
 }
 
-.item-card summary::-webkit-details-marker {
+.item-card summary::-webkit-details-marker,
+.explore-inline.is-inline-summary .explore-inline-list,
+.explore-inline-list.is-collapsed {
   display: none;
 }
 
@@ -2496,7 +2469,8 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
   text-align: left;
 }
 
-.tool-inline-toggle:focus-visible {
+.tool-inline-toggle:focus-visible,
+.explore-inline-header-toggle:focus-visible {
   outline: 1px solid var(--border-strong);
   border-radius: 6px;
 }
@@ -2706,11 +2680,6 @@ html[data-theme="light"] .memory-pick-empty-status-logo {
   text-align: left;
 }
 
-.explore-inline-header-toggle:focus-visible {
-  outline: 1px solid var(--border-strong);
-  border-radius: 6px;
-}
-
 /*
  * meta 行图标：与 thinking Brain / ToolMarkerShell 统一 14×14。
  * 只靠 Lucide size={14} 属性不够——Marker 默认 size-4 会盖成 16px。
@@ -2761,10 +2730,6 @@ svg.explore-inline-icon {
   flex: 0 1 auto;
 }
 
-.search-tool-inline-title .explore-inline-detail {
-  flex: 0 0 auto;
-}
-
 /* 内容：仅在展开时挂载；内边距负责展开态呼吸，不改外层 .explore-inline margin */
 /* 竖线右移到标题文字左缘（图标 14 + icon-gap），与标题形成更清晰的层级分隔 */
 .explore-inline-list {
@@ -2774,11 +2739,6 @@ svg.explore-inline-icon {
   margin: 4px 0 4px 6px;
   padding: 0 0 0 12px;
   border-left: 1.5px solid var(--border-subtle);
-}
-
-.explore-inline.is-inline-summary .explore-inline-list,
-.explore-inline-list.is-collapsed {
-  display: none;
 }
 
 .explore-inline-item {
@@ -2832,9 +2792,6 @@ svg.explore-inline-icon {
 }
 
 /* 文件路径：muted 文本，不做链接下划线 */
-.tool-meta-path {
-  color: var(--text-muted);
-}
 
 .explore-inline-label {
   color: var(--text-muted);
@@ -2990,14 +2947,6 @@ svg.explore-inline-icon {
   transition: transform 0.2s ease;
 }
 
-.tool-group-collapsed .tool-group-chevron {
-  transform: rotate(0deg);
-}
-
-.tool-group:not(.tool-group-collapsed) .tool-group-chevron {
-  transform: rotate(0deg);
-}
-
 .tool-group-summary {
   color: var(--text-secondary, var(--text-muted));
   font-weight: 500;
@@ -3020,14 +2969,6 @@ svg.explore-inline-icon {
 .tool-group-body .tool-block {
   margin: 4px 0;
   border-radius: 6px;
-}
-
-.tool-group-body .tool-block:first-child {
-  margin-top: 0;
-}
-
-.tool-group-body .tool-block:last-child {
-  margin-bottom: 0;
 }
 
 .tool-group-body .tool-inline {

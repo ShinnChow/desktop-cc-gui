@@ -196,7 +196,8 @@
   min-width: 0;
 }
 
-.approval-toast-summary-label {
+.approval-toast-summary-label,
+.approval-toast-detail-label {
   font-size: 11px;
   color: var(--text-faint);
   text-transform: uppercase;
@@ -230,13 +231,6 @@
 
 .approval-toast-note-block {
   border-style: dashed;
-}
-
-.approval-toast-detail-label {
-  font-size: 11px;
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .approval-toast-detail-value {

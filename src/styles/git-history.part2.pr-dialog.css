@@ -544,14 +544,17 @@
   border-bottom: 0;
 }
 
-.git-history-create-pr-preview-title-wrap {
+.git-history-create-pr-preview-title-wrap,
+.git-history-create-pr-stage-main {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.git-history-create-pr-preview-title {
+.git-history-create-pr-preview-title,
+.git-history-create-pr-stage-title,
+.git-history-create-pr-retry-command span {
   font-size: 12px;
   color: var(--text-secondary);
   font-weight: 600;
@@ -608,12 +611,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.git-history-create-pr-stage-title {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 600;
 }
 
 .git-history-create-pr-stage-list {
@@ -675,13 +672,6 @@
   height: 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--border-default) 80%, transparent);
-}
-
-.git-history-create-pr-stage-main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .git-history-create-pr-stage-label {
@@ -785,12 +775,6 @@
   display: flex;
   flex-direction: column;
   gap: 7px;
-}
-
-.git-history-create-pr-retry-command span {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 600;
 }
 
 .git-history-create-pr-retry-command code {

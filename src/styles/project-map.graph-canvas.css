@@ -278,25 +278,20 @@
   stroke-width: 2.35;
 }
 
-.project-map-node-drill-action.is-down {
+.project-map-node-drill-action.is-down,
+.project-map-node-drill-action.is-down:hover,
+.project-map-hierarchy-relation-row button:hover {
   color: var(--project-map-accent);
 }
 
-.project-map-node-drill-action.is-up {
+.project-map-node-drill-action.is-up,
+.project-map-node-drill-action.is-up:hover {
   color: var(--project-map-success);
 }
 
 .project-map-node-drill-action:hover {
   opacity: 1;
   transform: translateY(-1px) scale(1.06);
-}
-
-.project-map-node-drill-action.is-down:hover {
-  color: var(--project-map-accent);
-}
-
-.project-map-node-drill-action.is-up:hover {
-  color: var(--project-map-success);
 }
 
 .project-map-navigation-panel {
@@ -449,10 +444,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
-}
-
-.project-map-hierarchy-relation-row button:hover {
-  color: var(--project-map-accent);
 }
 
 .project-map-hierarchy-relation-row em {

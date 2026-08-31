@@ -71,7 +71,8 @@
   text-align: center;
 }
 
-.extensions-empty-panel-icon {
+.extensions-empty-panel-icon,
+.extensions-usage-card-icon {
   display: grid;
   width: 44px;
   height: 44px;
@@ -89,7 +90,8 @@
   justify-items: center;
 }
 
-.extensions-empty-panel h2 {
+.extensions-empty-panel h2,
+.extensions-usage-card h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
@@ -157,7 +159,10 @@
 }
 
 /* TokenTracker usage dashboard section */
-.extensions-usage-section {
+.extensions-usage-section,
+.extensions-usage-dashboard,
+.extensions-skills-dashboard,
+.extensions-mcps-dashboard {
   display: flex;
   min-height: 0;
   flex: 1;
@@ -194,24 +199,6 @@
   background: var(--surface-elevated);
 }
 
-.extensions-usage-card-icon {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--surface-card);
-  color: var(--text-secondary);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow-color, #000) 8%, transparent);
-}
-
-.extensions-usage-card h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
 .extensions-usage-card p {
   margin: 0;
   color: var(--text-secondary);
@@ -219,7 +206,8 @@
   line-height: 1.5;
 }
 
-.extensions-usage-card .extensions-usage-card-note {
+.extensions-usage-card .extensions-usage-card-note,
+.extensions-usage-install-label {
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -248,11 +236,6 @@
   background: var(--surface-card);
 }
 
-.extensions-usage-install-label {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
 .extensions-usage-install code {
   color: var(--text-primary);
   font-family: var(--font-mono, monospace);
@@ -273,42 +256,20 @@
   font-size: 12.5px;
 }
 
-.extensions-usage-dashboard {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
 .extensions-usage-dashboard .tt-dashboard main {
   padding: 0;
 }
 
 /* TokenTracker skills page section：与 usage 相同的纵向 flex 容器；滚动发生在
    .extensions-view（与 usage 一致），vendored SkillsPage 自带 main 内边距。 */
-.extensions-skills-dashboard {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-}
 
-.extensions-skills-dashboard .tt-dashboard main {
+.extensions-skills-dashboard .tt-dashboard main,
+.extensions-mcps-dashboard .tt-dashboard main {
   padding-top: 10px;
 }
 
 /* TokenTracker mcps page section：与 skills 相同的纵向 flex 容器；滚动发生在
    .extensions-view，McpsPage 自带 main 内边距。 */
-.extensions-mcps-dashboard {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-.extensions-mcps-dashboard .tt-dashboard main {
-  padding-top: 10px;
-}
 
 .extensions-skills-sticky-actions {
   position: sticky;

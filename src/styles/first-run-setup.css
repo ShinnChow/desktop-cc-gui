@@ -148,7 +148,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .first-run-step-pane {
+  .first-run-step-pane,
+.first-run-status-spinner.animate-spin {
     animation: none;
   }
 }
@@ -395,9 +396,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .first-run-status-spinner.animate-spin {
-    animation: none;
-  }
 }
 
 .first-run-engine-version {

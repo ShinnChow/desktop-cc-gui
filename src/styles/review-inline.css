@@ -84,7 +84,8 @@
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 
-.review-inline-option:hover:not(:disabled) {
+.review-inline-option:hover:not(:disabled),
+.review-inline-list-item:hover:not(:disabled) {
   border-color: var(--review-inline-border-strong);
   background: var(--review-inline-accent-soft-hover);
 }
@@ -220,11 +221,6 @@
   text-align: left;
   cursor: pointer;
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
-}
-
-.review-inline-list-item:hover:not(:disabled) {
-  border-color: var(--review-inline-border-strong);
-  background: var(--review-inline-accent-soft-hover);
 }
 
 .review-inline-list-item.is-selected {

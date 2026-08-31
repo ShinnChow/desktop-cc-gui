@@ -60,7 +60,8 @@
   box-shadow: none;
 }
 
-.ma-collab-pill.is-open {
+.ma-collab-pill.is-open,
+.ma-stage-agent-clear:hover {
   color: var(--ma-txt);
   background: var(--ma-surface-hover);
 }
@@ -84,7 +85,10 @@
   opacity: 0.72;
 }
 
-.ma-cp-item.is-incomplete:hover {
+.ma-cp-item.is-incomplete:hover,
+.ma-cp-item:hover,
+.ma-tpl-item:hover,
+.ma-inject-summary:hover {
   background: var(--ma-surface-hover);
 }
 
@@ -163,7 +167,14 @@
   padding: 0;
 }
 
-.ma-cp-manage:hover {
+.ma-cp-manage:hover,
+.ma-cp-new:hover,
+.ma-ghost:hover,
+.ma-rnd:hover,
+.ma-tpl-help-close:hover,
+.ma-step-move:hover:not(:disabled),
+.ma-feed-mode-btn:hover:not(.is-on),
+.ma-inject-step.is-active .ma-inject-step-label {
   color: var(--ma-txt);
 }
 
@@ -181,11 +192,8 @@
   transition: 0.15s;
 }
 
-.ma-cp-item:hover {
-  background: var(--ma-surface-hover);
-}
-
-.ma-cp-item.is-on {
+.ma-cp-item.is-on,
+.ma-tpl-item.is-on {
   border-color: var(--border-quiet, var(--ma-border2));
   background: var(--ma-control);
   box-shadow: 0 0 0 1px var(--border-quiet, var(--ma-border2));
@@ -286,10 +294,6 @@
   border: 0;
 }
 
-.ma-cp-new:hover {
-  color: var(--ma-txt);
-}
-
 .ma-cp-disarm {
   margin-top: 4px;
   color: var(--ma-red);
@@ -355,7 +359,8 @@
   cursor: pointer;
 }
 
-.ma-orch-head--toggle:hover {
+.ma-orch-head--toggle:hover,
+.ma-stage-row:hover {
   background: color-mix(in srgb, #fff 3%, transparent);
 }
 
@@ -370,7 +375,8 @@
   transition: transform 0.15s ease;
 }
 
-.ma-orch-chev.is-open {
+.ma-orch-chev.is-open,
+.ma-inject.is-open .ma-inject-chev {
   transform: rotate(90deg);
 }
 
@@ -398,15 +404,21 @@
   flex: none;
 }
 
-.ma-orch-st.is-run {
+.ma-orch-st.is-run,
+.ma-stage-st.is-live,
+button.ma-hist-toggle:hover .ma-hist-title,
+.ma-card-badge.is-live {
   color: var(--ma-blue);
 }
 
-.ma-orch-st.is-done {
+.ma-orch-st.is-done,
+.ma-card-badge.is-ok {
   color: var(--ma-green);
 }
 
-.ma-orch-st.is-fail {
+.ma-orch-st.is-fail,
+.ma-card-badge.is-fail,
+.ma-step-del:hover {
   color: var(--ma-red);
 }
 
@@ -435,10 +447,6 @@
   font-size: 12px;
   cursor: pointer;
   text-align: left;
-}
-
-.ma-stage-row:hover {
-  background: color-mix(in srgb, #fff 3%, transparent);
 }
 
 .ma-stage-row.is-running {
@@ -576,13 +584,12 @@
   background: color-mix(in srgb, var(--ma-blue, #3b82f6) 8%, transparent);
 }
 
-.ma-stage-retry:disabled {
+.ma-stage-retry:disabled,
+.ma-primary:disabled,
+.ma-stop:disabled,
+.ma-ghost:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.ma-stage-st.is-live {
-  color: var(--ma-blue);
 }
 
 /* 统一操作条：批准 / 超时 / 运行中 共用「主操作左 + 停止右」一排 */
@@ -813,7 +820,8 @@
   cursor: pointer;
 }
 
-.ma-lk:hover {
+.ma-lk:hover,
+.ma-hist-open:hover {
   text-decoration: underline;
 }
 
@@ -847,7 +855,8 @@
   border-top: 1px solid color-mix(in srgb, var(--ma-green, #4ade80) 35%, var(--ma-border));
 }
 
-.ma-summary-md {
+.ma-summary-md,
+.ma-inspector-type-text {
   min-width: 0;
 }
 
@@ -924,10 +933,6 @@
   background: none;
 }
 
-.ma-ghost:hover {
-  color: var(--ma-txt);
-}
-
 .ma-stop {
   border-color: color-mix(in srgb, var(--ma-red) 50%, transparent);
   color: color-mix(in srgb, var(--ma-red) 75%, var(--ma-txt));
@@ -938,13 +943,6 @@
   color: var(--ma-red);
   border: 1px solid color-mix(in srgb, var(--ma-red) 40%, var(--ma-border));
   background: color-mix(in srgb, var(--ma-red) 12%, var(--ma-card));
-}
-
-.ma-primary:disabled,
-.ma-stop:disabled,
-.ma-ghost:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* 历史轮折叠（图3）：单壳连续展开，避免头/体双卡断层 */
@@ -971,7 +969,8 @@
 }
 
 /* 展开时标题条与编排区用细分隔线衔接，无外间距 */
-.ma-hist-wrap.is-open > .ma-hist {
+.ma-hist-wrap.is-open > .ma-hist,
+.ma-inject:not(.is-open) {
   border-bottom: 1px solid var(--ma-border);
 }
 
@@ -981,7 +980,9 @@
   flex: none;
 }
 
-.ma-hist-ck.is-muted {
+.ma-hist-ck.is-muted,
+.ma-tpl-desc::placeholder,
+.ma-step-ed textarea::placeholder {
   color: var(--ma-muted2);
 }
 
@@ -1001,10 +1002,6 @@ button.ma-hist-toggle {
   text-align: left;
   cursor: pointer;
   font: inherit;
-}
-
-button.ma-hist-toggle:hover .ma-hist-title {
-  color: var(--ma-blue);
 }
 
 .ma-hist-title {
@@ -1033,17 +1030,14 @@ button.ma-hist-toggle:hover .ma-hist-title {
   white-space: nowrap;
 }
 
-.ma-hist-open:hover {
-  text-decoration: underline;
-}
-
 /* 展开体：贴在壳内，无第二层卡片边框 */
 .ma-hist-full {
   padding: 0;
   min-width: 0;
 }
 
-.ma-hist-full[hidden] {
+.ma-hist-full[hidden],
+.multi-agent-toggle {
   display: none;
 }
 
@@ -1076,20 +1070,8 @@ button.ma-hist-toggle:hover .ma-hist-title {
   flex: none;
 }
 
-.ma-card-badge.is-live {
-  color: var(--ma-blue);
-}
-
-.ma-card-badge.is-ok {
-  color: var(--ma-green);
-}
-
 .ma-card-badge.is-muted {
   color: var(--ma-muted);
-}
-
-.ma-card-badge.is-fail {
-  color: var(--ma-red);
 }
 
 .ma-card-close {
@@ -1139,10 +1121,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   background: var(--ma-card);
 }
 
-.ma-rnd:hover {
-  color: var(--ma-txt);
-}
-
 .ma-rnd.is-on {
   background: var(--ma-txt);
   color: var(--ma-bg);
@@ -1150,7 +1128,8 @@ button.ma-hist-toggle:hover .ma-hist-title {
   font-weight: 600;
 }
 
-.ma-rnd.is-dis {
+.ma-rnd.is-dis,
+.ma-pager > button:not(.ma-pager-btn):disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -1212,14 +1191,10 @@ button.ma-hist-toggle:hover .ma-hist-title {
   cursor: pointer;
 }
 
-.ma-pager > button:not(.ma-pager-btn):hover:not(:disabled) {
+.ma-pager > button:not(.ma-pager-btn):hover:not(:disabled),
+.ma-tpl-close:hover {
   color: var(--ma-txt);
   background: var(--ma-control-hover);
-}
-
-.ma-pager > button:not(.ma-pager-btn):disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .ma-dots {
@@ -1343,11 +1318,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   line-height: 1;
 }
 
-.ma-tpl-close:hover {
-  color: var(--ma-txt);
-  background: var(--ma-control-hover);
-}
-
 .ma-tpl-main-row {
   flex: 1;
   min-height: 0;
@@ -1390,10 +1360,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   font-size: 11px;
   cursor: pointer;
   padding: 2px 6px;
-}
-
-.ma-tpl-help-close:hover {
-  color: var(--ma-txt);
 }
 
 .ma-tpl-help-body {
@@ -1467,16 +1433,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   color: inherit;
 }
 
-.ma-tpl-item:hover {
-  background: var(--ma-surface-hover);
-}
-
-.ma-tpl-item.is-on {
-  border-color: var(--border-quiet, var(--ma-border2));
-  background: var(--ma-control);
-  box-shadow: 0 0 0 1px var(--border-quiet, var(--ma-border2));
-}
-
 .ma-tpl-item-nm {
   font-size: 12px;
   font-weight: 600;
@@ -1511,7 +1467,8 @@ button.ma-hist-toggle:hover .ma-hist-title {
   background: none;
 }
 
-.ma-tpl-new:hover {
+.ma-tpl-new:hover,
+.ma-add-step:hover {
   color: var(--ma-txt);
   border-color: var(--border-quiet, var(--ma-border2));
 }
@@ -1561,11 +1518,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   position: relative;
   z-index: 2;
   pointer-events: auto;
-}
-
-.ma-tpl-desc::placeholder,
-.ma-step-ed textarea::placeholder {
-  color: var(--ma-muted2);
 }
 
 .ma-tpl-mkdef {
@@ -1641,10 +1593,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   font-size: 10px;
   line-height: 1;
   padding: 0 2px;
-}
-
-.ma-step-move:hover:not(:disabled) {
-  color: var(--ma-txt);
 }
 
 .ma-step-move:disabled {
@@ -1752,10 +1700,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   box-shadow: 0 0 0 1px var(--ma-border);
 }
 
-.ma-feed-mode-btn:hover:not(.is-on) {
-  color: var(--ma-txt);
-}
-
 /* 环节智能体选择（Composer # 同源 agentProvider） */
 .ma-stage-agent {
   display: inline-flex;
@@ -1826,11 +1770,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   cursor: pointer;
   font-size: 14px;
   line-height: 1;
-}
-
-.ma-stage-agent-clear:hover {
-  color: var(--ma-txt);
-  background: var(--ma-surface-hover);
 }
 
 .ma-stage-agent-menu {
@@ -1928,10 +1867,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   padding: 0;
 }
 
-.ma-step-del:hover {
-  color: var(--ma-red);
-}
-
 .ma-step-ed textarea {
   width: 100%;
   background: var(--ma-bg);
@@ -1963,11 +1898,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   margin-bottom: 14px;
 }
 
-.ma-add-step:hover {
-  color: var(--ma-txt);
-  border-color: var(--border-quiet, var(--ma-border2));
-}
-
 .ma-tpl-efoot {
   display: flex;
   align-items: center;
@@ -1976,7 +1906,8 @@ button.ma-hist-toggle:hover .ma-hist-title {
   padding-top: 12px;
 }
 
-.ma-tpl-efoot .ma-primary {
+.ma-tpl-efoot .ma-primary,
+.ma-agent-inspector .ma-pager {
   margin-left: auto;
 }
 
@@ -1986,9 +1917,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
 }
 
 /* 兼容旧 class 名（若其它处引用） */
-.multi-agent-toggle {
-  display: none;
-}
 
 .multi-agent-spin {
   animation: ma-spin 0.9s linear infinite;
@@ -2113,19 +2041,11 @@ button.ma-hist-toggle:hover .ma-hist-title {
   margin: 0;
 }
 
-.ma-agent-inspector .ma-pager {
-  margin-left: auto;
-}
-
 .ma-inspector-type-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
-}
-
-.ma-inspector-type-text {
-  min-width: 0;
 }
 
 /* 当前节点上游喂料：吃全文 / 吃摘要 */
@@ -2178,10 +2098,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   overflow: hidden;
 }
 
-.ma-inject:not(.is-open) {
-  border-bottom: 1px solid var(--ma-border);
-}
-
 .ma-inject-summary {
   width: 100%;
   flex: 0 0 auto;
@@ -2197,20 +2113,12 @@ button.ma-hist-toggle:hover .ma-hist-title {
   font: inherit;
 }
 
-.ma-inject-summary:hover {
-  background: var(--ma-surface-hover);
-}
-
 .ma-inject-chev {
   color: var(--ma-muted2);
   font-size: 10px;
   width: 14px;
   flex-shrink: 0;
   transition: transform 0.15s ease;
-}
-
-.ma-inject.is-open .ma-inject-chev {
-  transform: rotate(90deg);
 }
 
 .ma-inject-label {
@@ -2458,10 +2366,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   }
 }
 
-.ma-inject-step.is-active .ma-inject-step-label {
-  color: var(--ma-txt);
-}
-
 .ma-inject-switch {
   display: inline-flex;
   padding: 2px;
@@ -2567,7 +2471,8 @@ button.ma-hist-toggle:hover .ma-hist-title {
   padding: 0;
 }
 
-.ma-inject-jump:hover {
+.ma-inject-jump:hover,
+.ma-inject-more:hover {
   color: var(--ma-blue);
   text-decoration: underline;
 }
@@ -2595,11 +2500,6 @@ button.ma-hist-toggle:hover .ma-hist-title {
   font-size: 11px;
   padding: 4px 0 0;
   cursor: pointer;
-}
-
-.ma-inject-more:hover {
-  color: var(--ma-blue);
-  text-decoration: underline;
 }
 
 .ma-inject-sec-meta {

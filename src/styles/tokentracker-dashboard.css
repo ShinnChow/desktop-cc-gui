@@ -325,7 +325,8 @@
     background: var(--oai-gray-400);
   }
 
-  .tt-dashboard.dark .oai-scrollbar::-webkit-scrollbar-thumb:hover {
+  .tt-dashboard.dark .oai-scrollbar::-webkit-scrollbar-thumb:hover,
+.tt-dashboard.dark .heatmap-scroll-thin::-webkit-scrollbar-thumb:hover {
     background: var(--oai-gray-500);
   }
 
@@ -345,10 +346,6 @@
   .tt-dashboard.dark .heatmap-scroll-thin:hover::-webkit-scrollbar-thumb,
   .tt-dashboard.dark .heatmap-scroll-thin:focus-within::-webkit-scrollbar-thumb {
     background: var(--oai-gray-600);
-  }
-
-  .tt-dashboard.dark .heatmap-scroll-thin::-webkit-scrollbar-thumb:hover {
-    background: var(--oai-gray-500);
   }
 }
 

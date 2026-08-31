@@ -92,7 +92,8 @@
   font-size: 12px;
 }
 
-.spec-hub-task-raw {
+.spec-hub-task-raw,
+.spec-hub-bootstrap-card-title svg {
   color: var(--text-secondary);
 }
 
@@ -205,7 +206,8 @@
   color: var(--text-strong);
 }
 
-.spec-hub-markdown .markdown-codeblock-copy-icon {
+.spec-hub-markdown .markdown-codeblock-copy-icon,
+.spec-hub-ai-takeover-auto-archive input {
   width: 14px;
   height: 14px;
 }
@@ -296,7 +298,12 @@
   gap: 10px;
 }
 
-.spec-hub-bootstrap-card-head {
+.spec-hub-bootstrap-card-head,
+.spec-hub-shared-engine,
+.spec-hub-guidance-next,
+.spec-hub-bootstrap-type,
+.spec-hub-validation-list,
+.spec-hub-gate-checks {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -324,10 +331,6 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--text-stronger);
-}
-
-.spec-hub-bootstrap-card-title svg {
-  color: var(--text-secondary);
 }
 
 .spec-hub-bootstrap-panel .spec-hub-bootstrap-desc {
@@ -404,12 +407,6 @@
   flex: 1 1 auto;
 }
 
-.spec-hub-shared-engine {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 .spec-hub-shared-engine label {
   font-size: 12px;
   line-height: 1.2;
@@ -470,11 +467,13 @@
   font-weight: 500;
 }
 
-.spec-hub-shared-engine-select-wrap select:focus {
+.spec-hub-shared-engine-select-wrap select:focus,
+.spec-hub-auto-profile select:focus {
   outline: none;
 }
 
-.spec-hub-shared-engine-chevron {
+.spec-hub-shared-engine-chevron,
+.spec-hub-auto-profile-select-chevron {
   position: absolute;
   right: 6px;
   top: 50%;
@@ -598,7 +597,13 @@
   min-width: 0;
 }
 
-.spec-hub-guidance-field > span {
+.spec-hub-guidance-field > span,
+.spec-hub-guidance-template > span,
+.spec-hub-guidance-highlights > span,
+.spec-hub-guidance-next > span,
+.spec-hub-bootstrap-type > span,
+.spec-hub-command-preview > span,
+.spec-hub-validation-item small {
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -609,38 +614,36 @@
   color: var(--text-stronger);
 }
 
-.spec-hub-guidance-field .spec-hub-status-value {
+.spec-hub-guidance-field .spec-hub-status-value,
+.spec-hub-apply-floating-actions,
+.spec-hub-bootstrap-type > div {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.spec-hub-guidance-field strong.is-running {
+.spec-hub-guidance-field strong.is-running,
+.spec-hub-ai-takeover-status-row strong.is-running,
+.spec-hub-ai-takeover-phases p.is-current strong {
   color: color-mix(in srgb, var(--accent) 82%, var(--text-stronger));
 }
 
-.spec-hub-guidance-field strong.is-success {
+.spec-hub-guidance-field strong.is-success,
+.spec-hub-ai-takeover-status-row strong.is-success {
   color: color-mix(in srgb, var(--success) 84%, var(--text-stronger));
 }
 
-.spec-hub-guidance-field strong.is-failed {
+.spec-hub-guidance-field strong.is-failed,
+.spec-hub-ai-takeover-status-row strong.is-failed {
   color: color-mix(in srgb, var(--danger) 84%, var(--text-stronger));
 }
 
-.spec-hub-guidance-field strong.is-idle {
+.spec-hub-guidance-field strong.is-idle,
+.spec-hub-ai-takeover-status-row strong.is-idle {
   color: var(--text-muted);
 }
 
-.spec-hub-guidance-highlights {
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--surface-command);
-  padding: 7px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
+.spec-hub-guidance-highlights,
 .spec-hub-guidance-template {
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -651,12 +654,8 @@
   gap: 6px;
 }
 
-.spec-hub-guidance-template > span {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.spec-hub-guidance-template ul {
+.spec-hub-guidance-template ul,
+.spec-hub-guidance-highlights ul {
   margin: 0;
   padding-left: 18px;
   list-style-type: disc;
@@ -667,11 +666,18 @@
   color: var(--text-primary);
 }
 
-.spec-hub-guidance-template li + li {
+.spec-hub-guidance-template li + li,
+.spec-hub-guidance-highlights li + li,
+.spec-hub-auto-preview li + li {
   margin-top: 4px;
 }
 
-.spec-hub-guidance-source {
+.spec-hub-guidance-source,
+.spec-hub-ai-takeover-meta,
+.spec-hub-auto-profile p,
+.spec-hub-proposal-attachment-hint,
+.spec-hub-action-inline-hint,
+.spec-hub-verify-auto-complete-hint {
   margin: 0;
   font-size: 11px;
   color: var(--text-muted);
@@ -688,31 +694,9 @@
   overflow-y: auto;
 }
 
-.spec-hub-guidance-highlights > span,
-.spec-hub-guidance-next > span {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.spec-hub-guidance-highlights ul {
-  margin: 0;
-  padding-left: 18px;
-  list-style-type: disc;
-}
-
 .spec-hub-guidance-highlights li {
   font-size: 12px;
   color: var(--text-primary);
-}
-
-.spec-hub-guidance-highlights li + li {
-  margin-top: 4px;
-}
-
-.spec-hub-guidance-next {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .spec-hub-guidance-controls {
@@ -750,39 +734,19 @@
   font-weight: 700;
 }
 
-.spec-hub-ai-takeover-status-row strong.is-idle {
-  color: var(--text-muted);
-}
-
-.spec-hub-ai-takeover-status-row strong.is-running {
-  color: color-mix(in srgb, var(--accent) 82%, var(--text-stronger));
-}
-
-.spec-hub-ai-takeover-status-row strong.is-success {
-  color: color-mix(in srgb, var(--success) 84%, var(--text-stronger));
-}
-
-.spec-hub-ai-takeover-status-row strong.is-failed {
-  color: color-mix(in srgb, var(--danger) 84%, var(--text-stronger));
-}
-
-.spec-hub-ai-takeover-meta {
-  margin: 0;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
 .spec-hub-ai-takeover-refresh {
   margin: 0;
   font-size: 11px;
   font-weight: 600;
 }
 
-.spec-hub-ai-takeover-refresh.is-refreshed {
+.spec-hub-ai-takeover-refresh.is-refreshed,
+.spec-hub-ai-takeover-phases p.is-done strong {
   color: color-mix(in srgb, var(--success) 82%, var(--text-stronger));
 }
 
-.spec-hub-ai-takeover-refresh.is-refresh-failed {
+.spec-hub-ai-takeover-refresh.is-refresh-failed,
+.spec-hub-ai-takeover-phases p.is-failed strong {
   color: color-mix(in srgb, var(--danger) 82%, var(--text-stronger));
 }
 
@@ -806,7 +770,8 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.spec-hub-ai-takeover-phases p:last-child {
+.spec-hub-ai-takeover-phases p:last-child,
+.spec-hub-apply-floating.is-collapsed .spec-hub-apply-floating-header {
   border-bottom: none;
 }
 
@@ -815,19 +780,9 @@
   font-weight: 700;
 }
 
-.spec-hub-ai-takeover-phases p.is-done strong {
-  color: color-mix(in srgb, var(--success) 82%, var(--text-stronger));
-}
-
-.spec-hub-ai-takeover-phases p.is-current strong {
-  color: color-mix(in srgb, var(--accent) 82%, var(--text-stronger));
-}
-
-.spec-hub-ai-takeover-phases p.is-failed strong {
-  color: color-mix(in srgb, var(--danger) 82%, var(--text-stronger));
-}
-
-.spec-hub-ai-takeover-phases p.is-pending strong {
+.spec-hub-ai-takeover-phases p.is-pending strong,
+.spec-hub-form-field input::placeholder,
+.spec-hub-form-field textarea::placeholder {
   color: var(--text-faint);
 }
 
@@ -836,7 +791,8 @@
   overflow-y: auto;
 }
 
-.spec-hub-ai-takeover-stream code {
+.spec-hub-ai-takeover-stream code,
+.spec-hub-apply-floating .spec-hub-command-preview code {
   max-height: 140px;
   overflow-y: auto;
 }
@@ -849,11 +805,6 @@
   color: var(--text-secondary);
 }
 
-.spec-hub-ai-takeover-auto-archive input {
-  width: 14px;
-  height: 14px;
-}
-
 .spec-hub-spec-root-panel {
   border: 1px dashed var(--border-muted);
   border-radius: 8px;
@@ -864,7 +815,8 @@
   gap: 6px;
 }
 
-.spec-hub-spec-root-panel label {
+.spec-hub-spec-root-panel label,
+.spec-hub-auto-profile label {
   font-size: 11px;
   color: var(--text-secondary);
   font-weight: 600;
@@ -903,12 +855,7 @@
   justify-content: center;
 }
 
-.spec-hub-bootstrap-desc {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
+.spec-hub-bootstrap-desc,
 .spec-hub-feedback-metrics {
   margin: 0;
   font-size: 12px;
@@ -963,12 +910,6 @@
   gap: 8px;
 }
 
-.spec-hub-auto-profile label {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
 .spec-hub-auto-profile-select-wrap {
   width: 100%;
   min-width: 0;
@@ -1012,28 +953,6 @@
   font-weight: 500;
 }
 
-.spec-hub-auto-profile select:focus {
-  outline: none;
-}
-
-.spec-hub-auto-profile-select-chevron {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.spec-hub-auto-profile p {
-  margin: 0;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
 .spec-hub-apply-agent {
   padding-bottom: 2px;
 }
@@ -1074,12 +993,6 @@
   cursor: grabbing;
 }
 
-.spec-hub-apply-floating-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .spec-hub-apply-floating-actions .ghost {
   width: 24px;
   height: 24px;
@@ -1099,15 +1012,6 @@
   gap: 8px;
   padding: 10px;
   overflow-y: auto;
-}
-
-.spec-hub-apply-floating .spec-hub-command-preview code {
-  max-height: 140px;
-  overflow-y: auto;
-}
-
-.spec-hub-apply-floating.is-collapsed .spec-hub-apply-floating-header {
-  border-bottom: none;
 }
 
 .spec-hub-proposal-floating {
@@ -1216,30 +1120,9 @@
   line-height: 1.45;
 }
 
-.spec-hub-auto-preview li + li {
-  margin-top: 4px;
-}
-
 .spec-hub-command-preview-compact code {
   border-radius: 8px;
   padding: 8px;
-}
-
-.spec-hub-bootstrap-type {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.spec-hub-bootstrap-type > span {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.spec-hub-bootstrap-type > div {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .spec-hub-bootstrap-type .ghost {
@@ -1278,11 +1161,6 @@
   resize: vertical;
 }
 
-.spec-hub-form-field input::placeholder,
-.spec-hub-form-field textarea::placeholder {
-  color: var(--text-faint);
-}
-
 .spec-hub-form-field input:focus,
 .spec-hub-form-field textarea:focus {
   outline: none;
@@ -1296,7 +1174,8 @@
   cursor: not-allowed;
 }
 
-.spec-hub-proposal-composer-header {
+.spec-hub-proposal-composer-header,
+.spec-hub-timeline-item header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1336,24 +1215,15 @@
   background: color-mix(in srgb, var(--surface-control-hover) 82%, var(--surface-command));
 }
 
-.spec-hub-proposal-attachment-hint {
-  margin: 0;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
 .spec-hub-command-preview {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.spec-hub-command-preview > span {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.spec-hub-command-preview code {
+.spec-hub-command-preview code,
+.spec-hub-action-item code,
+.spec-hub-passthrough code {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   padding: 6px;
@@ -1395,25 +1265,7 @@
   cursor: not-allowed;
 }
 
-.spec-hub-action-item code,
-.spec-hub-passthrough code {
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 6px;
-  background: var(--surface-command);
-  color: var(--text-muted);
-  font-size: 11px;
-  white-space: pre-wrap;
-}
-
-.spec-hub-verify-auto-complete {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
+.spec-hub-verify-auto-complete,
 .spec-hub-action-inline-toggle {
   display: inline-flex;
   align-items: center;
@@ -1422,39 +1274,14 @@
   color: var(--text-secondary);
 }
 
-.spec-hub-action-inline-toggle input {
-  margin: 0;
-}
-
-.spec-hub-action-inline-toggle.is-disabled {
-  opacity: 0.6;
-}
-
-.spec-hub-action-inline-hint {
-  margin: 0;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
+.spec-hub-action-inline-toggle input,
 .spec-hub-verify-auto-complete input {
   margin: 0;
 }
 
+.spec-hub-action-inline-toggle.is-disabled,
 .spec-hub-verify-auto-complete.is-disabled {
   opacity: 0.6;
-}
-
-.spec-hub-verify-auto-complete-hint {
-  margin: 0;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.spec-hub-validation-list,
-.spec-hub-gate-checks {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .spec-hub-validation-item,
@@ -1486,7 +1313,8 @@
   box-shadow: none;
 }
 
-.spec-hub-gate-check.pass [data-slot="badge"] {
+.spec-hub-gate-check.pass [data-slot="badge"],
+.spec-hub-check-item.ok [data-slot="badge"] {
   border-color: color-mix(in srgb, var(--success) 35%, var(--border-subtle));
   background: color-mix(in srgb, var(--success) 16%, var(--surface-card));
   color: color-mix(in srgb, var(--success) 80%, var(--text-stronger));
@@ -1504,12 +1332,6 @@
   color: color-mix(in srgb, var(--danger) 86%, var(--text-stronger));
 }
 
-.spec-hub-check-item.ok [data-slot="badge"] {
-  border-color: color-mix(in srgb, var(--success) 35%, var(--border-subtle));
-  background: color-mix(in srgb, var(--success) 16%, var(--surface-card));
-  color: color-mix(in srgb, var(--success) 80%, var(--text-stronger));
-}
-
 .spec-hub-check-item.fail [data-slot="badge"] {
   border-color: color-mix(in srgb, var(--warning) 38%, var(--border-subtle));
   background: color-mix(in srgb, var(--warning) 14%, var(--surface-card));
@@ -1521,11 +1343,6 @@
   font-size: 12px;
   margin: 0;
   color: var(--text-secondary);
-}
-
-.spec-hub-validation-item small {
-  font-size: 11px;
-  color: var(--text-muted);
 }
 
 .spec-hub-gate-check header {
@@ -1615,13 +1432,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.spec-hub-timeline-item header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
 
 .spec-hub-timeline-item time {
@@ -1794,7 +1604,8 @@
     justify-content: flex-start;
   }
 
-  .spec-hub-header-ops {
+  .spec-hub-header-ops,
+.spec-hub-doctor-card-head .spec-hub-mode-switch {
     margin-left: auto;
   }
 
@@ -1804,20 +1615,14 @@
     min-height: 22px;
   }
 
-  .spec-hub-control-tabs [role="tab"] {
+  .spec-hub-control-tabs [role="tab"],
+.spec-hub-tabs [role="tab"] {
     padding: 6px 8px;
     font-size: 11px;
   }
 
-  .spec-hub-doctor-card-head {
-    flex-wrap: wrap;
-  }
-
-  .spec-hub-doctor-card-head .spec-hub-mode-switch {
-    margin-left: auto;
-  }
-
-  .spec-hub-action-orchestrator-row {
+  .spec-hub-doctor-card-head,
+.spec-hub-action-orchestrator-row {
     flex-wrap: wrap;
   }
 
@@ -1842,11 +1647,6 @@
     min-width: 24px;
     height: 24px;
     min-height: 24px;
-  }
-
-  .spec-hub-tabs [role="tab"] {
-    padding: 6px 8px;
-    font-size: 11px;
   }
 
   .spec-hub-reader-outline {

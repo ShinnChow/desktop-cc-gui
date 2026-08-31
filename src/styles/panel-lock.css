@@ -285,7 +285,9 @@
   padding: 10px 11px;
 }
 
-.panel-lock-capability-core h4 {
+.panel-lock-capability-core h4,
+.panel-lock-workflow-item h4,
+.panel-lock-auth h4 {
   margin: 0;
   color: var(--text-stronger);
   font-size: 13px;
@@ -297,7 +299,8 @@
   font-size: 12px;
 }
 
-.panel-lock-capability-grid {
+.panel-lock-capability-grid,
+.panel-lock-highlight-row {
   margin-top: 8px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -311,24 +314,19 @@
   padding: 8px 9px;
 }
 
-.panel-lock-capability-card h4 {
+.panel-lock-capability-card h4,
+.panel-lock-highlight-card h4 {
   margin: 0;
   color: var(--text-stronger);
   font-size: 12px;
 }
 
-.panel-lock-capability-card p {
+.panel-lock-capability-card p,
+.panel-lock-highlight-card p {
   margin: 4px 0 0;
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1.45;
-}
-
-.panel-lock-highlight-row {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
 }
 
 .panel-lock-highlight-card {
@@ -336,19 +334,6 @@
   border-radius: 10px;
   background: color-mix(in srgb, var(--surface-control) 74%, transparent);
   padding: 8px 9px;
-}
-
-.panel-lock-highlight-card h4 {
-  margin: 0;
-  color: var(--text-stronger);
-  font-size: 12px;
-}
-
-.panel-lock-highlight-card p {
-  margin: 4px 0 0;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.45;
 }
 
 .panel-lock-workflow-list {
@@ -378,12 +363,6 @@
   background: color-mix(in srgb, var(--surface-active) 74%, transparent);
   font-size: 11px;
   font-weight: 700;
-}
-
-.panel-lock-workflow-item h4 {
-  margin: 0;
-  color: var(--text-stronger);
-  font-size: 13px;
 }
 
 .panel-lock-workflow-item p {
@@ -491,12 +470,6 @@
   border-top: 1px solid var(--border-muted);
 }
 
-.panel-lock-auth h4 {
-  margin: 0;
-  color: var(--text-stronger);
-  font-size: 13px;
-}
-
 .panel-lock-storage-label {
   margin: 8px 0 4px;
   color: var(--text-subtle);
@@ -552,20 +525,14 @@
   }
 
   .panel-lock-facts,
-  .panel-lock-card-grid {
+  .panel-lock-card-grid,
+.panel-lock-capability-grid,
+.panel-lock-highlight-row {
     grid-template-columns: 1fr;
   }
 
   .panel-lock-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .panel-lock-capability-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .panel-lock-highlight-row {
-    grid-template-columns: 1fr;
   }
 }
 

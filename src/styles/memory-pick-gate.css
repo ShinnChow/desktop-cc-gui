@@ -107,7 +107,8 @@ html[data-theme="light"] .memory-pick-gate,
   box-sizing: border-box;
 }
 
-.memory-pick-gate-slot:empty {
+.memory-pick-gate-slot:empty,
+.memory-pick-gate--matching .memory-pick-gate__match-skeleton {
   display: none;
 }
 
@@ -404,10 +405,6 @@ html[data-theme="light"] .memory-pick-gate,
   color: var(--mpg-muted);
 }
 
-.memory-pick-gate--matching .memory-pick-gate__match-skeleton {
-  display: none;
-}
-
 .memory-pick-gate__match-skeleton {
   display: grid;
   gap: 4px;
@@ -477,7 +474,8 @@ html[data-theme="light"] .memory-pick-gate,
 }
 
 .memory-pick-gate__row.is-on .memory-pick-gate__row-title,
-.memory-pick-gate__row.is-auto .memory-pick-gate__row-title {
+.memory-pick-gate__row.is-auto .memory-pick-gate__row-title,
+.memory-pick-gate__mode-menu button.is-on .memory-pick-gate__mode-title {
   font-weight: 700;
 }
 
@@ -568,18 +566,15 @@ html[data-theme="light"] .memory-pick-gate,
   opacity: 0.92;
 }
 
-.memory-pick-gate__mode-menu button:disabled {
+.memory-pick-gate__mode-menu button:disabled,
+.memory-pick-gate__action:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.memory-pick-gate__mode-menu button.is-on {
-  color: var(--mpg-ink);
-  font-weight: 650;
-  background: transparent;
-}
-
-.memory-pick-gate__mode-menu button.is-on.is-always-mode {
+.memory-pick-gate__mode-menu button.is-on,
+.memory-pick-gate__mode-menu button.is-on.is-always-mode,
+.memory-pick-gate__action.is-warn {
   color: var(--mpg-ink);
   font-weight: 650;
   background: transparent;
@@ -591,10 +586,7 @@ html[data-theme="light"] .memory-pick-gate,
   flex-shrink: 0;
 }
 
-.memory-pick-gate__mode-menu button.is-on .memory-pick-gate__mode-icon {
-  color: var(--mpg-ink);
-}
-
+.memory-pick-gate__mode-menu button.is-on .memory-pick-gate__mode-icon,
 .memory-pick-gate__mode-menu button.is-on.is-always-mode .memory-pick-gate__mode-icon {
   color: var(--mpg-ink);
 }
@@ -617,10 +609,6 @@ html[data-theme="light"] .memory-pick-gate,
   white-space: nowrap;
 }
 
-.memory-pick-gate__mode-menu button.is-on .memory-pick-gate__mode-title {
-  font-weight: 700;
-}
-
 .memory-pick-gate__mode-sub {
   font-size: 10.5px;
   font-weight: 500;
@@ -631,11 +619,9 @@ html[data-theme="light"] .memory-pick-gate,
   white-space: nowrap;
 }
 
-.memory-pick-gate__mode-menu button.is-on .memory-pick-gate__mode-sub {
-  color: var(--mpg-muted);
-}
-
-.memory-pick-gate__mode-menu button.is-on.is-always-mode .memory-pick-gate__mode-sub {
+.memory-pick-gate__mode-menu button.is-on .memory-pick-gate__mode-sub,
+.memory-pick-gate__mode-menu button.is-on.is-always-mode .memory-pick-gate__mode-sub,
+.memory-pick-gate__strategy-panel.is-always .memory-pick-gate__strategy-kicker {
   color: var(--mpg-muted);
 }
 
@@ -653,12 +639,7 @@ html[data-theme="light"] .memory-pick-gate,
   color: transparent;
 }
 
-.memory-pick-gate__mode-menu button.is-on .memory-pick-gate__mode-check {
-  border: none;
-  background: transparent;
-  color: var(--mpg-ink);
-}
-
+.memory-pick-gate__mode-menu button.is-on .memory-pick-gate__mode-check,
 .memory-pick-gate__mode-menu button.is-on.is-always-mode .memory-pick-gate__mode-check {
   border: none;
   background: transparent;
@@ -681,10 +662,6 @@ html[data-theme="light"] .memory-pick-gate,
   text-transform: uppercase;
   color: var(--mpg-muted);
   margin-bottom: 2px;
-}
-
-.memory-pick-gate__strategy-panel.is-always .memory-pick-gate__strategy-kicker {
-  color: var(--mpg-muted);
 }
 
 .memory-pick-gate__strategy-heading {
@@ -816,12 +793,6 @@ html[data-theme="light"] .memory-pick-gate,
   opacity: 0.88;
 }
 
-.memory-pick-gate__action.is-warn {
-  color: var(--mpg-ink);
-  font-weight: 650;
-  background: transparent;
-}
-
 .memory-pick-gate__action.is-danger {
   color: var(--mpg-ink);
   font-weight: 700;
@@ -875,11 +846,6 @@ html[data-theme="light"] .memory-pick-gate,
   font-weight: 650;
 }
 
-.memory-pick-gate__action:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 @keyframes mpg-confirm-fill {
   from {
     width: 0;
@@ -887,10 +853,6 @@ html[data-theme="light"] .memory-pick-gate,
   to {
     width: 100%;
   }
-}
-
-.memory-pick-gate__dismiss-wrap {
-  margin-left: auto;
 }
 
 /* 兼容 dialog 等仍使用旧 btn 类名的场景 */

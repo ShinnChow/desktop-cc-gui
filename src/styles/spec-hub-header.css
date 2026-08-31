@@ -99,7 +99,8 @@
   color: #b45309;
 }
 
-.spec-hub-badge-provider-unknown {
+.spec-hub-badge-provider-unknown,
+.spec-hub-badge-support-none {
   border-color: #d1d5db;
   background: #f3f4f6;
   color: #6b7280;
@@ -115,12 +116,6 @@
   border-color: #fed7aa;
   background: #fff7ed;
   color: #c2410c;
-}
-
-.spec-hub-badge-support-none {
-  border-color: #d1d5db;
-  background: #f3f4f6;
-  color: #6b7280;
 }
 
 .spec-hub-badge-gate.is-pass {

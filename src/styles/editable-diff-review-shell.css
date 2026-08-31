@@ -78,10 +78,7 @@
 }
 
 .editable-diff-review-surface.is-toolbar-inline-actions
-  .editable-diff-review-toolbar-actions {
-  display: contents;
-}
-
+  .editable-diff-review-toolbar-actions,
 .git-history-diff-modal-actions > .editable-diff-review-toolbar-actions {
   display: contents;
 }
@@ -141,7 +138,8 @@
 .editable-diff-review-main > .diff-viewer-frame,
 .editable-diff-review-main > .fvp,
 .editable-diff-review-main > .editable-diff-review-viewer,
-.editable-diff-review-main > .editable-diff-compare {
+.editable-diff-review-main > .editable-diff-compare,
+.editable-diff-review-viewer > .diff-viewer-frame {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -150,12 +148,6 @@
 .editable-diff-review-viewer {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-}
-
-.editable-diff-review-viewer > .diff-viewer-frame {
   flex: 1;
   min-height: 0;
   min-width: 0;

@@ -31,7 +31,8 @@
   transform: none !important;
 }
 
-.message-image-thumb img {
+.message-image-thumb img,
+.message-deferred-image-preview img {
   display: block;
   width: 100%;
   height: 100%;
@@ -145,13 +146,6 @@
 
 .message-deferred-image-preview:hover {
   border-color: var(--border-accent);
-}
-
-.message-deferred-image-preview img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .message-generated-image-card {

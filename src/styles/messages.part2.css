@@ -143,7 +143,8 @@
   font-size: 1.03em;
 }
 
-.reasoning-markdown.markdown-live-streaming :where(h1, h2, h3, h4) {
+.reasoning-markdown.markdown-live-streaming :where(h1, h2, h3, h4),
+.markdown :where(h5) {
   font-size: 1em;
 }
 
@@ -203,7 +204,9 @@
 }
 
 /* shadcn typography link: 统一为文件链接绿 + 点线下划线 */
-.reasoning-markdown :where(a) {
+.reasoning-markdown :where(a),
+:is(.message, .thinking-block) .markdown-linkblock a,
+.markdown a {
   color: var(--md-link-color);
   text-decoration-line: underline;
   text-decoration-style: dotted;
@@ -212,7 +215,9 @@
   text-underline-offset: 2px;
 }
 
-.reasoning-markdown :where(a:hover) {
+.reasoning-markdown :where(a:hover),
+:is(.message, .thinking-block) .markdown-linkblock a:hover,
+.markdown a:hover {
   text-decoration-thickness: 2px;
   opacity: 0.95;
 }
@@ -497,7 +502,11 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-:is(.message, .thinking-block) .markdown-codeblock-copy:hover {
+:is(.message, .thinking-block) .markdown-codeblock-copy:hover,
+:is(.message, .thinking-block) .markdown-heavy-island-placeholder-body button:hover,
+:is(.message, .thinking-block) .markdown-heavy-island-placeholder-body button:focus-visible,
+.tool-heavy-detail-placeholder button:hover,
+.tool-heavy-detail-placeholder button:focus-visible {
   background: var(--surface-control-hover);
   color: var(--text-strong);
 }
@@ -541,12 +550,6 @@
   font-size: var(--message-meta-font-size);
 }
 
-:is(.message, .thinking-block) .markdown-heavy-island-placeholder-body button:hover,
-:is(.message, .thinking-block) .markdown-heavy-island-placeholder-body button:focus-visible {
-  background: var(--surface-control-hover);
-  color: var(--text-strong);
-}
-
 .tool-heavy-detail-placeholder {
   display: grid;
   gap: 6px;
@@ -575,12 +578,6 @@
   cursor: pointer;
   font: inherit;
   font-size: 12px;
-}
-
-.tool-heavy-detail-placeholder button:hover,
-.tool-heavy-detail-placeholder button:focus-visible {
-  background: var(--surface-control-hover);
-  color: var(--text-strong);
 }
 
 :is(.message, .thinking-block) .markdown-codeblock pre {
@@ -850,20 +847,6 @@
   word-break: break-all;
 }
 
-:is(.message, .thinking-block) .markdown-linkblock a {
-  color: var(--md-link-color);
-  text-decoration-line: underline;
-  text-decoration-style: dotted;
-  text-decoration-thickness: 1px;
-  text-decoration-color: currentColor;
-  text-underline-offset: 2px;
-}
-
-:is(.message, .thinking-block) .markdown-linkblock a:hover {
-  text-decoration-thickness: 2px;
-  opacity: 0.95;
-}
-
 .markdown img {
   display: block;
   max-width: min(100%, 720px);
@@ -959,10 +942,6 @@
 .markdown :where(h4) {
   font-size: 1.05em;
   letter-spacing: -0.01em;
-}
-
-.markdown :where(h5) {
-  font-size: 1em;
 }
 
 .markdown :where(h6) {
@@ -1106,25 +1085,9 @@
 
 /* markdown 链接：移植自 idea-claude-code-gui 的文件链接样式（message.less / variables.less）
    颜色 暗 #a5d6a7 / 亮 #107c10（变量见 :root），点线下划线（dotted）+ offset 2px */
-.markdown a {
-  color: var(--md-link-color);
-  text-decoration-line: underline;
-  text-decoration-style: dotted;
-  text-decoration-thickness: 1px;
-  text-decoration-color: currentColor;
-  text-underline-offset: 2px;
-}
-
-.markdown a:hover {
-  text-decoration-thickness: 2px;
-  opacity: 0.95;
-}
 
 :is(.message, .thinking-block) .markdown a,
-:is(.message, .thinking-block) .markdown a:visited {
-  color: var(--md-link-color);
-}
-
+:is(.message, .thinking-block) .markdown a:visited,
 :is(.message, .thinking-block) .markdown a code {
   color: var(--md-link-color);
 }

@@ -10,7 +10,14 @@
   z-index: 3;
 }
 
-.app.windows-desktop .sidebar-topbar-placeholder {
+.app.windows-desktop .sidebar-topbar-placeholder,
+.sidebar-topbar-content .main-header-actions,
+.sidebar-topbar-content .main-header-session-tabs-slot,
+.sidebar-topbar-content .topbar-session-tabs,
+.sidebar-topbar-content .topbar-leading > .main-header-action,
+.sidebar-content-column > [data-slot="scroll-area-scrollbar"][data-orientation="horizontal"],
+.sidebar-content-column > [data-slot="scroll-area-scrollbar"][data-orientation="vertical"],
+.sidebar-content-column > [data-slot="scroll-area-corner"] {
   display: none;
 }
 
@@ -35,21 +42,8 @@
   padding-right: 12px;
 }
 
-.sidebar-topbar-content .main-header-actions {
-  display: none;
-}
-
-.sidebar-topbar-content .main-header-session-tabs-slot,
-.sidebar-topbar-content .topbar-session-tabs {
-  display: none;
-}
-
 .sidebar-topbar-content .main-header {
   justify-content: flex-end;
-}
-
-.sidebar-topbar-content .topbar-leading > .main-header-action {
-  display: none;
 }
 
 .sidebar-topbar-content .workspace-header {
@@ -226,7 +220,8 @@
     opacity 0.15s ease;
 }
 
-.sidebar-title-add svg {
+.sidebar-title-add svg,
+.sidebar-nav-icon {
   width: 16px;
   height: 16px;
 }
@@ -409,11 +404,6 @@
   -webkit-app-region: no-drag;
 }
 
-.sidebar-nav-icon {
-  width: 16px;
-  height: 16px;
-}
-
 .sidebar-body {
   flex: 1;
   min-height: 0;
@@ -455,22 +445,8 @@
   height: 0;
 }
 
-.sidebar-content-column > [data-slot="scroll-area-scrollbar"][data-orientation="horizontal"],
-.sidebar-content-column > [data-slot="scroll-area-scrollbar"][data-orientation="vertical"],
-.sidebar-content-column > [data-slot="scroll-area-corner"] {
-  display: none;
-}
-
-.sidebar-content-column.fade-top.fade-bottom {
-  -webkit-mask-image: none;
-  mask-image: none;
-}
-
-.sidebar-content-column.fade-top:not(.fade-bottom) {
-  -webkit-mask-image: none;
-  mask-image: none;
-}
-
+.sidebar-content-column.fade-top.fade-bottom,
+.sidebar-content-column.fade-top:not(.fade-bottom),
 .sidebar-content-column.fade-bottom:not(.fade-top) {
   -webkit-mask-image: none;
   mask-image: none;

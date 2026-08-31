@@ -207,17 +207,22 @@
   outline: none;
 }
 
-.git-panel-select-trigger:hover {
+.git-panel-select-trigger:hover,
+.git-panel-select-trigger.is-open,
+.git-panel-select-option:hover,
+.git-panel-select-option.is-active,
+.git-root-button:hover,
+.git-root-button--toggle:hover,
+.git-panel-history-button:hover,
+.git-panel-history-button.is-active,
+.commit-message-actions .commit-message-generate-button:hover:not(:disabled) {
   background: var(--accent);
   color: var(--accent-foreground);
 }
 
-.git-panel-select-trigger.is-open {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
-.git-panel-select-trigger:focus-visible {
+.git-panel-select-trigger:focus-visible,
+.git-panel-history-button:focus-visible,
+.git-commit-scope-toggle:focus-visible {
   outline: none;
   border-color: var(--ring);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
@@ -302,16 +307,6 @@
   transition: background 150ms ease, color 150ms ease;
 }
 
-.git-panel-select-option:hover {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
-.git-panel-select-option.is-active {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
 .git-panel-select-option:focus-visible {
   outline: none;
   background: var(--accent);
@@ -328,7 +323,10 @@
   margin-top: 1px;
 }
 
-.git-panel-select-option-check.is-active {
+.git-panel-select-option-check.is-active,
+.commit-message-config-chip--loading,
+.commit-message-generate-button--loading,
+.commit-message-generate-button--loading:disabled {
   opacity: 1;
 }
 
@@ -455,17 +453,7 @@
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 
-.git-root-button:hover {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
-.git-root-button--scan {
-  border: 1px solid transparent;
-  box-shadow: none;
-  background: transparent;
-}
-
+.git-root-button--scan,
 .git-root-button--workspace-root {
   border: 1px solid transparent;
   box-shadow: none;
@@ -485,11 +473,6 @@
   box-shadow: none;
   background: var(--background);
   color: var(--muted-foreground);
-}
-
-.git-root-button--toggle:hover {
-  background: var(--accent);
-  color: var(--accent-foreground);
 }
 
 .git-root-button--toggle .git-root-button-icon {
@@ -518,7 +501,8 @@
   font-size: 11px;
 }
 
-.git-root-list {
+.git-root-list,
+.git-log-section {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -564,11 +548,13 @@
   color: var(--text-faint);
 }
 
-.diff-status-add {
+.diff-status-add,
+.diff-add {
   color: var(--status-success, #47d488);
 }
 
-.diff-status-del {
+.diff-status-del,
+.diff-del {
   color: var(--status-error, #ff6b6b);
 }
 
@@ -627,7 +613,11 @@
 }
 
 .diff-section-title:hover .diff-tree-summary-root-action,
-.diff-section-title:focus-within .diff-tree-summary-root-action {
+.diff-section-title:focus-within .diff-tree-summary-root-action,
+.git-repository-change-group__header:hover .git-repository-change-group__refresh,
+.git-repository-change-group__header:focus-within .git-repository-change-group__refresh,
+.diff-section-title:hover .diff-section-actions,
+.diff-section-title:focus-within .diff-section-actions {
   opacity: 1;
   pointer-events: auto;
 }
@@ -648,12 +638,15 @@
   transition: background 150ms ease, color 150ms ease;
 }
 
-.git-status-refresh-button:hover {
+.git-status-refresh-button:hover,
+.git-status-push-button:hover:not(:disabled) {
   background: var(--accent);
   color: var(--foreground);
 }
 
-.git-status-refresh-button:focus-visible {
+.git-status-refresh-button:focus-visible,
+.git-status-push-button:focus-visible,
+.diff-tree-folder-row:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
 }
@@ -704,16 +697,6 @@
   transition: background 150ms ease, color 150ms ease;
 }
 
-.git-status-push-button:hover:not(:disabled) {
-  background: var(--accent);
-  color: var(--foreground);
-}
-
-.git-status-push-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
-}
-
 .git-status-push-button:disabled {
   cursor: default;
   opacity: 0.7;
@@ -753,7 +736,8 @@
   flex: 0 0 auto;
 }
 
-.diff-tree-summary-root-icon {
+.diff-tree-summary-root-icon,
+.commit-message-input::placeholder {
   color: var(--muted-foreground);
 }
 
@@ -796,7 +780,10 @@ button.diff-section-indicator {
   cursor: pointer;
 }
 
-button.diff-section-indicator:hover {
+button.diff-section-indicator:hover,
+.diff-list-view-button:hover,
+.diff-tree-folder-row:hover .diff-tree-folder-toggle,
+.commit-message-engine-picker__language:hover {
   color: var(--foreground);
 }
 
@@ -838,15 +825,20 @@ button.diff-section-indicator:focus-visible {
   font-size: 10px;
 }
 
-.diff-section-line-stats-badge .is-add {
+.diff-section-line-stats-badge .is-add,
+.git-repository-change-group__count .diff-counts-inline.git-filetree-badge .is-add {
   color: var(--success, #22c55e);
 }
 
-.diff-section-line-stats-badge .is-del {
+.diff-section-line-stats-badge .is-del,
+.git-repository-change-group__count .diff-counts-inline.git-filetree-badge .is-del {
   color: var(--destructive, #f87171);
 }
 
-.diff-section-line-stats-badge .is-sep {
+.diff-section-line-stats-badge .is-sep,
+.git-repository-change-group__count .diff-counts-inline.git-filetree-badge .is-sep,
+.diff-row:hover .diff-row-action,
+.diff-row:focus-within .diff-row-action {
   color: var(--text-muted);
 }
 
@@ -935,10 +927,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   flex: 0 0 auto;
 }
 
-.diff-list-view-button:hover {
-  color: var(--foreground);
-}
-
 .diff-list-view-button.active {
   background: var(--background);
   color: var(--foreground);
@@ -963,22 +951,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   padding: 4px 8px;
   cursor: pointer;
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
-}
-
-.git-panel-history-button:hover {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
-.git-panel-history-button.is-active {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
-.git-panel-history-button:focus-visible {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
 }
 
 .diff-status-issues {
@@ -1049,12 +1021,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   transition: opacity 120ms ease;
 }
 
-.git-repository-change-group__header:hover .git-repository-change-group__refresh,
-.git-repository-change-group__header:focus-within .git-repository-change-group__refresh {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 .git-repository-change-group__refresh .git-status-refresh-button:disabled {
   cursor: wait;
 }
@@ -1083,18 +1049,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
 
 .git-repository-change-group__count .diff-counts-inline.git-filetree-badge {
   font-size: 10px;
-}
-
-.git-repository-change-group__count .diff-counts-inline.git-filetree-badge .is-add {
-  color: var(--success, #22c55e);
-}
-
-.git-repository-change-group__count .diff-counts-inline.git-filetree-badge .is-del {
-  color: var(--destructive, #f87171);
-}
-
-.git-repository-change-group__count .diff-counts-inline.git-filetree-badge .is-sep {
-  color: var(--text-muted);
 }
 
 .git-repository-commit-summary {
@@ -1153,12 +1107,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;
-}
-
-.diff-section-title:hover .diff-section-actions,
-.diff-section-title:focus-within .diff-section-actions {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .diff-section-list {
@@ -1237,11 +1185,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   color: var(--foreground);
 }
 
-.diff-tree-folder-row:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
-}
-
 .diff-tree-folder-toggle {
   display: inline-flex;
   width: var(--git-filetree-icon-size);
@@ -1249,10 +1192,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   align-items: center;
   justify-content: center;
   color: var(--muted-foreground);
-}
-
-.diff-tree-folder-row:hover .diff-tree-folder-toggle {
-  color: var(--foreground);
 }
 
 .diff-tree-folder-spacer {
@@ -1269,7 +1208,8 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   flex-shrink: 0;
 }
 
-.diff-tree-folder-icon svg {
+.diff-tree-folder-icon svg,
+.diff-file-icon svg {
   width: 16px;
   height: 16px;
 }
@@ -1282,7 +1222,8 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   color: var(--foreground);
 }
 
-.diff-empty {
+.diff-empty,
+.diff-danger-dialog-list li {
   font-size: 12px;
   color: var(--muted-foreground);
 }
@@ -1356,13 +1297,11 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   color: var(--muted-foreground);
 }
 
-.git-commit-scope-toggle:focus-visible {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
-}
-
-.git-commit-scope-toggle:disabled {
+.git-commit-scope-toggle:disabled,
+.commit-message-input:disabled,
+.commit-message-actions .commit-message-commit-button:disabled,
+.commit-button:disabled,
+.diff-danger-dialog-confirm:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -1513,11 +1452,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   position: relative;
 }
 
-.diff-row:hover .diff-row-action,
-.diff-row:focus-within .diff-row-action {
-  color: var(--text-muted);
-}
-
 .diff-row-action:hover {
   background: var(--surface-control-hover);
   border-color: var(--border-subtle);
@@ -1655,11 +1589,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   color: var(--muted-foreground);
 }
 
-.diff-file-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
 .diff-file {
   display: flex;
   align-items: center;
@@ -1712,7 +1641,9 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   flex: 1;
 }
 
-.diff-dir::before {
+.diff-dir::before,
+.diff-section-tree-list.git-filetree-list--tree .git-filetree-folder-row::before,
+.diff-section-tree-list.git-filetree-list--tree .git-filetree-row::before {
   content: none;
 }
 
@@ -1736,25 +1667,12 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   cursor: default;
 }
 
-.diff-section-tree-list.git-filetree-list--tree .git-filetree-folder-row::before,
-.diff-section-tree-list.git-filetree-list--tree .git-filetree-row::before {
-  content: none;
-}
-
 .diff-dir {
   font-size: var(--git-filetree-path-font-size);
   color: var(--text-faint);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.diff-add {
-  color: var(--status-success, #47d488);
-}
-
-.diff-del {
-  color: var(--status-error, #ff6b6b);
 }
 
 .diff-sep {
@@ -1771,7 +1689,8 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   color: var(--status-error);
 }
 
-:root[data-theme="light"] .diff-row:hover .diff-sep {
+:root[data-theme="light"] .diff-row:hover .diff-sep,
+.git-issue-date {
   color: var(--text-faint);
 }
 
@@ -1814,12 +1733,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   gap: 6px;
 }
 
-.git-log-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 .git-log-section-title {
   font-size: 10px;
   letter-spacing: 0.08em;
@@ -1827,7 +1740,8 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   color: var(--text-faint);
 }
 
-.git-log-section-list {
+.git-log-section-list,
+.diff-danger-dialog-copy {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1886,20 +1800,14 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   margin: -2px -6px;
 }
 
-.git-issue-entry:last-child {
-  border-bottom: none;
-}
-
-.git-pr-entry:last-child {
+.git-issue-entry:last-child,
+.git-pr-entry:last-child,
+.git-log-entry:last-child {
   border-bottom: none;
 }
 
 .git-log-entry-compact {
   padding: 4px 0;
-}
-
-.git-log-entry:last-child {
-  border-bottom: none;
 }
 
 .git-log-entry.active {
@@ -1923,7 +1831,10 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   flex-wrap: wrap;
 }
 
-.git-issue-number {
+.git-issue-number,
+.git-pr-number,
+.git-pr-author-inline,
+.git-pr-branches {
   font-family: var(--code-font-family);
   font-size: var(--code-font-size, 11px);
   color: var(--text-faint);
@@ -1967,21 +1878,8 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   overflow-wrap: break-word;
 }
 
-.git-pr-number,
-.git-pr-author-inline {
-  font-family: var(--code-font-family);
-  font-size: var(--code-font-size, 11px);
-  color: var(--text-faint);
-}
-
 .git-pr-author-inline {
   font-size: var(--code-font-size, 11px);
-}
-
-.git-pr-branches {
-  font-family: var(--code-font-family);
-  font-size: var(--code-font-size, 11px);
-  color: var(--text-faint);
 }
 
 .git-pr-draft {
@@ -2005,10 +1903,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   border: 1px solid var(--border-subtle);
   background: var(--surface-control);
   max-width: 100%;
-}
-
-.git-issue-date {
-  color: var(--text-faint);
 }
 
 .git-panel-spinner {
@@ -2224,10 +2118,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   cursor: not-allowed;
 }
 
-.commit-message-config-chip--loading {
-  opacity: 1;
-}
-
 .commit-message-config-chip .commit-message-engine-icon,
 .commit-message-config-chip svg {
   flex-shrink: 0;
@@ -2353,20 +2243,11 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   font-weight: 550;
 }
 
-.commit-message-input::placeholder {
-  color: var(--muted-foreground);
-}
-
 .commit-message-input:focus {
   outline: none;
   border-color: var(--ring);
   color: var(--foreground);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent);
-}
-
-.commit-message-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .commit-message-generate-button {
@@ -2392,24 +2273,21 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   border-color: var(--border);
 }
 
-.commit-message-generate-button:disabled {
+.commit-message-generate-button:disabled,
+.commit-message-actions .commit-message-generate-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
 .commit-message-generate-button svg,
-.commit-message-generate-button img {
+.commit-message-generate-button img,
+.commit-message-actions .commit-message-generate-button svg,
+.commit-message-actions .commit-message-generate-button img,
+.commit-message-actions .commit-message-commit-button svg,
+.commit-message-actions .commit-message-commit-button img {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-}
-
-.commit-message-generate-button--loading {
-  opacity: 1;
-}
-
-.commit-message-generate-button--loading:disabled {
-  opacity: 1;
 }
 
 .commit-message-actions {
@@ -2444,16 +2322,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   color: var(--secondary-foreground);
 }
 
-.commit-message-actions .commit-message-generate-button:hover:not(:disabled) {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
-.commit-message-actions .commit-message-generate-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .commit-message-actions .commit-message-commit-button {
   background: var(--primary);
   color: var(--primary-foreground);
@@ -2461,20 +2329,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
 
 .commit-message-actions .commit-message-commit-button:hover:not(:disabled) {
   background: color-mix(in srgb, var(--primary) 88%, transparent);
-}
-
-.commit-message-actions .commit-message-commit-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.commit-message-actions .commit-message-generate-button svg,
-.commit-message-actions .commit-message-generate-button img,
-.commit-message-actions .commit-message-commit-button svg,
-.commit-message-actions .commit-message-commit-button img {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
 }
 
 .commit-message-generate-menu {
@@ -2509,7 +2363,9 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   font-weight: 600;
 }
 
-.commit-message-generate-menu-engine-icon {
+.commit-message-generate-menu-engine-icon,
+.commit-message-engine-picker__engine-icon svg,
+.commit-message-engine-picker__engine-icon img {
   width: 13px;
   height: 13px;
 }
@@ -2538,10 +2394,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   background: var(--accent);
   color: var(--accent-foreground);
   outline: none;
-}
-
-.commit-message-generate-button--loading:disabled {
-  opacity: 1;
 }
 
 .commit-message-engine-icon {
@@ -2596,11 +2448,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   background: color-mix(in srgb, var(--primary) 90%, transparent);
 }
 
-.commit-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .commit-button-spinner {
   width: 14px;
   height: 14px;
@@ -2641,12 +2488,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   color: var(--popover-foreground);
 }
 
-.diff-danger-dialog-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .diff-danger-dialog-copy p {
   margin: 0;
   font-size: 13px;
@@ -2675,11 +2516,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   gap: 4px;
   max-height: 180px;
   overflow: auto;
-}
-
-.diff-danger-dialog-list li {
-  font-size: 12px;
-  color: var(--muted-foreground);
 }
 
 .diff-danger-dialog-file {
@@ -2739,11 +2575,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
 
 .diff-danger-dialog-confirm:hover:not(:disabled) {
   opacity: 0.9;
-}
-
-.diff-danger-dialog-confirm:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 @media (max-width: 520px) {
@@ -2849,10 +2680,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
-.commit-message-engine-picker__language:hover {
-  color: var(--foreground);
-}
-
 .commit-message-engine-picker__language[data-selected="true"],
 .commit-message-engine-picker__language[aria-pressed="true"] {
   color: var(--foreground);
@@ -2908,12 +2735,6 @@ body[data-read-only-compare-resizing="true"] .read-only-compare-resizer::after {
   border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
   border-radius: 6px;
   background: color-mix(in srgb, var(--background) 90%, var(--muted, transparent));
-}
-
-.commit-message-engine-picker__engine-icon svg,
-.commit-message-engine-picker__engine-icon img {
-  width: 13px;
-  height: 13px;
 }
 
 .commit-message-engine-picker__engine-name {

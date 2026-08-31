@@ -75,7 +75,8 @@
  * viewerjs's baked-white sprite only at the toolbar scope. The toolbar
  * background, blur, and border-radius are unaffected because the
  * filter is applied to `::before` only (the icon layer). */
-.viewer-toolbar > ul > li::before {
+.viewer-toolbar > ul > li::before,
+.viewer-button::before {
   filter: var(--mermaid-fullscreen-icon-filter);
 }
 
@@ -102,10 +103,6 @@
 .viewer-button:hover,
 .viewer-button:focus {
   background-color: var(--mermaid-fullscreen-button-hover-bg);
-}
-
-.viewer-button::before {
-  filter: var(--mermaid-fullscreen-icon-filter);
 }
 
 .viewer-title {

@@ -184,7 +184,9 @@ html.dark .crs-subagent-row.is-error .crs-subagent-dot {
   letter-spacing: 0.01em;
 }
 
-.crs-subagent-row.is-running .crs-subagent-status {
+.crs-subagent-row.is-running .crs-subagent-status,
+.composer-run-status-chrome-toggle.is-live,
+.composer-run-status-pill.is-selected .composer-run-status-pill-label {
   color: var(--crs-ink);
 }
 
@@ -197,7 +199,9 @@ html.dark .crs-subagent-row.is-error .crs-subagent-dot {
 }
 
 :root[data-theme="dark"] .crs-subagent-row.is-error .crs-subagent-status,
-html.dark .crs-subagent-row.is-error .crs-subagent-status {
+html.dark .crs-subagent-row.is-error .crs-subagent-status,
+:root[data-theme="dark"] .composer-run-status-pill-count--edit .is-del,
+html.dark .composer-run-status-pill-count--edit .is-del {
   color: #f87171;
 }
 
@@ -319,17 +323,14 @@ html.dark .crs-subagent-row.is-error .crs-subagent-status {
   color: var(--crs-ink);
 }
 
-.composer-run-status-chrome-toggle:focus-visible {
+.composer-run-status-chrome-toggle:focus-visible,
+.composer-run-status-pill:focus-visible {
   outline: 1px dashed var(--crs-ink);
   outline-offset: 2px;
 }
 
 .composer-run-status-chrome-toggle:active {
   transform: scale(0.97);
-}
-
-.composer-run-status-chrome-toggle.is-live {
-  color: var(--crs-ink);
 }
 
 .composer-run-status-chrome-toggle .composer-run-status-live-dot {
@@ -372,11 +373,6 @@ html.dark .crs-subagent-row.is-error .crs-subagent-status {
   transform: scale(0.98);
 }
 
-.composer-run-status-pill:focus-visible {
-  outline: 1px dashed var(--crs-ink);
-  outline-offset: 2px;
-}
-
 /* 选中：同色系、虚线略深，无彩色底/指示条 */
 .composer-run-status-pill.is-selected {
   border-style: dashed;
@@ -406,10 +402,6 @@ html.dark .crs-subagent-row.is-error .crs-subagent-status {
   flex-shrink: 0;
   color: var(--crs-muted);
   font-weight: 500;
-}
-
-.composer-run-status-pill.is-selected .composer-run-status-pill-label {
-  color: var(--crs-ink);
 }
 
 .composer-run-status-pill-count {
@@ -489,11 +481,6 @@ html.dark .crs-subagent-row.is-error .crs-subagent-status {
 :root[data-theme="dark"] .composer-run-status-pill-count--edit .is-add,
 html.dark .composer-run-status-pill-count--edit .is-add {
   color: #34d399;
-}
-
-:root[data-theme="dark"] .composer-run-status-pill-count--edit .is-del,
-html.dark .composer-run-status-pill-count--edit .is-del {
-  color: #f87171;
 }
 
 /* 活跃点：中性灰，轻呼吸，无彩色 */

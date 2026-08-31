@@ -186,7 +186,8 @@
   scrollbar-color: color-mix(in srgb, var(--project-map-accent) 52%, transparent) transparent;
 }
 
-.project-map-relationship-dashboard-grid.is-hidden {
+.project-map-relationship-dashboard-grid.is-hidden,
+.project-map-relationship-role-strip::-webkit-scrollbar {
   display: none;
 }
 
@@ -225,10 +226,6 @@
   overflow-x: auto;
   padding-bottom: 2px;
   scrollbar-width: none;
-}
-
-.project-map-relationship-role-strip::-webkit-scrollbar {
-  display: none;
 }
 
 .project-map-relationship-role-strip button {
