@@ -108,34 +108,7 @@ export function QuickSwitcherTitlebarButton({
   );
 }
 
-export function RightPanelCollapseButton({
-  isCompact,
-  rightPanelCollapsed,
-  rightPanelAvailable = true,
-  rightPanelShortcutLabel,
-  onCollapseRightPanel,
-}: SidebarToggleProps) {
-  const { t } = useTranslation();
-  if (isCompact || rightPanelCollapsed || !rightPanelAvailable) {
-    return null;
-  }
-  const label = t("sidebar.hideGitSidebar");
-  const tooltip = rightPanelShortcutLabel
-    ? `${label} (${rightPanelShortcutLabel})`
-    : label;
-  return (
-    <button
-      type="button"
-      className="ghost main-header-action"
-      onClick={onCollapseRightPanel}
-      data-tauri-drag-region="false"
-      aria-label={tooltip}
-      title={tooltip}
-    >
-      <PanelRightClose size={14} aria-hidden />
-    </button>
-  );
-}
+
 
 function WindowControls() {
   const { t } = useTranslation();

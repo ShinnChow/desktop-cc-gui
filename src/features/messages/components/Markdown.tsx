@@ -1,1 +1,3 @@
-export { Markdown, prewarmKatexAssets } from "../../../markdown/components/Markdown";
+export {
+  Markdown,
+} from "../../../markdown/components/Markdown";

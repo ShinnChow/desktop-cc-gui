@@ -130,11 +130,7 @@ export function isTerminalAgentStatus(status: AgentRunStatus): boolean {
   );
 }
 
-export function targetBadge(target: AgentExecutionTarget | null | undefined): string {
-  if (!target?.engine) return "—";
-  const model = target.model?.trim() || target.providerProfileNameSnapshot?.trim();
-  return model ? `${target.engine} · ${model}` : target.engine;
-}
+
 
 export function normalizeAgentProjection(
   projection: AgentProjectionV1 | null | undefined,
@@ -168,30 +164,4 @@ export function normalizeAgentProjection(
   };
 }
 
-export function defaultStageBindings(
-  target: AgentExecutionTarget,
-): AgentStageBinding[] {
-  return [
-    {
-      id: "plan",
-      target,
-      title: "规划",
-      requiresApproval: true,
-      accessMode: "read-only",
-    },
-    {
-      id: "implement",
-      target,
-      title: "实现",
-      requiresApproval: false,
-      accessMode: "current",
-    },
-    {
-      id: "review",
-      target,
-      title: "审查",
-      requiresApproval: false,
-      accessMode: "read-only",
-    },
-  ];
-}
+

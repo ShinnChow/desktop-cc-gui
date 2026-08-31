@@ -22,15 +22,12 @@ import { dispatchThreadFamily } from "./appServerEventDispatch/threadDispatch";
 import { dispatchTurnFamily } from "./appServerEventDispatch/turnDispatch";
 import type { AppServerEventDispatchContext } from "./appServerEventDispatch/types";
 export type {
-  AgentDelta,
   AppServerEventHandlers,
   DispatchAppServerEventBatchOptions,
   DispatchAppServerEventOptions,
 } from "./appServerEventTypes";
 export {
-  buildCoalescibleAppServerEventKey,
   coalesceAppServerEventBatch,
-  isProviderContinuationBootstrapEvent,
 } from "./appServerEventExtractors";
 
 export {

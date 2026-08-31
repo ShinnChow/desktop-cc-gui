@@ -499,10 +499,7 @@ export type TransientTurnRef = {
   state: { completedAt: number | null; errorAt: number | null; assistantCompletedAt: number | null };
 };
 
-export function resolveRefSettledAt(ref: TransientTurnRef): number | null {
-  const { state } = ref;
-  return state.completedAt ?? state.errorAt ?? state.assistantCompletedAt;
-}
+
 
 export type SweepableThreadDiagnostic = {
   threadId: string;

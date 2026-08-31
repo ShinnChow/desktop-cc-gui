@@ -119,13 +119,7 @@ export type FastMarkdownWorkerRequestMeta = {
   createdAtMs: number;
 };
 
-export type FastMarkdownCompileCacheKey = {
-  documentKey: string;
-  contentHash: string;
-  rendererProfile: FastMarkdownRendererProfileId;
-  boundedLineLimit: number;
-  featureFlagFingerprint: string;
-};
+
 
 export type FastMarkdownWorkerDiagnostics = {
   hasWorker: boolean;

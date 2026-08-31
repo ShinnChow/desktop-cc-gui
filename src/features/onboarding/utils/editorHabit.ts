@@ -9,13 +9,6 @@ export const EDITOR_HABIT_CHOICES: readonly FirstRunIdeId[] = [
   ...FIRST_RUN_IDE_CHOICES,
 ];
 
-export function isEditorHabitId(value: unknown): value is FirstRunIdeId {
-  return (
-    typeof value === "string" &&
-    (EDITOR_HABIT_CHOICES as readonly string[]).includes(value)
-  );
-}
-
 export function applyEditorHabitToAppSettings(
   settings: AppSettings,
   ide: FirstRunIdeId,

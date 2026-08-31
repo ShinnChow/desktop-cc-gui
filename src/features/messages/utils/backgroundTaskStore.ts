@@ -224,16 +224,7 @@ export function listBackgroundTasks(
 }
 
 /** 运行中任务数（pill 计数）。 */
-export function countRunningBackgroundTasks(
-  workspaceId: string,
-  threadId: string,
-): number {
-  // 终态口径与 isTerminalBackgroundTaskStatus 完全一致（含 cancelled/canceled）：
-  // 取消的任务必须立刻退出 running 计数，否则 sidebar 紫点 / unread 永不收口。
-  return listBackgroundTasks(workspaceId, threadId).filter(
-    (record) => !isTerminalBackgroundTaskStatus(record.task.status),
-  ).length;
-}
+
 
 /**
  * 枚举全部会话的 running 计数（thread-status 单订阅 sync 专用读副本）。

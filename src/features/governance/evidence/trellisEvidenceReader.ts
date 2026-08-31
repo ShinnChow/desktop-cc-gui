@@ -59,7 +59,5 @@ export async function readTrellisEvidence(
   ];
 }
 
-export const trellisEvidenceReaderInternals = {
-  parseTotalSessions,
-};
+
 

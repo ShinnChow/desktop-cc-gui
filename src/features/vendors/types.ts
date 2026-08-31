@@ -9,8 +9,6 @@
 import {
   MODEL_ID_PATTERN,
   isValidModelId,
-  isValidShapeOnlyCustomModel,
-  isValidCodexCustomModel,
   validateCodexCustomModels,
   validateShapeOnlyCustomModels,
   type CodexCustomModel,
@@ -20,8 +18,6 @@ import { STORAGE_KEYS as MODEL_STORAGE_KEYS } from "../models/constants";
 export {
   MODEL_ID_PATTERN,
   isValidModelId,
-  isValidShapeOnlyCustomModel,
-  isValidCodexCustomModel,
   validateCodexCustomModels,
   validateShapeOnlyCustomModels,
 };

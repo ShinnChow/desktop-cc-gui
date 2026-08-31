@@ -65,9 +65,7 @@ export function setMemoryPickTelemetrySink(
   injectedSink = sink;
 }
 
-export function getMemoryPickTelemetrySink(): MemoryPickTelemetrySink | null {
-  return injectedSink;
-}
+
 
 /** 过滤 props：只保留白名单，剔除疑似正文键 */
 export function sanitizeMemoryPickTelemetryProps(

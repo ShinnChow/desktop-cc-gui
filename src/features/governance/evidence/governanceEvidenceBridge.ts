@@ -42,9 +42,4 @@ export function createFrozenGovernanceEvidenceSnapshot(input: {
   return createGovernanceEvidenceSnapshot(input);
 }
 
-export function findGovernanceEvidenceBySource(
-  snapshot: GovernanceEvidenceSnapshot | null | undefined,
-  source: GovernanceEvidence["source"],
-): readonly GovernanceEvidence[] {
-  return snapshot?.evidence.filter((entry) => entry.source === source) ?? [];
-}
+

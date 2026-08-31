@@ -126,7 +126,6 @@ export type {
   ComposerNoteCardSelectionRequest,
   ComposerProps,
   ComposerRewindDialogRequest,
-  NoteCardSelection,
 } from "./Composer/types";
 
 
@@ -2061,6 +2060,4 @@ function ComposerGate(props: ComposerProps) {
 export const Composer = memo(ComposerGate, areComposerPropsEqual);
 
 /** @internal 测试可重置 warm，避免污染其它用例 */
-export function __resetComposerHeavyWarmForTests(): void {
-  composerHeavyWarmed = false;
-}
+

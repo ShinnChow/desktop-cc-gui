@@ -34,7 +34,7 @@ import {
   normalizeEditScenePath,
 } from './fileEditSceneUtils';
 
-export { mergeEditSceneStatus, normalizeEditScenePath } from './fileEditSceneUtils';
+
 
 type ToolItem = Extract<ConversationItem, { kind: 'tool' }>;
 

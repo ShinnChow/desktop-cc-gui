@@ -23,9 +23,7 @@ export function normalizeManagedInstructionSource(source?: string | null) {
   return normalized;
 }
 
-export function isGlobalManagedInstructionSource(source?: string | null) {
-  return normalizeManagedInstructionSource(source).startsWith("global_");
-}
+
 
 export function classifyManagedInstructionAttribution(
   source?: string | null,

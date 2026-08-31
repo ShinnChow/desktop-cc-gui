@@ -280,22 +280,7 @@ export function buildShortcutValue(event: KeyboardEvent): string | null {
   return [...modifiers, key].join("+");
 }
 
-export function matchesShortcut(event: KeyboardEvent, value: string | null | undefined): boolean {
-  const parsed = parseShortcut(value);
-  if (!parsed) {
-    return false;
-  }
-  const key = normalizeKey(event.key);
-  if (!key || key !== parsed.key) {
-    return false;
-  }
-  return (
-    parsed.meta === event.metaKey &&
-    parsed.ctrl === event.ctrlKey &&
-    parsed.alt === event.altKey &&
-    matchesShiftModifier(event, parsed)
-  );
-}
+
 
 export function matchesShortcutForPlatform(
   event: KeyboardEvent,

@@ -79,11 +79,7 @@ function ensureHydrated() {
   memory.store = readStorage();
 }
 
-export function subscribeSessionSideEffectLedger(listener: () => void): () => void {
-  ensureHydrated();
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
+
 
 export function getSessionSideEffectRecord(
   threadId: string | null | undefined,

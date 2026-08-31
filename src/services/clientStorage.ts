@@ -9,10 +9,7 @@ import {
 } from "./clientStorageSchema";
 import { recordHotspotSample } from "./perfBaseline/hotspotTracker";
 
-export {
-  CRITICAL_CLIENT_STORES,
-  DEFERRED_CLIENT_STORES,
-} from "./clientStorageSchema";
+
 
 const cache: Partial<Record<ClientStoreName, Record<string, unknown>>> = {};
 const hydratedStores = new Set<ClientStoreName>();

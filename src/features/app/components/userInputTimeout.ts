@@ -11,7 +11,7 @@ export const USER_INPUT_TIMEOUT_SECONDS = 30 * 60;
 /** Warning window near the end of the countdown. */
 export const USER_INPUT_TIMEOUT_WARNING_SECONDS = 60;
 /** Milliseconds form for CLI MCP_TOOL_TIMEOUT env (must stay ≥ server wait). */
-export const USER_INPUT_MCP_TOOL_TIMEOUT_MS = USER_INPUT_TIMEOUT_SECONDS * 1000;
+
 
 /**
  * First option of each question is the recommended default (tool schema /

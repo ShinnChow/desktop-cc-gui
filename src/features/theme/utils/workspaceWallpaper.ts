@@ -17,8 +17,8 @@ import {
 export const WORKSPACE_WALLPAPER_MODES = ["none", "fluid", "custom"] as const;
 
 export const DEFAULT_WORKSPACE_WALLPAPER_VEIL_OPACITY = 0;
-export const MIN_WORKSPACE_WALLPAPER_VEIL_OPACITY = 0;
-export const MAX_WORKSPACE_WALLPAPER_VEIL_OPACITY = 20;
+
+
 
 export const DEFAULT_WORKSPACE_WALLPAPER_BLUR = 0;
 export const MIN_WORKSPACE_WALLPAPER_BLUR = 0;

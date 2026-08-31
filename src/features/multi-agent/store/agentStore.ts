@@ -158,13 +158,7 @@ export function flushAgentProjectionNotify(): void {
   emit(evidenceListeners);
 }
 
-export function getAgentRunHistory(
-  workspaceId: string | null | undefined,
-  threadId: string | null | undefined,
-): AgentProjectionV1[] {
-  if (!workspaceId || !threadId) return EMPTY_ROUNDS;
-  return historyByScope.get(scopeKey(workspaceId, threadId)) ?? EMPTY_ROUNDS;
-}
+
 
 /** 当前 + 历史，按时间升序（第一轮…最新轮）。引用在无变更时保持稳定。 */
 export function getAgentRoundList(
@@ -240,12 +234,7 @@ export function isAgentAttempt(attemptId: string | null | undefined): boolean {
   return Boolean(attemptId && attemptIds.has(attemptId));
 }
 
-export function getAgentAttemptOwner(
-  attemptId: string | null | undefined,
-): AttemptOwner | null {
-  if (!attemptId) return null;
-  return attemptOwners.get(attemptId) ?? null;
-}
+
 
 export function resolveAgentAttemptOwner(input: {
   attemptId?: string | null;

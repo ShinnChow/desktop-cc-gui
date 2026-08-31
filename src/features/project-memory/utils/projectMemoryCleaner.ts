@@ -133,16 +133,4 @@ export function cleanProjectMemoryRecordsForRequest(params: {
   };
 }
 
-export function buildProjectMemoryCleanerFailureResult(params: {
-  status: "timeout" | "error";
-  records: ProjectMemoryRetrievalPackRecord[];
-}): ProjectMemoryRetrievalPackCleanerResult {
-  return {
-    cleanedContextText: "- Memory Cleaner unavailable. Use source records only if relevant.",
-    relevantFacts: [],
-    irrelevantRecords: [],
-    conflicts: [],
-    confidence: params.records.length > 0 ? "low" : "low",
-    status: params.status,
-  };
-}
+

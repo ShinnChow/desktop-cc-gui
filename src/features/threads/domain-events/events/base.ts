@@ -14,7 +14,7 @@ export type DomainEventCommonFields = Readonly<{
   }>;
 }>;
 
-export type DomainEventFactoryInput = DomainEventCommonFields;
+
 
 export function assertIsoTimestamp(value: string) {
   if (Number.isNaN(Date.parse(value))) {

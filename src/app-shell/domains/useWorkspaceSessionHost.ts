@@ -45,4 +45,4 @@ export function useWorkspaceSessionHost({
   };
 }
 
-export type WorkspaceSessionHost = ReturnType<typeof useWorkspaceSessionHost>;
+

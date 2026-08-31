@@ -207,9 +207,7 @@ export function isProjectMapReadableWorkspacePath(value: string): boolean {
   return normalizeWorkspaceEvidencePath(value) !== "";
 }
 
-export function looksLikeProjectMapWorkspaceFilePath(value: string): boolean {
-  return normalizeWorkspaceEvidencePath(value) !== "";
-}
+
 
 export function inferProjectMapWorkspaceFilePath(input: {
   label?: string | null;

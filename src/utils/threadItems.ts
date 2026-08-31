@@ -61,7 +61,7 @@ import {
   extractImplementPlanActionId,
   formatPlanSteps,
 } from "./threadItemsPlan";
-export type { ClaudeApprovalResumeEntry } from "./threadItemsAssistantText";
+
 export {
   extractClaudeApprovalResumeEntries,
   stripClaudeApprovalResumeArtifacts,

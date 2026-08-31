@@ -86,7 +86,7 @@ import {
   useNormalizedRealtimePipeline,
   type PendingNormalizedRealtimeOperation,
 } from "./useNormalizedRealtimePipeline";
-export { shouldUrgentlyDispatchReasoningDelta } from "./useNormalizedRealtimePipeline";
+
 
 // A4 流式正文外部化（docs/perf/a4-live-text-externalization-plan.md）：
 // 模块加载时读一次，翻转 flag 需刷新页面（与其余 perf flag 同语义）。

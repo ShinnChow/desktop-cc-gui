@@ -57,9 +57,7 @@ export type ClaudeProviderActionError = Readonly<{
   cause: unknown;
 }>;
 
-export type ClaudeProviderActionResult =
-  | Readonly<{ ok: true }>
-  | Readonly<{ ok: false; error: ClaudeProviderActionError }>;
+
 
 function providerActionError(
   action: ClaudeProviderAction,
@@ -568,6 +566,4 @@ export function useProviderManagement() {
   };
 }
 
-export type UseProviderManagementReturn = ReturnType<
-  typeof useProviderManagement
->;
+

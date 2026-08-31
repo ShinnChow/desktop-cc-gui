@@ -61,7 +61,7 @@ export type ParsedProjectMemoryPackSummary = {
   records: Array<{ index: string; memoryId: string; title: string }>;
 };
 
-export const PROJECT_MEMORY_PACK_OPEN_TAG = "project-memory-pack";
+
 export const DEFAULT_PACK_FIELD_CHAR_LIMIT = 1600;
 export const DEFAULT_PACK_TOTAL_CHAR_LIMIT = 9000;
 

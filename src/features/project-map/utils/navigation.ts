@@ -15,13 +15,7 @@ import {
   compareProjectMapNodes,
   normalizeProjectMapProjectionNodes,
 } from "./interactiveLayout";
-import {
-  buildProjectMapBoundedPreview,
-  capProjectMapProjectionItems,
-  normalizeProjectMapProjectionPath,
-  projectMapPathMatches,
-  uniqueProjectMapStrings,
-} from "./projectionGuards";
+import { buildProjectMapBoundedPreview, capProjectMapProjectionItems, normalizeProjectMapProjectionPath, uniqueProjectMapStrings } from "./projectionGuards";
 
 export type ProjectMapSearchResult = {
   node: ProjectMapNode;
@@ -561,13 +555,4 @@ export function explainProjectMapAssociationPath(input: {
   };
 }
 
-export function queryMatchesProjectMapPath(input: {
-  query: string;
-  path: string;
-}): boolean {
-  const query = normalizeSearchText(input.query);
-  if (!query) {
-    return false;
-  }
-  return normalizeSearchText(input.path).includes(query) || projectMapPathMatches(input.query, input.path);
-}
+

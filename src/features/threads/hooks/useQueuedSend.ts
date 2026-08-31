@@ -56,11 +56,8 @@ import {
   type ThreadFusionState,
 } from "./queuedSendHelpers";
 export {
-  ENABLE_BACKGROUND_QUEUE_DRAIN,
   buildQueueDrainSignal,
-  MAX_BACKGROUND_QUEUE_DRAIN,
   __setEnableBackgroundQueueDrainForTests,
-  getEnableBackgroundQueueDrain,
 } from "./queuedSendHelpers";
 
 type UseQueuedSendOptions = {

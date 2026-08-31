@@ -223,9 +223,7 @@ export function getSelectedTemplate(): CollaborationTemplate {
   return getTemplateById(memory.selectedId);
 }
 
-export function getSelectedTemplateId(): string {
-  return memory.selectedId;
-}
+
 
 export function getDefaultTemplateId(): string {
   return memory.defaultId;

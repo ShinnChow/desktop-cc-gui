@@ -1,18 +1,5 @@
-import type {
-  ProjectMapAutoIngestionRunContext,
-  ProjectMapDataset,
-  ProjectMapGenerationIntent,
-  ProjectMapGenerationRequest,
-  ProjectMapGenerationScope,
-  ProjectMapNode,
-  ProjectMapNodePatch,
-  ProjectMapPreferredLanguage,
-  ProjectMapRunMetadata,
-  ProjectMapRunOwnership,
-  ProjectMapSource,
-  ProjectMapStorageLocation,
-} from "../types";
-import { validateProjectMapNodePatch } from "./evidenceGate";
+import type { ProjectMapAutoIngestionRunContext, ProjectMapDataset, ProjectMapGenerationIntent, ProjectMapGenerationRequest, ProjectMapGenerationScope, ProjectMapNode, ProjectMapPreferredLanguage, ProjectMapRunMetadata, ProjectMapRunOwnership, ProjectMapSource, ProjectMapStorageLocation } from "../types";
+
 import {
   getProjectMapPathBasename,
   inferProjectMapWorkspaceFilePath,
@@ -257,19 +244,4 @@ export function createRunMetadataFromRequest(
   };
 }
 
-export function validateStructuredProjectMapPatch(input: {
-  dataset: ProjectMapDataset;
-  patch: ProjectMapNodePatch;
-}): { ok: true; patch: ProjectMapNodePatch } | { ok: false; errors: string[] } {
-  const node = input.dataset.nodes.find((candidate) => candidate.id === input.patch.nodeId);
-  if (!node) {
-    return { ok: false, errors: [`Unknown project-map node: ${input.patch.nodeId}`] };
-  }
 
-  const gate = validateProjectMapNodePatch(node, input.patch);
-  if (!gate.ok) {
-    return { ok: false, errors: gate.issues.map((issue) => issue.message) };
-  }
-
-  return { ok: true, patch: input.patch };
-}

@@ -203,7 +203,7 @@ export const POST_FIRST_PAINT_INDEX_SOFT_RESYNC_MAX_DEFER_WINDOW_MS = 8_000;
 export const EMPTY_SETTLE_LOADING_GRACE_MS = IS_VITEST ? 50 : 20_000;
 
 /** @deprecated Prefer COLD_START_IDLE_* / WORKSPACE_SWITCH_INTENT_DELAY_MS */
-export const COLD_START_FIRST_PAINT_DELAY_MS = COLD_START_IDLE_MIN_DELAY_MS;
+
 
 function isDiscardedStaleHydrationResult(
   result: ThreadListHydrationResult,

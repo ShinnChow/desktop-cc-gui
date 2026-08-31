@@ -26,10 +26,9 @@ export type {
   ThreadMoveFolderTarget,
   WorkspaceMenuAction,
   WorkspaceMenuGroup,
-  WorkspaceMenuIconKind,
   WorkspaceMenuState,
 } from "./sidebarMenus/types";
-export { NEW_SESSION_ENGINE_ACTION_IDS } from "./sidebarMenus/constants";
+
 import { requestEngineDetection } from "../../engine/hooks/engineDetectionCoordinator";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";

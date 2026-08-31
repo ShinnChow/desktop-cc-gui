@@ -5,8 +5,6 @@ import type { ConversationFact } from "../contracts/conversationFactContract";
 
 export {
   buildMessagePresentationMetadata,
-  getPresentationContext,
-  getPresentationContexts,
   withMessagePresentationMetadata,
 } from "../../../conversation-presentation/normalizeConversationPresentation";
 

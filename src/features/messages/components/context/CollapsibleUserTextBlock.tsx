@@ -17,7 +17,9 @@ import {
 } from "./parseUserTextContent";
 
 export { parseUserTextContent };
-export type { UserCodeAnnotationSegment, UserTextParseResult };
+export type {
+  UserCodeAnnotationSegment,
+};
 
 
 export const CollapsibleUserTextBlock = memo(function CollapsibleUserTextBlock({

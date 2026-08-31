@@ -303,80 +303,9 @@ export function normalizeDigestSummaryForMemory(value: string) {
   return deduped.join(" ").trim();
 }
 
-function isAssistantOutputRedundant(summary: string, output: string) {
-  const compactSummary = compactComparableMemoryText(summary);
-  const compactOutput = compactComparableMemoryText(output);
-  if (!compactSummary || !compactOutput) {
-    return false;
-  }
-  if (compactSummary === compactOutput) {
-    return true;
-  }
-  const longerLength = Math.max(compactSummary.length, compactOutput.length);
-  const shorterLength = Math.min(compactSummary.length, compactOutput.length);
-  if (shorterLength < 12) {
-    return false;
-  }
-  if (longerLength <= 0) {
-    return false;
-  }
-  if (shorterLength / longerLength < 0.78) {
-    return false;
-  }
-  return compactSummary.includes(compactOutput) || compactOutput.includes(compactSummary);
-}
 
-export function extractNovelAssistantOutput(summary: string, output: string) {
-  const normalizedSummary = normalizeDigestSummaryForMemory(summary);
-  const normalizedOutput = normalizeAssistantOutputForMemory(output);
-  if (!normalizedOutput) {
-    return "";
-  }
 
-  const summarySentences = splitMemorySentences(normalizedSummary);
-  const summaryComparables = summarySentences
-    .map((entry) => compactComparableMemoryText(entry))
-    .filter((entry) => entry.length >= 8);
 
-  if (summaryComparables.length === 0) {
-    return normalizedOutput;
-  }
-
-  const outputSentences = splitMemorySentences(normalizedOutput);
-  const kept: string[] = [];
-  for (const sentence of outputSentences) {
-    const comparable = compactComparableMemoryText(sentence);
-    if (!comparable) {
-      continue;
-    }
-    const overlapsSummary = summaryComparables.some((entry) => {
-      if (comparable === entry) {
-        return true;
-      }
-      const minLength = Math.min(comparable.length, entry.length);
-      if (minLength < 12) {
-        return false;
-      }
-      return comparable.includes(entry) || entry.includes(comparable);
-    });
-    if (overlapsSummary) {
-      continue;
-    }
-    const previous = kept[kept.length - 1];
-    if (previous && compactComparableMemoryText(previous) === comparable) {
-      continue;
-    }
-    kept.push(sentence);
-  }
-
-  const novelOutput = kept.join(" ").trim();
-  if (!novelOutput) {
-    return "";
-  }
-  return isAssistantOutputRedundant(normalizedSummary, novelOutput)
-    ? ""
-    : novelOutput;
-}
 
 function isMemoryDebugEnabled(): boolean {
   if (!import.meta.env.DEV) {

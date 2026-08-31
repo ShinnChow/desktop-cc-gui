@@ -3,12 +3,6 @@ import type { ConversationItem } from "../../../types";
 export type MessageConversationItem = Extract<ConversationItem, { kind: "message" }>;
 export type ReasoningConversationItem = Extract<ConversationItem, { kind: "reasoning" }>;
 
-export function isMessageConversationItem(
-  item: ConversationItem | undefined,
-): item is MessageConversationItem {
-  return item?.kind === "message";
-}
-
 export function isUserMessageConversationItem(
   item: ConversationItem | undefined,
 ): item is MessageConversationItem & { role: "user" } {

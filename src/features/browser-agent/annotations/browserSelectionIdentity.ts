@@ -1,7 +1,4 @@
-import type {
-  BrowserSelectedElementEvidence,
-  BrowserUserAnnotation,
-} from "../types";
+import type { BrowserUserAnnotation } from "../types";
 
 function normalizeBrowserSelectionText(value: string | null | undefined): string {
   return (value ?? "").replace(/\s+/g, " ").trim();
@@ -21,15 +18,7 @@ function browserSelectionIdentity(input: {
   return `role:${role}|t:${text}`;
 }
 
-export function browserSelectionIdentityFromElement(
-  element: BrowserSelectedElementEvidence,
-): string {
-  return browserSelectionIdentity({
-    text: element.text || element.label || element.href || "",
-    selectorHint: element.selectorHint,
-    role: element.role || element.tagName,
-  });
-}
+
 
 export function browserSelectionIdentityFromAnnotation(
   annotation: BrowserUserAnnotation,

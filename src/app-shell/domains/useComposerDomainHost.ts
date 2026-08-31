@@ -202,4 +202,4 @@ export function useComposerDomainHost(input: {
   };
 }
 
-export type ComposerDomainHost = ReturnType<typeof useComposerDomainHost>;
+

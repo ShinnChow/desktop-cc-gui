@@ -17,7 +17,7 @@ export const DSH_LOCAL_PROVIDER_PROFILE_ID = "__dsh_host_catalog__";
 export const DSH_LOCAL_PROVIDER_PROFILE_NAME = LOCAL_PROVIDER_PROFILE_DISPLAY_NAME;
 /** Historic Qoder local sentinel. Existing sessions resolve to Qoder Global. */
 export const QODER_LOCAL_PROVIDER_PROFILE_ID = "__local_qoder__";
-export const QODER_LOCAL_PROVIDER_PROFILE_NAME = LOCAL_PROVIDER_PROFILE_DISPLAY_NAME;
+
 /** Fixed distribution bindings; unlike ordinary native local profiles, these
  * must survive model/session selection to keep Global and CN isolated. */
 export const QODER_GLOBAL_PROVIDER_PROFILE_ID = "__qoder_global__";

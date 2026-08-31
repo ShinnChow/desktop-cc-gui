@@ -1055,38 +1055,7 @@ export function isProjectMapRelationshipNoiseFile(file: ProjectMapScannedFile): 
     || file.role === "unknown";
 }
 
-export function buildProjectMapRelationshipSentence(input: {
-  relation: ProjectMapFileRelation;
-  sourceFile?: ProjectMapScannedFile;
-  targetFile?: ProjectMapScannedFile;
-}): string {
-  const source = input.sourceFile?.basename ?? input.relation.sourceFileId;
-  const target = input.targetFile?.basename ?? input.relation.targetFileId;
-  switch (input.relation.type) {
-    case "imports":
-      return `${source} imports ${target}`;
-    case "calls":
-      return `${source} calls ${target}`;
-    case "bridges_to":
-      return `${source} calls command in ${target}`;
-    case "tested_by":
-      return `${source} is tested by ${target}`;
-    case "documents":
-      return `${source} documents ${target}`;
-    case "configures":
-      return `${source} configures ${target}`;
-    case "styled_by":
-      return `${source} is styled by ${target}`;
-    case "specified_by":
-      return `${source} is specified by ${target}`;
-    case "contains":
-      return `${source} contains ${target}`;
-    case "exports":
-      return `${source} exports symbols`;
-    default:
-      return `${source} relates to ${target}`;
-  }
-}
+
 
 export function getProjectMapRelationshipCallCandidate(relation: ProjectMapFileRelation): string | null {
   if (relation.type !== "calls") {

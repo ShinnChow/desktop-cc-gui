@@ -1,9 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { EngineType } from "../../../types";
-import type {
-  SharedProjectionItem,
-  SharedProjectionMismatchReport,
-} from "../../messages/presentation/sharedProjection/types";
+import type { SharedProjectionItem } from "../../messages/presentation/sharedProjection/types";
 import type {
   CanonicalProviderProfileSource,
   ExecutionTarget,
@@ -94,19 +91,9 @@ export type SharedSessionRuntimeDelivery = Record<string, unknown> & {
   };
 };
 
-export type SharedContextArtifactRecord = {
-  artifactId: string;
-  workspaceId: string;
-  sessionId: string;
-  checksum: string;
-  referenceOnly: boolean;
-  package: SharedV2ContextPackage;
-};
 
-export type SharedContextOrphanReport = {
-  status: "report-only";
-  paths: string[];
-};
+
+
 
 export async function listSharedSessions(workspaceId: string) {
   return invoke<Record<string, unknown>[]>("list_shared_sessions", {
@@ -128,19 +115,9 @@ export async function loadSharedProjection(workspaceId: string, threadId: string
   });
 }
 
-export async function rebuildSharedProjection(workspaceId: string, threadId: string) {
-  return invoke<SharedProjectionItem[]>("rebuild_shared_projection", {
-    workspaceId,
-    threadId,
-  });
-}
 
-export async function compareSharedProjection(workspaceId: string, threadId: string) {
-  return invoke<SharedProjectionMismatchReport>("compare_shared_projection", {
-    workspaceId,
-    threadId,
-  });
-}
+
+
 
 export async function setSharedSessionSelectedEngine(
   workspaceId: string,
@@ -344,18 +321,7 @@ export type SharedV2DispatchTurnResult = SharedSessionRuntimeDelivery & {
   alreadySettled?: boolean;
 };
 
-export type SharedV2CommitTurnResult =
-  | {
-      status: "committed";
-      duplicate: boolean;
-      sequence?: number | null;
-      bindingKey: string;
-    }
-  | {
-      status: "pending";
-      attemptId: string;
-      bindingKey: string;
-    };
+
 
 export type SharedV2AwaitTurnTerminalResult = {
   status: "committed";
@@ -528,23 +494,9 @@ export async function sharedSessionV2DispatchTurn(
   });
 }
 
-export async function sharedContextRetrieveArtifact(
-  workspaceId: string,
-  threadId: string,
-  artifactId: string,
-  checksum: string,
-) {
-  return invoke<SharedContextArtifactRecord>("shared_context_retrieve_artifact", {
-    workspaceId,
-    threadId,
-    artifactId,
-    checksum,
-  });
-}
 
-export async function sharedContextScanOrphans() {
-  return invoke<SharedContextOrphanReport>("shared_context_scan_orphans");
-}
+
+
 
 export async function sharedSessionV2AwaitTurnTerminal(
   workspaceId: string,
@@ -561,17 +513,7 @@ export async function sharedSessionV2AwaitTurnTerminal(
   );
 }
 
-export async function sharedSessionV2CommitTurn(
-  workspaceId: string,
-  threadId: string,
-  attemptId: string,
-) {
-  return invoke<SharedV2CommitTurnResult>("shared_session_v2_commit_turn", {
-    workspaceId,
-    threadId,
-    attemptId,
-  });
-}
+
 
 export async function sharedSessionV2MarkRecovery(
   workspaceId: string,

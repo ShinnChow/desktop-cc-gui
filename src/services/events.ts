@@ -186,12 +186,7 @@ const terminalOutputBackpressure = createEventBackpressure<TerminalOutputEvent>(
   onStats: appendEventBackpressureDiagnostic,
 });
 
-const runtimeLogLineBackpressure = createEventBackpressure<RuntimeLogLineEvent>({
-  surfaceId: "runtime-log-line",
-  eventKind: "runtime-log-line",
-  estimateBytes: terminalOutputBytes,
-  onStats: appendEventBackpressureDiagnostic,
-});
+
 
 const runtimeLogStatusBackpressure =
   createEventBackpressure<RuntimeLogSessionSnapshot>({
@@ -352,10 +347,7 @@ const terminalOutputHub =
   createEventHub<TerminalOutputEvent>("terminal-output", {
     backpressure: terminalOutputBackpressure,
   });
-const runtimeLogLineHub = createEventHub<RuntimeLogLineEvent>(
-  "runtime-log:line-appended",
-  { backpressure: runtimeLogLineBackpressure },
-);
+
 const runtimeLogStatusHub = createEventHub<RuntimeLogSessionSnapshot>(
   "runtime-log:status-changed",
   { backpressure: runtimeLogStatusBackpressure },
@@ -424,18 +416,10 @@ const menuCycleReasoningHub = createEventHub<void>(
 const menuCycleCollaborationHub = createEventHub<void>(
   "menu-composer-cycle-collaboration",
 );
-const menuComposerCycleModelHub = createEventHub<void>(
-  "menu-composer-cycle-model",
-);
-const menuComposerCycleAccessHub = createEventHub<void>(
-  "menu-composer-cycle-access",
-);
-const menuComposerCycleReasoningHub = createEventHub<void>(
-  "menu-composer-cycle-reasoning",
-);
-const menuComposerCycleCollaborationHub = createEventHub<void>(
-  "menu-composer-cycle-collaboration",
-);
+
+
+
+
 const openPathsHub = createEventHub<string[]>("open-paths");
 
 let appServerEventBridgeRefCount = 0;
@@ -504,12 +488,7 @@ export function subscribeRawAppServerEvents(
  * batch-aware path so the frontend does not pay per-event reducer dispatch
  * cost for every raw event.
  */
-export function subscribeAppServerEventBatch(
-  onBatch: (events: readonly AppServerEvent[]) => void,
-  options?: SubscriptionOptions,
-): Unsubscribe {
-  return appServerBatchHub.subscribe(onBatch, options);
-}
+
 
 export function getAppServerEventBackpressureForTests() {
   return appServerEventBackpressure;
@@ -541,12 +520,7 @@ export function subscribeTerminalOutput(
   return terminalOutputHub.subscribe(onEvent, options);
 }
 
-export function subscribeRuntimeLogLine(
-  onEvent: (event: RuntimeLogLineEvent) => void,
-  options?: SubscriptionOptions,
-): Unsubscribe {
-  return runtimeLogLineHub.subscribe(onEvent, options);
-}
+
 
 export function subscribeRuntimeLogStatus(
   onEvent: (event: RuntimeLogSessionSnapshot) => void,
@@ -804,41 +778,13 @@ export function subscribeMenuCycleCollaborationMode(
   }, options);
 }
 
-export function subscribeMenuComposerCycleModel(
-  onEvent: () => void,
-  options?: SubscriptionOptions,
-): Unsubscribe {
-  return menuComposerCycleModelHub.subscribe(() => {
-    onEvent();
-  }, options);
-}
 
-export function subscribeMenuComposerCycleAccess(
-  onEvent: () => void,
-  options?: SubscriptionOptions,
-): Unsubscribe {
-  return menuComposerCycleAccessHub.subscribe(() => {
-    onEvent();
-  }, options);
-}
 
-export function subscribeMenuComposerCycleReasoning(
-  onEvent: () => void,
-  options?: SubscriptionOptions,
-): Unsubscribe {
-  return menuComposerCycleReasoningHub.subscribe(() => {
-    onEvent();
-  }, options);
-}
 
-export function subscribeMenuComposerCycleCollaboration(
-  onEvent: () => void,
-  options?: SubscriptionOptions,
-): Unsubscribe {
-  return menuComposerCycleCollaborationHub.subscribe(() => {
-    onEvent();
-  }, options);
-}
+
+
+
+
 
 export function subscribeOpenPaths(
   onEvent: (paths: string[]) => void,

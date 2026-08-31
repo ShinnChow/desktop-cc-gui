@@ -7,22 +7,14 @@ import {
   deleteGrokProvider,
   switchGrokProvider,
 } from "../../../services/tauri";
-import {
-  useVendorProviderManagement,
-  type VendorProviderDialogState,
-  type VendorProviderDeleteConfirmState,
-  type VendorProviderLoadOptions,
-  type VendorProviderManagementAdapter,
-} from "./useVendorProviderManagement";
+import { useVendorProviderManagement, type VendorProviderManagementAdapter } from "./useVendorProviderManagement";
 
 /** List load options. `silent` skips list-level loading UI (switch / external events). */
-export type GrokProviderLoadOptions = VendorProviderLoadOptions;
 
-export type GrokProviderDialogState =
-  VendorProviderDialogState<GrokProviderConfig>;
 
-export type DeleteGrokConfirmState =
-  VendorProviderDeleteConfirmState<GrokProviderConfig>;
+
+
+
 
 const GROK_ADAPTER: VendorProviderManagementAdapter<
   GrokProviderConfig,
@@ -69,6 +61,4 @@ export function useGrokProviderManagement() {
   };
 }
 
-export type UseGrokProviderManagementReturn = ReturnType<
-  typeof useGrokProviderManagement
->;
+

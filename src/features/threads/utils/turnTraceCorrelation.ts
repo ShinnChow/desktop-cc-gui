@@ -22,17 +22,7 @@ export type TurnTraceMilestoneName =
   | "first-visible-text-growth"
   | "terminal-settlement";
 
-export const TURN_TRACE_MILESTONE_NAMES: readonly TurnTraceMilestoneName[] = [
-  "user-send-committed",
-  "runtime-process-started",
-  "first-engine-delta-ingress",
-  "batch-flush-start",
-  "batch-flush-end",
-  "reducer-commit",
-  "first-visible-row-render",
-  "first-visible-text-growth",
-  "terminal-settlement",
-] as const;
+
 
 export type TurnTraceEvidenceClass = "measured" | "proxy" | "manual-only" | "unsupported";
 

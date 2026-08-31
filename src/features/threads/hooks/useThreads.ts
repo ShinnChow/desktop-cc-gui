@@ -67,10 +67,7 @@ import {
   resolvePendingThreadIdForSession,
   resolvePendingThreadIdForTurn,
 } from "../utils/threadPendingResolution";
-export {
-  resolvePendingThreadIdForSession,
-  resolvePendingThreadIdForTurn,
-} from "../utils/threadPendingResolution";
+
 import {
   isGhostClientSessionIndexDeleteError,
   mapDeleteErrorCode,

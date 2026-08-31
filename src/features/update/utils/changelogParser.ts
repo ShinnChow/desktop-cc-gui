@@ -173,17 +173,7 @@ export function parseChangelogEntries(markdown: string): ReleaseNotesEntry[] {
   return entries;
 }
 
-export function toReleaseNotesCatalogItem(
-  entry: ReleaseNotesEntry,
-): ReleaseNotesCatalogItem {
-  return {
-    id: entry.id,
-    tagName: entry.tagName,
-    version: entry.version,
-    title: entry.title,
-    dateLabel: entry.dateLabel,
-  };
-}
+
 
 export function findReleaseIndex(
   entries: ReadonlyArray<Pick<ReleaseNotesEntry, "version">>,

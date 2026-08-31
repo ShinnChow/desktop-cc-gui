@@ -140,10 +140,7 @@ function normalizeWindowErrorMessage(payload: unknown): string {
   return JSON.stringify(payload ?? "unknown error");
 }
 
-export async function hasDetachedFileExplorerWindow(): Promise<boolean> {
-  const existing = await WebviewWindow.getByLabel(DETACHED_FILE_EXPLORER_WINDOW_LABEL);
-  return existing !== null;
-}
+
 
 async function createDetachedFileExplorerWindow(
   windowLabel: string,

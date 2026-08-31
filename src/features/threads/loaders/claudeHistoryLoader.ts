@@ -19,7 +19,6 @@ import {
 import { parseClaudeHistoryMessagesWithShadowRecovery } from "./claudeShadowRecovery";
 export {
   parseClaudeHistoryMessagesWithShadowRecovery,
-  recoverClaudeInterruptedAssistantFromShadow,
 } from "./claudeShadowRecovery";
 import {
   extractClaudeAssistantFinalFlag,

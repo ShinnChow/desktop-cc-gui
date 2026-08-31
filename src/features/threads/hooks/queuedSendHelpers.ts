@@ -31,7 +31,7 @@ export function __setEnableBackgroundQueueDrainForTests(enabled: boolean): void 
   enableBackgroundQueueDrain = enabled;
 }
 /** @deprecated 使用 getEnableBackgroundQueueDrain()；保留导出名避免外部误引用常量快照 */
-export const ENABLE_BACKGROUND_QUEUE_DRAIN = true;
+
 /** native 成功后若 isProcessing 边沿丢失，超时清 inFlight（不重发，仅放行下一条）。 */
 export const NATIVE_INFLIGHT_SETTLE_FALLBACK_MS = 3_000;
 

@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  type ReactNode,
-} from "react";
+import { createContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 
 /**
  * T2.3：Layout chrome 低 churn Context。
@@ -70,19 +63,9 @@ export function LayoutChromeProvider(props: {
   );
 }
 
-export function useLayoutChromeContext(): LayoutChromeProviderValue {
-  const value = useContext(LayoutChromeContext);
-  if (!value) {
-    throw new Error(
-      "useLayoutChromeContext must be used within LayoutChromeProvider",
-    );
-  }
-  return value;
-}
 
-export function useOptionalLayoutChromeContext(): LayoutChromeProviderValue | null {
-  return useContext(LayoutChromeContext);
-}
+
+
 
 export function useMemoizedLayoutChromeProviderValue(
   input: LayoutChromeProviderValue,

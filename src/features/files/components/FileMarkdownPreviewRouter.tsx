@@ -14,9 +14,7 @@ import {
 import { PreviewOutlineSidebar } from "./PreviewOutlineSidebar";
 import type { PreviewOutlineItem } from "../utils/filePreviewOutline";
 
-export {
-  clearFileMarkdownPreviewRuntimeCachesForTests,
-} from "./FileMarkdownPreview";
+
 
 const LOCAL_MARKDOWN_IMAGE_TARGET_REGEX =
   /\.(?:apng|avif|bmp|gif|jpe?g|png|svg|webp)(?:[?#][^\s)]*)?$/i;

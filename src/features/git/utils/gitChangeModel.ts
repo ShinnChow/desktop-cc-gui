@@ -8,11 +8,7 @@ export type CanonicalGitChangeSource = {
   statusInferred: boolean;
 };
 
-export type CanonicalGitChange = GitFileStatus & {
-  normalizedPath: string;
-  section: CanonicalGitChangeSection;
-  source: CanonicalGitChangeSource;
-};
+
 
 export type CanonicalGitChanges = {
   files: GitFileStatus[];
