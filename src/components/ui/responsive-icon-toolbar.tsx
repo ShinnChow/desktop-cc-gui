@@ -210,7 +210,7 @@ export function ResponsiveIconToolbar({
       className={className}
       role={role}
       aria-label={ariaLabel}
-      data-tauri-drag-region="false"
+      data-tauri-drag-region
     >
       {leadingVisibleItems.map((item) => (
         <TooltipIconButton

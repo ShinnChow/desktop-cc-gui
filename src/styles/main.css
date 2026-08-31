@@ -1995,7 +1995,7 @@ body.editor-horizontal-split-resizing * {
   box-sizing: border-box;
   position: relative;
   z-index: 3;
-  -webkit-app-region: no-drag;
+  -webkit-app-region: drag;
 }
 
 .right-panel-toolbar.has-git-mode-slot {

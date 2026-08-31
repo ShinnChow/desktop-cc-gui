@@ -28,6 +28,7 @@ describe("useWindowDrag", () => {
     document.body.innerHTML = "";
     const titlebar = document.createElement("div");
     titlebar.id = "titlebar";
+    titlebar.setAttribute("data-tauri-drag-region", "");
     document.body.appendChild(titlebar);
 
     mocks.getCurrentWindow.mockReset();
@@ -92,6 +93,54 @@ describe("useWindowDrag", () => {
     await flushMicrotasks();
 
     expect(isFullscreen).toHaveBeenCalledTimes(1);
+    expect(startDragging).not.toHaveBeenCalled();
+  });
+
+  it("starts non-Windows dragging from the right toolbar blank region", async () => {
+    const isFullscreen = vi.fn().mockResolvedValue(false);
+    const startDragging = vi.fn().mockResolvedValue(undefined);
+    mocks.getCurrentWindow.mockReturnValue({ isFullscreen, startDragging });
+    const toolbar = document.createElement("div");
+    toolbar.className = "right-panel-toolbar";
+    toolbar.setAttribute("data-tauri-drag-region", "");
+    document.body.appendChild(toolbar);
+
+    renderHook(() => useWindowDrag("titlebar"));
+    toolbar.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        buttons: 1,
+        detail: 1,
+      }),
+    );
+    await flushMicrotasks();
+
+    expect(startDragging).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps right toolbar controls non-draggable", async () => {
+    const isFullscreen = vi.fn().mockResolvedValue(false);
+    const startDragging = vi.fn().mockResolvedValue(undefined);
+    mocks.getCurrentWindow.mockReturnValue({ isFullscreen, startDragging });
+    const toolbar = document.createElement("div");
+    toolbar.setAttribute("data-tauri-drag-region", "");
+    const button = document.createElement("button");
+    button.setAttribute("data-tauri-drag-region", "false");
+    toolbar.appendChild(button);
+    document.body.appendChild(toolbar);
+
+    renderHook(() => useWindowDrag("titlebar"));
+    button.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        buttons: 1,
+        detail: 1,
+      }),
+    );
+    await flushMicrotasks();
+
     expect(startDragging).not.toHaveBeenCalled();
   });
 
