@@ -8,10 +8,10 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-31T00:31:29.856Z
+- Generated at: 2026-08-31T04:37:41.344Z
 - Scope: fail
 - Policy version: 2026-08-30.policy-v5
-- Count: 31
+- Count: 25
 
 | File | Lines | Type | Policy | Priority | Warn | Fail | Severity | Status | Baseline | Delta |
 |---|---:|---|---|---|---:|---:|---|---|---:|---:|
@@ -25,14 +25,10 @@ status: generated
 | `src/services/tauri.test.ts` | 3508 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/styles/sidebar.css` | 3409 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadActions.test.tsx` | 3330 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
-| `src-tauri/src/backend/app_server_cli.rs` | 3306 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadsReducer.test.ts` | 3251 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
-| `src-tauri/src/browser_agent/mod.rs` | 3224 | rust | default-source | P1 | 2600 | 3000 | fail | captured |  |  |
 | `src-tauri/src/engine/pi.rs` | 3201 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src/utils/threadItems.test.ts` | 3193 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src-tauri/src/bin/cc_gui_daemon/daemon_state/git.rs` | 3170 | rust | default-source | P1 | 2600 | 3000 | fail | captured |  |  |
-| `src-tauri/src/local_usage.rs` | 3169 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
-| `src/features/files/components/FileViewPanel.tsx` | 3149 | ts/tsx | default-source | P1 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/git-history/components/GitHistoryPanel.test.tsx` | 3134 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/threads/loaders/historyLoaders.test.ts` | 3089 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadEventHandlers.test.ts` | 3078 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
@@ -44,6 +40,4 @@ status: generated
 | `src/styles/file-view-panel.css` | 2980 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src-tauri/src/engine/claude_history.rs` | 2881 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadMessaging.ts` | 2819 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
-| `src/features/settings/components/settings-view/sections/SessionManagementSection.tsx` | 2648 | ts/tsx | settings-view-sections | P1 | 1500 | 2000 | fail | captured |  |  |
-| `src-tauri/src/engine/grok_history.rs` | 2620 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
 
