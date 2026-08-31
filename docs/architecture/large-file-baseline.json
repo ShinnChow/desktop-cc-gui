@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-31T03:56:18.803Z",
+  "generatedAt": "2026-08-31T04:37:41.346Z",
   "scope": "fail",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -114,16 +114,6 @@
       "thresholdSource": "policy"
     },
     {
-      "path": "src-tauri/src/browser_agent/mod.rs",
-      "lines": 3224,
-      "type": "rust",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 3000,
-      "thresholdSource": "policy"
-    },
-    {
       "path": "src-tauri/src/engine/pi.rs",
       "lines": 3201,
       "type": "rust",
@@ -147,26 +137,6 @@
       "path": "src-tauri/src/bin/cc_gui_daemon/daemon_state/git.rs",
       "lines": 3170,
       "type": "rust",
-      "policyId": "default-source",
-      "priority": "P1",
-      "warnThreshold": 2600,
-      "failThreshold": 3000,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src-tauri/src/local_usage.rs",
-      "lines": 3169,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 2600,
-      "thresholdSource": "policy"
-    },
-    {
-      "path": "src/features/files/components/FileViewPanel.tsx",
-      "lines": 3149,
-      "type": "ts/tsx",
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,

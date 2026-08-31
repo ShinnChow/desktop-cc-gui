@@ -159,3 +159,11 @@ created: 2026-08-31
 | app_server_cli.rs | 3306 | 2458 |
 | gate | 绿 | 绿（baseline 咬新值） |
 | tsc | 零 error | 零 error |
+### 波 2（2026-08-31 第三会话，3 代理并行，落地 1 commit）
+
+- **A3 FileViewPanel**：3149→2023（纪律④算不到 ~1500，提前拍板接受：菜单 deps 逐字留调用点 + bag 逐名 59 名 + Footer 33 props/Tabs 20 props 使用块 ~370 行硬底；再降需动核心状态 wiring，计划外）。新建 fileViewContextMenus.tsx 717（两 deps 对象 40+19 名，menu item id 不变）+ useFileImagePreview 112 + useFileTabDrag 133（两 ref 随迁）+ FileViewPanelTabs 160 + FileViewExternalChangeOverlays 169 + FileViewPanelFooter 386。12 chunk byte-identical 审计（md5 登记）；测试 21 文件 150/152 前后一致（2 个 open-in-browser 5s 超时 pre-existing flaky，新增存量名单）。
+- **B3 browser_agent**：3224→mod.rs 57 + 13 个子模块（state/routing/diagnostics/capture/snapshot/tab_context_menu/webview/url_validation/commands_query/sessions/webview/snapshot/actions）+ tests.rs 276 逐字外移。130 处机械 pub(crate) 为唯一偏差（跨模块必需）；command_registry 23 命令等调用点零改动；cargo test 18/18 前后一致。
+- **B4 local_usage**：主体 3169→1103（5 个 #[path] 平铺桶：codex_session_list 742/codex_session_parse 413/codex_summary_helpers 515/codex_session_roots 230/claude_scan 228）；tests.rs 2577→1844 + tests/session_mutation.rs 739（两段均 <2000）。43 处 pub(crate) bump + 52 行 decl 块为唯一偏差；20+ 引用方零改动；cargo test 71+71 前后一致；tests.rs 内 child mod 需显式 #[path]（E0583 教训）。
+- 波末：两道 baseline 重生成 + gate 绿 + 删 tsbuildinfo tsc 零 error。
+
+**教训增补**：⑧ #[path] 加载的测试文件内再声明 child mod 必须继续显式 #[path]（裸 mod 触发 E0583）；⑨ 并行代理共享 target 时 cargo check exit 101 / 引用未落盘文件 E0583 为 transient，hub 协调后重跑即可。
