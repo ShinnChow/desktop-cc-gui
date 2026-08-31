@@ -1,7 +1,4 @@
 import {
-  lazy,
-  Profiler,
-  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -13,37 +10,24 @@ import {
 import { useEventCallback } from "../../../utils/useEventCallback";
 import { useSidebarThreadStatusProjection } from "../../threads/hooks/useSidebarThreadStatusProjection";
 import { useTranslation } from "react-i18next";
-import { Sidebar } from "../../app/components/Sidebar";
-import { HomeChat } from "../../home/components/HomeChat";
-import { MainHeader } from "../../app/components/MainHeader";
+import { buildSidebarNode } from "./layoutNodes/sidebarNode";
 import {
   CODEX_DISK_PROVIDER_PROFILE_ID,
   type CodexProviderProfileSelection,
   type CodexProviderProfileOption,
 } from "../../threads/constants/codexProviderProfiles";
-import { isManagedEngineProviderProfileId } from "../../threads/hooks/sessionLifecycleController";
-import { UpdateToast } from "../../update/components/UpdateToast";
-import { ErrorToasts } from "../../notifications/components/ErrorToasts";
 import { GlobalRuntimeNoticeDock } from "../../notifications/components/GlobalRuntimeNoticeDock";
 import type {
   ComposerNoteCardSelectionRequest,
   ComposerRewindDialogRequest,
 } from "../../composer/components/Composer";
-import { GitDiffViewer } from "../../git/components/GitDiffViewer";
 import { buildCanonicalGitChanges } from "../../git/utils/gitChangeModel";
 import {
   publishGitRepositoryActionIntent,
   type GitRepositoryActionRequest,
 } from "../../git/types/gitRepositoryActions";
 import type { GitModalPreviewRequest } from "../../git/components/GitDiffPanelTypes";
-import {
-  FileTreePanel,
-  type FileTreeRevealRequest,
-} from "../../files/components/FileTreePanel";
-import { WorkspaceFileComparePanel } from "../../files/components/WorkspaceFileComparePanel";
-import { WorkspaceSearchPanel } from "../../search/components/WorkspaceSearchPanel";
-import { PromptPanel } from "../../prompts/components/PromptPanel";
-import { ProjectMemoryPanel } from "../../project-memory/components/ProjectMemoryPanel";
+import type { FileTreeRevealRequest } from "../../files/components/FileTreePanel";
 import type {
   CanvasSemanticGraph,
   IntentCanvasCodeSelectionAnchor,
@@ -53,21 +37,16 @@ import {
   buildGitStatusProjectMapImpactInput,
   type ProjectMapImpactInput,
 } from "../../project-map/utils/impactSources";
-import { WorkspaceNoteCardPanel } from "../../note-cards/components/WorkspaceNoteCardPanel";
 import type {
   NoteCaptureDraft,
   WorkspaceNoteCaptureRequest,
 } from "../../note-cards/types";
-import { WorkspaceSessionRadarPanel } from "../../session-activity/components/WorkspaceSessionRadarPanel";
-import { TabBar } from "../../app/components/TabBar";
-import { TabletNav } from "../../app/components/TabletNav";
 import { useGlobalRuntimeNoticeDock } from "../../notifications/hooks/useGlobalRuntimeNoticeDock";
 import type { EditorNavigationLocation } from "../../app/hooks/useGitPanelController";
 import type {
   CustomCommandOption,
   EngineType,
   RequestUserInputRequest,
-  ThreadSummary,
 } from "../../../types";
 import { __profile as threadsRuntimeProfile } from "../../threads/hooks/useThreadsReducer";
 import { getClientStoreSync } from "../../../services/clientStorage";
@@ -86,10 +65,7 @@ import {
   buildCodeAnnotationDedupeKey,
   createCodeAnnotationSelection,
 } from "../../code-annotations/utils/codeAnnotations";
-import type {
-  ConversationEngine,
-  ConversationState,
-} from "../../threads/contracts/conversationCurtainContracts";
+import type { ConversationState } from "../../threads/contracts/conversationCurtainContracts";
 import { resolveDiffPathFromWorkspacePath } from "../../../utils/workspacePaths";
 import { resolvePresentationProfile } from "../../../conversation-presentation/presentationProfile";
 import { appendQueuedHandoffBubbleIfNeeded } from "../../threads/utils/queuedHandoffBubble";
@@ -98,7 +74,6 @@ import { DISABLED_WORKSPACE_SESSION_ACTIVITY } from "../../session-activity/adap
 import { useClientUiVisibility } from "../../client-ui-visibility/hooks/useClientUiVisibility";
 import {
   getHomeWorkspaceOptions,
-  resolveHomeWorkspaceId,
 } from "../../home/utils/homeWorkspaceOptions";
 import { deriveRewindWorkspaceGitState } from "./rewindWorkspaceGitState";
 import { buildWorkspaceHeaderGroups } from "./workspaceHeaderGroups";
@@ -116,22 +91,31 @@ import {
   stabilizeListByMemberIdentity,
   type ActiveCanvasSnapshot,
 } from "./activeCanvasStore";
-import { ActiveCanvasComposer } from "./activeCanvasComposerNode";
-import { SharedSendStatusBar } from "../../shared-session/components/SharedSendStatusBar";
-import { ProviderContinuationContextCard } from "../../shared-session/components/ProviderContinuationContextCard";
 import { buildProviderContinuationSourceExcerpt } from "../../shared-session/components/providerContinuationSourceExcerpt";
 import { useSharedSendState } from "../../shared-session/runtime/sharedSendStateStore";
 import { useSharedSendStateRestore } from "../../shared-session/runtime/useSharedSendStateRestore";
-import {
-  isComposerInputLocked,
-  isComposerSubmitLocked,
-  isPickerLocked,
-} from "../../shared-session/target/sendStateMachine";
 import { buildShellRuntimeSummary } from "./layoutShellSummary";
-import { buildConversationCanvasNode } from "./conversationCanvasNode";
-import { CollabTimelineWaiting } from "../../multi-agent/components/CollabTimelineWaiting";
+import { buildComposerNode } from "./layoutNodes/composerNode";
+import { buildMessagesNode } from "./layoutNodes/messagesNode";
+import { buildGitDiffPanelNode } from "./layoutNodes/gitDiffPanelNode";
+import {
+  buildGitDiffViewerNode,
+  buildFileViewPanelNode,
+  buildNoteCardsPanelNode,
+  buildFileComparePanelNode,
+  buildProjectMapPanelNode,
+  buildIntentCanvasPanelNode,
+} from "./layoutNodes/panelNodes";
+import {
+  buildHomeNode,
+  buildMainHeaderNode,
+  buildTabletNavNode,
+  buildTabBarNode,
+  buildUpdateToastNode,
+  buildErrorToastsNode,
+  buildBrowserDockNode,
+} from "./layoutNodes/chromeNodes";
 import { useCollabUiState } from "../../multi-agent/store/collabUiStore";
-import { SharedProviderRetryHint } from "../../shared-session/provider-retry/SharedProviderRetryHint";
 import { useSharedProviderRetry } from "../../shared-session/provider-retry/useSharedProviderRetry";
 import { resolveIsSharedSession } from "../../shared-session/utils/sharedSessionIdentity";
 import { useLayoutTopbarSessionTabs } from "./useLayoutTopbarSessionTabs";
@@ -148,35 +132,6 @@ import {
   buildTerminalDockNode,
 } from "./layoutNodeSections";
 
-const GitDiffPanel = lazy(() =>
-  import("../../git/components/GitDiffPanel").then((m) => ({
-    default: m.GitDiffPanel,
-  })),
-);
-const FileViewPanel = lazy(() =>
-  import("../../files/components/FileViewPanel").then((m) => ({
-    default: m.FileViewPanel,
-  })),
-);
-const BrowserDock = lazy(() =>
-  import("../../browser-agent/components/BrowserDock").then((m) => ({
-    default: m.BrowserDock,
-  })),
-);
-const ProjectMapPanel = lazy(() =>
-  import("../../project-map/components/ProjectMapPanel").then((m) => ({
-    default: m.ProjectMapPanel,
-  })),
-);
-const IntentCanvasManager = lazy(() =>
-  import("../../intent-canvas/components/IntentCanvasManager").then((m) => ({
-    default: m.IntentCanvasManager,
-  })),
-);
-
-function HeavyPanelFallback() {
-  return <div className="heavy-panel-fallback" aria-hidden="true" />;
-}
 
 import type {
   LayoutNodesFlatOptions,
@@ -184,6 +139,11 @@ import type {
   LayoutNodesResult,
   RightPanelTabSelection,
 } from "./layoutNodesTypes";
+import {
+  collectCanvasChildSubagentThreads,
+  resolveActiveConversationEngine,
+} from "./layoutNodes/engineResolve";
+export { collectCanvasChildSubagentThreads } from "./layoutNodes/engineResolve";
 const EMPTY_COMMANDS: CustomCommandOption[] = [];
 const EMPTY_PROJECT_MAP_IMPACT_INPUT: ProjectMapImpactInput = {
   filePaths: [],
@@ -193,152 +153,6 @@ const EMPTY_PROJECT_MAP_IMPACT_INPUT: ProjectMapImpactInput = {
     fileCount: 0,
   },
 };
-
-function toConversationEngine(
-  engine: EngineType | undefined,
-): ConversationEngine {
-  if (
-    engine === "claude" ||
-    engine === "gemini" ||
-    engine === "grok" ||
-    engine === "kimi" ||
-    engine === "opencode" ||
-    engine === "dsh" ||
-    engine === "qoder" ||
-    engine === "pi"
-  ) {
-    return engine;
-  }
-  return "codex";
-}
-
-function inferConversationEngineFromThreadId(
-  threadId: string | null | undefined,
-): ConversationEngine | null {
-  const normalizedThreadId = threadId?.trim().toLowerCase();
-  if (!normalizedThreadId) {
-    return null;
-  }
-
-  if (
-    normalizedThreadId.startsWith("claude:") ||
-    normalizedThreadId.startsWith("claude-pending-")
-  ) {
-    return "claude";
-  }
-  if (
-    normalizedThreadId.startsWith("gemini:") ||
-    normalizedThreadId.startsWith("gemini-pending-")
-  ) {
-    return "gemini";
-  }
-  if (
-    normalizedThreadId.startsWith("grok:") ||
-    normalizedThreadId.startsWith("grok-pending-")
-  ) {
-    return "grok";
-  }
-  if (
-    normalizedThreadId.startsWith("kimi:") ||
-    normalizedThreadId.startsWith("kimi-pending-")
-  ) {
-    return "kimi";
-  }
-  if (
-    normalizedThreadId.startsWith("pi:") ||
-    normalizedThreadId.startsWith("pi-pending-")
-  ) {
-    return "pi";
-  }
-  if (
-    normalizedThreadId.startsWith("opencode:") ||
-    normalizedThreadId.startsWith("opencode-pending-")
-  ) {
-    return "opencode";
-  }
-  if (
-    normalizedThreadId.startsWith("dsh:") ||
-    normalizedThreadId.startsWith("dsh-pending-")
-  ) {
-    return "dsh";
-  }
-  if (
-    normalizedThreadId.startsWith("qoder:") ||
-    normalizedThreadId.startsWith("qoder-pending-")
-  ) {
-    return "qoder";
-  }
-  if (
-    normalizedThreadId.startsWith("codex:") ||
-    normalizedThreadId.startsWith("codex-pending-")
-  ) {
-    return "codex";
-  }
-
-  return null;
-}
-
-function resolveActiveConversationEngine(
-  activeThreadSummary: ThreadSummary | null,
-  activeThreadId: string | null,
-  selectedEngine: EngineType | undefined,
-): ConversationEngine {
-  const threadEngine =
-    activeThreadSummary?.selectedEngine ??
-    activeThreadSummary?.engineSource ??
-    inferConversationEngineFromThreadId(activeThreadId);
-  return toConversationEngine(threadEngine ?? selectedEngine);
-}
-
-/**
- * 收集当前 canvas 会话的「子代理线程」。
- *
- * - parent 直接挂到 activeId 的行（grok 等 Shared remap 后的子行）
- * - Shared 父：`claude:subagent:{owner}:{agentId}` 行 parentThreadId 为空，
- *   owner 命中该 Shared 的 nativeThreadIds 即视为子代理
- *   （与侧栏树对 claude:subagent id 的解析口径一致）。
- */
-export function collectCanvasChildSubagentThreads(
-  activeId: string | null | undefined,
-  workspaceId: string | null | undefined,
-  threads: readonly ThreadSummary[] | undefined,
-  threadParentById: Record<string, string>,
-  nativeThreadIds: readonly string[] | undefined,
-): ThreadSummary[] {
-  if (!activeId || !workspaceId || !threads) {
-    return [];
-  }
-  const isSharedParent = activeId.startsWith("shared:");
-  const owners = isSharedParent
-    ? (nativeThreadIds ?? []).filter((id) => id.trim().length > 0)
-    : [];
-  return threads.filter((thread) => {
-    // pi fork 派生会话不是子代理：pi 没有 subagent 概念，parentThreadId 在 pi
-    // 语义里是会话分支（fork-to-new-file），分支归属由会话树单独控制，
-    // 不计入子代理（capability-router-allow-engine-branch：pi 分域，见
-    // enhance-pi-native-rpc-session）。
-    if (thread.engineSource === "pi" || thread.id.startsWith("pi:")) {
-      return false;
-    }
-    const parent =
-      thread.parentThreadId ?? threadParentById[thread.id] ?? null;
-    if (parent === activeId) {
-      return true;
-    }
-    if (owners.length === 0) {
-      return false;
-    }
-    return owners.some((owner) => {
-      const bare = owner.startsWith("claude:")
-        ? owner.slice("claude:".length)
-        : owner;
-      return (
-        thread.id.startsWith(`claude:subagent:${owner}:`) ||
-        thread.id.startsWith(`claude:subagent:${bare}:`)
-      );
-    });
-  });
-}
 
 function flattenLayoutNodesOptions(
   options: LayoutNodesOptions,
@@ -775,137 +589,121 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
   // 稳定 sidebar 元素引用，避免 AppLayout memo 因 ReactNode 身份变化而失效。
   // Sidebar 本身已 memo；根链合法更新时若 props 未变则整棵侧栏跳过协调。
   const sidebarNode = useMemo(
-    () => (
-      <Profiler id="sidebar" onRender={handleRuntimeProfileRender}>
-        <Sidebar
-          workspaces={options.workspaces}
-          groupedWorkspaces={options.groupedWorkspaces}
-          hasWorkspaceGroups={options.hasWorkspaceGroups}
-          deletingWorktreeIds={options.deletingWorktreeIds}
-          threadsByWorkspace={options.threadsByWorkspace}
-          activeItems={sidebarActiveItems}
-          threadParentById={options.threadParentById}
-          threadStatusById={sidebarThreadStatusById}
-          runningSessionCountByWorkspaceId={
-            options.runningSessionCountByWorkspaceId
-          }
-          recentSessionCountByWorkspaceId={
-            options.recentCompletedSessionCountByWorkspaceId
-          }
-          hydratedThreadListWorkspaceIds={options.hydratedThreadListWorkspaceIds}
-          threadListLoadingByWorkspace={options.threadListLoadingByWorkspace}
-          threadListPagingByWorkspace={options.threadListPagingByWorkspace}
-          threadListCursorByWorkspace={options.threadListCursorByWorkspace}
-          activeWorkspaceId={options.activeWorkspaceId}
-          activeThreadId={options.activeThreadId}
-          systemProxyEnabled={options.systemProxyEnabled}
-          systemProxyUrl={options.systemProxyUrl}
-          onUpdateSystemProxy={options.onUpdateSystemProxy}
-          accountRateLimits={options.activeRateLimits}
-          usageShowRemaining={options.usageShowRemaining}
-          showProviderLabels={options.showSidebarProviderLabels}
-          defaultVisibleThreadRootCount={options.defaultVisibleThreadRootCount}
-          onChangeDefaultVisibleThreadRootCount={
-            options.onChangeDefaultVisibleThreadRootCount
-          }
-          accountInfo={options.accountInfo}
-          onSwitchAccount={options.onSwitchAccount}
-          onCancelSwitchAccount={options.onCancelSwitchAccount}
-          accountSwitching={options.accountSwitching}
-          onOpenSettings={options.onOpenSettings}
-          onOpenSessionManagement={options.onOpenSessionManagement}
-          onOpenDebug={options.onOpenDebug}
-          showDebugButton={options.showDebugButton}
-          onAddWorkspace={options.onAddWorkspace}
-          onSelectHome={options.onSelectHome}
-          onSelectWorkspace={options.onSelectWorkspace}
-          onReorderWorkspaces={options.onReorderWorkspaces}
-          onConnectWorkspace={options.onConnectWorkspace}
-          onAddAgent={options.onAddAgent}
-          engineOptions={options.engineOptions}
-          onRefreshEngineOptions={options.onRefreshEngineOptions}
-          onAddSharedAgent={options.onAddSharedAgent}
-          onAddWorktreeAgent={options.onAddWorktreeAgent}
-          onAddCloneAgent={options.onAddCloneAgent}
-          onToggleWorkspaceCollapse={options.onToggleWorkspaceCollapse}
-          onSelectThread={options.onSelectThread}
-          onProviderContinuationTargetReady={
-            options.onProviderContinuationTargetReady
-          }
-          onDeleteThread={options.onDeleteThread}
-          onArchiveThread={options.onArchiveThread}
-          deleteConfirmThreadId={options.deleteConfirmThreadId}
-          deleteConfirmWorkspaceId={options.deleteConfirmWorkspaceId}
-          deleteConfirmBusy={options.deleteConfirmBusy}
-          onCancelDeleteConfirm={options.onCancelDeleteConfirm}
-          onConfirmDeleteConfirm={options.onConfirmDeleteConfirm}
-          renameThreadId={options.renameThreadId}
-          renameWorkspaceId={options.renameWorkspaceId}
-          renameName={options.renameName}
-          onRenameChange={options.onRenameChange}
-          onRenameCancel={options.onRenameCancel}
-          onRenameConfirm={options.onRenameConfirm}
-          onSyncThread={options.onSyncThread}
-          pinThread={options.pinThread}
-          unpinThread={options.unpinThread}
-          isThreadPinned={options.isThreadPinned}
-          isThreadAutoNaming={options.isThreadAutoNaming}
-          getPinTimestamp={options.getPinTimestamp}
-          pinnedThreadsVersion={options.pinnedThreadsVersion}
-          onRenameThread={options.onRenameThread}
-          onAutoNameThread={options.onAutoNameThread}
-          onOpenClaudeTui={options.onOpenClaudeTui}
-          onDeleteWorkspace={options.onDeleteWorkspace}
-          onDeleteWorktree={options.onDeleteWorktree}
-          onRenameWorkspaceAlias={options.onRenameWorkspaceAlias}
-          workspaceGroups={options.workspaceGroups}
-          onAssignWorkspaceGroup={options.onAssignWorkspaceGroup}
-          onLoadOlderThreads={options.onLoadOlderThreads}
-          onReloadWorkspaceThreads={options.onReloadWorkspaceThreads}
-          onQuickReloadWorkspaceThreads={options.onQuickReloadWorkspaceThreads}
-          onRequestRootSessionFolderDraft={options.onRequestRootSessionFolderDraft}
-          isExitedSessionsHidden={options.isExitedSessionsHidden}
-          onToggleExitedSessionsHidden={options.onToggleExitedSessionsHidden}
-          rootSessionFolderDraftRequestByWorkspaceId={
-            options.rootSessionFolderDraftRequestByWorkspaceId
-          }
-          workspaceDropTargetRef={options.workspaceDropTargetRef}
-          isWorkspaceDropActive={options.isWorkspaceDropActive}
-          workspaceDropText={options.workspaceDropText}
-          onWorkspaceDragOver={options.onWorkspaceDragOver}
-          onWorkspaceDragEnter={options.onWorkspaceDragEnter}
-          onWorkspaceDragLeave={options.onWorkspaceDragLeave}
-          onWorkspaceDrop={options.onWorkspaceDrop}
-          appMode={options.appMode}
-          onAppModeChange={options.onAppModeChange}
-          onOpenHomeChat={options.onOpenHomeChat}
-          onLockPanel={options.onLockPanel}
-          onOpenProjectMemory={options.onOpenProjectMemory}
-          onOpenReleaseNotes={options.onOpenReleaseNotes}
-          onOpenGlobalSearch={options.onOpenGlobalSearch}
-          onOpenQuickSwitcher={options.onOpenQuickSwitcher}
-          onCollapseSidebar={options.onCollapseSidebar}
-          globalSearchShortcut={options.globalSearchShortcut}
-          openChatShortcut={options.openChatShortcut}
-          openSettingsShortcut={options.openSettingsShortcut}
-          showLoadingProgressDialog={options.showLoadingProgressDialog}
-          hideLoadingProgressDialog={options.hideLoadingProgressDialog}
-          onOpenSpecHub={options.onOpenSpecHub}
-          onOpenWorkspaceHome={options.onOpenWorkspaceHome}
-          showTerminalButton={options.showTerminalButton}
-          isTerminalOpen={options.terminalOpen}
-          onToggleTerminal={options.onToggleTerminal}
-          runtimeNoticeDockNode={sidebarRuntimeNoticeDockNode}
-          onOpenRuntimeNotice={
-            showGlobalRuntimeNoticeDock ? globalRuntimeNoticeDock.expand : undefined
-          }
-          showRuntimeNoticeMenuItem={
-            Boolean(showGlobalRuntimeNoticeDock && !options.isPhone)
-          }
-          runtimeNoticeHasError={globalRuntimeNoticeDock.status === "has-error"}
-        />
-      </Profiler>
-    ),
+    () =>
+      buildSidebarNode({
+        handleRuntimeProfileRender,
+        sidebarActiveItems,
+        sidebarThreadStatusById,
+        sidebarRuntimeNoticeDockNode,
+        showGlobalRuntimeNoticeDock,
+        globalRuntimeNoticeDock,
+        workspaces: options.workspaces,
+        groupedWorkspaces: options.groupedWorkspaces,
+        hasWorkspaceGroups: options.hasWorkspaceGroups,
+        deletingWorktreeIds: options.deletingWorktreeIds,
+        threadsByWorkspace: options.threadsByWorkspace,
+        threadParentById: options.threadParentById,
+        runningSessionCountByWorkspaceId: options.runningSessionCountByWorkspaceId,
+        recentCompletedSessionCountByWorkspaceId: options.recentCompletedSessionCountByWorkspaceId,
+        hydratedThreadListWorkspaceIds: options.hydratedThreadListWorkspaceIds,
+        threadListLoadingByWorkspace: options.threadListLoadingByWorkspace,
+        threadListPagingByWorkspace: options.threadListPagingByWorkspace,
+        threadListCursorByWorkspace: options.threadListCursorByWorkspace,
+        activeWorkspaceId: options.activeWorkspaceId,
+        activeThreadId: options.activeThreadId,
+        systemProxyEnabled: options.systemProxyEnabled,
+        systemProxyUrl: options.systemProxyUrl,
+        onUpdateSystemProxy: options.onUpdateSystemProxy,
+        activeRateLimits: options.activeRateLimits,
+        usageShowRemaining: options.usageShowRemaining,
+        showSidebarProviderLabels: options.showSidebarProviderLabels,
+        defaultVisibleThreadRootCount: options.defaultVisibleThreadRootCount,
+        onChangeDefaultVisibleThreadRootCount: options.onChangeDefaultVisibleThreadRootCount,
+        accountInfo: options.accountInfo,
+        onSwitchAccount: options.onSwitchAccount,
+        onCancelSwitchAccount: options.onCancelSwitchAccount,
+        accountSwitching: options.accountSwitching,
+        onOpenSettings: options.onOpenSettings,
+        onOpenSessionManagement: options.onOpenSessionManagement,
+        onOpenDebug: options.onOpenDebug,
+        showDebugButton: options.showDebugButton,
+        onAddWorkspace: options.onAddWorkspace,
+        onSelectHome: options.onSelectHome,
+        onSelectWorkspace: options.onSelectWorkspace,
+        onReorderWorkspaces: options.onReorderWorkspaces,
+        onConnectWorkspace: options.onConnectWorkspace,
+        onAddAgent: options.onAddAgent,
+        engineOptions: options.engineOptions,
+        onRefreshEngineOptions: options.onRefreshEngineOptions,
+        onAddSharedAgent: options.onAddSharedAgent,
+        onAddWorktreeAgent: options.onAddWorktreeAgent,
+        onAddCloneAgent: options.onAddCloneAgent,
+        onToggleWorkspaceCollapse: options.onToggleWorkspaceCollapse,
+        onSelectThread: options.onSelectThread,
+        onProviderContinuationTargetReady: options.onProviderContinuationTargetReady,
+        onDeleteThread: options.onDeleteThread,
+        onArchiveThread: options.onArchiveThread,
+        deleteConfirmThreadId: options.deleteConfirmThreadId,
+        deleteConfirmWorkspaceId: options.deleteConfirmWorkspaceId,
+        deleteConfirmBusy: options.deleteConfirmBusy,
+        onCancelDeleteConfirm: options.onCancelDeleteConfirm,
+        onConfirmDeleteConfirm: options.onConfirmDeleteConfirm,
+        renameThreadId: options.renameThreadId,
+        renameWorkspaceId: options.renameWorkspaceId,
+        renameName: options.renameName,
+        onRenameChange: options.onRenameChange,
+        onRenameCancel: options.onRenameCancel,
+        onRenameConfirm: options.onRenameConfirm,
+        onSyncThread: options.onSyncThread,
+        pinThread: options.pinThread,
+        unpinThread: options.unpinThread,
+        isThreadPinned: options.isThreadPinned,
+        isThreadAutoNaming: options.isThreadAutoNaming,
+        getPinTimestamp: options.getPinTimestamp,
+        pinnedThreadsVersion: options.pinnedThreadsVersion,
+        onRenameThread: options.onRenameThread,
+        onAutoNameThread: options.onAutoNameThread,
+        onOpenClaudeTui: options.onOpenClaudeTui,
+        onDeleteWorkspace: options.onDeleteWorkspace,
+        onDeleteWorktree: options.onDeleteWorktree,
+        onRenameWorkspaceAlias: options.onRenameWorkspaceAlias,
+        workspaceGroups: options.workspaceGroups,
+        onAssignWorkspaceGroup: options.onAssignWorkspaceGroup,
+        onLoadOlderThreads: options.onLoadOlderThreads,
+        onReloadWorkspaceThreads: options.onReloadWorkspaceThreads,
+        onQuickReloadWorkspaceThreads: options.onQuickReloadWorkspaceThreads,
+        onRequestRootSessionFolderDraft: options.onRequestRootSessionFolderDraft,
+        isExitedSessionsHidden: options.isExitedSessionsHidden,
+        onToggleExitedSessionsHidden: options.onToggleExitedSessionsHidden,
+        rootSessionFolderDraftRequestByWorkspaceId: options.rootSessionFolderDraftRequestByWorkspaceId,
+        workspaceDropTargetRef: options.workspaceDropTargetRef,
+        isWorkspaceDropActive: options.isWorkspaceDropActive,
+        workspaceDropText: options.workspaceDropText,
+        onWorkspaceDragOver: options.onWorkspaceDragOver,
+        onWorkspaceDragEnter: options.onWorkspaceDragEnter,
+        onWorkspaceDragLeave: options.onWorkspaceDragLeave,
+        onWorkspaceDrop: options.onWorkspaceDrop,
+        appMode: options.appMode,
+        onAppModeChange: options.onAppModeChange,
+        onOpenHomeChat: options.onOpenHomeChat,
+        onLockPanel: options.onLockPanel,
+        onOpenProjectMemory: options.onOpenProjectMemory,
+        onOpenReleaseNotes: options.onOpenReleaseNotes,
+        onOpenGlobalSearch: options.onOpenGlobalSearch,
+        onOpenQuickSwitcher: options.onOpenQuickSwitcher,
+        onCollapseSidebar: options.onCollapseSidebar,
+        globalSearchShortcut: options.globalSearchShortcut,
+        openChatShortcut: options.openChatShortcut,
+        openSettingsShortcut: options.openSettingsShortcut,
+        showLoadingProgressDialog: options.showLoadingProgressDialog,
+        hideLoadingProgressDialog: options.hideLoadingProgressDialog,
+        onOpenSpecHub: options.onOpenSpecHub,
+        onOpenWorkspaceHome: options.onOpenWorkspaceHome,
+        showTerminalButton: options.showTerminalButton,
+        terminalOpen: options.terminalOpen,
+        onToggleTerminal: options.onToggleTerminal,
+        isPhone: options.isPhone,
+      }),
     [
       globalRuntimeNoticeDock.expand,
       globalRuntimeNoticeDock.status,
@@ -1362,96 +1160,47 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
 
   const messagesNode = useMemo(
     () =>
-      buildConversationCanvasNode({
-        isProviderContinuation:
-          activeThreadSummary?.originKind === "provider-continuation",
-        timelineTrailingNode: (
-          <>
-            <CollabTimelineWaiting
-              workspaceId={options.activeWorkspaceId}
-              threadId={options.activeThreadId ?? null}
-            />
-            <SharedProviderRetryHint
-              workspaceId={options.activeWorkspaceId}
-              threadId={options.activeThreadId ?? null}
-            />
-          </>
-        ),
-        continuationContextNode:
-          activeThreadSummary?.originKind === "provider-continuation" ? (
-            <ProviderContinuationContextCard
-              thread={activeThreadSummary}
-              source={continuationContext?.source ?? null}
-              sourceExcerpt={continuationContext?.sourceExcerpt ?? null}
-              onOpenSource={continuationContext?.onOpenSource ?? null}
-            />
-          ) : null,
-        messagesProps: {
-          items: EMPTY_ACTIVE_CANVAS_ITEMS,
-          threadId: null,
-          workspaceId: null,
-          workspacePath: null,
-          openTargets: options.openAppTargets,
-          selectedOpenAppId: options.selectedOpenAppId,
-          showMessageAnchors,
-          codeBlockCopyUseModifier: options.codeBlockCopyUseModifier,
-          userInputRequests: [],
-          approvals: [],
-          workspaces: options.workspaces,
-          onUserInputSubmit: options.handleUserInputSubmit,
-          onUserInputDismiss: options.handleUserInputDismiss,
-          onRecoverThreadRuntime: options.onRecoverThreadRuntime,
-          onRecoverThreadRuntimeAndResend:
-            options.onRecoverThreadRuntimeAndResend,
-          onThreadRecoveryFork: options.onThreadRecoveryFork,
-          onForkFromMessage: onForkFromMessage
-            ? handleOpenForkConfirmFromMessage
-            : undefined,
-          onRewindFromMessage: options.onRewind
-            ? handleOpenRewindDialogFromMessage
-            : undefined,
-          onApprovalDecision: options.handleApprovalDecision,
-          onApprovalBatchAccept: options.handleApprovalBatchAccept,
-          onApprovalRemember: options.handleApprovalRemember,
-          conversationState: null,
-          presentationProfile,
-          activeEngine: conversationEngine,
-          claudeThinkingVisible,
-          activeCollaborationModeId: options.selectedCollaborationModeId,
-          plan: null,
-          isPlanMode: options.isPlanMode,
-          isPlanProcessing: false,
-          onOpenDiffPath: handleOpenDiffPath,
-          onPreviewFileDiff: handlePreviewFileDiff,
-          onOpenPlanPanel: options.onOpenPlanPanel,
-          onExitPlanModeExecute: options.handleExitPlanModeExecute,
-          onOpenWorkspaceFile: options.onOpenFile,
-          onCaptureNote: handleCaptureWorkspaceNote,
-          agentTaskScrollRequest: options.agentTaskScrollRequest,
-          isThinking: false,
-          isHistoryLoading: false,
-          historyRecoveryFailureReason: null,
-          onRetryHistory: options.onRecoverThreadRuntime
-            ? handleRetryHistory
-            : undefined,
-          isContextCompacting: false,
-          proxyEnabled: options.systemProxyEnabled,
-          proxyUrl: options.systemProxyUrl,
-          processingStartedAt: null,
-          lastDurationMs: null,
-          heartbeatPulse: 0,
-          codexSilentSuspectedAt: null,
-        },
-        forkConfirmDialogProps: {
-          userMessageId: forkConfirmUserMessageId,
-          onCancel: handleCancelForkConfirm,
-          onConfirm: handleConfirmForkFromMessage,
-          showProviderSelector: conversationEngine === "codex",
-          defaultProviderProfileId:
-            activeThreadSummary?.providerProfileId ??
-            CODEX_DISK_PROVIDER_PROFILE_ID,
-          providerProfiles: codexForkProviderProfiles,
-        },
+      buildMessagesNode({
+        activeThreadSummary,
+        continuationContext,
+        showMessageAnchors,
+        onForkFromMessage,
+        handleOpenForkConfirmFromMessage,
+        handleOpenRewindDialogFromMessage,
+        presentationProfile,
+        conversationEngine,
+        claudeThinkingVisible,
+        handleOpenDiffPath,
+        handlePreviewFileDiff,
+        handleCaptureWorkspaceNote,
+        handleRetryHistory,
+        forkConfirmUserMessageId,
+        handleCancelForkConfirm,
+        handleConfirmForkFromMessage,
+        codexForkProviderProfiles,
+        activeWorkspaceId: options.activeWorkspaceId,
+        activeThreadId: options.activeThreadId,
+        openAppTargets: options.openAppTargets,
+        selectedOpenAppId: options.selectedOpenAppId,
+        codeBlockCopyUseModifier: options.codeBlockCopyUseModifier,
+        workspaces: options.workspaces,
+        handleUserInputSubmit: options.handleUserInputSubmit,
+        handleUserInputDismiss: options.handleUserInputDismiss,
+        onRecoverThreadRuntime: options.onRecoverThreadRuntime,
+        onRecoverThreadRuntimeAndResend: options.onRecoverThreadRuntimeAndResend,
+        onThreadRecoveryFork: options.onThreadRecoveryFork,
+        onRewind: options.onRewind,
+        handleApprovalDecision: options.handleApprovalDecision,
+        handleApprovalBatchAccept: options.handleApprovalBatchAccept,
+        handleApprovalRemember: options.handleApprovalRemember,
+        selectedCollaborationModeId: options.selectedCollaborationModeId,
+        isPlanMode: options.isPlanMode,
+        onOpenPlanPanel: options.onOpenPlanPanel,
+        handleExitPlanModeExecute: options.handleExitPlanModeExecute,
+        onOpenFile: options.onOpenFile,
+        agentTaskScrollRequest: options.agentTaskScrollRequest,
+        systemProxyEnabled: options.systemProxyEnabled,
+        systemProxyUrl: options.systemProxyUrl,
       }),
     [
       options.systemProxyEnabled,
@@ -1766,223 +1515,144 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
       externalNoteCardRequest: ComposerNoteCardSelectionRequest | null = null,
       createSessionTargetPicker: boolean = false,
     ) =>
-    options.showComposer ? (
-      <Profiler id="composer" onRender={handleRuntimeProfileRender}>
-        {/*
-          SharedSendStatusBar 与无协作 Shared 一致：贴在 Composer 输入区底部集群。
-          放在 ActiveCanvasComposer 之后，避免协作 sticky 卡把状态条夹在中间。
-        */}
-        <ActiveCanvasComposer
-          items={EMPTY_ACTIVE_CANVAS_ITEMS}
-          activeThreadId={null}
-          threadItemsByThread={{}}
-          threadParentById={options.threadParentById}
-          threadStatusById={{}}
-          onSend={options.onSend}
-          onQueue={options.onQueue}
-          onRequestContextCompaction={options.onRequestContextCompaction}
-          onStop={options.onStop}
-          completionEmailSelected={options.completionEmailSelected}
-          completionEmailDisabled={options.completionEmailDisabled}
-          onToggleCompletionEmail={options.onToggleCompletionEmail}
-          onRewind={options.onRewind}
-          rewindDialogRequest={rewindDialogRequest}
-          onRewindDialogRequestConsumed={handleRewindDialogRequestConsumed}
-          canStop={options.canStop}
-          disabled={
-            options.isReviewing ||
-            (!createSessionTargetPicker &&
-              isComposerInputLocked(sharedSendState))
-          }
-          submitDisabled={
-            !createSessionTargetPicker &&
-            isComposerSubmitLocked(sharedSendState)
-          }
-          contextUsage={null}
-          contextDualViewEnabled={options.contextDualViewEnabled}
-          codexAutoCompactionEnabled={options.codexAutoCompactionEnabled}
-          codexAutoCompactionThresholdPercent={
-            options.codexAutoCompactionThresholdPercent
-          }
-          onCodexAutoCompactionSettingsChange={
-            options.onCodexAutoCompactionSettingsChange
-          }
-          isContextCompacting={activeThreadStatus?.isContextCompacting ?? false}
-          codexCompactionLifecycleState={
-            activeThreadStatus?.codexCompactionLifecycleState ?? "idle"
-          }
-          codexCompactionSource={
-            activeThreadStatus?.codexCompactionSource ?? null
-          }
-          codexCompactionCompletedAt={
-            activeThreadStatus?.codexCompactionCompletedAt ?? null
-          }
-          lastTokenUsageUpdatedAt={
-            activeThreadStatus?.lastTokenUsageUpdatedAt ?? null
-          }
-          accountRateLimits={null}
-          usageShowRemaining={options.usageShowRemaining}
-          onRefreshAccountRateLimits={options.onRefreshAccountRateLimits}
-          queuedMessages={options.activeQueue}
-          userInputRequests={[]}
-          onJumpToUserInputRequest={handleJumpToUserInputRequest}
-          runtimeLifecycleState={composerRuntimeLifecycleState}
-          sendLabel={
-            options.composerSendLabel ??
-            ((isSharedSession &&
-              (sharedSendState === "running" ||
-                sharedSendState === "settling")) ||
-            (options.isProcessing && !options.steerEnabled)
-              ? t("messages.queue")
-              : t("messages.send"))
-          }
-          steerEnabled={options.steerEnabled}
-          isProcessing={options.isProcessing}
-          onDraftChange={options.onDraftChange}
-          attachedImages={options.activeImages}
-          onPickImages={options.onPickImages}
-          onAttachImages={options.onAttachImages}
-          onRemoveImage={options.onRemoveImage}
-          intentCanvasAttachments={options.pendingIntentCanvasDocuments}
-          onRemoveIntentCanvasAttachment={options.onRemovePendingIntentCanvas}
-          prefillDraft={options.prefillDraft}
-          onPrefillHandled={options.onPrefillHandled}
-          insertText={options.insertText}
-          onInsertHandled={options.onInsertHandled}
-          onEditQueued={options.onEditQueued}
-          onDeleteQueued={options.onDeleteQueued}
-          onFuseQueued={options.onFuseQueued}
-          canFuseQueuedMessages={options.canFuseActiveQueue}
-          fuseDisabledReasonKey={options.fuseDisabledReasonKey ?? null}
-          fusingQueuedMessageId={options.activeFusingMessageId}
-          collaborationModes={options.collaborationModes}
-          collaborationModesEnabled={options.collaborationModesEnabled}
-          selectedCollaborationModeId={options.selectedCollaborationModeId}
-          onSelectCollaborationMode={options.onSelectCollaborationMode}
-          isSharedSession={isSharedSession && !createSessionTargetPicker}
-          createSessionTargetPicker={createSessionTargetPicker}
-          onCreationTargetEngineChange={
-            createSessionTargetPicker
-              ? setHomeCreationTargetEngine
-              : undefined
-          }
-          sharedTargetPickerLocked={
-            !createSessionTargetPicker && isPickerLocked(sharedSendState)
-          }
-          engines={options.engines}
-          selectedEngine={options.selectedEngine}
-          onSelectEngine={options.onSelectEngine}
-          models={options.models}
-          providerModelCatalogs={options.providerModelCatalogs}
-          providerProfileId={
-            isManagedEngineProviderProfileId(
-              activeThreadSummary?.providerProfileId,
-            )
-              ? activeThreadSummary?.providerProfileId
-              : null
-          }
-          providerProfileName={activeThreadSummary?.providerProfileName ?? null}
-          dshAgentPreset={activeThreadSummary?.dshAgentPreset ?? null}
-          selectedModelId={options.selectedModelId}
-          onSelectModel={options.onSelectModel}
-          reasoningOptions={options.reasoningOptions}
-          selectedEffort={options.selectedEffort}
-          onSelectEffort={options.onSelectEffort}
-          reasoningSupported={options.reasoningSupported}
-          onResolvedAlwaysThinkingChange={handleResolvedAlwaysThinkingChange}
-          opencodeAgents={options.opencodeAgents}
-          selectedOpenCodeAgent={options.selectedOpenCodeAgent}
-          onSelectOpenCodeAgent={options.onSelectOpenCodeAgent}
-          selectedAgent={composerSelectedAgent}
-          onAgentSelect={options.onSelectAgent}
-          onOpenAgentSettings={options.onOpenAgentSettings}
-          onOpenPromptSettings={options.onOpenPromptSettings}
-          onOpenModelSettings={options.onOpenModelSettings}
-          onOpenCliSettings={options.onOpenCliSettings}
-          onRefreshModelConfig={options.onRefreshModelConfig}
-          isModelConfigRefreshing={options.isModelConfigRefreshing}
-          opencodeVariantOptions={options.opencodeVariantOptions}
-          selectedOpenCodeVariant={options.selectedOpenCodeVariant}
-          onSelectOpenCodeVariant={options.onSelectOpenCodeVariant}
-          accessMode={options.accessMode}
-          onSelectAccessMode={options.onSelectAccessMode}
-          skills={options.skills}
-          customSkillDirectories={options.customSkillDirectories}
-          prompts={options.prompts}
-          commands={composerCommands}
-          files={options.files}
-          directories={options.directories}
-          textareaRef={options.textareaRef}
-          editorSettings={options.composerEditorSettings}
-          sendShortcut={options.composerSendShortcut}
-          interruptShortcutLabel={options.composerInterruptShortcutLabel}
-          textareaHeight={options.textareaHeight}
-          onTextareaHeightChange={options.onTextareaHeightChange}
-          onOpenSkillsSettings={options.onOpenSkillsSettings}
-          onOpenExperimentalSettings={options.onOpenExperimentalSettings}
-          activeFilePath={options.activeComposerFilePath}
-          activeFileLineRange={options.activeComposerFileLineRange}
-          fileReferenceMode={options.fileReferenceMode}
-          activeWorkspaceId={options.activeWorkspaceId}
-          activeWorkspaceName={options.activeWorkspace?.name ?? null}
-          activeWorkspacePath={options.activeWorkspace?.path ?? null}
-          branchControl={branchControlEnabled ? composerBranchControl : null}
-          // 首页（branchControlEnabled=false）的分支/指示器行由 HomeChat 自行渲染
-          footerUsageIndicatorEnabled={branchControlEnabled}
-          rewindWorkspaceGitState={rewindWorkspaceGitState}
-          plan={options.plan}
-          isPlanMode={options.isPlanMode}
-          onOpenDiffPath={handleComposerOpenDiffPath}
-          gitChangedFiles={
-            // 非 git 仓库时传 null，退回 tool 统计；空数组表示 clean working tree
-            options.gitStatus.error === "not a git repository"
-              ? null
-              : options.gitStatus.files
-          }
-          isGitRepository={options.gitStatus.error !== "not a git repository"}
-          onRequestGitStatusRefresh={options.queueGitStatusRefresh}
-          onRevertFile={options.onRevertGitFile}
-          onRevertAllFiles={options.onRevertGitPaths}
-          showStatusPanelToggleOverride={false}
-          statusPanelExpandedOverride={false}
-          onToggleStatusPanelOverride={undefined}
-          selectedCodeAnnotations={selectedCodeAnnotations}
-          onRemoveCodeAnnotation={handleRemoveCodeAnnotation}
-          onClearCodeAnnotations={handleClearCodeAnnotations}
-          externalNoteCardSelectionRequest={externalNoteCardRequest}
-          reviewPrompt={options.reviewPrompt}
-          onReviewPromptClose={options.onReviewPromptClose}
-          onReviewPromptShowPreset={options.onReviewPromptShowPreset}
-          onReviewPromptChoosePreset={options.onReviewPromptChoosePreset}
-          highlightedPresetIndex={options.highlightedPresetIndex}
-          onReviewPromptHighlightPreset={options.onReviewPromptHighlightPreset}
-          highlightedBranchIndex={options.highlightedBranchIndex}
-          onReviewPromptHighlightBranch={options.onReviewPromptHighlightBranch}
-          highlightedCommitIndex={options.highlightedCommitIndex}
-          onReviewPromptHighlightCommit={options.onReviewPromptHighlightCommit}
-          onReviewPromptKeyDown={options.onReviewPromptKeyDown}
-          onReviewPromptSelectBranch={options.onReviewPromptSelectBranch}
-          onReviewPromptSelectBranchAtIndex={
-            options.onReviewPromptSelectBranchAtIndex
-          }
-          onReviewPromptConfirmBranch={options.onReviewPromptConfirmBranch}
-          onReviewPromptSelectCommit={options.onReviewPromptSelectCommit}
-          onReviewPromptSelectCommitAtIndex={
-            options.onReviewPromptSelectCommitAtIndex
-          }
-          onReviewPromptConfirmCommit={options.onReviewPromptConfirmCommit}
-          onReviewPromptUpdateCustomInstructions={
-            options.onReviewPromptUpdateCustomInstructions
-          }
-          onReviewPromptConfirmCustom={options.onReviewPromptConfirmCustom}
-        />
-        <SharedSendStatusBar
-          workspaceId={options.activeWorkspaceId ?? null}
-          threadId={options.activeThreadId ?? null}
-          isSharedSession={isSharedSession && !createSessionTargetPicker}
-        />
-      </Profiler>
-    ) : null,
+      buildComposerNode({
+        branchControlEnabled,
+        externalNoteCardRequest,
+        createSessionTargetPicker,
+        handleRuntimeProfileRender,
+        rewindDialogRequest,
+        handleRewindDialogRequestConsumed,
+        isSharedSession,
+        sharedSendState,
+        activeThreadStatus,
+        handleJumpToUserInputRequest,
+        composerRuntimeLifecycleState,
+        t,
+        composerSelectedAgent,
+        composerBranchControl,
+        rewindWorkspaceGitState,
+        handleComposerOpenDiffPath,
+        selectedCodeAnnotations,
+        handleRemoveCodeAnnotation,
+        handleClearCodeAnnotations,
+        setHomeCreationTargetEngine,
+        activeThreadSummary,
+        composerCommands,
+        handleResolvedAlwaysThinkingChange,
+        showComposer: options.showComposer,
+        threadParentById: options.threadParentById,
+        onSend: options.onSend,
+        onQueue: options.onQueue,
+        onRequestContextCompaction: options.onRequestContextCompaction,
+        onStop: options.onStop,
+        completionEmailSelected: options.completionEmailSelected,
+        completionEmailDisabled: options.completionEmailDisabled,
+        onToggleCompletionEmail: options.onToggleCompletionEmail,
+        onRewind: options.onRewind,
+        canStop: options.canStop,
+        isReviewing: options.isReviewing,
+        contextDualViewEnabled: options.contextDualViewEnabled,
+        codexAutoCompactionEnabled: options.codexAutoCompactionEnabled,
+        codexAutoCompactionThresholdPercent: options.codexAutoCompactionThresholdPercent,
+        onCodexAutoCompactionSettingsChange: options.onCodexAutoCompactionSettingsChange,
+        usageShowRemaining: options.usageShowRemaining,
+        onRefreshAccountRateLimits: options.onRefreshAccountRateLimits,
+        activeQueue: options.activeQueue,
+        composerSendLabel: options.composerSendLabel,
+        isProcessing: options.isProcessing,
+        steerEnabled: options.steerEnabled,
+        onDraftChange: options.onDraftChange,
+        activeImages: options.activeImages,
+        onPickImages: options.onPickImages,
+        onAttachImages: options.onAttachImages,
+        onRemoveImage: options.onRemoveImage,
+        pendingIntentCanvasDocuments: options.pendingIntentCanvasDocuments,
+        onRemovePendingIntentCanvas: options.onRemovePendingIntentCanvas,
+        prefillDraft: options.prefillDraft,
+        onPrefillHandled: options.onPrefillHandled,
+        insertText: options.insertText,
+        onInsertHandled: options.onInsertHandled,
+        onEditQueued: options.onEditQueued,
+        onDeleteQueued: options.onDeleteQueued,
+        onFuseQueued: options.onFuseQueued,
+        canFuseActiveQueue: options.canFuseActiveQueue,
+        fuseDisabledReasonKey: options.fuseDisabledReasonKey,
+        activeFusingMessageId: options.activeFusingMessageId,
+        collaborationModes: options.collaborationModes,
+        collaborationModesEnabled: options.collaborationModesEnabled,
+        selectedCollaborationModeId: options.selectedCollaborationModeId,
+        onSelectCollaborationMode: options.onSelectCollaborationMode,
+        engines: options.engines,
+        selectedEngine: options.selectedEngine,
+        onSelectEngine: options.onSelectEngine,
+        models: options.models,
+        providerModelCatalogs: options.providerModelCatalogs,
+        selectedModelId: options.selectedModelId,
+        onSelectModel: options.onSelectModel,
+        reasoningOptions: options.reasoningOptions,
+        selectedEffort: options.selectedEffort,
+        onSelectEffort: options.onSelectEffort,
+        reasoningSupported: options.reasoningSupported,
+        opencodeAgents: options.opencodeAgents,
+        selectedOpenCodeAgent: options.selectedOpenCodeAgent,
+        onSelectOpenCodeAgent: options.onSelectOpenCodeAgent,
+        onSelectAgent: options.onSelectAgent,
+        onOpenAgentSettings: options.onOpenAgentSettings,
+        onOpenPromptSettings: options.onOpenPromptSettings,
+        onOpenModelSettings: options.onOpenModelSettings,
+        onOpenCliSettings: options.onOpenCliSettings,
+        onRefreshModelConfig: options.onRefreshModelConfig,
+        isModelConfigRefreshing: options.isModelConfigRefreshing,
+        opencodeVariantOptions: options.opencodeVariantOptions,
+        selectedOpenCodeVariant: options.selectedOpenCodeVariant,
+        onSelectOpenCodeVariant: options.onSelectOpenCodeVariant,
+        accessMode: options.accessMode,
+        onSelectAccessMode: options.onSelectAccessMode,
+        skills: options.skills,
+        customSkillDirectories: options.customSkillDirectories,
+        prompts: options.prompts,
+        files: options.files,
+        directories: options.directories,
+        textareaRef: options.textareaRef,
+        composerEditorSettings: options.composerEditorSettings,
+        composerSendShortcut: options.composerSendShortcut,
+        composerInterruptShortcutLabel: options.composerInterruptShortcutLabel,
+        textareaHeight: options.textareaHeight,
+        onTextareaHeightChange: options.onTextareaHeightChange,
+        onOpenSkillsSettings: options.onOpenSkillsSettings,
+        onOpenExperimentalSettings: options.onOpenExperimentalSettings,
+        activeComposerFilePath: options.activeComposerFilePath,
+        activeComposerFileLineRange: options.activeComposerFileLineRange,
+        fileReferenceMode: options.fileReferenceMode,
+        activeWorkspaceId: options.activeWorkspaceId,
+        activeWorkspace: options.activeWorkspace,
+        plan: options.plan,
+        isPlanMode: options.isPlanMode,
+        gitStatus: options.gitStatus,
+        queueGitStatusRefresh: options.queueGitStatusRefresh,
+        onRevertGitFile: options.onRevertGitFile,
+        onRevertGitPaths: options.onRevertGitPaths,
+        reviewPrompt: options.reviewPrompt,
+        onReviewPromptClose: options.onReviewPromptClose,
+        onReviewPromptShowPreset: options.onReviewPromptShowPreset,
+        onReviewPromptChoosePreset: options.onReviewPromptChoosePreset,
+        highlightedPresetIndex: options.highlightedPresetIndex,
+        onReviewPromptHighlightPreset: options.onReviewPromptHighlightPreset,
+        highlightedBranchIndex: options.highlightedBranchIndex,
+        onReviewPromptHighlightBranch: options.onReviewPromptHighlightBranch,
+        highlightedCommitIndex: options.highlightedCommitIndex,
+        onReviewPromptHighlightCommit: options.onReviewPromptHighlightCommit,
+        onReviewPromptKeyDown: options.onReviewPromptKeyDown,
+        onReviewPromptSelectBranch: options.onReviewPromptSelectBranch,
+        onReviewPromptSelectBranchAtIndex: options.onReviewPromptSelectBranchAtIndex,
+        onReviewPromptConfirmBranch: options.onReviewPromptConfirmBranch,
+        onReviewPromptSelectCommit: options.onReviewPromptSelectCommit,
+        onReviewPromptSelectCommitAtIndex: options.onReviewPromptSelectCommitAtIndex,
+        onReviewPromptConfirmCommit: options.onReviewPromptConfirmCommit,
+        onReviewPromptUpdateCustomInstructions: options.onReviewPromptUpdateCustomInstructions,
+        onReviewPromptConfirmCustom: options.onReviewPromptConfirmCustom,
+        activeThreadId: options.activeThreadId,
+      }),
     [
       options.showComposer,
       options.threadParentById,
@@ -2141,23 +1811,18 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
   const approvalToastsNode = null;
 
   const updateToastNode = useMemo(
-    () => (
-      <UpdateToast
-        state={options.updaterState}
-        onUpdate={options.onUpdate}
-        onDismiss={options.onDismissUpdate}
-      />
-    ),
+    () =>
+      buildUpdateToastNode({
+        options,
+      }),
     [options.updaterState, options.onUpdate, options.onDismissUpdate],
   );
 
   const errorToastsNode = useMemo(
-    () => (
-      <ErrorToasts
-        toasts={options.errorToasts}
-        onDismiss={options.onDismissErrorToast}
-      />
-    ),
+    () =>
+      buildErrorToastsNode({
+        options,
+      }),
     [options.errorToasts, options.onDismissErrorToast],
   );
   const homeWorkspaceOptions = useMemo(
@@ -2167,20 +1832,14 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
   );
 
   const homeNode = useMemo(
-    () => (
-      <HomeChat
-        workspaces={homeWorkspaceOptions}
-        selectedWorkspaceId={resolveHomeWorkspaceId(
-          options.activeWorkspace?.id ?? null,
-          homeWorkspaceOptions,
-        )}
-        onSelectWorkspace={options.onSelectHomeWorkspace}
-        onAddWorkspace={options.onAddWorkspace}
-        composerNode={homeComposerNode}
-        selectedEngine={homeCreationTargetEngine ?? options.selectedEngine}
-        branchControl={composerBranchControl}
-      />
-    ),
+    () =>
+      buildHomeNode({
+        options,
+        homeWorkspaceOptions,
+        homeComposerNode,
+        homeCreationTargetEngine,
+        composerBranchControl,
+      }),
     [
       homeWorkspaceOptions,
       options.activeWorkspace?.id,
@@ -2195,43 +1854,14 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
 
   const mainHeaderNode = useMemo(
     () =>
-      options.activeWorkspace ? (
-        <MainHeader
-          workspace={options.activeWorkspace}
-          parentName={options.activeParentWorkspace?.name ?? null}
-          worktreePath={
-            options.isWorktreeWorkspace ? options.activeWorkspace.path : null
-          }
-          activeFilePath={options.activeComposerFilePath}
-          openTargets={options.openAppTargets}
-          openAppIconById={options.openAppIconById}
-          selectedOpenAppId={options.selectedOpenAppId}
-          onSelectOpenAppId={options.onSelectOpenAppId}
-          sessionTabsNode={sessionTabsNode}
-          canCopyThread={canCopyActiveThread}
-          onCopyThread={options.onCopyThread}
-          onLockPanel={options.onLockPanel}
-          launchScript={options.launchScript}
-          launchScriptEditorOpen={options.launchScriptEditorOpen}
-          launchScriptDraft={options.launchScriptDraft}
-          launchScriptSaving={options.launchScriptSaving}
-          launchScriptError={options.launchScriptError}
-          onRunLaunchScript={options.onRunLaunchScript}
-          onOpenLaunchScriptEditor={options.onOpenLaunchScriptEditor}
-          onCloseLaunchScriptEditor={options.onCloseLaunchScriptEditor}
-          onLaunchScriptDraftChange={options.onLaunchScriptDraftChange}
-          onSaveLaunchScript={options.onSaveLaunchScript}
-          launchScriptsState={options.launchScriptsState}
-          showLaunchScriptControls={showTopRunControls}
-          showOpenAppMenu={showOpenWorkspaceAppControl}
-          openAppExtraActions={options.mainHeaderActions}
-          groupedWorkspaces={groupedWorkspacesForHeader}
-          activeWorkspaceId={options.activeWorkspaceId}
-          onSelectWorkspace={options.onSelectWorkspace}
-          onOpenShortcutsSettings={options.onOpenShortcutsSettings}
-
-        />
-      ) : null,
+      buildMainHeaderNode({
+        options,
+        sessionTabsNode,
+        canCopyActiveThread,
+        showTopRunControls,
+        showOpenWorkspaceAppControl,
+        groupedWorkspacesForHeader,
+      }),
     [
       options.activeWorkspace,
       options.activeParentWorkspace?.name,
@@ -2285,19 +1915,18 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
   );
 
   const tabletNavNode = useMemo(
-    () => (
-      <TabletNav
-        activeTab={options.tabletNavTab}
-        onSelect={options.onSelectTab}
-      />
-    ),
+    () =>
+      buildTabletNavNode({
+        options,
+      }),
     [options.tabletNavTab, options.onSelectTab],
   );
 
   const tabBarNode = useMemo(
-    () => (
-      <TabBar activeTab={options.activeTab} onSelect={options.onSelectTab} />
-    ),
+    () =>
+      buildTabBarNode({
+        options,
+      }),
     [options.activeTab, options.onSelectTab],
   );
   const activeWorkspaceCustomSpecRoot = useMemo(() => {
@@ -2475,401 +2104,182 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
     ],
   );
 
-  const gitDiffPanelNode = useMemo(() => {
-    if (
-      (options.filePanelMode === "files" ||
-        options.filePanelMode === "notes" ||
-        // DISABLED activity: treat residual mode as files until normalize runs
-        options.filePanelMode === "activity") &&
-      options.activeWorkspace
-    ) {
-      return (
-        <FileTreePanel
-          workspaceId={options.activeWorkspace.id}
-          workspaceName={options.activeWorkspace.name}
-          workspacePath={options.activeWorkspace.path}
-          gitRoot={options.gitRoot}
-          files={options.files}
-          directories={options.directories}
-          directoryMetadata={options.directoryMetadata}
-          sourceVersion={options.fileTreeSourceVersion}
-          isLoading={options.fileTreeLoading}
-          loadError={options.fileTreeLoadError}
-          filePanelMode="files"
-          onFilePanelModeChange={options.onFilePanelModeChange}
-          onInsertText={options.onInsertComposerText}
-          onOpenFile={options.onOpenFile}
-          onCompareFiles={options.onCompareFiles}
-          openTargets={options.openAppTargets}
-          openAppIconById={options.openAppIconById}
-          selectedOpenAppId={options.selectedOpenAppId}
-          onSelectOpenAppId={options.onSelectOpenAppId}
-          onToggleRuntimeConsole={options.onToggleRuntimeConsole}
-          isRuntimeConsoleVisible={options.runtimeConsoleVisible}
-          showSpecHubAction={false}
-          showDetachedExplorerAction={false}
-          gitStatusFiles={options.gitStatus.files}
-          gitRepositories={options.gitRepositories}
-          onGitRepositoryAction={handleFileTreeGitRepositoryAction}
-          onOpenFileHistory={options.onOpenFileHistory}
-          gitignoredFiles={options.gitignoredFiles}
-          gitignoredDirectories={options.gitignoredDirectories}
-          onRefreshFiles={options.onRefreshFiles}
-          revealRequest={fileTreeRevealRequest}
-        />
-      );
-    }
-    if (options.filePanelMode === "search") {
-      return (
-        <WorkspaceSearchPanel
-          workspaceId={options.activeWorkspace?.id ?? null}
-          filePanelMode={options.filePanelMode}
-          onFilePanelModeChange={options.onFilePanelModeChange}
-          onOpenFile={options.onOpenFile}
-        />
-      );
-    }
-    if (options.filePanelMode === "prompts") {
-      return (
-        <PromptPanel
-          prompts={options.prompts}
-          workspacePath={options.activeWorkspace?.path ?? null}
-          filePanelMode={options.filePanelMode}
-          onFilePanelModeChange={options.onFilePanelModeChange}
-          onSendPrompt={options.onSendPrompt}
-          onSendPromptToNewAgent={options.onSendPromptToNewAgent}
-          onCreatePrompt={options.onCreatePrompt}
-          onUpdatePrompt={options.onUpdatePrompt}
-          onDeletePrompt={options.onDeletePrompt}
-          onMovePrompt={options.onMovePrompt}
-          onRevealWorkspacePrompts={options.onRevealWorkspacePrompts}
-          onRevealGeneralPrompts={options.onRevealGeneralPrompts}
-          canRevealGeneralPrompts={options.canRevealGeneralPrompts}
-        />
-      );
-    }
-    if (options.filePanelMode === "memory") {
-      return (
-        <ProjectMemoryPanel
-          workspaceId={options.activeWorkspace?.id ?? null}
-          workspaces={options.workspaces}
-          onSelectWorkspace={options.onSelectWorkspace}
-          filePanelMode={options.filePanelMode}
-          onFilePanelModeChange={options.onFilePanelModeChange}
-          focusMemoryId={options.focusedProjectMemoryId ?? null}
-          focusRequestKey={options.focusedProjectMemoryRequestKey ?? 0}
-        />
-      );
-    }
-    if (options.filePanelMode === "radar") {
-      return (
-        <WorkspaceSessionRadarPanel
-          runningSessions={options.sessionRadarRunningSessions}
-          recentCompletedSessions={options.sessionRadarRecentCompletedSessions}
-          onSelectThread={options.onSelectThread}
-        />
-      );
-    }
-    return (
-      <Suspense fallback={<HeavyPanelFallback />}>
-        <GitDiffPanel
-          workspaceId={options.activeWorkspace?.id ?? null}
-          workspacePath={options.activeWorkspace?.path ?? null}
-          headerControlsTarget={gitModeControlsTarget}
-          mode={options.gitPanelMode}
-          onModeChange={options.onGitPanelModeChange}
-          onOpenGitHistoryPanel={options.onOpenGitHistoryPanel}
-          isGitHistoryOpen={options.appMode === "gitHistory"}
-          diffEntries={options.gitDiffs}
-          gitDiffListView={options.gitDiffListView}
-          onGitDiffListViewChange={options.onGitDiffListViewChange}
-          toggleGitDiffListViewShortcut={options.toggleGitDiffListViewShortcut}
-          filePanelMode={options.filePanelMode}
-          onFilePanelModeChange={options.onFilePanelModeChange}
-          worktreeApplyLabel={options.worktreeApplyLabel}
-          worktreeApplyTitle={options.worktreeApplyTitle}
-          worktreeApplyLoading={options.worktreeApplyLoading}
-          worktreeApplyError={options.worktreeApplyError}
-          worktreeApplySuccess={options.worktreeApplySuccess}
-          onApplyWorktreeChanges={options.onApplyWorktreeChanges}
-          branchName={
-            options.gitStatus.branchName || t("workspace.unknownBranch")
-          }
-          totalAdditions={canonicalGitPanelTotals.additions}
-          totalDeletions={canonicalGitPanelTotals.deletions}
-          fileStatus={options.fileStatus}
-          diffViewStyle={options.gitDiffViewStyle}
-          onDiffViewStyleChange={options.onGitDiffViewStyleChange}
-          error={options.gitStatus.error}
-          logError={options.gitLogError}
-          logLoading={options.gitLogLoading}
-          stagedFiles={canonicalGitPanelChanges.stagedFiles}
-          unstagedFiles={canonicalGitPanelChanges.unstagedFiles}
-          onSelectFile={options.onSelectDiff}
-          onOpenFile={(path, repositoryRoot) =>
-            options.onOpenFile(path, undefined, {
-              pathDomain: "git",
-              repositoryRoot,
-            })
-          }
-          onOpenFileHistory={options.onOpenFileHistory}
-          modalPreviewRequest={gitModalPreviewRequest}
-          selectedPath={sidebarSelectedDiffPath}
-          logEntries={options.gitLogEntries}
-          logTotal={options.gitLogTotal}
-          logAhead={options.gitLogAhead}
-          logBehind={options.gitLogBehind}
-          logAheadEntries={options.gitLogAheadEntries}
-          logBehindEntries={options.gitLogBehindEntries}
-          logUpstream={options.gitLogUpstream}
-          selectedCommitSha={options.selectedCommitSha}
-          onSelectCommit={options.onSelectCommit}
-          issues={options.gitIssues}
-          issuesTotal={options.gitIssuesTotal}
-          issuesLoading={options.gitIssuesLoading}
-          issuesError={options.gitIssuesError}
-          pullRequests={options.gitPullRequests}
-          pullRequestsTotal={options.gitPullRequestsTotal}
-          pullRequestsLoading={options.gitPullRequestsLoading}
-          pullRequestsError={options.gitPullRequestsError}
-          selectedPullRequest={options.selectedPullRequestNumber}
-          onSelectPullRequest={options.onSelectPullRequest}
-          gitRemoteUrl={options.gitRemoteUrl}
-          gitRoot={options.gitRoot}
-          gitRootCandidates={options.gitRootCandidates}
-          gitRootScanDepth={options.gitRootScanDepth}
-          gitRootScanLoading={options.gitRootScanLoading}
-          gitRootScanError={options.gitRootScanError}
-          gitRootScanHasScanned={options.gitRootScanHasScanned}
-          onGitRootScanDepthChange={options.onGitRootScanDepthChange}
-          onScanGitRoots={options.onScanGitRoots}
-          onSelectGitRoot={options.onSelectGitRoot}
-          onClearGitRoot={options.onClearGitRoot}
-          onPickGitRoot={options.onPickGitRoot}
-          onStageAllChanges={options.onStageGitAll}
-          onStageFile={options.onStageGitFile}
-          onUnstageAllChanges={options.onUnstageGitAll}
-          onUnstageFile={options.onUnstageGitFile}
-          onUnstageFiles={options.onUnstageGitPaths}
-          onRevertFile={options.onRevertGitFile}
-          onRevertFiles={options.onRevertGitPaths}
-          onRevertAllChanges={options.onRevertAllGitChanges}
-          commitMessage={options.commitMessage}
-          commitMessageLoading={options.commitMessageLoading}
-          commitMessageError={options.commitMessageError}
-          onCommitMessageChange={options.onCommitMessageChange}
-          onGenerateCommitMessage={options.onGenerateCommitMessage}
-          onCommit={options.onCommit}
-          onCommitAndPush={options.onCommitAndPush}
-          onCommitAndSync={options.onCommitAndSync}
-          onPush={options.onPush}
-          onSync={options.onSync}
-          commitLoading={options.commitLoading}
-          pushLoading={options.pushLoading}
-          syncLoading={options.syncLoading}
-          commitError={options.commitError}
-          pushError={options.pushError}
-          syncError={options.syncError}
-          commitsAhead={options.commitsAhead}
-          multiRepositoryMode={options.multiRepositoryMode}
-          repositoryStatuses={options.repositoryStatuses}
-          repositoryStatusesLoading={options.repositoryStatusesLoading}
-          onRefreshRepositoryStatuses={options.onRefreshRepositoryStatuses}
-          onStageRepositoryFile={options.onStageRepositoryFile}
-          onUnstageRepositoryFile={options.onUnstageRepositoryFile}
-          onUnstageRepositoryAll={options.onUnstageRepositoryAll}
-          onUnstageRepositoryFiles={options.onUnstageRepositoryFiles}
-          onRevertRepositoryFile={options.onRevertRepositoryFile}
-          onRevertRepositoryFiles={options.onRevertRepositoryFiles}
-          onStageRepositoryAll={options.onStageRepositoryAll}
-          onCommitRepositories={options.onCommitRepositories}
-          repositoryCommitSummary={options.repositoryCommitSummary}
-          onRefreshGitStatus={options.queueGitStatusRefresh}
-          onRefreshGitLog={options.refreshGitLog}
-          onRefreshGitDiffs={options.refreshGitDiffs}
-          onCreateCodeAnnotation={handleCreateCodeAnnotation}
-          onRemoveCodeAnnotation={handleRemoveCodeAnnotation}
-          codeAnnotations={selectedCodeAnnotations}
-        />
-      </Suspense>
-    );
-  }, [
-    options.filePanelMode,
-    options.activeWorkspace,
-    options.gitRoot,
-    options.files,
-    options.directories,
-    options.directoryMetadata,
-    options.fileTreeSourceVersion,
-    options.fileTreeLoading,
-    options.fileTreeLoadError,
-    options.onFilePanelModeChange,
-    options.onInsertComposerText,
-    options.onOpenFile,
-    options.onCompareFiles,
-    options.openAppTargets,
-    options.openAppIconById,
-    options.selectedOpenAppId,
-    options.onSelectOpenAppId,
-    options.onToggleRuntimeConsole,
-    options.runtimeConsoleVisible,
-    options.gitStatus.files,
-    options.gitStatus.branchName,
-    options.gitStatus.error,
-    options.gitRepositories,
-    handleFileTreeGitRepositoryAction,
-    options.onOpenFileHistory,
-    options.gitignoredFiles,
-    options.gitignoredDirectories,
-    options.onRefreshFiles,
-    fileTreeRevealRequest,
-    options.prompts,
-    options.onSendPrompt,
-    options.onSendPromptToNewAgent,
-    options.onCreatePrompt,
-    options.onUpdatePrompt,
-    options.onDeletePrompt,
-    options.onMovePrompt,
-    options.onRevealWorkspacePrompts,
-    options.onRevealGeneralPrompts,
-    options.canRevealGeneralPrompts,
-    options.workspaces,
-    options.onSelectWorkspace,
-    options.focusedProjectMemoryId,
-    options.focusedProjectMemoryRequestKey,
-    options.sessionRadarRunningSessions,
-    options.sessionRadarRecentCompletedSessions,
-    options.onSelectThread,
-    gitModeControlsTarget,
-    options.gitPanelMode,
-    options.onGitPanelModeChange,
-    options.onOpenGitHistoryPanel,
-    options.appMode,
-    options.gitDiffs,
-    options.gitDiffListView,
-    options.onGitDiffListViewChange,
-    options.toggleGitDiffListViewShortcut,
-    options.worktreeApplyLabel,
-    options.worktreeApplyTitle,
-    options.worktreeApplyLoading,
-    options.worktreeApplyError,
-    options.worktreeApplySuccess,
-    options.onApplyWorktreeChanges,
-    t,
-    canonicalGitPanelTotals.additions,
-    canonicalGitPanelTotals.deletions,
-    options.fileStatus,
-    options.gitDiffViewStyle,
-    options.onGitDiffViewStyleChange,
-    options.gitLogError,
-    options.gitLogLoading,
-    canonicalGitPanelChanges.stagedFiles,
-    canonicalGitPanelChanges.unstagedFiles,
-    options.onSelectDiff,
-    gitModalPreviewRequest,
-    sidebarSelectedDiffPath,
-    options.gitLogEntries,
-    options.gitLogTotal,
-    options.gitLogAhead,
-    options.gitLogBehind,
-    options.gitLogAheadEntries,
-    options.gitLogBehindEntries,
-    options.gitLogUpstream,
-    options.selectedCommitSha,
-    options.onSelectCommit,
-    options.gitIssues,
-    options.gitIssuesTotal,
-    options.gitIssuesLoading,
-    options.gitIssuesError,
-    options.gitPullRequests,
-    options.gitPullRequestsTotal,
-    options.gitPullRequestsLoading,
-    options.gitPullRequestsError,
-    options.selectedPullRequestNumber,
-    options.onSelectPullRequest,
-    options.gitRemoteUrl,
-    options.gitRootCandidates,
-    options.gitRootScanDepth,
-    options.gitRootScanLoading,
-    options.gitRootScanError,
-    options.gitRootScanHasScanned,
-    options.onGitRootScanDepthChange,
-    options.onScanGitRoots,
-    options.onSelectGitRoot,
-    options.onClearGitRoot,
-    options.onPickGitRoot,
-    options.onStageGitAll,
-    options.onStageGitFile,
-    options.onUnstageGitAll,
-    options.onUnstageGitFile,
-    options.onUnstageGitPaths,
-    options.onRevertGitFile,
-    options.onRevertGitPaths,
-    options.onRevertAllGitChanges,
-    options.commitMessage,
-    options.commitMessageLoading,
-    options.commitMessageError,
-    options.onCommitMessageChange,
-    options.onGenerateCommitMessage,
-    options.onCommit,
-    options.onCommitAndPush,
-    options.onCommitAndSync,
-    options.onPush,
-    options.onSync,
-    options.commitLoading,
-    options.pushLoading,
-    options.syncLoading,
-    options.commitError,
-    options.pushError,
-    options.syncError,
-    options.commitsAhead,
-    options.multiRepositoryMode,
-    options.repositoryStatuses,
-    options.repositoryStatusesLoading,
-    options.onRefreshRepositoryStatuses,
-    options.onStageRepositoryFile,
-    options.onUnstageRepositoryFile,
-    options.onUnstageRepositoryAll,
-    options.onUnstageRepositoryFiles,
-    options.onRevertRepositoryFile,
-    options.onRevertRepositoryFiles,
-    options.onStageRepositoryAll,
-    options.onCommitRepositories,
-    options.repositoryCommitSummary,
-    options.queueGitStatusRefresh,
-    options.refreshGitLog,
-    options.refreshGitDiffs,
-    handleCreateCodeAnnotation,
-    handleRemoveCodeAnnotation,
-    selectedCodeAnnotations,
-  ]);
+  const gitDiffPanelNode = useMemo(
+    () =>
+      buildGitDiffPanelNode({
+        options,
+        handleFileTreeGitRepositoryAction,
+        fileTreeRevealRequest,
+        gitModeControlsTarget,
+        t,
+        canonicalGitPanelTotals,
+        canonicalGitPanelChanges,
+        gitModalPreviewRequest,
+        sidebarSelectedDiffPath,
+        handleCreateCodeAnnotation,
+        handleRemoveCodeAnnotation,
+        selectedCodeAnnotations,
+      }),
+    [
+      options.filePanelMode,
+      options.activeWorkspace,
+      options.gitRoot,
+      options.files,
+      options.directories,
+      options.directoryMetadata,
+      options.fileTreeSourceVersion,
+      options.fileTreeLoading,
+      options.fileTreeLoadError,
+      options.onFilePanelModeChange,
+      options.onInsertComposerText,
+      options.onOpenFile,
+      options.onCompareFiles,
+      options.openAppTargets,
+      options.openAppIconById,
+      options.selectedOpenAppId,
+      options.onSelectOpenAppId,
+      options.onToggleRuntimeConsole,
+      options.runtimeConsoleVisible,
+      options.gitStatus.files,
+      options.gitStatus.branchName,
+      options.gitStatus.error,
+      options.gitRepositories,
+      handleFileTreeGitRepositoryAction,
+      options.onOpenFileHistory,
+      options.gitignoredFiles,
+      options.gitignoredDirectories,
+      options.onRefreshFiles,
+      fileTreeRevealRequest,
+      options.prompts,
+      options.onSendPrompt,
+      options.onSendPromptToNewAgent,
+      options.onCreatePrompt,
+      options.onUpdatePrompt,
+      options.onDeletePrompt,
+      options.onMovePrompt,
+      options.onRevealWorkspacePrompts,
+      options.onRevealGeneralPrompts,
+      options.canRevealGeneralPrompts,
+      options.workspaces,
+      options.onSelectWorkspace,
+      options.focusedProjectMemoryId,
+      options.focusedProjectMemoryRequestKey,
+      options.sessionRadarRunningSessions,
+      options.sessionRadarRecentCompletedSessions,
+      options.onSelectThread,
+      gitModeControlsTarget,
+      options.gitPanelMode,
+      options.onGitPanelModeChange,
+      options.onOpenGitHistoryPanel,
+      options.appMode,
+      options.gitDiffs,
+      options.gitDiffListView,
+      options.onGitDiffListViewChange,
+      options.toggleGitDiffListViewShortcut,
+      options.worktreeApplyLabel,
+      options.worktreeApplyTitle,
+      options.worktreeApplyLoading,
+      options.worktreeApplyError,
+      options.worktreeApplySuccess,
+      options.onApplyWorktreeChanges,
+      t,
+      canonicalGitPanelTotals.additions,
+      canonicalGitPanelTotals.deletions,
+      options.fileStatus,
+      options.gitDiffViewStyle,
+      options.onGitDiffViewStyleChange,
+      options.gitLogError,
+      options.gitLogLoading,
+      canonicalGitPanelChanges.stagedFiles,
+      canonicalGitPanelChanges.unstagedFiles,
+      options.onSelectDiff,
+      gitModalPreviewRequest,
+      sidebarSelectedDiffPath,
+      options.gitLogEntries,
+      options.gitLogTotal,
+      options.gitLogAhead,
+      options.gitLogBehind,
+      options.gitLogAheadEntries,
+      options.gitLogBehindEntries,
+      options.gitLogUpstream,
+      options.selectedCommitSha,
+      options.onSelectCommit,
+      options.gitIssues,
+      options.gitIssuesTotal,
+      options.gitIssuesLoading,
+      options.gitIssuesError,
+      options.gitPullRequests,
+      options.gitPullRequestsTotal,
+      options.gitPullRequestsLoading,
+      options.gitPullRequestsError,
+      options.selectedPullRequestNumber,
+      options.onSelectPullRequest,
+      options.gitRemoteUrl,
+      options.gitRootCandidates,
+      options.gitRootScanDepth,
+      options.gitRootScanLoading,
+      options.gitRootScanError,
+      options.gitRootScanHasScanned,
+      options.onGitRootScanDepthChange,
+      options.onScanGitRoots,
+      options.onSelectGitRoot,
+      options.onClearGitRoot,
+      options.onPickGitRoot,
+      options.onStageGitAll,
+      options.onStageGitFile,
+      options.onUnstageGitAll,
+      options.onUnstageGitFile,
+      options.onUnstageGitPaths,
+      options.onRevertGitFile,
+      options.onRevertGitPaths,
+      options.onRevertAllGitChanges,
+      options.commitMessage,
+      options.commitMessageLoading,
+      options.commitMessageError,
+      options.onCommitMessageChange,
+      options.onGenerateCommitMessage,
+      options.onCommit,
+      options.onCommitAndPush,
+      options.onCommitAndSync,
+      options.onPush,
+      options.onSync,
+      options.commitLoading,
+      options.pushLoading,
+      options.syncLoading,
+      options.commitError,
+      options.pushError,
+      options.syncError,
+      options.commitsAhead,
+      options.multiRepositoryMode,
+      options.repositoryStatuses,
+      options.repositoryStatusesLoading,
+      options.onRefreshRepositoryStatuses,
+      options.onStageRepositoryFile,
+      options.onUnstageRepositoryFile,
+      options.onUnstageRepositoryAll,
+      options.onUnstageRepositoryFiles,
+      options.onRevertRepositoryFile,
+      options.onRevertRepositoryFiles,
+      options.onStageRepositoryAll,
+      options.onCommitRepositories,
+      options.repositoryCommitSummary,
+      options.queueGitStatusRefresh,
+      options.refreshGitLog,
+      options.refreshGitDiffs,
+      handleCreateCodeAnnotation,
+      handleRemoveCodeAnnotation,
+      selectedCodeAnnotations,
+    ],
+  );
 
   const gitDiffViewerNode = useMemo(
-    () => (
-      <GitDiffViewer
-        workspaceId={options.activeWorkspace?.id ?? null}
-        diffs={options.gitDiffs}
-        listView={options.gitDiffListView}
-        selectedPath={options.selectedDiffPath}
-        scrollRequestId={options.diffScrollRequestId}
-        isLoading={options.gitDiffLoading}
-        error={options.gitDiffError}
-        diffStyle={options.gitDiffViewStyle}
-        alignedTextPreview
-        onDiffStyleChange={options.onGitDiffViewStyleChange}
-        pullRequest={options.selectedPullRequest}
-        pullRequestComments={options.selectedPullRequestComments}
-        pullRequestCommentsLoading={options.selectedPullRequestCommentsLoading}
-        pullRequestCommentsError={options.selectedPullRequestCommentsError}
-        onActivePathChange={options.onDiffActivePathChange}
-        onOpenFile={options.onOpenFile}
-        onRequestClose={options.onExitDiff}
-        onCreateCodeAnnotation={handleCreateCodeAnnotation}
-        onRemoveCodeAnnotation={handleRemoveCodeAnnotation}
-        codeAnnotations={selectedCodeAnnotations}
-        codeAnnotationSurface="embedded-diff-view"
-      />
-    ),
+    () =>
+      buildGitDiffViewerNode({
+        options,
+        handleCreateCodeAnnotation,
+        handleRemoveCodeAnnotation,
+        selectedCodeAnnotations,
+      }),
     [
       options.activeWorkspace?.id,
       options.gitDiffs,
@@ -2897,73 +2307,17 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
   // props Object.is 比较，让根 render 反复重渲染已挂载的重面板（S1 残余项）。
   const fileViewPanelNode = useMemo(
     () =>
-      options.editorFilePath && options.activeWorkspace ? (
-      <Suspense fallback={<HeavyPanelFallback />}>
-        <FileViewPanel
-          workspaceId={options.activeWorkspace.id}
-          workspaceName={options.activeWorkspace.name}
-          workspacePath={options.activeWorkspace.path}
-          gitRoot={options.gitRoot}
-          gitRepositories={options.gitRepositories}
-          customSpecRoot={activeWorkspaceCustomSpecRoot}
-          filePath={options.editorFilePath}
-          navigationTarget={options.editorNavigationTarget}
-          highlightMarkers={
-            options.editorHighlightTarget?.path === options.editorFilePath
-              ? options.editorHighlightTarget.markers
-              : null
-          }
-          gitStatusFiles={options.gitStatus.files}
-          openTabs={options.openEditorTabs}
-          activeTabPath={options.editorFilePath}
-          onActivateTab={options.onActivateEditorTab}
-          onCloseTab={options.onCloseEditorTab}
-          onCloseOtherTabs={options.onCloseOtherEditorTabs}
-          onCloseAllTabs={options.onCloseAllEditorTabs}
-          onReorderTabs={options.onReorderEditorTabs}
-          fileReferenceMode={options.fileReferenceMode}
-          onFileReferenceModeChange={options.onFileReferenceModeChange}
-          activeFileLineRange={options.activeComposerFileLineRange}
-          onActiveFileLineRangeChange={options.onActiveEditorLineRangeChange}
-          onActiveCodeAnchorChange={options.onActiveCodeSelectionAnchorChange}
-          onAssociateIntentCanvasCodeAnchor={
-            handleAssociateIntentCanvasCodeAnchor
-          }
-          openTargets={options.openAppTargets}
-          openAppIconById={options.openAppIconById}
-          selectedOpenAppId={options.selectedOpenAppId}
-          onSelectOpenAppId={options.onSelectOpenAppId}
-          editorSplitLayout={options.editorSplitLayout}
-          onToggleEditorSplitLayout={options.onToggleEditorSplitLayout}
-          isEditorFileMaximized={options.isEditorFileMaximized}
-          onToggleEditorFileMaximized={options.onToggleEditorFileMaximized}
-          onNavigateToLocation={options.onOpenFile}
-          onOpenFileHistory={options.onOpenFileHistory}
-          onRevealInFileTree={handleRevealInFileTree}
-          onClose={options.onExitEditor}
-          onInsertText={options.onInsertComposerText}
-          onCreateCodeAnnotation={handleCreateCodeAnnotation}
-          onCaptureNote={handleCaptureWorkspaceNote}
-          onRemoveCodeAnnotation={handleRemoveCodeAnnotation}
-          codeAnnotations={selectedCodeAnnotations}
-          externalChangeMonitoringEnabled={
-            options.externalChangeMonitoringEnabled
-          }
-          externalChangeTransportMode={options.externalChangeTransportMode}
-          externalChangeApplyMode={options.externalChangeApplyMode}
-          externalChangeAutoApplyDebounceMs={
-            options.externalChangeAutoApplyDebounceMs
-          }
-          markdownPreviewSnapshotMode={
-            options.liveEditPreviewEnabled ? "live" : "stable"
-          }
-          fileRenderPressure={fileRenderPressure}
-          saveFileShortcut={options.saveFileShortcut}
-          findInFileShortcut={options.findInFileShortcut}
-          expandSelectionShortcut={options.expandSelectionShortcut}
-        />
-      </Suspense>
-      ) : null,
+      buildFileViewPanelNode({
+        options,
+        activeWorkspaceCustomSpecRoot,
+        handleAssociateIntentCanvasCodeAnchor,
+        handleRevealInFileTree,
+        handleCreateCodeAnnotation,
+        handleCaptureWorkspaceNote,
+        handleRemoveCodeAnnotation,
+        selectedCodeAnnotations,
+        fileRenderPressure,
+      }),
     [
       options.editorFilePath,
       options.activeWorkspace,
@@ -3020,19 +2374,14 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
       options.editorSplitCompanion === "notes");
   const noteCardsPanelNode = useMemo(
     () =>
-      isWorkspaceNoteCardsMounted ? (
-        <WorkspaceNoteCardPanel
-          workspaceId={options.activeWorkspace?.id ?? null}
-          workspaceName={options.activeWorkspace?.name ?? null}
-          workspacePath={options.activeWorkspace?.path ?? null}
-          focusNoteId={options.focusedWorkspaceNoteId ?? null}
-          focusRequestKey={options.focusedWorkspaceNoteRequestKey ?? 0}
-          captureRequest={workspaceNoteCaptureRequest}
-          onCaptureRequestHandled={handleWorkspaceNoteCaptureRequestHandled}
-          onReferenceNote={handleReferenceWorkspaceNote}
-          onOpenCodeSource={handleOpenWorkspaceNoteCodeSource}
-        />
-      ) : null,
+      buildNoteCardsPanelNode({
+        options,
+        isWorkspaceNoteCardsMounted,
+        workspaceNoteCaptureRequest,
+        handleWorkspaceNoteCaptureRequestHandled,
+        handleReferenceWorkspaceNote,
+        handleOpenWorkspaceNoteCodeSource,
+      }),
     [
       isWorkspaceNoteCardsMounted,
       options.activeWorkspace,
@@ -3047,16 +2396,9 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
 
   const fileComparePanelNode = useMemo(
     () =>
-      options.centerMode === "fileCompare" ? (
-        <WorkspaceFileComparePanel
-          session={options.fileCompareSession}
-          workspaceId={options.activeWorkspace?.id ?? null}
-          workspaceName={options.activeWorkspace?.name ?? null}
-          workspacePath={options.activeWorkspace?.path ?? null}
-          saveFileShortcut={options.saveFileShortcut}
-          onClose={options.onCloseFileCompare}
-        />
-      ) : null,
+      buildFileComparePanelNode({
+        options,
+      }),
     [
       options.centerMode,
       options.fileCompareSession,
@@ -3075,25 +2417,12 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
   );
   const projectMapPanelNode = useMemo(
     () =>
-      isProjectMapSurfaceActive ? (
-        <Suspense fallback={<HeavyPanelFallback />}>
-          <ProjectMapPanel
-            key={options.activeWorkspace?.id ?? "no-workspace"}
-            activeWorkspace={options.activeWorkspace ?? null}
-            workspaceName={options.activeWorkspace?.name ?? null}
-            selectedEngine={options.selectedEngine ?? null}
-            selectedModelId={options.selectedModelId}
-            models={options.models}
-            datasetController={options.projectMapDatasetController}
-            changedFilePaths={projectMapImpactInput.filePaths}
-            changedFileSource={projectMapImpactInput.source}
-            activeCodeSelectionAnchor={options.activeCodeSelectionAnchor}
-            onOpenEvidenceFile={handleOpenProjectMapEvidenceFile}
-            onOpenIntentCanvas={options.onOpenIntentCanvas}
-            onOpenIntentCanvasFromRelationship={options.onOpenIntentCanvas}
-          />
-        </Suspense>
-      ) : null,
+      buildProjectMapPanelNode({
+        options,
+        isProjectMapSurfaceActive,
+        projectMapImpactInput,
+        handleOpenProjectMapEvidenceFile,
+      }),
     [
       isProjectMapSurfaceActive,
       options.activeWorkspace,
@@ -3110,19 +2439,11 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
 
   const intentCanvasPanelNode = useMemo(
     () =>
-      isIntentCanvasSurfaceActive ? (
-        <Suspense fallback={<HeavyPanelFallback />}>
-          <IntentCanvasManager
-            activeWorkspace={options.activeWorkspace ?? null}
-            activeThreadId={options.activeThreadId ?? null}
-            openRequest={options.intentCanvasOpenRequest ?? null}
-            onOpenRequestConsumed={options.onIntentCanvasOpenRequestConsumed}
-            onAttachToThread={options.onAttachIntentCanvasToThread}
-            onOpenProjectMap={options.onOpenProjectMap}
-            onOpenSourceFile={handleOpenProjectMapEvidenceFile}
-          />
-        </Suspense>
-      ) : null,
+      buildIntentCanvasPanelNode({
+        options,
+        isIntentCanvasSurfaceActive,
+        handleOpenProjectMapEvidenceFile,
+      }),
     [
       isIntentCanvasSurfaceActive,
       options.activeWorkspace,
@@ -3185,20 +2506,7 @@ export function useLayoutNodes(input: LayoutNodesOptions): LayoutNodesResult {
     diffLabel: t("workspace.diff"),
     onBackFromDiff: options.onBackFromDiff,
   });
-  const browserDockNode =
-    options.browserDockOpen &&
-    options.centerMode === "chat" &&
-    options.activeWorkspaceId ? (
-      <Suspense fallback={<HeavyPanelFallback />}>
-        <BrowserDock
-          workspaceId={options.activeWorkspaceId}
-          ownerSurface="main-split-browser-dock"
-          displayMode="embedded"
-          className="browser-agent-center-panel-dock"
-          onClosePanel={options.onCloseBrowserDock}
-        />
-      </Suspense>
-    ) : null;
+  const browserDockNode = buildBrowserDockNode({ options });
 
   return {
     codeAnnotationBridgeProps,
