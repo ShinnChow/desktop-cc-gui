@@ -23,7 +23,7 @@
     },
     {
       "id": "bridge-runtime-critical",
-      "description": "Bridge, runtime, and app-shell orchestration files get the strictest growth control.",
+      "description": "Bridge, runtime, and app-shell orchestration files get the strictest growth control. strictReduction enabled 2026-08-31 after Wave6 W6-A split engine/status.rs (3020->70 shell + status/ 11 modules); group retained is now zero and retained entries block.",
       "priority": "P0",
       "warnThreshold": 2200,
       "failThreshold": 2600,
@@ -50,7 +50,8 @@
           "src-tauri/src/computer_use/",
           "src/app-shell/"
         ]
-      }
+      },
+      "strictReduction": true
     },
     {
       "id": "settings-view-sections",

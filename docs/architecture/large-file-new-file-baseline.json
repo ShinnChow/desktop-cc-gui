@@ -1,28 +1,8 @@
 {
-  "generatedAt": "2026-08-31T06:58:39.704Z",
+  "generatedAt": "2026-08-31T07:39:52.137Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
-    {
-      "path": "src/features/app/hooks/useAppServerEvents.test.tsx",
-      "lines": 4327,
-      "type": "ts/tsx",
-      "policyId": "test-files",
-      "priority": "P2",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/threads/hooks/useThreadMessaging.test.tsx",
-      "lines": 4101,
-      "type": "ts/tsx",
-      "policyId": "test-files",
-      "priority": "P2",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
     {
       "path": "src/styles/settings.part2.basic-redesign.css",
       "lines": 4074,
@@ -180,26 +160,6 @@
       "policyId": "test-files",
       "priority": "P2",
       "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src-tauri/src/engine/status.rs",
-      "lines": 3020,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/git-history/components/git-history-panel/components/GitHistoryPanelView.tsx",
-      "lines": 3012,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -470,6 +430,16 @@
       "policyId": "bridge-runtime-critical",
       "priority": "P0",
       "warnThreshold": 2200,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/git-history/components/git-history-panel/components/GitHistoryPanelView.tsx",
+      "lines": 2340,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },

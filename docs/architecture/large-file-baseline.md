@@ -8,15 +8,13 @@ status: generated
 > **Lifecycle**: Generated snapshot. This report reflects repository state only at the generation time below; rerun the current scanner before making governance decisions.
 > **Fact boundary**: This Markdown is a human-readable projection, not an accepted baseline source or proof that the current tree passes the gate. Machine-readable baseline JSON and current CLI output remain authoritative.
 
-- Generated at: 2026-08-31T06:58:38.774Z
+- Generated at: 2026-08-31T07:39:51.224Z
 - Scope: fail
 - Policy version: 2026-08-30.policy-v5
-- Count: 22
+- Count: 18
 
 | File | Lines | Type | Policy | Priority | Warn | Fail | Severity | Status | Baseline | Delta |
 |---|---:|---|---|---|---:|---:|---|---|---:|---:|
-| `src/features/app/hooks/useAppServerEvents.test.tsx` | 4327 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
-| `src/features/threads/hooks/useThreadMessaging.test.tsx` | 4101 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/styles/settings.part2.basic-redesign.css` | 4074 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src/features/composer/components/ChatInputBox/selectors/ModelSelect.test.tsx` | 3679 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
 | `src/features/app/components/Sidebar.test.tsx` | 3620 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
@@ -33,8 +31,6 @@ status: generated
 | `src/styles/diff.css` | 3077 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src/styles/messages.part1.css` | 3035 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src/features/app/hooks/useSidebarMenus.test.tsx` | 3032 | ts/tsx | test-files | P2 | 2600 | 3000 | fail | captured |  |  |
-| `src-tauri/src/engine/status.rs` | 3020 | rust | bridge-runtime-critical | P0 | 2200 | 2600 | fail | captured |  |  |
-| `src/features/git-history/components/git-history-panel/components/GitHistoryPanelView.tsx` | 3012 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
 | `src/styles/file-view-panel.css` | 2980 | css | styles | P1 | 2200 | 2800 | fail | captured |  |  |
 | `src/features/threads/hooks/useThreadMessaging.ts` | 2819 | ts/tsx | feature-hotpath | P1 | 2400 | 2800 | fail | captured |  |  |
 
