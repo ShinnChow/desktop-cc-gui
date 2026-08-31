@@ -38,12 +38,7 @@ export async function discoverCodexModels(
   });
 }
 
-export async function generateRunMetadata(workspaceId: string, prompt: string) {
-  return invoke<{ title: string; worktreeName: string }>("generate_run_metadata", {
-    workspaceId,
-    prompt,
-  });
-}
+
 
 export async function getCollaborationModes(workspaceId: string) {
   return traceStartupInvoke("collaboration_mode_list", workspaceScope(workspaceId), () =>

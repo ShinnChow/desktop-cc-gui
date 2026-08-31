@@ -12,9 +12,7 @@ export interface SettingsRecoveryNotice {
   backupFileName: string | null;
 }
 
-export async function getCodexConfigPath(): Promise<string> {
-  return invoke<string>("get_codex_config_path");
-}
+
 
 export async function getAppSettings(): Promise<AppSettings> {
   return invoke<AppSettings>("get_app_settings");
