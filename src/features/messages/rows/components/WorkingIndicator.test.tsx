@@ -3,26 +3,17 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  isWindowsPlatform: vi.fn(),
   liveTokenSnapshot: {
     tokenCount: null as number | null,
     usageUpdatedAt: null as number | null,
   },
 }));
 
-vi.mock("../../../../utils/platform", () => ({
-  isWindowsPlatform: mocks.isWindowsPlatform,
-}));
-
 vi.mock("../../../layout/hooks/activeCanvasStore", () => ({
   useActiveCanvasSelector: () => mocks.liveTokenSnapshot,
 }));
 
-import {
-  WorkingIndicator,
-  WORKING_GLYPH_FRAME_MS,
-  WORKING_GLYPH_FRAMES,
-} from "./WorkingIndicator";
+import { WorkingIndicator } from "./WorkingIndicator";
 
 function renderWorking(isThinking = true) {
   return render(
@@ -34,7 +25,7 @@ function renderWorking(isThinking = true) {
   );
 }
 
-describe("WorkingIndicator spinner platform split", () => {
+describe("WorkingIndicator agent-thinking indicator", () => {
   it("renders an explicit conversation-tail curtain while background tasks await a main-channel continuation", () => {
     const { getByText } = render(
       <WorkingIndicator
@@ -51,8 +42,6 @@ describe("WorkingIndicator spinner platform split", () => {
   });
 
   beforeEach(() => {
-    mocks.isWindowsPlatform.mockReset();
-    mocks.isWindowsPlatform.mockReturnValue(false);
     vi.useFakeTimers();
   });
 
@@ -61,38 +50,32 @@ describe("WorkingIndicator spinner platform split", () => {
     vi.useRealTimers();
   });
 
-  it("uses SVG dash on Mac and other non-Windows platforms", () => {
-    mocks.isWindowsPlatform.mockReturnValue(false);
+  it("renders the dot-spin grid indicator", () => {
     const { container } = renderWorking();
-    const spinner = container.querySelector(".working-spinner");
-    expect(spinner).toBeTruthy();
-    expect(spinner?.tagName.toLowerCase()).toBe("svg");
-    expect(spinner?.classList.contains("working-spinner-dash")).toBe(true);
-    expect(spinner?.classList.contains("working-spinner-glyph")).toBe(false);
-    expect(spinner?.querySelector("circle")).toBeTruthy();
+    const root = container.querySelector(".agent-thinking");
+    expect(root).toBeTruthy();
+    const dots = container.querySelector(".agent-thinking-dots");
+    expect(dots).toBeTruthy();
+    expect(dots?.querySelectorAll(".agent-thinking-dot")).toHaveLength(9);
+    expect(
+      container.querySelector(".working-text")?.textContent ?? "",
+    ).toContain("响应中");
   });
 
-  it("uses glyph frames on Windows and advances textContent without ticking the timer", () => {
-    mocks.isWindowsPlatform.mockReturnValue(true);
+  it("anchors the clock to the turn start and advances it in place", () => {
     const { container } = renderWorking();
-    const spinner = container.querySelector(".working-spinner-glyph");
     const clock = container.querySelector(".working-timer-clock");
-    expect(spinner).toBeTruthy();
-    expect(spinner?.classList.contains("working-spinner")).toBe(true);
-    expect(spinner?.classList.contains("working-spinner-dash")).toBe(false);
-    expect(spinner?.textContent).toBe(WORKING_GLYPH_FRAMES[0]);
-    const clockBefore = clock?.textContent;
+    expect(clock).toBeTruthy();
+    expect(clock?.textContent).toBe("0:01");
 
     act(() => {
-      vi.advanceTimersByTime(WORKING_GLYPH_FRAME_MS);
+      vi.advanceTimersByTime(3_000);
     });
 
-    expect(spinner?.textContent).toBe(WORKING_GLYPH_FRAMES[1]);
-    expect(clock?.textContent).toBe(clockBefore);
+    expect(clock?.textContent).toBe("0:04");
   });
 
-  it("clears the glyph interval on unmount", () => {
-    mocks.isWindowsPlatform.mockReturnValue(true);
+  it("clears the clock interval on unmount", () => {
     const clearIntervalSpy = vi.spyOn(window, "clearInterval");
     const { unmount } = renderWorking();
     unmount();
@@ -100,16 +83,14 @@ describe("WorkingIndicator spinner platform split", () => {
     clearIntervalSpy.mockRestore();
   });
 
-  it("hides the spinner when not thinking", () => {
-    mocks.isWindowsPlatform.mockReturnValue(true);
+  it("hides the indicator when not thinking", () => {
     const { container } = renderWorking(false);
-    expect(container.querySelector(".working-spinner")).toBeNull();
+    expect(container.querySelector(".agent-thinking")).toBeNull();
   });
 });
 
 describe("WorkingIndicator live tokens", () => {
   beforeEach(() => {
-    mocks.isWindowsPlatform.mockReturnValue(false);
     mocks.liveTokenSnapshot.tokenCount = null;
     mocks.liveTokenSnapshot.usageUpdatedAt = null;
   });

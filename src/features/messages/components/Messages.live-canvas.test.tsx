@@ -353,7 +353,7 @@ describe("Messages live behavior", () => {
       const waitingNode = container.querySelector(".working");
       expect(waitingNode).toBeTruthy();
       expect(waitingNode?.className ?? "").toBe("working");
-      expect(waitingNode?.querySelector(".working-spinner")).toBeTruthy();
+      expect(waitingNode?.querySelector(".agent-thinking")).toBeTruthy();
       expect(waitingNode?.className ?? "").not.toContain("is-waiting");
       expect(waitingNode?.className ?? "").not.toContain("is-ingress");
 
