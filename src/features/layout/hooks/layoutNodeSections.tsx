@@ -69,6 +69,7 @@ export function buildRightPanelToolbarNode({
   return (
     <div
       className={`right-panel-toolbar${active === "git" ? " has-git-mode-slot" : ""}`}
+      data-tauri-drag-region
     >
       {active === "git" ? (
         <div
