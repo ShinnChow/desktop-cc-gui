@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-31T04:37:42.351Z",
+  "generatedAt": "2026-08-31T05:51:00.849Z",
   "scope": "new-file",
   "policyVersion": "2026-08-30.policy-v5",
   "entries": [
@@ -40,16 +40,6 @@
       "policyId": "test-files",
       "priority": "P2",
       "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/git-history/components/git-history-panel/components/GitHistoryPanelImpl.tsx",
-      "lines": 3662,
-      "type": "ts/tsx",
-      "policyId": "feature-hotpath",
-      "priority": "P1",
-      "warnThreshold": 2400,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -110,16 +100,6 @@
       "policyId": "test-files",
       "priority": "P2",
       "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src-tauri/src/engine/pi.rs",
-      "lines": 3201,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -244,16 +224,6 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
-      "path": "src-tauri/src/engine/claude_history.rs",
-      "lines": 2881,
-      "type": "rust",
-      "policyId": "bridge-runtime-critical",
-      "priority": "P0",
-      "warnThreshold": 2200,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
       "path": "src/features/session-activity/components/WorkspaceSessionActivityPanel.test.tsx",
       "lines": 2821,
       "type": "ts/tsx",
@@ -309,16 +279,6 @@
       "type": "ts/tsx",
       "policyId": "test-files",
       "priority": "P2",
-      "warnThreshold": 2600,
-      "failThreshold": 800,
-      "thresholdSource": "new-file-ratchet"
-    },
-    {
-      "path": "src/features/files/components/FileTreePanel.tsx",
-      "lines": 2622,
-      "type": "ts/tsx",
-      "policyId": "default-source",
-      "priority": "P1",
       "warnThreshold": 2600,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
@@ -994,6 +954,16 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
+      "path": "src/features/git-history/components/git-history-panel/components/GitHistoryPanelImpl.tsx",
+      "lines": 1932,
+      "type": "ts/tsx",
+      "policyId": "feature-hotpath",
+      "priority": "P1",
+      "warnThreshold": 2400,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
       "path": "src/features/threads/hooks/useThreadActions.helpers.test.ts",
       "lines": 1932,
       "type": "ts/tsx",
@@ -1220,6 +1190,16 @@
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src-tauri/src/engine/claude_history_filter.rs",
+      "lines": 1822,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
       "failThreshold": 800,
       "thresholdSource": "new-file-ratchet"
     },
@@ -1994,6 +1974,16 @@
       "thresholdSource": "new-file-ratchet"
     },
     {
+      "path": "src-tauri/src/engine/pi/session_rpc.rs",
+      "lines": 1330,
+      "type": "rust",
+      "policyId": "bridge-runtime-critical",
+      "priority": "P0",
+      "warnThreshold": 2200,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
       "path": "src-tauri/src/session_management_catalog_projection.rs",
       "lines": 1324,
       "type": "rust",
@@ -2337,6 +2327,16 @@
       "path": "src-tauri/src/shared_session_v2_shared_interrupt_owner_tests.rs",
       "lines": 1189,
       "type": "rust",
+      "policyId": "default-source",
+      "priority": "P1",
+      "warnThreshold": 2600,
+      "failThreshold": 800,
+      "thresholdSource": "new-file-ratchet"
+    },
+    {
+      "path": "src/features/files/components/FileTreePanel.tsx",
+      "lines": 1188,
+      "type": "ts/tsx",
       "policyId": "default-source",
       "priority": "P1",
       "warnThreshold": 2600,

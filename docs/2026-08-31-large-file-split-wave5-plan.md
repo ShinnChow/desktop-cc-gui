@@ -167,3 +167,11 @@ created: 2026-08-31
 - 波末：两道 baseline 重生成 + gate 绿 + 删 tsbuildinfo tsc 零 error。
 
 **教训增补**：⑧ #[path] 加载的测试文件内再声明 child mod 必须继续显式 #[path]（裸 mod 触发 E0583）；⑨ 并行代理共享 target 时 cargo check exit 101 / 引用未落盘文件 E0583 为 transient，hub 协调后重跑即可。
+### 波 3（2026-08-31 第三会话，4 代理并行，落地 1 commit）
+
+- **B5 claude_history**：2881→30 壳 + 三族平铺（filter 1822 / loader 700 / delete 376）；17 处机械 pub(crate) 为唯一偏差；cargo test 61 passed/9 failed 前后逐字相同（9 个为既有失败名单，panic 签名逐字一致）。
+- **B6 pi.rs**：3201→68 壳 + engine/pi/ 12 子模块（session_rpc 1330/session_send 584/stream_lines 250/background_tasks 188/session 160/session_interrupt 132 等）；Dual-Path Gate 判定函数集（is_pi_external_wakeup_allowed 等 5 件）单实现落 gates.rs 原路径重导出，dev/daemon 两转发器调用点零改动；110 处 pub(crate) 前缀为唯一偏差；cargo test lib 242+daemon 150 前后一致。
+- **A4 FileTreePanel**：2622→1188（硬底测算 ~1180，memo 推导链 ~250 性能敏感区未动，拍板接受）；新建 fileTreeContextMenu 481（deps 29 名逐字留调用点、menu item id 集合比对一致）+ useFileTreeLazyChildren 275 + useFileTreePreviewPopover 296 + useFileTreeItemOperations 753；59/59 测试前后一致。
+- **C1 GitHistoryPanelImpl**：3662→1932（<2000 ✓）；11 个同目录 hook（deps 对象模式，DataLoading 先例）；4 锚点原地不动，两 scope bag 与 HEAD 逐字节一致；两治理脚本绿；git-history 测试 8 failed/202 passed 前后逐字相同（8 个为既有 GitHistoryWorktreePanel）。
+- 波末：两道 baseline 重生成 + gate 绿 + 删 tsbuildinfo tsc 零 error。
+- 事故登记：波中仓内出现 0 字节杂散 src-tauri/src/bin/cc_gui_daemon/main.rs（duplicate bin 阻塞 manifest 解析），B6 移至 /tmp 恢复；来源未定位（非 B5/B6 任务内容），后续波次留意。
