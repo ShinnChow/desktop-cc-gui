@@ -61,7 +61,7 @@ describe("appShellFeatureBoundaries (T3.5/T3.6/T3.7)", () => {
           offenders.push(`${relative(srcDir, p)}: direct app-shell/ import`);
           continue;
         }
-        const rel = relative(srcDir, p);
+        const rel = relative(srcDir, p).replace(/\\/g, "/");
         if (!FEATURE_SHELL_BRIDGE_ALLOWLIST.has(rel)) {
           offenders.push(`${rel}: unlisted app-shell-parts bridge`);
         }

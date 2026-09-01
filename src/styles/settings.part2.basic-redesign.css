@@ -3850,3 +3850,20 @@ button.settings-open-app-health:disabled {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Homepage preferences share the standard Settings rows. */
+.settings-home-appearance .settings-pref-title,
+.settings-home-appearance .settings-pref-desc { margin: 0; }
+.settings-home-appearance .settings-pref-control { gap: 10px; }
+.settings-home-appearance .settings-input { width: 240px; max-width: 100%; }
+.settings-home-logo-control { max-width: 300px; }
+.settings-home-logo-control img { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; }
+.settings-home-logo-control input { width: 240px; min-width: 0; max-width: 100%; font-size: 12px; }
+.settings-home-appearance input[type="color"] { width: 36px; height: 32px; padding: 2px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--surface-card); }
+.settings-home-appearance-actions > .settings-pref-control { margin-left: auto; }
+.settings-home-appearance-error { color: var(--text-danger, #e85d5d); font-size: 12px; margin: 0; }
+@media (max-width: 900px) {
+  .settings-section-basic .settings-home-appearance .settings-pref-row:not(.settings-pref-row--stack),
+  .settings-section-basic .settings-home-appearance .settings-pref-row-main { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .settings-section-basic .settings-home-appearance .settings-pref-control { max-width: 100%; justify-content: flex-start; }
+}

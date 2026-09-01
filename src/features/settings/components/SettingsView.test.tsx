@@ -2477,7 +2477,7 @@ describe("SettingsView Shortcuts", () => {
     expect(tabButton.querySelector(".settings-basic-tab-icon")).toBeTruthy();
   }
 
-  it("reaches shortcuts and open-app editors from Basic tabs", async () => {
+  it("reaches home appearance, shortcuts and open-app editors from Basic tabs", async () => {
     renderDisplaySection();
     await flushSettingsViewEffects();
 
@@ -2486,6 +2486,11 @@ describe("SettingsView Shortcuts", () => {
     expectTabButtonHasIcon("Open in");
     expectTabButtonHasIcon("Web Service");
     expectTabButtonHasIcon("Email");
+
+    expect(screen.getByRole("form", { name: "homeChat.appearance.customize" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Behavior" }));
+    await flushSettingsViewEffects();
+    expect(screen.queryByRole("form", { name: "homeChat.appearance.customize" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Shortcuts" }));
     await flushSettingsViewEffects();
