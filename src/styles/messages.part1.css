@@ -10,13 +10,6 @@
   contain: layout style;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .working-spinner,
-.working-spinner-dash circle {
-    animation: none;
-  }
-}
-
 .message.user {
   justify-content: flex-end;
 }
