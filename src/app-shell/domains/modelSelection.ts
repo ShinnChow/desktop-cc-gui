@@ -117,7 +117,7 @@ export function resolveLedgerAwareEngineModels({
   engineModelsAsOptions: ModelOption[];
   threadLedgerModelId: string | null;
 }): ModelOption[] {
-  if (activeEngine !== "pi" || !hasActiveThread) {
+  if ((activeEngine !== "pi" && activeEngine !== "omp") || !hasActiveThread) {
     return engineModelsAsOptions;
   }
   return preserveLedgerModelOnFallbackCatalog(
@@ -222,7 +222,8 @@ export function isReasoningEffortSupportedForEngine(
     activeEngine === "codex" ||
     activeEngine === "dsh" ||
     activeEngine === "qoder" ||
-    activeEngine === "pi"
+    activeEngine === "pi" ||
+    activeEngine === "omp"
   ) {
     // dsh / qoder / pi：只有选中模型在 catalog 声明了 reasoning efforts 才支持
     return getNormalizedReasoningOptions(reasoningOptions).length > 0;
@@ -365,7 +366,8 @@ export function getEffectiveSelectedEffort({
     (activeEngine !== "codex" &&
       activeEngine !== "dsh" &&
       activeEngine !== "qoder" &&
-      activeEngine !== "pi") ||
+      activeEngine !== "pi" &&
+      activeEngine !== "omp") ||
     !hasActiveThread
   ) {
     return normalizeEffort(selectedEffort, { fallbackToFirst: true });
@@ -401,7 +403,8 @@ export function getEffectiveReasoningSupported(
     activeEngine === "grok" ||
     ((activeEngine === "codex" ||
       activeEngine === "dsh" ||
-      activeEngine === "pi") &&
+      activeEngine === "pi" ||
+      activeEngine === "omp") &&
       codexReasoningSupported)
   );
 }

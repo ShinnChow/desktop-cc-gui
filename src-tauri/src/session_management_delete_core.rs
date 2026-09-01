@@ -164,6 +164,10 @@ pub(crate) async fn delete_workspace_sessions_core(
         .get_engine_config(engine::EngineType::Pi)
         .await
         .and_then(|item| item.home_dir);
+    let omp_home_dir = engine_manager
+        .get_engine_config(engine::EngineType::Omp)
+        .await
+        .and_then(|item| item.home_dir);
     let qoder_distribution_settings = engine_manager.qoder_distribution_settings().await;
     let dsh_config = engine_manager
         .get_engine_config(engine::EngineType::Dsh)
@@ -237,10 +241,26 @@ pub(crate) async fn delete_workspace_sessions_core(
                 let pi_home_dir = pi_home_dir.clone();
                 let raw_id = target.native_session_id.clone();
                 let handle = tokio::spawn(async move {
-                    engine::pi_history::delete_pi_session(
+                    engine::pi_history::delete_pi_family_session(
+                        engine::EngineType::Pi,
                         &workspace_path,
                         &raw_id,
                         pi_home_dir.as_deref(),
+                    )
+                    .await
+                });
+                async_delete_handles.push((target, handle));
+            }
+            "omp" => {
+                let workspace_path = target.owner_workspace_path.clone();
+                let omp_home_dir = omp_home_dir.clone();
+                let raw_id = target.native_session_id.clone();
+                let handle = tokio::spawn(async move {
+                    engine::pi_history::delete_pi_family_session(
+                        engine::EngineType::Omp,
+                        &workspace_path,
+                        &raw_id,
+                        omp_home_dir.as_deref(),
                     )
                     .await
                 });

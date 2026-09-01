@@ -77,7 +77,7 @@ export function parseStoredThreadAgentSelectionEntry(raw: unknown): {
 
 function resolveThreadEngine(
   threadId: string,
-): "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | "codex" | null {
+): "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | "codex" | null {
   if (threadId.startsWith("claude:") || threadId.startsWith("claude-pending-")) {
     return "claude";
   }
@@ -92,6 +92,9 @@ function resolveThreadEngine(
   }
   if (threadId.startsWith("pi:") || threadId.startsWith("pi-pending-")) {
     return "pi";
+  }
+  if (threadId.startsWith("omp:") || threadId.startsWith("omp-pending-")) {
+    return "omp";
   }
   if (threadId.startsWith("opencode:") || threadId.startsWith("opencode-pending-")) {
     return "opencode";

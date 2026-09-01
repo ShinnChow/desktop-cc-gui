@@ -178,6 +178,8 @@ export function useWorkspaceActions({
           return t("workspace.engineOpenCode");
         case "pi":
           return t("workspace.enginePi");
+        case "omp":
+          return t("workspace.engineOmp");
         case "qoder":
           return t("workspace.engineQoder");
         case "dsh":

@@ -9,6 +9,7 @@ export const NEW_SESSION_ENGINE_ACTION_IDS: Readonly<Record<string, EngineType>>
   "new-session-kimi": "kimi",
   "new-session-grok": "grok",
   "new-session-pi": "pi",
+  "new-session-omp": "omp",
   "new-session-dsh": "dsh",
   "new-session-qoder-global": "qoder",
   "new-session-qoder-cn": "qoder",

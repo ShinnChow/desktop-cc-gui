@@ -299,6 +299,7 @@ export function extractAgentMessageDeltaPayload(
     !isGrokThreadId(threadId) &&
     !isKimiThreadId(threadId) &&
     !isPiThreadId(threadId) &&
+    !isOmpThreadId(threadId) &&
     !isQoderThreadId(threadId) &&
     !isDshThreadId(threadId)
   ) {
@@ -462,6 +463,10 @@ export function isPiThreadId(threadId: string): boolean {
   return threadId.startsWith("pi:") || threadId.startsWith("pi-pending-");
 }
 
+export function isOmpThreadId(threadId: string): boolean {
+  return threadId.startsWith("omp:") || threadId.startsWith("omp-pending-");
+}
+
 export function isQoderThreadId(threadId: string): boolean {
   return threadId.startsWith("qoder:") || threadId.startsWith("qoder-pending-");
 }
@@ -480,7 +485,7 @@ export function isDshThreadId(threadId: string): boolean {
 
 export function inferGeminiReasoningHintFromThreadId(
   threadId: string,
-): "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder" | null {
+): "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder" | null {
   if (!threadId) {
     return null;
   }
@@ -493,6 +498,9 @@ export function inferGeminiReasoningHintFromThreadId(
   if (isPiThreadId(threadId)) {
     return "pi";
   }
+  if (isOmpThreadId(threadId)) {
+    return "omp";
+  }
   if (isQoderThreadId(threadId)) {
     return "qoder";
   }
@@ -504,7 +512,7 @@ export function inferGeminiReasoningHintFromThreadId(
 
 export function inferRawMethodEngine(
   method: string,
-): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | undefined {
+): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | undefined {
   switch (method) {
     case "claude/raw":
       return "claude";
@@ -520,6 +528,8 @@ export function inferRawMethodEngine(
       return "opencode";
     case "pi/raw":
       return "pi";
+    case "omp/raw":
+      return "omp";
     case "qoder/raw":
       return "qoder";
     case "dsh/raw":

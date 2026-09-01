@@ -10,7 +10,8 @@ fn pi_external_wakeup_notification_is_allowed_after_pending_tasks_clear() {
         source: "notification".to_string(),
     };
 
-    assert!(is_pi_external_wakeup_allowed(
+    assert!(is_pi_family_external_wakeup_allowed(
+        engine::EngineType::Pi,
         "pi-external-follow-up",
         "pi-turn-primary",
         &notification,
@@ -27,7 +28,8 @@ fn pi_external_wakeup_without_notification_stays_blocked_after_pending_tasks_cle
         text: "unrelated".to_string(),
     };
 
-    assert!(!is_pi_external_wakeup_allowed(
+    assert!(!is_pi_family_external_wakeup_allowed(
+        engine::EngineType::Pi,
         "pi-external-unrelated",
         "pi-turn-primary",
         &unrelated,

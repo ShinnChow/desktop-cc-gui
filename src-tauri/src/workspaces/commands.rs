@@ -1306,6 +1306,7 @@ pub(crate) async fn add_workspace(
         None,
         None,
         None,
+        None,
         qoder_bin_setting.as_deref(),
         &disabled_engines,
     )
@@ -1350,6 +1351,9 @@ pub(crate) async fn add_workspace(
         EngineType::Pi => {
             add_workspace_for_cli_engine(EngineType::Pi, path, codex_bin, &state).await
         }
+        EngineType::Omp => {
+            add_workspace_for_cli_engine(EngineType::Omp, path, codex_bin, &state).await
+        }
         EngineType::Qoder => {
             add_workspace_for_cli_engine(EngineType::Qoder, path, codex_bin, &state).await
         }
@@ -1360,7 +1364,7 @@ pub(crate) async fn add_workspace(
 }
 
 /// Add workspace for a CLI-based engine (no persistent session needed).
-/// Supports Claude, Gemini, OpenCode, Kimi, Grok, Pi, Qoder and Dsh engines.
+/// Supports Claude, Gemini, OpenCode, Kimi, Grok, Pi, Omp, Qoder and Dsh engines.
 async fn add_workspace_for_cli_engine(
     engine_type: EngineType,
     path: String,
@@ -1369,7 +1373,7 @@ async fn add_workspace_for_cli_engine(
 ) -> Result<WorkspaceInfo, String> {
     use crate::engine::status::{
         detect_claude_status, detect_grok_status, detect_kimi_status, detect_opencode_status,
-        detect_pi_status, detect_qoder_status,
+        detect_omp_status, detect_pi_status, detect_qoder_status,
     };
     use std::path::PathBuf;
 
@@ -1384,6 +1388,7 @@ async fn add_workspace_for_cli_engine(
         EngineType::Kimi => "kimi",
         EngineType::Grok => "grok",
         EngineType::Pi => "pi",
+        EngineType::Omp => "omp",
         EngineType::Qoder => "qoder",
         EngineType::Dsh => "dsh",
         _ => return Err(format!("Unsupported CLI engine: {:?}", engine_type)),
@@ -1437,6 +1442,13 @@ async fn add_workspace_for_cli_engine(
                 settings.pi_bin.clone()
             };
             detect_pi_status(pi_bin.as_deref()).await.installed
+        }
+        EngineType::Omp => {
+            let omp_bin = {
+                let settings = state.app_settings.lock().await;
+                settings.omp_bin.clone()
+            };
+            detect_omp_status(omp_bin.as_deref()).await.installed
         }
         EngineType::Qoder => {
             let qoder_bin = {

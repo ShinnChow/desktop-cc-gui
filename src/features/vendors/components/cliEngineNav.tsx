@@ -107,6 +107,7 @@ export const CLI_DOCS_HREF_BY_ID: Record<CliEngineId, string> = {
   ruixing: "https://open.lkcoffee.com/docs",
   deveco: "https://developer.huawei.com/consumer/en/doc/harmonyos-guides/ide-commandline-get",
   pi: "https://pi.dev/docs/latest/usage",
+  omp: "https://omp.sh",
   iflow: "https://github.com/iflow-ai/iflow-cli",
   qoder: "https://docs.qoder.com/en/cli/using-cli",
   qwen: "https://qwenlm.github.io/qwen-code-docs/en/users/overview/",
@@ -130,6 +131,7 @@ const CLI_ICON_BY_ID: Record<CliEngineId, string | null> = {
   ruixing: null,
   deveco: huaweiMonoIcon,
   pi: piCliIcon,
+  omp: piCliIcon,
   iflow: null,
   qoder: qoderCliMonoIcon,
   qwen: qwenCliMonoIcon,
@@ -153,6 +155,7 @@ const CLI_MONO_ICON_BY_ID: Record<CliEngineId, string | null> = {
   ruixing: null,
   deveco: huaweiMonoIcon,
   pi: piCliMonoIcon,
+  omp: piCliMonoIcon,
   iflow: null,
   qoder: qoderCliMonoIcon,
   qwen: qwenCliMonoIcon,
@@ -171,6 +174,7 @@ export function buildCliEngineNavItems(options: {
   grokHasConfig: boolean;
   openCodeHasConfig: boolean;
   piHasConfig: boolean;
+  ompHasConfig: boolean;
   dshHasConfig: boolean;
   qoderHasConfig: boolean;
 }): CliEngineNavItem[] {
@@ -182,6 +186,7 @@ export function buildCliEngineNavItems(options: {
     { key: "grok", label: "Grok CLI", hasConfig: options.grokHasConfig, supported: true, docsUrl: CLI_DOCS_HREF_BY_ID.grok },
     { key: "opencode", label: "OpenCode CLI", hasConfig: options.openCodeHasConfig, supported: true, docsUrl: CLI_DOCS_HREF_BY_ID.opencode },
     { key: "pi", label: "PI CLI", hasConfig: options.piHasConfig, supported: true, docsUrl: CLI_DOCS_HREF_BY_ID.pi },
+    { key: "omp", label: "OMP CLI", hasConfig: options.ompHasConfig, supported: true, docsUrl: CLI_DOCS_HREF_BY_ID.omp },
     { key: "dsh", label: "DeepSeek Harness", hasConfig: options.dshHasConfig, supported: true, docsUrl: CLI_DOCS_HREF_BY_ID.dsh },
     { key: "qoder", label: "Qoder CLI", hasConfig: options.qoderHasConfig, supported: true, docsUrl: CLI_DOCS_HREF_BY_ID.qoder },
     { key: "glm", label: "GLM CLI", supported: false, docsUrl: CLI_DOCS_HREF_BY_ID.glm },

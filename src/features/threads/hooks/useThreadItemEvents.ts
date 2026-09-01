@@ -918,6 +918,7 @@ export function useThreadItemEvents({
           itemEngineSource === "kimi" ||
           itemEngineSource === "opencode" ||
           itemEngineSource === "pi" ||
+          itemEngineSource === "omp" ||
           itemEngineSource === "dsh" ||
           itemEngineSource === "qoder" ||
           itemEngineSource === "codex"
@@ -931,6 +932,7 @@ export function useThreadItemEvents({
                   | "kimi"
                   | "opencode"
                   | "pi"
+                  | "omp"
                   | "dsh"
                   | "qoder",
               }

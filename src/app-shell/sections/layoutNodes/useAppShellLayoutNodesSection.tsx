@@ -797,6 +797,7 @@ export function useAppShellLayoutNodesSection(
         | "kimi"
         | "opencode"
         | "pi"
+        | "omp"
         | "dsh"
         | "qoder",
     ) => {

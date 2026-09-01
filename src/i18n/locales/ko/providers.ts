@@ -29,6 +29,9 @@ const providers = {
     "pi": {
       "label": "PI CLI"
     },
+    "omp": {
+      "label": "OMP CLI"
+    },
     "qoder": {
       "label": "Qoder CLI"
     }

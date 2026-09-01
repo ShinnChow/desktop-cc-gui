@@ -67,6 +67,8 @@ export function useCreateSessionLoading({
               ? t("workspace.engineKimi")
             : params.engine === "pi"
               ? t("workspace.enginePi")
+            : params.engine === "omp"
+              ? t("workspace.engineOmp")
             : params.engine === "qoder"
               ? t("workspace.engineQoder")
             : params.engine === "opencode"

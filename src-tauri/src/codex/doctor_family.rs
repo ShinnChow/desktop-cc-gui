@@ -4,7 +4,7 @@ use tauri::{AppHandle, Emitter, State};
 use super::doctor::{
     run_claude_doctor_with_settings, run_codex_doctor_with_settings, run_dsh_doctor_with_settings,
     run_grok_doctor_with_settings, run_kimi_doctor_with_settings,
-    run_opencode_doctor_with_settings, run_pi_doctor_with_settings,
+    run_omp_doctor_with_settings, run_opencode_doctor_with_settings, run_pi_doctor_with_settings,
 };
 use super::{
     build_cli_install_plan_with_backend, resolve_cli_version_status,
@@ -131,6 +131,15 @@ pub(crate) fn remote_pi_doctor_request(pi_bin: Option<String>) -> (&'static str,
     )
 }
 
+pub(crate) fn remote_omp_doctor_request(omp_bin: Option<String>) -> (&'static str, Value) {
+    (
+        "omp_doctor",
+        json!({
+            "ompBin": omp_bin.map(remote_backend::normalize_path_for_remote),
+        }),
+    )
+}
+
 pub(crate) fn remote_qoder_doctor_request(
     qoder_bin: Option<String>,
     provider_profile_id: Option<String>,
@@ -211,6 +220,21 @@ pub(crate) async fn pi_doctor(
 
     let settings = state.app_settings.lock().await.clone();
     run_pi_doctor_with_settings(pi_bin, &settings).await
+}
+
+#[tauri::command]
+pub(crate) async fn omp_doctor(
+    omp_bin: Option<String>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        let (method, params) = remote_omp_doctor_request(omp_bin);
+        return remote_backend::call_remote(&*state, app, method, params).await;
+    }
+
+    let settings = state.app_settings.lock().await.clone();
+    run_omp_doctor_with_settings(omp_bin, &settings).await
 }
 
 #[tauri::command]

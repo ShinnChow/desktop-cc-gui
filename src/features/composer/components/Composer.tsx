@@ -1932,10 +1932,11 @@ function ComposerImpl({
                             }
                             currentProvider="codex"
                           />
-                        ) : selectedEngine === "pi" && // capability-router-allow-engine-branch: pi-only /compact entry, 见 enhance-pi-native-rpc-session
+                        ) : (selectedEngine === "pi" || selectedEngine === "omp") && // capability-router-allow-engine-branch: pi-family /compact entry（omp 与 pi 同 RPC compact 面）, 见 enhance-pi-native-rpc-session / add-omp-engine
                         activeWorkspaceId &&
                         activeThreadId ? (
                           <PiCompactEntry
+                            engine={selectedEngine}
                             percentage={footerUsagePercentage}
                             workspaceId={activeWorkspaceId}
                             threadId={activeThreadId}

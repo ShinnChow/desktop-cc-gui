@@ -125,9 +125,10 @@ impl DaemonState {
                 )
                 .await
             }
-            engine::EngineType::Pi => {
-                engine_send_message_sync_pi(
+            engine @ (engine::EngineType::Pi | engine::EngineType::Omp) => {
+                engine_send_message_sync_pi_family(
                     self,
+                    engine,
                     workspace_id,
                     text,
                     model,
@@ -564,10 +565,12 @@ async fn engine_send_message_sync_kimi(
     }))
 }
 
+/// pi 族共享同步发送路径（add-omp-engine，与 app 侧 commands_send_sync.rs 同形同步）。
 #[allow(clippy::too_many_arguments)]
 #[allow(unused_variables)]
-async fn engine_send_message_sync_pi(
+async fn engine_send_message_sync_pi_family(
     state: &DaemonState,
+    engine: engine::EngineType,
     workspace_id: String,
     text: String,
     model: Option<String>,
@@ -587,10 +590,16 @@ async fn engine_send_message_sync_pi(
 ) -> Result<Value, String> {
     let workspace_path = state.workspace_path_for_engine(&workspace_id).await?;
     let provider_launch_profile =
-        engine::pi_provider_profile::resolve_pi_provider_launch_profile(&workspace_id, None, None)?;
+        engine::pi_provider_profile::resolve_pi_family_provider_launch_profile(
+            engine,
+            &workspace_id,
+            None,
+            None,
+        )?;
     let session = state
         .engine_manager
-        .get_or_create_pi_session_for_runtime(
+        .get_or_create_pi_family_session_for_runtime(
+            engine,
             &workspace_id,
             &workspace_path,
             &provider_launch_profile.runtime_key,
@@ -622,24 +631,24 @@ async fn engine_send_message_sync_pi(
         collaboration_mode: None,
         custom_spec_root: normalized_custom_spec_root.clone(),
     };
-    let turn_id = format!("pi-sync-{}", uuid::Uuid::new_v4());
+    let turn_id = format!("{}-sync-{}", engine.icon(), uuid::Uuid::new_v4());
     let response = tokio::time::timeout(
         std::time::Duration::from_secs(900),
         session.send_message(params, &turn_id),
     )
     .await
-    .map_err(|_| "PI response timed out".to_string())??;
+    .map_err(|_| format!("{} response timed out", engine.icon()))??;
     let response_session_id = session.get_session_id().await;
     state
         .record_auto_session_metadata_if_present(
             &workspace_id,
             response_session_id.as_deref(),
             auto_session,
-            "pi",
+            engine.icon(),
         )
         .await;
     Ok(json!({
-        "engine": "pi",
+        "engine": engine.icon(),
         "sessionId": response_session_id,
         "text": response,
     }))

@@ -45,6 +45,7 @@ pub mod kimi;
 pub mod kimi_history;
 pub(crate) mod kimi_provider_profile;
 pub mod manager;
+pub(crate) mod omp_provider_profile;
 pub mod opencode;
 pub(crate) mod opencode_native_artifact;
 pub(crate) mod opencode_provider_profile;
@@ -94,6 +95,8 @@ pub enum EngineType {
     Kimi,
     /// PI CLI
     Pi,
+    /// OMP CLI (oh-my-pi, pi fork — shares the pi-family runtime)
+    Omp,
     /// DeepSeek Harness (dsh web host)
     Dsh,
     /// Qoder CLI (ACP over stdio)
@@ -117,6 +120,7 @@ impl EngineType {
             EngineType::OpenCode => "OpenCode",
             EngineType::Kimi => "Kimi CLI",
             EngineType::Pi => "PI CLI",
+            EngineType::Omp => "OMP CLI",
             EngineType::Dsh => "DeepSeek Harness",
             EngineType::Qoder => "Qoder CLI",
         }
@@ -132,8 +136,67 @@ impl EngineType {
             EngineType::OpenCode => "opencode",
             EngineType::Kimi => "kimi",
             EngineType::Pi => "pi",
+            EngineType::Omp => "omp",
             EngineType::Dsh => "dsh",
             EngineType::Qoder => "qoder",
+        }
+    }
+}
+/// pi-family identity spec（add-omp-engine）：omp 与 pi 协议面全等
+///（mossx-omp-capability-spike），运行时共享同一实现，全部身份差异收敛于此。
+/// thread id / pending 前缀直接复用 `icon()`（= serde id），不入 spec。
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PiFamilySpec {
+    pub engine: EngineType,
+    /// CLI binary name（`find_cli_binary` / spawn 用）
+    pub bin_name: &'static str,
+    /// 用户 home 下的引擎目录名（`.pi` / `.omp`）
+    pub home_dir_name: &'static str,
+    /// 面向用户的 CLI 短名（fallback catalog 条目 / 诊断文案用："PI" / "OMP"）
+    pub cli_label: &'static str,
+    /// local provider profile sentinel
+    pub local_profile_id: &'static str,
+}
+
+impl EngineType {
+    /// pi 族（pi / omp）身份 spec；非 pi 族引擎返回 None。
+    pub(crate) fn pi_family_spec(self) -> Option<PiFamilySpec> {
+        match self {
+            EngineType::Pi => Some(PiFamilySpec {
+                engine: EngineType::Pi,
+                bin_name: "pi",
+                home_dir_name: ".pi",
+                cli_label: "PI",
+                local_profile_id: pi_provider_profile::PI_LOCAL_PROVIDER_PROFILE_ID,
+            }),
+            EngineType::Omp => Some(PiFamilySpec {
+                engine: EngineType::Omp,
+                bin_name: "omp",
+                home_dir_name: ".omp",
+                cli_label: "OMP",
+                local_profile_id: omp_provider_profile::OMP_LOCAL_PROVIDER_PROFILE_ID,
+            }),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn is_pi_family(self) -> bool {
+        self.pi_family_spec().is_some()
+    }
+    /// Per-engine feature capabilities（三处重复 match 的抽离：
+    /// disabled_engine_status / capability_matrix / commands 共用此口）。
+    pub(crate) fn features(self) -> EngineFeatures {
+        match self {
+            EngineType::Claude => EngineFeatures::claude(),
+            EngineType::Codex => EngineFeatures::codex(),
+            EngineType::Gemini => EngineFeatures::gemini(),
+            EngineType::Grok => EngineFeatures::grok(),
+            EngineType::OpenCode => EngineFeatures::opencode(),
+            EngineType::Kimi => EngineFeatures::kimi(),
+            EngineType::Pi => EngineFeatures::pi(),
+            EngineType::Omp => EngineFeatures::omp(),
+            EngineType::Dsh => EngineFeatures::dsh(),
+            EngineType::Qoder => EngineFeatures::qoder(),
         }
     }
 }
@@ -150,6 +213,7 @@ pub(crate) fn engine_enabled_in_settings(
         | EngineType::Grok
         | EngineType::Kimi
         | EngineType::Pi
+        | EngineType::Omp
         | EngineType::Dsh
         | EngineType::Qoder => true,
     }
@@ -167,6 +231,7 @@ pub(crate) fn detection_disabled_engines(settings: &crate::types::AppSettings) -
         EngineType::OpenCode,
         EngineType::Kimi,
         EngineType::Pi,
+        EngineType::Omp,
         EngineType::Dsh,
         EngineType::Qoder,
     ]
@@ -189,23 +254,14 @@ pub(crate) fn engine_disabled_diagnostic(engine_type: EngineType) -> Option<&'st
         | EngineType::Grok
         | EngineType::Kimi
         | EngineType::Pi
+        | EngineType::Omp
         | EngineType::Dsh
         | EngineType::Qoder => None,
     }
 }
 
 pub(crate) fn disabled_engine_status(engine_type: EngineType) -> EngineStatus {
-    let features = match engine_type {
-        EngineType::Claude => EngineFeatures::claude(),
-        EngineType::Codex => EngineFeatures::codex(),
-        EngineType::Gemini => EngineFeatures::gemini(),
-        EngineType::Grok => EngineFeatures::grok(),
-        EngineType::OpenCode => EngineFeatures::opencode(),
-        EngineType::Kimi => EngineFeatures::kimi(),
-        EngineType::Pi => EngineFeatures::pi(),
-        EngineType::Dsh => EngineFeatures::dsh(),
-        EngineType::Qoder => EngineFeatures::qoder(),
-    };
+    let features = engine_type.features();
     EngineStatus {
         engine_type,
         auth_state: crate::engine::AuthState::default(),
@@ -524,6 +580,11 @@ impl EngineFeatures {
             mcp: false,
         }
     }
+    /// Features for OMP CLI (oh-my-pi): protocol-identical pi fork
+    /// (mossx-omp-capability-spike) — same headless/RPC surface.
+    pub fn omp() -> Self {
+        Self::pi()
+    }
 
     /// Features for DeepSeek Harness (host-managed tools / catalog).
     pub fn dsh() -> Self {
@@ -633,6 +694,31 @@ mod tests {
         assert_eq!(EngineType::Claude.display_name(), "Claude Code");
         assert_eq!(EngineType::Codex.display_name(), "Codex");
         assert_eq!(EngineType::Pi.display_name(), "PI CLI");
+        assert_eq!(EngineType::Omp.display_name(), "OMP CLI");
+    }
+
+    #[test]
+    fn omp_serializes_as_lowercase_id() {
+        // DB/JSONL 序列化兼容闸门：omp 以字符串 "omp" 落盘。
+        assert_eq!(serde_json::to_string(&EngineType::Omp).unwrap(), "\"omp\"");
+        let parsed: EngineType = serde_json::from_str("\"omp\"").unwrap();
+        assert_eq!(parsed, EngineType::Omp);
+    }
+
+    #[test]
+    fn pi_family_spec_splits_identity_only() {
+        let pi = EngineType::Pi.pi_family_spec().expect("pi spec");
+        assert_eq!(pi.bin_name, "pi");
+        assert_eq!(pi.home_dir_name, ".pi");
+        assert_eq!(pi.local_profile_id, "__local_pi__");
+        let omp = EngineType::Omp.pi_family_spec().expect("omp spec");
+        assert_eq!(omp.bin_name, "omp");
+        assert_eq!(omp.home_dir_name, ".omp");
+        assert_eq!(omp.cli_label, "OMP");
+        assert_eq!(omp.local_profile_id, "__local_omp__");
+        assert!(EngineType::Claude.pi_family_spec().is_none());
+        assert!(EngineType::Omp.is_pi_family());
+        assert!(!EngineType::Qoder.is_pi_family());
     }
 
     #[test]

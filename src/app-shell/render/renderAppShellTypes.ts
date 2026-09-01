@@ -55,6 +55,7 @@ export type RenderAppShellFlattenedContext = {
   grokDoctor: any;
   opencodeDoctor: any;
   piDoctor: any;
+  ompDoctor: any;
   qoderDoctor: any;
   editorSplitCompanion: any;
   editorSplitLayout: any;

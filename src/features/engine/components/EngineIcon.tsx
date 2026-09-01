@@ -176,6 +176,17 @@ export function EngineIcon({
           style={style}
         />
       );
+    case "omp":
+      // omp 是 pi 的协议全等 fork：omp.sh 品牌标识同为 π 符号，
+      // 资产未落地前复用 PI monochrome glyph（见 add-omp-engine 设计 §5）。
+      return (
+        <MonochromeGlyph
+          paths={PI_ICON_PATHS}
+          size={size}
+          className={className}
+          style={style}
+        />
+      );
     case "dsh":
       return (
         <img

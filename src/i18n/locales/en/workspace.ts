@@ -70,6 +70,7 @@ const workspace = {
     engineGemini: "Gemini",
     engineKimi: "Kimi CLI",
     enginePi: "PI CLI",
+    engineOmp: "OMP CLI",
     engineQoder: "Qoder CLI",
     engineGrok: "Grok CLI",
     engineOpenCode: "OpenCode",

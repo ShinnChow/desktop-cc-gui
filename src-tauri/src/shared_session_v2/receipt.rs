@@ -88,10 +88,13 @@ pub(crate) fn provider_runtime_key_for_target(
                 provider_profile_id,
             ),
         ),
-        EngineType::Pi => Ok(crate::engine::pi_provider_profile::pi_runtime_key(
-            workspace_id,
-            provider_profile_id,
-        )),
+        engine if engine.is_pi_family() => Ok(
+            crate::engine::pi_provider_profile::pi_family_runtime_key(
+                engine,
+                workspace_id,
+                provider_profile_id,
+            ),
+        ),
         // qoder_runtime_key 内部兼容 None / legacy sentinel → Qoder Global，并为
         // Global/CN 分配彼此隔离的 runtime key。
         EngineType::Qoder => crate::engine::qoder_provider_profile::qoder_runtime_key(

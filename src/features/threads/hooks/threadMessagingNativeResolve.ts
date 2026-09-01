@@ -337,6 +337,7 @@ export type NativeRealSessionContext = {
   kimiSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
   dshSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
   piSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
+  ompSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
   qoderSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
   getThreadProviderProfileId: UseThreadMessagingOptions["getThreadProviderProfileId"];
 };
@@ -357,6 +358,7 @@ export function resolveNativeRealSessionId(
     kimiSessionIdByPendingThreadRef,
     dshSessionIdByPendingThreadRef,
     piSessionIdByPendingThreadRef,
+    ompSessionIdByPendingThreadRef,
     qoderSessionIdByPendingThreadRef,
     getThreadProviderProfileId,
   } = ctx;
@@ -410,6 +412,14 @@ export function resolveNativeRealSessionId(
                               ? (piSessionIdByPendingThreadRef.current.get(
                                   threadId,
                                 ) ?? null)
+                              : resolvedEngine === "omp" &&
+                                  threadId.startsWith("omp:")
+                                ? threadId.slice("omp:".length)
+                                : resolvedEngine === "omp" &&
+                                    threadId.startsWith("omp-pending-")
+                                  ? (ompSessionIdByPendingThreadRef.current.get(
+                                      threadId,
+                                    ) ?? null)
                               : resolvedEngine === "qoder" &&
                                   threadId.startsWith("qoder:")
                                 ? (() => {

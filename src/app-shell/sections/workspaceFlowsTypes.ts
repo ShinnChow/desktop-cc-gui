@@ -39,6 +39,7 @@ export function isEngineType(value: unknown): value is EngineType {
     value === "kimi" ||
     value === "opencode" ||
     value === "pi" ||
+    value === "omp" ||
     value === "dsh" ||
     value === "qoder"
   );

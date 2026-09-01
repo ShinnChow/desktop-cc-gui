@@ -43,6 +43,7 @@ export function dispatchThreadFamily(
       rawEngine === "kimi" ||
       rawEngine === "gemini" ||
       rawEngine === "pi" ||
+      rawEngine === "omp" ||
       rawEngine === "dsh" ||
       rawEngine === "qoder"
         ? rawEngine
@@ -112,6 +113,7 @@ export function dispatchThreadFamily(
         sessionId !== "pending" &&
         eventEngine &&
         eventEngine !== "dsh" &&
+        eventEngine !== "omp" &&
         shouldRebindSharedNativeThreadOnStartedEvent(eventEngine)
       ) {
         const finalizedNativeThreadId = resolveFinalizedSharedNativeThreadId(

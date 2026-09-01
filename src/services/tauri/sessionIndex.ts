@@ -7,6 +7,7 @@ export type SessionIndexEngine =
   | "grok"
   | "kimi"
   | "pi"
+  | "omp"
   | "opencode"
   | "dsh"
   | "qoder"
@@ -108,6 +109,7 @@ function inferEngineFromThreadId(threadId: string): string {
   if (raw.startsWith("kimi:") || raw.startsWith("kimi-pending-")) return "kimi";
   if (raw.startsWith("opencode:") || raw.startsWith("opencode-pending-")) return "opencode";
   if (raw.startsWith("pi:") || raw.startsWith("pi-pending-")) return "pi";
+  if (raw.startsWith("omp:") || raw.startsWith("omp-pending-")) return "omp";
   if (raw.startsWith("dsh:") || raw.startsWith("dsh-pending-")) return "dsh";
   if (raw.startsWith("qoder:") || raw.startsWith("qoder-pending-")) return "qoder";
   return "codex";

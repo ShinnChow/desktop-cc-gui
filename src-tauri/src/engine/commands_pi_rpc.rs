@@ -34,7 +34,10 @@ pub(crate) async fn drive_detached_pi_send<F>(
     }
 }
 
-async fn resolve_pi_session_for_rpc_commands(
+/// pi 族共享解析（add-omp-engine）：omp 复用同一 RPC resident 命令面
+/// （stats / compact；omp 无 fork/tree，不注册对应命令）。
+async fn resolve_pi_family_session_for_rpc_commands(
+    engine: EngineType,
     state: &State<'_, AppState>,
     workspace_id: &str,
     provider_profile_id: Option<&str>,
@@ -51,24 +54,35 @@ async fn resolve_pi_session_for_rpc_commands(
             state.storage_path.as_path(),
             workspace_id,
             None,
-            "pi",
+            engine.icon(),
             provider_profile_id,
         )?;
     let provider_launch_profile =
-        crate::engine::pi_provider_profile::resolve_pi_provider_launch_profile(
+        crate::engine::pi_provider_profile::resolve_pi_family_provider_launch_profile(
+            engine,
             workspace_id,
             effective_provider_profile_id.as_deref(),
             None,
         )?;
     let manager = &state.engine_manager;
     Ok(manager
-        .get_or_create_pi_session_for_runtime(
+        .get_or_create_pi_family_session_for_runtime(
+            engine,
             workspace_id,
             &workspace_path,
             &provider_launch_profile.runtime_key,
             provider_launch_profile.home_dir.as_deref(),
         )
         .await)
+}
+
+async fn resolve_pi_session_for_rpc_commands(
+    state: &State<'_, AppState>,
+    workspace_id: &str,
+    provider_profile_id: Option<&str>,
+) -> Result<std::sync::Arc<crate::engine::pi::PiSession>, String> {
+    resolve_pi_family_session_for_rpc_commands(EngineType::Pi, state, workspace_id, provider_profile_id)
+        .await
 }
 
 #[tauri::command]
@@ -123,6 +137,73 @@ pub async fn pi_compact(
     let session =
         resolve_pi_session_for_rpc_commands(&state, &workspace_id, provider_profile_id.as_deref())
             .await?;
+    session
+        .with_exclusive_rpc_command(session_id.as_deref(), |client| async move {
+            client.compact(custom_instructions.as_deref()).await
+        })
+        .await
+}
+
+#[tauri::command]
+pub async fn omp_get_session_stats(
+    workspace_id: String,
+    session_id: Option<String>,
+    provider_profile_id: Option<String>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "omp_get_session_stats",
+            json!({ "workspaceId": workspace_id, "sessionId": session_id, "providerProfileId": provider_profile_id }),
+        )
+        .await;
+    }
+    let session = resolve_pi_family_session_for_rpc_commands(
+        EngineType::Omp,
+        &state,
+        &workspace_id,
+        provider_profile_id.as_deref(),
+    )
+    .await?;
+    let client = session
+        .rpc_client_for_commands(session_id.as_deref())
+        .await?;
+    client.get_session_stats().await
+}
+
+#[tauri::command]
+pub async fn omp_compact(
+    workspace_id: String,
+    session_id: Option<String>,
+    custom_instructions: Option<String>,
+    provider_profile_id: Option<String>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "omp_compact",
+            json!({
+                "workspaceId": workspace_id,
+                "sessionId": session_id,
+                "customInstructions": custom_instructions,
+                "providerProfileId": provider_profile_id,
+            }),
+        )
+        .await;
+    }
+    let session = resolve_pi_family_session_for_rpc_commands(
+        EngineType::Omp,
+        &state,
+        &workspace_id,
+        provider_profile_id.as_deref(),
+    )
+    .await?;
     session
         .with_exclusive_rpc_command(session_id.as_deref(), |client| async move {
             client.compact(custom_instructions.as_deref()).await

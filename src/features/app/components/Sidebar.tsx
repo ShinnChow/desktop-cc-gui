@@ -514,6 +514,8 @@ function SidebarImpl({
         return <EngineIcon engine="grok" size={14} />;
       case "engine-pi":
         return <EngineIcon engine="pi" size={14} />;
+      case "engine-omp":
+        return <EngineIcon engine="omp" size={14} />;
       case "engine-dsh":
         return <EngineIcon engine="dsh" size={14} />;
       case "engine-qoder":

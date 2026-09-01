@@ -85,7 +85,7 @@ export type ThreadAction =
       type: "ensureThread";
       workspaceId: string;
       threadId: string;
-      engine?: "codex" | "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+      engine?: "codex" | "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
       name?: string | null;
       dshAgentPreset?: string | null;
       parentThreadId?: string | null;
@@ -187,7 +187,7 @@ export type ThreadAction =
       type: "setThreadEngine";
       workspaceId: string;
       threadId: string;
-      engine: "codex" | "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+      engine: "codex" | "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
     }
   | {
       type: "setThreadDshAgentPreset";
@@ -353,6 +353,7 @@ export type ThreadAction =
         | "kimi"
         | "opencode"
         | "pi"
+        | "omp"
         | "dsh"
         | "qoder";
       plan?: TurnPlan | null;

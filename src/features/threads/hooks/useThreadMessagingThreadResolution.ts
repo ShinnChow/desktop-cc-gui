@@ -13,7 +13,7 @@ import { loadClaudeSession as loadClaudeSessionService } from "../../../services
 import { parseClaudeHistoryMessagesWithShadowRecovery } from "../loaders/claudeHistoryLoader";
 import type { ThreadAction } from "./useThreadsReducer";
 
-type ThreadEngine = "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+type ThreadEngine = "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
 
 type RunWithCreateSessionLoading = <T>(
   params: {
@@ -106,6 +106,9 @@ export function useThreadMessagingThreadResolution({
   const piSessionIdByPendingThreadRef = useRef<Map<string, string>>(
     new Map(),
   );
+  const ompSessionIdByPendingThreadRef = useRef<Map<string, string>>(
+    new Map(),
+  );
   const qoderSessionIdByPendingThreadRef = useRef<Map<string, string>>(
     new Map(),
   );
@@ -118,6 +121,7 @@ export function useThreadMessagingThreadResolution({
       engine === "grok" ||
       engine === "kimi" ||
       engine === "pi" ||
+      engine === "omp" ||
       engine === "dsh" ||
       engine === "qoder"
         ? engine
@@ -154,6 +158,9 @@ export function useThreadMessagingThreadResolution({
       }
       if (threadId.startsWith("pi:") || threadId.startsWith("pi-pending-")) {
         return "pi";
+      }
+      if (threadId.startsWith("omp:") || threadId.startsWith("omp-pending-")) {
+        return "omp";
       }
       if (threadId.startsWith("qoder:") || threadId.startsWith("qoder-pending-")) {
         return "qoder";
@@ -207,6 +214,9 @@ export function useThreadMessagingThreadResolution({
       if (engine === "pi") {
         return threadId.startsWith("pi:") || threadId.startsWith("pi-pending-");
       }
+      if (engine === "omp") {
+        return threadId.startsWith("omp:") || threadId.startsWith("omp-pending-");
+      }
       if (engine === "qoder") {
         return threadId.startsWith("qoder:") || threadId.startsWith("qoder-pending-");
       }
@@ -234,6 +244,8 @@ export function useThreadMessagingThreadResolution({
         !threadId.startsWith("kimi-pending-") &&
         !threadId.startsWith("pi:") &&
         !threadId.startsWith("pi-pending-") &&
+        !threadId.startsWith("omp:") &&
+        !threadId.startsWith("omp-pending-") &&
         !threadId.startsWith("qoder:") &&
         !threadId.startsWith("qoder-pending-") &&
         !threadId.startsWith("opencode:") &&
@@ -378,6 +390,7 @@ export function useThreadMessagingThreadResolution({
     kimiSessionIdByPendingThreadRef,
     dshSessionIdByPendingThreadRef,
     piSessionIdByPendingThreadRef,
+    ompSessionIdByPendingThreadRef,
     qoderSessionIdByPendingThreadRef,
     isClaudePendingThreadAwaitingNativeSession,
     isThreadIdCompatibleWithEngine,

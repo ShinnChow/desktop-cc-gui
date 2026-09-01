@@ -280,6 +280,8 @@ export function resolveEngineLabel(engine: EngineType): string {
       return "Grok CLI";
     case "pi":
       return "PI CLI";
+    case "omp":
+      return "OMP CLI";
     case "opencode":
       return "OpenCode";
     case "dsh":

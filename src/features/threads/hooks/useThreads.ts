@@ -25,6 +25,7 @@ import { useThreadEventHandlers } from "./useThreadEventHandlers";
 import { useThreadActions } from "./useThreadActions";
 import { useThreadMessaging } from "./useThreadMessaging";
 import { usePiResidentPrewarm } from "./usePiResidentPrewarm";
+import { useOmpResidentPrewarm } from "./usePiResidentPrewarm";
 import { useThreadApprovals } from "./useThreadApprovals";
 import type { TurnExecutionSnapshot } from "../../shared-session/target/types";
 import {
@@ -141,7 +142,7 @@ type UseThreadsOptions = {
   steerEnabled?: boolean;
   customPrompts?: CustomPromptOption[];
   onMessageActivity?: () => void;
-  activeEngine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+  activeEngine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   useNormalizedRealtimeAdapters?: boolean;
   useUnifiedHistoryLoader?: boolean;
   sessionAttributionMode?: WorkspaceSessionAttributionMode;
@@ -163,7 +164,7 @@ type UseThreadsOptions = {
   runWithCreateSessionLoading?: <T>(
     params: {
       workspace: WorkspaceInfo;
-      engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+      engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
     },
     action: () => Promise<T>,
   ) => Promise<T>;
@@ -317,6 +318,14 @@ export function useThreads({
   // pi resident 预热：会话激活后延迟 fire-and-forget（双轨契约，见
   // usePiResidentPrewarm.ts）。只读 activeThreadIdByWorkspace 投影，不进根链。
   usePiResidentPrewarm({
+    workspaceId: activeWorkspace?.id ?? null,
+    threadId: activeWorkspace
+      ? (state.activeThreadIdByWorkspace[activeWorkspace.id] ?? null)
+      : null,
+    onDebug,
+  });
+  // omp resident 预热：与 pi 同形（pi-family，见 usePiResidentPrewarm.ts）。
+  useOmpResidentPrewarm({
     workspaceId: activeWorkspace?.id ?? null,
     threadId: activeWorkspace
       ? (state.activeThreadIdByWorkspace[activeWorkspace.id] ?? null)
@@ -694,7 +703,7 @@ export function useThreads({
   );
 
   const getThreadEngine = useCallback(
-    (workspaceId: string, threadId: string): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | undefined => {
+    (workspaceId: string, threadId: string): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | undefined => {
       const threads = state.threadsByWorkspace[workspaceId] ?? [];
       const thread = threads.find((t) => t.id === threadId);
       return thread?.engineSource;
@@ -737,7 +746,7 @@ export function useThreads({
   const resolvePendingThreadForSession = useCallback(
     (
       workspaceId: string,
-      engine: "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder",
+      engine: "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder",
     ): string | null => {
       const resolved = resolvePendingThreadIdForSession({
         workspaceId,
@@ -788,7 +797,7 @@ export function useThreads({
   const resolvePendingThreadForTurn = useCallback(
     (
       workspaceId: string,
-      engine: "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder",
+      engine: "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder",
       turnId: string | null | undefined,
     ): string | null =>
       resolvePendingThreadIdForTurn({
@@ -2262,6 +2271,7 @@ export function useThreads({
               thread.engineSource === "kimi" ||
               thread.engineSource === "opencode" ||
               thread.engineSource === "pi" ||
+              thread.engineSource === "omp" ||
               thread.engineSource === "dsh" ||
               thread.engineSource === "qoder"
                 ? thread.engineSource
@@ -2274,6 +2284,7 @@ export function useThreads({
               thread.selectedEngine === "kimi" ||
               thread.selectedEngine === "opencode" ||
               thread.selectedEngine === "pi" ||
+              thread.selectedEngine === "omp" ||
               thread.selectedEngine === "dsh" ||
               thread.selectedEngine === "qoder"
                 ? thread.selectedEngine
@@ -2309,7 +2320,7 @@ export function useThreads({
           message: string;
           willRetry: boolean;
           suppressMessage?: boolean;
-          engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | null;
+          engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | null;
           executionTargetSnapshot?: TurnExecutionSnapshot;
         },
       ) => {
@@ -2326,7 +2337,7 @@ export function useThreads({
           source: string;
           startedAtMs: number | null;
           timeoutMs: number | null;
-          engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | null;
+          engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | null;
         },
       ) => {
         handlers.onTurnStalled?.(workspaceId, threadId, turnId, payload);

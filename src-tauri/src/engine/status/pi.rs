@@ -10,16 +10,27 @@ pub async fn detect_pi_status_with_options(
     custom_bin: Option<&str>,
     include_models: bool,
 ) -> EngineStatus {
-    let bin_path = resolve_bin_path("pi", custom_bin);
+    detect_pi_family_status_with_options(pi_spec(), custom_bin, include_models).await
+}
+
+/// pi 族共享检测实现（add-omp-engine）：omp 与 pi 仅身份不同（spec），
+/// 探测路径 / catalog 链 / 容错语义完全一致。
+pub(crate) async fn detect_pi_family_status_with_options(
+    spec: PiFamilySpec,
+    custom_bin: Option<&str>,
+    include_models: bool,
+) -> EngineStatus {
+    let bin_path = resolve_bin_path(spec.bin_name, custom_bin);
     let bin = bin_path
         .as_ref()
         .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|| "pi".to_string());
+        .unwrap_or_else(|| spec.bin_name.to_string());
     let path_env = build_codex_path_env(custom_bin);
     if !include_models {
-        let (installed, version, error) = probe_cli_version(&bin, "pi", path_env.as_ref()).await;
+        let (installed, version, error) =
+            probe_cli_version(&bin, spec.bin_name, path_env.as_ref()).await;
         if !installed {
-            return not_installed_status(EngineType::Pi, error);
+            return not_installed_status(spec.engine, error);
         }
         // 快照回填已撤销（P0 教训）：EngineStatus.models 会被引擎切换的乐观
         // 选中 / 新会话默认解析当作**可选模型**消费——静态 fallback 条目
@@ -27,32 +38,33 @@ pub async fn detect_pi_status_with_options(
         // 「跟随配置默认」→ 跳过对账 → resident 落 broken 默认链）。目录
         // 只能由 get_engine_models 的真实探测权威填充（on-demand 22s 预算）。
         return EngineStatus {
-            engine_type: EngineType::Pi,
+            engine_type: spec.engine,
             auth_state: crate::engine::AuthState::default(),
             installed: true,
             version,
             bin_path: Some(bin.to_string()),
-            home_dir: get_pi_home_dir().map(|p| p.to_string_lossy().to_string()),
+            home_dir: get_pi_family_home_dir(spec.engine)
+                .map(|p| p.to_string_lossy().to_string()),
             models: Vec::new(),
             default_model: None,
-            features: EngineFeatures::pi(),
+            features: spec.engine.features(),
             error: None,
         };
     }
     // version 与 models 探测无数据依赖：并行发起，最坏路径 30s → 20s
     // （max(version 10s, RPC 10s + list-models 10s 回退)），与 FE on-demand
     // timeout 对齐。未安装时 models 探测 spawn 立即失败，结果被丢弃。
-    let version_probe = probe_cli_version(&bin, "pi", path_env.as_ref());
-    let models_probe = get_pi_models(&bin, path_env.as_ref());
+    let version_probe = probe_cli_version(&bin, spec.bin_name, path_env.as_ref());
+    let models_probe = get_pi_family_models(spec, &bin, path_env.as_ref());
     let ((installed, version, error), (models, config_diagnostic)) =
         tokio::join!(version_probe, models_probe);
     if !installed {
-        return not_installed_status(EngineType::Pi, error);
+        return not_installed_status(spec.engine, error);
     }
-    let home_dir = get_pi_home_dir();
+    let home_dir = get_pi_family_home_dir(spec.engine);
     let default_model = models.iter().find(|m| m.default).map(|m| m.id.clone());
     EngineStatus {
-        engine_type: EngineType::Pi,
+        engine_type: spec.engine,
         auth_state: crate::engine::AuthState::default(),
         installed: true,
         version,
@@ -60,19 +72,32 @@ pub async fn detect_pi_status_with_options(
         home_dir: home_dir.map(|p| p.to_string_lossy().to_string()),
         models,
         default_model,
-        features: EngineFeatures::pi(),
+        features: spec.engine.features(),
         error: config_diagnostic,
     }
 }
 
-pub(crate) fn get_pi_home_dir() -> Option<PathBuf> {
+pub(crate) fn pi_spec() -> PiFamilySpec {
+    EngineType::Pi
+        .pi_family_spec()
+        .expect("pi is a pi-family engine")
+}
+
+/// pi 族 home 解析：`PI_CODING_AGENT_DIR` env 优先（omp 同遵守，spike E8），
+/// fallback `~/{.pi|.omp}/agent` 按引擎身份。
+pub(crate) fn get_pi_family_home_dir(engine: EngineType) -> Option<PathBuf> {
     if let Ok(agent_dir) = std::env::var("PI_CODING_AGENT_DIR") {
         let trimmed = agent_dir.trim();
         if !trimmed.is_empty() {
             return Some(PathBuf::from(trimmed));
         }
     }
-    dirs::home_dir().map(|home| home.join(".pi").join("agent"))
+    let spec = engine.pi_family_spec()?;
+    dirs::home_dir().map(|home| home.join(spec.home_dir_name).join("agent"))
+}
+
+pub(crate) fn get_pi_home_dir() -> Option<PathBuf> {
+    get_pi_family_home_dir(EngineType::Pi)
 }
 
 pub(crate) const PI_STANDARD_THINKING_LEVELS: &[&str] =
@@ -120,8 +145,23 @@ pub(crate) fn apply_pi_thinking_levels(info: ModelInfo, levels: Vec<String>) -> 
     }
 }
 
+/// pi 族共享 fallback catalog 条目（`auto` = 跟随 CLI 配置默认）。
+pub(crate) fn pi_family_fallback_model(spec: PiFamilySpec) -> ModelInfo {
+    ModelInfo::new("auto", format!("{} Auto", spec.cli_label))
+        .with_description(format!("Use {} CLI default model", spec.cli_label))
+        .with_provider(spec.bin_name)
+        .with_protocol(spec.bin_name)
+        .with_source("fallback")
+        .as_default()
+}
+
 /// Parse RPC `get_available_models` `data` into catalog rows.
 pub(crate) fn parse_pi_available_models(data: &Value) -> Vec<ModelInfo> {
+    parse_pi_family_available_models(pi_spec(), data)
+}
+
+/// pi 族共享 RPC catalog 解析（add-omp-engine）。
+pub(crate) fn parse_pi_family_available_models(spec: PiFamilySpec, data: &Value) -> Vec<ModelInfo> {
     let models = data
         .get("models")
         .and_then(Value::as_array)
@@ -184,8 +224,8 @@ pub(crate) fn parse_pi_available_models(data: &Value) -> Vec<ModelInfo> {
         };
         let mut info = ModelInfo::new(id.clone(), name.to_string())
             .with_description(description)
-            .with_protocol("pi")
-            .with_provenance("cli:pi-available-models")
+            .with_protocol(spec.bin_name)
+            .with_provenance(format!("cli:{}-available-models", spec.bin_name))
             .with_source("detected");
         if !provider.is_empty() {
             info = info.with_provider(provider.to_string());
@@ -193,14 +233,7 @@ pub(crate) fn parse_pi_available_models(data: &Value) -> Vec<ModelInfo> {
         parsed.push(apply_pi_thinking_levels(info, levels));
     }
     if parsed.is_empty() {
-        parsed.push(
-            ModelInfo::new("auto", "PI Auto")
-                .with_description("Use PI CLI default model")
-                .with_provider("pi")
-                .with_protocol("pi")
-                .with_source("fallback")
-                .as_default(),
-        );
+        parsed.push(pi_family_fallback_model(spec));
     } else if let Some(first) = parsed.first_mut() {
         first.default = true;
     }
@@ -217,7 +250,8 @@ pub(crate) const PI_CATALOG_PROBE_RPC_ARGS: &str = "--no-session --no-extensions
 /// catalog 探测（RPC 请求 + `--list-models`），version 探测与其他引擎不动。
 pub(crate) const PI_CATALOG_PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 
-pub(crate) async fn fetch_pi_models_via_rpc(
+pub(crate) async fn fetch_pi_family_models_via_rpc(
+    spec: PiFamilySpec,
     bin: &str,
     home_dir: Option<&str>,
 ) -> Result<Vec<ModelInfo>, String> {
@@ -243,12 +277,15 @@ pub(crate) async fn fetch_pi_models_via_rpc(
         }
         Err(_) => {
             client.kill().await;
-            return Err("pi get_available_models timed out".to_string());
+            return Err(format!("{} get_available_models timed out", spec.bin_name));
         }
     };
-    let models = parse_pi_available_models(&data);
+    let models = parse_pi_family_available_models(spec, &data);
     if models.is_empty() || models.iter().all(|model| model.source == "fallback") {
-        Err("pi get_available_models returned no models".to_string())
+        Err(format!(
+            "{} get_available_models returned no models",
+            spec.bin_name
+        ))
     } else {
         Ok(models)
     }
@@ -256,6 +293,11 @@ pub(crate) async fn fetch_pi_models_via_rpc(
 
 /// Parse `pi --list-models` fixed-width table into ModelInfo entries.
 pub(crate) fn parse_pi_models_output(stdout: &str) -> Vec<ModelInfo> {
+    parse_pi_family_models_output(pi_spec(), stdout)
+}
+
+/// pi 族共享 `--list-models` 输出解析（add-omp-engine）。
+pub(crate) fn parse_pi_family_models_output(spec: PiFamilySpec, stdout: &str) -> Vec<ModelInfo> {
     let mut models = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for raw_line in stdout.lines() {
@@ -325,8 +367,8 @@ pub(crate) fn parse_pi_models_output(stdout: &str) -> Vec<ModelInfo> {
         let info = ModelInfo::new(id.clone(), id.clone())
             .with_description(description)
             .with_provider(provider.clone())
-            .with_protocol("pi")
-            .with_provenance("cli:pi-list-models")
+            .with_protocol(spec.bin_name)
+            .with_provenance(format!("cli:{}-list-models", spec.bin_name))
             .with_source("detected");
         models.push(apply_pi_thinking_levels(
             info,
@@ -334,21 +376,15 @@ pub(crate) fn parse_pi_models_output(stdout: &str) -> Vec<ModelInfo> {
         ));
     }
     if models.is_empty() {
-        models.push(
-            ModelInfo::new("auto", "PI Auto")
-                .with_description("Use PI CLI default model")
-                .with_provider("pi")
-                .with_protocol("pi")
-                .with_source("fallback")
-                .as_default(),
-        );
+        models.push(pi_family_fallback_model(spec));
     } else if let Some(first) = models.first_mut() {
         first.default = true;
     }
     models
 }
 
-pub(crate) async fn run_pi_list_models(
+pub(crate) async fn run_pi_family_list_models(
+    spec: PiFamilySpec,
     bin: &str,
     path_env: Option<&String>,
     extra_args: &[&str],
@@ -363,23 +399,34 @@ pub(crate) async fn run_pi_list_models(
     }
     let output = timeout(PI_CATALOG_PROBE_TIMEOUT, cmd.output())
         .await
-        .map_err(|_| "pi --list-models timed out".to_string())?
-        .map_err(|error| format!("failed to run pi --list-models: {error}"))?;
+        .map_err(|_| format!("{} --list-models timed out", spec.bin_name))?
+        .map_err(|error| format!("failed to run {} --list-models: {error}", spec.bin_name))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("pi --list-models failed: {}", stderr.trim()));
+        return Err(format!(
+            "{} --list-models failed: {}",
+            spec.bin_name,
+            stderr.trim()
+        ));
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let models = parse_pi_models_output(&stdout);
+    let models = parse_pi_family_models_output(spec, &stdout);
     if models.is_empty() {
-        return Err("pi --list-models returned no models".to_string());
+        return Err(format!(
+            "{} --list-models returned no models",
+            spec.bin_name
+        ));
     }
     Ok(models)
 }
 
-pub(crate) async fn get_pi_models(bin: &str, path_env: Option<&String>) -> (Vec<ModelInfo>, Option<String>) {
-    let (mut models, config_diagnostic) = probe_pi_models_chain(bin, path_env).await;
-    promote_pi_default_from_settings(&mut models);
+pub(crate) async fn get_pi_family_models(
+    spec: PiFamilySpec,
+    bin: &str,
+    path_env: Option<&String>,
+) -> (Vec<ModelInfo>, Option<String>) {
+    let (mut models, config_diagnostic) = probe_pi_models_chain(spec, bin, path_env).await;
+    promote_pi_family_default_from_settings(spec, &mut models);
     (models, config_diagnostic)
 }
 
@@ -387,26 +434,33 @@ pub(crate) async fn get_pi_models(bin: &str, path_env: Option<&String>) -> (Vec<
 /// generated fallback）。default 标记保持 parse 层兜底语义（首条目），由
 /// `promote_pi_default_from_settings` 在汇合点按 settings 修正。
 pub(crate) async fn probe_pi_models_chain(
+    spec: PiFamilySpec,
     bin: &str,
     path_env: Option<&String>,
 ) -> (Vec<ModelInfo>, Option<String>) {
-    match fetch_pi_models_via_rpc(bin, None).await {
+    match fetch_pi_family_models_via_rpc(spec, bin, None).await {
         Ok(models) => return (models, None),
         Err(error) => {
-            log::info!("[pi] catalog rpc unavailable ({error}); falling back to --list-models");
+            log::info!(
+                "[{}] catalog rpc unavailable ({error}); falling back to --list-models",
+                spec.bin_name
+            );
         }
     }
     // 先跳过 extension boot（同 RPC 探测理由，实测 9.3s → 1.0s）；失败再裸
-    // 跑一次兜底不识别 --no-extensions 的旧版 pi，两次皆败才落 generated fallback。
-    match run_pi_list_models(bin, path_env, &["--no-extensions"]).await {
+    // 跑一次兜底不识别 --no-extensions 的旧版 CLI，两次皆败才落 generated fallback。
+    match run_pi_family_list_models(spec, bin, path_env, &["--no-extensions"]).await {
         Ok(models) => return (models, None),
         Err(error) => {
-            log::info!("[pi] --list-models with --no-extensions failed ({error}); retrying bare");
+            log::info!(
+                "[{}] --list-models with --no-extensions failed ({error}); retrying bare",
+                spec.bin_name
+            );
         }
     }
-    match run_pi_list_models(bin, path_env, &[]).await {
+    match run_pi_family_list_models(spec, bin, path_env, &[]).await {
         Ok(models) => (models, None),
-        Err(error) => (get_generated_fallback_models(EngineType::Pi), Some(error)),
+        Err(error) => (get_generated_fallback_models(spec.engine), Some(error)),
     }
 }
 
@@ -430,8 +484,11 @@ pub(crate) fn read_pi_default_model_selection(home_dir: Option<&Path>) -> Option
 
 /// PI default 解析：settings 候选 id 依次 `{defaultProvider}/{defaultModel}` →
 /// 裸 `{defaultModel}`；全部未命中或 settings 不可用时不动列表。
-pub(crate) fn promote_pi_default_from_settings(models: &mut Vec<ModelInfo>) {
-    let Some((provider, model)) = read_pi_default_model_selection(get_pi_home_dir().as_deref())
+/// omp 无 `<agent>/settings.json`（config.yml + SQLite 配置面，spike E9）→
+/// read 返回 None，本函数天然 no-op，无需特判。
+pub(crate) fn promote_pi_family_default_from_settings(spec: PiFamilySpec, models: &mut Vec<ModelInfo>) {
+    let Some((provider, model)) =
+        read_pi_default_model_selection(get_pi_family_home_dir(spec.engine).as_deref())
     else {
         return;
     };

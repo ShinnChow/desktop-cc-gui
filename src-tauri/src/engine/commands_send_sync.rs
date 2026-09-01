@@ -473,7 +473,9 @@ pub(crate) async fn engine_send_message_sync_kimi(
     }))
 }
 
-pub(crate) async fn engine_send_message_sync_pi(
+/// pi 族共享同步发送路径（add-omp-engine）。
+pub(crate) async fn engine_send_message_sync_pi_family(
+    engine: EngineType,
     workspace_id: String,
     text: String,
     model: Option<String>,
@@ -500,17 +502,19 @@ pub(crate) async fn engine_send_message_sync_pi(
             state.storage_path.as_path(),
             &workspace_id,
             session_id.as_deref(),
-            "pi",
+            engine.icon(),
             None,
         )?;
     let provider_launch_profile =
-        crate::engine::pi_provider_profile::resolve_pi_provider_launch_profile(
+        crate::engine::pi_provider_profile::resolve_pi_family_provider_launch_profile(
+            engine,
             &workspace_id,
             effective_provider_profile_id.as_deref(),
             None,
         )?;
     let session = manager
-        .get_or_create_pi_session_for_runtime(
+        .get_or_create_pi_family_session_for_runtime(
+            engine,
             &workspace_id,
             &workspace_path,
             &provider_launch_profile.runtime_key,
@@ -544,13 +548,13 @@ pub(crate) async fn engine_send_message_sync_pi(
         custom_spec_root: normalized_custom_spec_root.clone(),
     };
 
-    let turn_id = format!("pi-sync-{}", uuid::Uuid::new_v4());
+    let turn_id = format!("{}-sync-{}", engine.icon(), uuid::Uuid::new_v4());
     let response = timeout(
         Duration::from_secs(900),
         session.send_message(params, &turn_id),
     )
     .await
-    .map_err(|_| "PI response timed out".to_string())??;
+    .map_err(|_| format!("{} response timed out", engine.icon()))??;
     let response_session_id = session.get_session_id().await;
     if let Some(binding) = provider_launch_profile.binding.as_ref() {
         let binding_session_id = response_session_id.as_deref().unwrap_or(turn_id.as_str());
@@ -559,7 +563,7 @@ pub(crate) async fn engine_send_message_sync_pi(
             state.storage_path.as_path(),
             workspace_id.clone(),
             binding_session_id.to_string(),
-            "pi".to_string(),
+            engine.icon().to_string(),
             binding.clone(),
         )
         .await?;
@@ -569,12 +573,12 @@ pub(crate) async fn engine_send_message_sync_pi(
         &workspace_id,
         response_session_id.as_deref(),
         auto_session,
-        "pi",
+        engine.icon(),
     )
     .await;
 
     Ok(json!({
-        "engine": "pi",
+        "engine": engine.icon(),
         "sessionId": response_session_id,
         "text": response
     }))
@@ -1049,8 +1053,9 @@ pub async fn engine_send_message_sync(
             )
             .await
         }
-        EngineType::Pi => {
-            engine_send_message_sync_pi(
+        engine @ (EngineType::Pi | EngineType::Omp) => {
+            engine_send_message_sync_pi_family(
+                engine,
                 workspace_id,
                 text,
                 model,

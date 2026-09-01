@@ -741,6 +741,7 @@ const enginesVendors = {
     cliValidationTabGrokCli: "Grok CLI",
     cliValidationTabDshCli: "DeepSeek Harness",
     cliValidationTabPiCli: "PI CLI",
+    cliValidationTabOmpCli: "OMP CLI",
     cliValidationTabQoderCli: "Qoder CLI",
     cliEngineEnabledLabel: "引擎启用",
     geminiCliDisableDescription:
@@ -762,6 +763,8 @@ const enginesVendors = {
     piDescription: "配置 PI CLI 认证与模型。凭据保存在 ~/.pi。",
     piCliLifecycleHint:
       "通过 npm 包 @earendil-works/pi-coding-agent 安装或更新本机 PI CLI。认证与模型仍使用 ~/.pi。",
+    ompDescription: "安装并配置 ccgui 使用的 OMP CLI。认证与模型仍使用 ~/.omp。",
+    ompCliLifecycleHint: "安装、更新或卸载本机 OMP CLI。认证与模型仍使用 ~/.omp。",
     qoderDescription:
       "一个 Qoder 引擎，分为相互隔离的 Global 与 CN 发行版；各自拥有 CLI、配置目录、账号、PAT 和 ACP 实时模型目录。",
     qoderCliLifecycleHint:
@@ -881,6 +884,9 @@ const enginesVendors = {
     runPiDoctor: "运行 PI Doctor",
     piLooksGood: "PI CLI 状态正常",
     piIssueDetected: "PI CLI 检测到问题",
+    runOmpDoctor: "运行 OMP Doctor",
+    ompLooksGood: "OMP CLI 状态正常",
+    ompIssueDetected: "OMP CLI 检测到问题",
     runQoderDoctor: "运行 Qoder Doctor",
     qoderLooksGood: "Qoder CLI 状态正常",
     qoderIssueDetected: "检测到 Qoder CLI 问题",

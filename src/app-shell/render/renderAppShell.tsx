@@ -140,6 +140,7 @@ export function renderAppShell(ctx: RenderAppShellContext) {
     grokDoctor,
     opencodeDoctor,
     piDoctor,
+    ompDoctor,
     qoderDoctor,
     editorSplitCompanion,
     editorSplitLayout,
@@ -579,6 +580,7 @@ export function renderAppShell(ctx: RenderAppShellContext) {
                 onRunGrokDoctor={grokDoctor}
                 onRunOpenCodeDoctor={opencodeDoctor}
                 onRunPiDoctor={piDoctor}
+                onRunOmpDoctor={ompDoctor}
                 onRunQoderDoctor={qoderDoctor}
                 activeWorkspace={activeWorkspace}
                 activeThreadId={activeThreadId}

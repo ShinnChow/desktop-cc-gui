@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tauri::{AppHandle, Manager};
 
+#[cfg(target_os = "macos")]
 use super::macos::get_open_app_icon_inner;
 
 #[tauri::command]

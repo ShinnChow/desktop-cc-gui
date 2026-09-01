@@ -82,13 +82,13 @@ type UseThreadMessagingSessionToolingOptions = {
   resolveThreadEngine: (
     workspaceId: string,
     threadId: string,
-  ) => "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+  ) => "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   resolveThreadKind: (
     workspaceId: string,
     threadId: string,
   ) => "native" | "shared";
   isThreadIdCompatibleWithEngine: (
-    engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder",
+    engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder",
     threadId: string,
   ) => boolean;
   safeMessageActivity: () => void;

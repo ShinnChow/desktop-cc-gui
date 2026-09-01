@@ -16,16 +16,17 @@ use super::writers::{
     backfill_claude_for_workspace, backfill_codex_for_workspace, backfill_kimi_for_workspace,
     commit_engine_rows, dsh_source_fingerprint, engine_source_should_skip, gemini_home_fingerprint,
     grok_home_fingerprint, invalidate_workspace_sources, opencode_source_fingerprint,
-    pi_home_fingerprint, qoder_source_fingerprint, rows_from_dsh_summaries,
-    rows_from_gemini_summaries, rows_from_grok_summaries, rows_from_opencode_entries,
-    rows_from_pi_summaries, rows_from_qoder_summaries, sync_claude_for_workspace,
+    omp_home_fingerprint, pi_home_fingerprint, qoder_source_fingerprint,
+    rows_from_dsh_summaries, rows_from_gemini_summaries, rows_from_grok_summaries,
+    rows_from_omp_summaries, rows_from_opencode_entries, rows_from_pi_summaries,
+    rows_from_qoder_summaries, sync_claude_for_workspace,
     sync_codex_for_workspace, sync_kimi_for_workspace, BackfillBatchResult, WriterResult,
     CLAUDE_BACKFILL_BATCH_SIZE, CODEX_BACKFILL_PARTITIONS_PER_BATCH, KIMI_BACKFILL_BATCH_SIZE,
 };
 use crate::engine::gemini_history::list_gemini_sessions;
 use crate::engine::grok_history::list_grok_sessions;
 use crate::engine::opencode_session_list_core;
-use crate::engine::pi_history::list_pi_sessions;
+use crate::engine::pi_history::list_pi_family_sessions;
 use crate::engine::qoder_history::{list_qoder_sessions_for_launch_profile, QoderSessionSummary};
 use crate::engine::qoder_provider_profile::{
     resolve_qoder_provider_launch_profile, QoderDistributionSettings, QoderProviderLaunchProfile,
@@ -332,7 +333,12 @@ async fn sync_pi_engine(workspace_path: PathBuf, limit: usize, force: bool) -> W
 
     let list_result = timeout(
         ASYNC_ENGINE_LIST_TIMEOUT,
-        list_pi_sessions(&workspace_path, Some(limit), None),
+        list_pi_family_sessions(
+            crate::engine::EngineType::Pi,
+            &workspace_path,
+            Some(limit),
+            None,
+        ),
     )
     .await;
 
@@ -362,6 +368,71 @@ async fn sync_pi_engine(workspace_path: PathBuf, limit: usize, force: bool) -> W
     .unwrap_or_else(|| WriterResult {
         engines: vec!["pi".into()],
         partial_source: Some("pi-commit-error".into()),
+        skipped_fresh: false,
+        ..WriterResult::default()
+    })
+}
+
+async fn sync_omp_engine(workspace_path: PathBuf, limit: usize, force: bool) -> WriterResult {
+    let fingerprint = omp_home_fingerprint();
+    let skip = !force
+        && tokio::task::spawn_blocking({
+            let workspace_path = workspace_path.clone();
+            let fingerprint = fingerprint.clone();
+            move || {
+                let connection = open_connection()?;
+                engine_source_should_skip(&connection, "omp", &workspace_path, &fingerprint)
+            }
+        })
+        .await
+        .ok()
+        .and_then(|result| result.ok())
+        .unwrap_or(false);
+    if skip {
+        return WriterResult {
+            skipped_fresh: true,
+            engines: vec!["omp".into()],
+            ..WriterResult::default()
+        };
+    }
+
+    let list_result = timeout(
+        ASYNC_ENGINE_LIST_TIMEOUT,
+        list_pi_family_sessions(
+            crate::engine::EngineType::Omp,
+            &workspace_path,
+            Some(limit),
+            None,
+        ),
+    )
+    .await;
+
+    let (rows, partial) = match list_result {
+        Ok(Ok(sessions)) => (rows_from_omp_summaries(&workspace_path, &sessions), None),
+        Ok(Err(error)) => (
+            Vec::new(),
+            Some(format!("omp-sync-error:{}", truncate_error(&error))),
+        ),
+        Err(_) => (Vec::new(), Some("omp-sync-timeout".into())),
+    };
+
+    tokio::task::spawn_blocking(move || {
+        let connection = open_connection()?;
+        commit_engine_rows(
+            &connection,
+            "omp",
+            &workspace_path,
+            rows,
+            &fingerprint,
+            partial,
+        )
+    })
+    .await
+    .ok()
+    .and_then(|result| result.ok())
+    .unwrap_or_else(|| WriterResult {
+        engines: vec!["omp".into()],
+        partial_source: Some("omp-commit-error".into()),
         skipped_fresh: false,
         ..WriterResult::default()
     })
@@ -639,18 +710,21 @@ pub(crate) async fn sync_session_index_core(
     let mut aggregated =
         sync_disk_engines(workspace_path.clone(), sessions_roots, limit, force).await?;
 
-    // Gemini / Grok / PI / DSH / Qoder each have their own 3s timeout. Join them so a
-    // slow Gemini probe cannot serialize PI/DSH/Qoder off the first-paint window.
-    let (gemini, grok, pi, dsh, qoder) = tokio::join!(
+    // Gemini / Grok / PI / OMP / DSH / Qoder each have their own 3s timeout. Join
+    // them so a slow Gemini probe cannot serialize PI/OMP/DSH/Qoder off the
+    // first-paint window.
+    let (gemini, grok, pi, omp, dsh, qoder) = tokio::join!(
         sync_gemini_engine(workspace_path.clone(), limit, force),
         sync_grok_engine(workspace_path.clone(), limit, force),
         sync_pi_engine(workspace_path.clone(), limit, force),
+        sync_omp_engine(workspace_path.clone(), limit, force),
         sync_dsh_engine(state, workspace_path.clone(), limit, force),
         sync_qoder_engine(state, workspace_path.clone(), limit, force),
     );
     merge_writer(&mut aggregated, gemini);
     merge_writer(&mut aggregated, grok);
     merge_writer(&mut aggregated, pi);
+    merge_writer(&mut aggregated, omp);
     merge_writer(&mut aggregated, dsh);
     merge_writer(&mut aggregated, qoder);
 
@@ -858,7 +932,7 @@ pub(crate) async fn backfill_session_index_core(
             )
         })
         .transpose()?;
-    let (gemini, grok, pi, dsh, qoder) = tokio::join!(
+    let (gemini, grok, pi, omp, dsh, qoder) = tokio::join!(
         backfill_async_engine(
             "gemini",
             workspace_path.clone(),
@@ -874,8 +948,20 @@ pub(crate) async fn backfill_session_index_core(
         backfill_async_engine(
             "pi",
             workspace_path.clone(),
-            |path, limit| async move { list_pi_sessions(&path, Some(limit), None).await },
+            |path, limit| async move {
+                list_pi_family_sessions(crate::engine::EngineType::Pi, &path, Some(limit), None)
+                    .await
+            },
             rows_from_pi_summaries,
+        ),
+        backfill_async_engine(
+            "omp",
+            workspace_path.clone(),
+            |path, limit| async move {
+                list_pi_family_sessions(crate::engine::EngineType::Omp, &path, Some(limit), None)
+                    .await
+            },
+            rows_from_omp_summaries,
         ),
         backfill_async_engine(
             "dsh",
@@ -927,6 +1013,7 @@ pub(crate) async fn backfill_session_index_core(
     merge_writer(&mut aggregated, gemini);
     merge_writer(&mut aggregated, grok);
     merge_writer(&mut aggregated, pi);
+    merge_writer(&mut aggregated, omp);
     merge_writer(&mut aggregated, dsh);
     merge_writer(&mut aggregated, qoder);
 

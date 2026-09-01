@@ -49,6 +49,10 @@ export type PiSessionSummary = GeminiSessionSummary & {
   parentSessionId?: string | null;
 };
 
+// OMP（pi fork）：summary 形状与 pi 全等。omp 无 fork/tree 派生，
+// parentSessionId 正常为空，仅保留透传兼容（协议同构）。
+export type OmpSessionSummary = PiSessionSummary;
+
 export type QoderSessionSummary = KimiSessionSummary & {
   providerProfileId: string;
   providerProfileName?: string | null;
@@ -370,8 +374,8 @@ function mergeNativeCliSessionSummaries(params: {
       providerProfileName?: string | null;
     }
   >;
-  idPrefix: "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder";
-  engineSource: "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder";
+  idPrefix: "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder";
+  engineSource: "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder";
   fallbackTitle: string;
   workspaceId: string;
   mappedTitles: Record<string, string>;
@@ -608,6 +612,27 @@ export function mergePiSessionSummaries(
   });
 }
 
+export function mergeOmpSessionSummaries(
+  baseSummaries: ThreadSummary[],
+  ompSessions: OmpSessionSummary[],
+  workspaceId: string,
+  mappedTitles: Record<string, string>,
+  getCustomName: (workspaceId: string, threadId: string) => string | undefined,
+  hiddenSharedBindingIds?: ReadonlySet<string>,
+): ThreadSummary[] {
+  return mergeNativeCliSessionSummaries({
+    baseSummaries,
+    sessions: ompSessions,
+    idPrefix: "omp",
+    engineSource: "omp",
+    fallbackTitle: "OMP Session",
+    workspaceId,
+    mappedTitles,
+    getCustomName,
+    hiddenSharedBindingIds,
+  });
+}
+
 export function mergeQoderSessionSummaries(
   baseSummaries: ThreadSummary[],
   qoderSessions: QoderSessionSummary[],
@@ -688,6 +713,7 @@ function normalizeCatalogEngine(
     case "grok":
     case "kimi":
     case "pi":
+    case "omp":
     case "qoder":
     case "opencode":
     case "dsh":
@@ -830,7 +856,9 @@ export function mergeCodexCatalogSessionSummaries(
               ? "Kimi Session"
               : engineSource === "pi"
                 ? "PI Session"
-                : engineSource === "qoder"
+                : engineSource === "omp"
+                  ? "OMP Session"
+                  : engineSource === "qoder"
                   ? "Qoder Session"
                 : engineSource === "opencode"
                   ? "OpenCode Session"
@@ -985,4 +1013,11 @@ export function normalizePiSessionSummaries(
     });
   });
   return summaries;
+}
+
+// OMP 与 pi 的 list_*_sessions 载荷同构（pi-family），解析零复制。
+export function normalizeOmpSessionSummaries(
+  value: unknown,
+): OmpSessionSummary[] {
+  return normalizePiSessionSummaries(value);
 }

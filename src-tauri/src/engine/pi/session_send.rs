@@ -186,7 +186,7 @@ impl PiSession {
         let mut child = match command.spawn() {
             Ok(child) => child,
             Err(error) => {
-                let error_msg = format!("Failed to spawn pi: {error}");
+                let error_msg = format!("Failed to spawn {}: {error}", self.engine.icon());
                 self.emit_error(turn_id, error_msg.clone());
                 return Err(error_msg);
             }
@@ -223,7 +223,7 @@ impl PiSession {
             EngineEvent::SessionStarted {
                 workspace_id: self.workspace_id.clone(),
                 session_id: "pending".to_string(),
-                engine: EngineType::Pi,
+                engine: self.engine,
                 turn_id: Some(turn_id.to_string()),
             },
         );
@@ -321,7 +321,7 @@ impl PiSession {
                                 EngineEvent::SessionStarted {
                                     workspace_id: self.workspace_id.clone(),
                                     session_id,
-                                    engine: EngineType::Pi,
+                                    engine: self.engine,
                                     turn_id: Some(turn_id.to_string()),
                                 },
                             );

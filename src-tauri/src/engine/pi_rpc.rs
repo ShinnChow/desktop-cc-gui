@@ -220,7 +220,10 @@ impl PiRpcClient {
                                     shared.streaming.store(true, Ordering::SeqCst);
                                     let _ = pump_sender.send(PiRpcPumpEvent::Agent(value));
                                 }
-                                "agent_settled" => {
+                                // omp 无 agent_settled（run 以 agent_end 收尾，
+                                // v18.0.11 实测）；pi 的 agent_end → agent_settled
+                                // 相邻，同点清 streaming 对 pi 语义不变。
+                                "agent_settled" | "agent_end" => {
                                     shared.streaming.store(false, Ordering::SeqCst);
                                     let _ = pump_sender.send(PiRpcPumpEvent::Agent(value));
                                 }

@@ -19,6 +19,7 @@ import {
   isInterruptedThread,
   isKimiEventThread,
   isPiEventThread,
+  isOmpEventThread,
   isQoderEventThread,
   readHighResolutionNowMs,
   type ReasoningEngineHint,
@@ -184,6 +185,7 @@ export function useRealtimeDeltaQueue({
           isGrokEventThread(threadId, reasoningEngineHint) ||
           isKimiEventThread(threadId, reasoningEngineHint) ||
           isPiEventThread(threadId, reasoningEngineHint) ||
+          isOmpEventThread(threadId, reasoningEngineHint) ||
           isQoderEventThread(threadId, reasoningEngineHint) ||
           isDshEventThread(threadId, reasoningEngineHint)) &&
         (operation.kind === "reasoningSummaryDelta" ||

@@ -18,9 +18,11 @@ pub(crate) fn is_pi_background_notification_event(event: &EngineEvent) -> bool {
     )
 }
 
-/// daemon/app forwarder 的外部 turn 门控：`pi-external-*` 仅在携带后台
+/// daemon/app forwarder 的外部 turn 门控：`<engine>-external-*` 仅在携带后台
 /// 通知、仍有待回收后台任务、或属已知唤醒 turn 时放行进入当前会话。
-pub(crate) fn is_pi_external_wakeup_allowed(
+/// （add-omp-engine：前缀按引擎身份，omp 唤醒不串 pi 门控。）
+pub(crate) fn is_pi_family_external_wakeup_allowed(
+    engine: crate::engine::EngineType,
     external_turn_id: &str,
     primary_turn_id: &str,
     event: &EngineEvent,
@@ -28,7 +30,7 @@ pub(crate) fn is_pi_external_wakeup_allowed(
     pending_external_wakeup: bool,
     is_known_external_wakeup: bool,
 ) -> bool {
-    external_turn_id.starts_with("pi-external-")
+    external_turn_id.starts_with(&format!("{}-external-", engine.icon()))
         && (is_pi_background_notification_event(event)
             || has_pending_background_tasks
             || pending_external_wakeup

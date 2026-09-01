@@ -7,7 +7,7 @@ const registryPath = path.join(root, "src/features/engine/engineIds.json");
 const frontendRegistryPath = path.join(root, "src/features/engine/engineRegistry.ts");
 const rustRegistryPath = path.join(root, "src-tauri/src/engine/adapter_registry.rs");
 const scannerPath = path.join(root, "scripts/scan-engine-name-branches.mjs");
-const expectedBuiltins = ["claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "dsh", "qoder"];
+const expectedBuiltins = ["claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "omp", "dsh", "qoder"];
 
 function fail(message) {
   throw new Error(`[engine-adapter-registry] ${message}`);

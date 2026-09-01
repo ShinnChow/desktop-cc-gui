@@ -68,6 +68,7 @@ export type SettingsDoctorEngine =
   | "opencode"
   | "dsh"
   | "pi"
+  | "omp"
   | "qoder";
 
 export type SettingsDoctorRunners = Record<
@@ -93,6 +94,7 @@ export function useSettingsDoctorRunners(
   const opencode = useDoctorRunner(specs.opencode);
   const dsh = useDoctorRunner(specs.dsh);
   const pi = useDoctorRunner(specs.pi);
+  const omp = useDoctorRunner(specs.omp);
   const qoder = useDoctorRunner(specs.qoder);
   const runners: SettingsDoctorRunners = {
     codex,
@@ -102,6 +104,7 @@ export function useSettingsDoctorRunners(
     opencode,
     dsh,
     pi,
+    omp,
     qoder,
   };
   const reportInstallerResult = (

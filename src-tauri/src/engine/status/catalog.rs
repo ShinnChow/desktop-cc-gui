@@ -17,6 +17,8 @@ pub(crate) struct GeneratedModelCatalogEngines {
     opencode: Vec<GeneratedModelEntry>,
     #[serde(default)]
     pi: Vec<GeneratedModelEntry>,
+    #[serde(default)]
+    omp: Vec<GeneratedModelEntry>,
 }
 
 #[derive(Deserialize)]
@@ -46,6 +48,7 @@ pub(crate) fn get_generated_fallback_models(engine: EngineType) -> Vec<ModelInfo
         EngineType::Grok => catalog.engines.grok,
         EngineType::Kimi => catalog.engines.kimi,
         EngineType::Pi => catalog.engines.pi,
+        EngineType::Omp => catalog.engines.omp,
         EngineType::OpenCode => catalog.engines.opencode,
         _ => return Vec::new(),
     };
@@ -88,6 +91,7 @@ pub(crate) fn public_models_for_engine(engine_type: EngineType) -> Vec<ModelInfo
             get_generated_fallback_models(engine_type)
         }
         EngineType::Pi => get_generated_fallback_models(engine_type),
+        EngineType::Omp => get_generated_fallback_models(engine_type),
         // Qoder catalog is ACP runtime-only (no static fallback roster).
         EngineType::Gemini | EngineType::Dsh | EngineType::Qoder => Vec::new(),
     }
@@ -176,6 +180,7 @@ pub(crate) fn get_local_engine_models_for_validation(
         EngineType::Kimi => Some(get_kimi_models(get_kimi_home_dir().as_deref()).0),
         // PI models are async CLI-probed; callers use detect_pi_status / refresh path.
         EngineType::Pi => Some(get_generated_fallback_models(EngineType::Pi)),
+        EngineType::Omp => Some(get_generated_fallback_models(EngineType::Omp)),
         EngineType::Grok => Some(get_grok_models(get_grok_home_dir().as_deref()).0),
         EngineType::OpenCode => Some(resolve_opencode_validation_catalog(
             cached_opencode_runtime_models(),
@@ -471,9 +476,8 @@ pub(crate) fn get_provider_scoped_engine_models(
                 &provider,
             )));
         }
-        EngineType::Gemini | EngineType::Pi | EngineType::Dsh | EngineType::Qoder => {
-            return Ok(None)
-        }
+        EngineType::Gemini | EngineType::Pi | EngineType::Omp | EngineType::Dsh
+        | EngineType::Qoder => return Ok(None),
     };
     Ok(Some(finalize_provider_scoped_catalog(
         engine_type,

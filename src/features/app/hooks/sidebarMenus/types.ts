@@ -132,6 +132,7 @@ export type WorkspaceMenuIconKind =
   | "engine-kimi"
   | "engine-grok"
   | "engine-pi"
+  | "engine-omp"
   | "engine-dsh"
   | "engine-qoder"
   | "new-shared"

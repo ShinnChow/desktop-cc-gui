@@ -324,7 +324,7 @@ export function extractTurnIdFromRawItem(item: Record<string, unknown>) {
 export function inferRawItemEngine(
   threadId: string,
   item: Record<string, unknown>,
-): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" {
+): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" {
   const rawEngine = asString(item.engineSource ?? item.engine_source)
     .trim()
     .toLowerCase();
@@ -336,6 +336,7 @@ export function inferRawItemEngine(
     rawEngine === "kimi" ||
     rawEngine === "opencode" ||
     rawEngine === "pi" ||
+    rawEngine === "omp" ||
     rawEngine === "dsh" ||
     rawEngine === "qoder"
   ) {
@@ -395,7 +396,7 @@ export function createTurnDiagnosticState(
 
 export function inferThreadEngine(
   threadId: string,
-): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" {
+): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" {
   if (threadId.startsWith("claude:") || threadId.startsWith("claude-pending-")) {
     return "claude";
   }
@@ -410,6 +411,9 @@ export function inferThreadEngine(
   }
   if (threadId.startsWith("pi:") || threadId.startsWith("pi-pending-")) {
     return "pi";
+  }
+  if (threadId.startsWith("omp:") || threadId.startsWith("omp-pending-")) {
+    return "omp";
   }
   if (threadId.startsWith("qoder:") || threadId.startsWith("qoder-pending-")) {
     return "qoder";

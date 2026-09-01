@@ -332,6 +332,7 @@ const workspaceBehavior = {
     projectSessionEngineKimi: "Kimi CLI",
     projectSessionEngineGrok: "Grok CLI",
     projectSessionEnginePi: "PI CLI",
+    projectSessionEngineOmp: "OMP CLI",
     projectSessionEngineQoder: "Qoder CLI",
     projectSessionEngineDsh: "DeepSeek Harness",
     projectSessionEngineShared: "Shared CLI",

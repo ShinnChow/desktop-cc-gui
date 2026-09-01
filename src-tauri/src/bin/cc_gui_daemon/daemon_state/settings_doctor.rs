@@ -72,6 +72,18 @@ impl DaemonState {
         crate::codex::run_dsh_doctor_with_settings(dsh_bin, &settings).await
     }
 
+    /// pi/omp doctor 补齐（add-omp-engine）：app 侧 pi_doctor 早有 remote 分发
+    /// 但 daemon 缺 arm（remote 模式 pi doctor 必失败的存量缺口），omp 顺带补齐。
+    pub(crate) async fn pi_doctor(&self, pi_bin: Option<String>) -> Result<Value, String> {
+        let settings = self.app_settings.lock().await.clone();
+        crate::codex::run_pi_doctor_with_settings(pi_bin, &settings).await
+    }
+
+    pub(crate) async fn omp_doctor(&self, omp_bin: Option<String>) -> Result<Value, String> {
+        let settings = self.app_settings.lock().await.clone();
+        crate::codex::run_omp_doctor_with_settings(omp_bin, &settings).await
+    }
+
     pub(crate) async fn qoder_doctor(
         &self,
         qoder_bin: Option<String>,
@@ -377,6 +389,30 @@ impl DaemonState {
                 engine::EngineType::Dsh,
                 engine::EngineConfig {
                     bin_path: settings.dsh_bin.clone(),
+                    home_dir: None,
+                    custom_args: None,
+                    default_model: None,
+                },
+            )
+            .await;
+        // pi 族配置同步（add-omp-engine）：pi 原本缺省（存量缺口——自定义
+        // piBin 在 daemon 侧不生效），omp 随接入一并补齐。
+        self.engine_manager
+            .set_engine_config(
+                engine::EngineType::Pi,
+                engine::EngineConfig {
+                    bin_path: settings.pi_bin.clone(),
+                    home_dir: None,
+                    custom_args: None,
+                    default_model: None,
+                },
+            )
+            .await;
+        self.engine_manager
+            .set_engine_config(
+                engine::EngineType::Omp,
+                engine::EngineConfig {
+                    bin_path: settings.omp_bin.clone(),
                     home_dir: None,
                     custom_args: None,
                     default_model: None,

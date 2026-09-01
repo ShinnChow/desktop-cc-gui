@@ -36,7 +36,7 @@ fn target(engine: EngineType, provider: &str) -> ExecutionTargetInput {
             EngineType::OpenCode => "ccgui/opencode-model".to_string(),
             EngineType::Pi => "auto".to_string(),
             EngineType::Qoder => "qmodel_38max".to_string(),
-            EngineType::Gemini | EngineType::Dsh => "unsupported".to_string(),
+            EngineType::Gemini | EngineType::Dsh | EngineType::Omp => "unsupported".to_string(),
         }),
         reasoning_effort: Some("medium".to_string()),
         provider_profile_name_snapshot: Some(provider.to_string()),
@@ -110,7 +110,7 @@ fn assert_route(engine: EngineType, provider: &str) {
             format!("{}:native-{provider}", engine.icon())
         }
         EngineType::Qoder => format!("qoder:{provider}:native-{provider}"),
-        EngineType::Codex | EngineType::Gemini | EngineType::Dsh => {
+        EngineType::Codex | EngineType::Gemini | EngineType::Dsh | EngineType::Omp => {
             format!("native-{provider}")
         }
     };

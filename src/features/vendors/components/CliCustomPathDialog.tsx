@@ -12,6 +12,7 @@ export type CliCustomPathEngine =
   | "grok"
   | "opencode"
   | "pi"
+  | "omp"
   | "dsh"
   | "qoder"
   | "qoder-cn";
@@ -43,6 +44,7 @@ const CLI_CUSTOM_PATH_ENGINE_META: Record<
   grok: { command: "grok", displayName: "Grok CLI" },
   opencode: { command: "opencode", displayName: "OpenCode CLI" },
   pi: { command: "pi", displayName: "PI CLI" },
+  omp: { command: "omp", displayName: "OMP CLI" },
   dsh: { command: "dsh", displayName: "DeepSeek Harness" },
   qoder: { command: "qodercli", displayName: "Qoder Global CLI" },
   "qoder-cn": { command: "qoderclicn", displayName: "Qoder CN CLI" },

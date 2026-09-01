@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "engineIds": ["claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "dsh", "qoder"],
+  "engineIds": ["claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "omp", "dsh", "qoder"],
   "engines": [
     {
       "id": "claude",
@@ -64,6 +64,15 @@
       "protocolFamily": "pi-rpc",
       "executionModel": "persistent",
       "capabilityProfile": "pi"
+    },
+    {
+      "id": "omp",
+      "displayName": "OMP CLI",
+      "shortName": "OMP",
+      "adapterId": "builtin.omp",
+      "protocolFamily": "pi-rpc",
+      "executionModel": "persistent",
+      "capabilityProfile": "omp"
     },
     {
       "id": "dsh",

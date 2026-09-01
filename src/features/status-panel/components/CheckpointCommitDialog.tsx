@@ -28,7 +28,7 @@ type CheckpointCommitDialogProps = {
   onCommitMessageChange?: (value: string) => void;
   onGenerateCommitMessage?: (
     language?: "zh" | "en",
-    engine?: "codex" | "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi",
+    engine?: "codex" | "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp",
     selectedPaths?: string[],
   ) => void | Promise<void>;
   onCommit?: (selectedPaths?: string[]) => void | Promise<void>;
@@ -38,7 +38,7 @@ type CheckpointCommitDialogProps = {
 type CommitDialogFile = FileChangeSummary & {
   commitPath: string;
 };
-type CommitMessageEngine = "codex" | "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi";
+type CommitMessageEngine = "codex" | "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp";
 type CommitMessageLanguage = "zh" | "en";
 
 const COMMIT_MESSAGE_ENGINES: CommitMessageEngine[] = [

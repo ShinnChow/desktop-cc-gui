@@ -15,6 +15,7 @@ import {
   KIMI_LOCAL_PROVIDER_PROFILE_ID,
   LOCAL_PROVIDER_PROFILE_DISPLAY_NAME,
   OPENCODE_LOCAL_PROVIDER_PROFILE_ID,
+  OMP_LOCAL_PROVIDER_PROFILE_ID,
   PI_LOCAL_PROVIDER_PROFILE_ID,
   QODER_CN_PROVIDER_PROFILE_ID,
   QODER_CN_PROVIDER_PROFILE_NAME,
@@ -40,10 +41,11 @@ const LOCAL_PROFILE_IDS: Partial<Record<EngineType, string>> = {
   grok: GROK_LOCAL_PROVIDER_PROFILE_ID,
   opencode: OPENCODE_LOCAL_PROVIDER_PROFILE_ID,
   pi: PI_LOCAL_PROVIDER_PROFILE_ID,
+  omp: OMP_LOCAL_PROVIDER_PROFILE_ID,
   dsh: DSH_LOCAL_PROVIDER_PROFILE_ID,
 };
 
-export type CreateSessionSupportedEngine = SharedSessionSupportedEngine | "dsh";
+export type CreateSessionSupportedEngine = SharedSessionSupportedEngine | "dsh" | "omp";
 
 export type ResolvedCreationExecutionTarget = Omit<ExecutionTarget, "engine"> & {
   engine: CreateSessionSupportedEngine;
@@ -57,7 +59,7 @@ export function isCreateSessionSupportedEngine(
   engine: EngineType | null | undefined,
 ): engine is CreateSessionSupportedEngine {
   // qoder 已在 SharedSessionSupportedEngine 集合内（enable-qoder-shared-target）。
-  return isSharedSessionSupportedEngine(engine) || engine === "dsh";
+  return isSharedSessionSupportedEngine(engine) || engine === "dsh" || engine === "omp";
 }
 
 function hasResolvedCreationTargetIdentity(

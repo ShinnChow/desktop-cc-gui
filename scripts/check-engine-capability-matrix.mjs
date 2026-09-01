@@ -26,6 +26,7 @@ const ENGINE_VARIANTS = {
   opencode: "OpenCode",
   kimi: "Kimi",
   pi: "Pi",
+  omp: "Omp",
   dsh: "Dsh",
   qoder: "Qoder",
 };

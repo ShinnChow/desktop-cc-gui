@@ -241,6 +241,12 @@ export function inferThreadEngineSource(
     return "pi";
   }
   if (
+    normalized.startsWith("omp:") ||
+    normalized.startsWith("omp-pending-")
+  ) {
+    return "omp";
+  }
+  if (
     normalized.startsWith("qoder:") ||
     normalized.startsWith("qoder-pending-")
   ) {

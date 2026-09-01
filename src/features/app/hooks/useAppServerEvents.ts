@@ -175,6 +175,7 @@ export function dispatchAppServerEvent(
         | "opencode"
         | "dsh"
         | "pi"
+        | "omp"
         | "qoder"
         | undefined);
     if (

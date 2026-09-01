@@ -9,6 +9,7 @@ import {
   listGrokSessions as listGrokSessionsService,
   listKimiSessions as listKimiSessionsService,
   listPiSessions as listPiSessionsService,
+  listOmpSessions as listOmpSessionsService,
   listQoderSessions as listQoderSessionsService,
   listDshSessions as listDshSessionsService,
 } from "../../../services/tauri";
@@ -35,6 +36,7 @@ import {
   GROK_SESSION_FETCH_TIMEOUT_MS,
   KIMI_SESSION_FETCH_TIMEOUT_MS,
   NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
+  OMP_SESSION_FETCH_TIMEOUT_MS,
   PI_SESSION_FETCH_TIMEOUT_MS,
   QODER_SESSION_FETCH_TIMEOUT_MS,
 } from "./useThreadActions.threadList";
@@ -43,12 +45,14 @@ import {
   mergeGeminiSessionSummaries,
   mergeGrokSessionSummaries,
   mergeKimiSessionSummaries,
+  mergeOmpSessionSummaries,
   mergePiSessionSummaries,
   mergeQoderSessionSummaries,
   normalizeDshSessionSummaries,
   normalizeGeminiSessionSummaries,
   normalizeGrokSessionSummaries,
   normalizeKimiSessionSummaries,
+  normalizeOmpSessionSummaries,
   normalizePiSessionSummaries,
   normalizeQoderSessionSummaries,
   stripHiddenSharedBindingSummaries,
@@ -58,6 +62,7 @@ import {
   type GeminiSessionSummary,
   type GrokSessionSummary,
   type KimiSessionSummary,
+  type OmpSessionSummary,
   type PiSessionSummary,
   type QoderSessionSummary,
 } from "./useThreadActions.helpers";
@@ -81,15 +86,18 @@ type EngineAsyncSessionMergeParams = {
   archivedSessionMapPromise: Promise<ArchivedSessionMapResult | null>;
   includeEngineDiskLists: boolean;
   includePiDiskList: boolean;
+  includeOmpDiskList: boolean;
   hasGeminiSignal: boolean;
   hasKimiSignal: boolean;
   hasPiSignal: boolean;
+  hasOmpSignal: boolean;
   hasQoderSignal: boolean;
   hasGrokSignal: boolean;
   hasDshSignal: boolean;
   cachedGemini: SessionCacheEntry<GeminiSessionSummary>;
   cachedKimi: SessionCacheEntry<KimiSessionSummary>;
   cachedPi: SessionCacheEntry<PiSessionSummary>;
+  cachedOmp: SessionCacheEntry<OmpSessionSummary>;
   cachedQoder: SessionCacheEntry<QoderSessionSummary>;
   cachedGrok: SessionCacheEntry<GrokSessionSummary>;
   cachedDsh: SessionCacheEntry<DshSessionSummary>;
@@ -101,6 +109,9 @@ type EngineAsyncSessionMergeParams = {
   >;
   piSessionCacheRef: MutableRefObject<
     Record<string, SessionCacheEntry<PiSessionSummary>>
+  >;
+  ompSessionCacheRef: MutableRefObject<
+    Record<string, SessionCacheEntry<OmpSessionSummary>>
   >;
   qoderSessionCacheRef: MutableRefObject<
     Record<string, SessionCacheEntry<QoderSessionSummary>>
@@ -114,6 +125,7 @@ type EngineAsyncSessionMergeParams = {
   geminiRefreshAttemptedRef: MutableRefObject<Record<string, boolean>>;
   kimiRefreshAttemptedRef: MutableRefObject<Record<string, boolean>>;
   piRefreshAttemptedRef: MutableRefObject<Record<string, boolean>>;
+  ompRefreshAttemptedRef: MutableRefObject<Record<string, boolean>>;
   qoderRefreshAttemptedRef: MutableRefObject<Record<string, boolean>>;
   grokRefreshAttemptedRef: MutableRefObject<Record<string, boolean>>;
   dshRefreshAttemptedRef: MutableRefObject<Record<string, boolean>>;
@@ -132,27 +144,32 @@ export function scheduleEngineAsyncSessionMerges({
   archivedSessionMapPromise,
   includeEngineDiskLists,
   includePiDiskList,
+  includeOmpDiskList,
   hasGeminiSignal,
   hasKimiSignal,
   hasPiSignal,
+  hasOmpSignal,
   hasQoderSignal,
   hasGrokSignal,
   hasDshSignal,
   cachedGemini,
   cachedKimi,
   cachedPi,
+  cachedOmp,
   cachedQoder,
   cachedGrok,
   cachedDsh,
   geminiSessionCacheRef,
   kimiSessionCacheRef,
   piSessionCacheRef,
+  ompSessionCacheRef,
   qoderSessionCacheRef,
   grokSessionCacheRef,
   dshSessionCacheRef,
   geminiRefreshAttemptedRef,
   kimiRefreshAttemptedRef,
   piRefreshAttemptedRef,
+  ompRefreshAttemptedRef,
   qoderRefreshAttemptedRef,
   grokRefreshAttemptedRef,
   dshRefreshAttemptedRef,
@@ -678,6 +695,87 @@ export function scheduleEngineAsyncSessionMerges({
         stripHiddenSharedBindingSummaries(
           nextSummaries,
           freshHiddenSharedBindingIds,
+        ),
+        await archivedSessionMapPromise,
+      );
+      if (!isLatestThreadListRequest()) {
+        return;
+      }
+      dispatch({
+        type: "setThreads",
+        workspaceId: workspace.id,
+        threads: visibleNextSummaries,
+        unionMembership: true,
+      });
+      latestThreadsByWorkspaceRef.current = {
+        ...latestThreadsByWorkspaceRef.current,
+        [workspace.id]: visibleNextSummaries,
+      };
+    })();
+  }
+  const hasAttemptedOmpRefresh =
+    ompRefreshAttemptedRef.current[workspace.id] === true;
+  // Same as PI: first-paint never probes OMP disk. Index is the read layer.
+  // omp 无 fork/tree 派生血缘，无需 pi 的 derived-hide 自愈与 shared 认领
+  // 重取（omp 不进 Shared 集合，nativeThreadIds 永不引用 omp 线程）。
+  const shouldRefreshOmpSessions =
+    isLatestThreadListRequest() &&
+    includeOmpDiskList &&
+    (hasOmpSignal || !!cachedOmp || !hasAttemptedOmpRefresh);
+  if (shouldRefreshOmpSessions) {
+    void (async () => {
+      ompRefreshAttemptedRef.current[workspace.id] = true;
+      const ompResult = await withTimeout(
+        listOmpSessionsService(workspace.path, 50),
+        OMP_SESSION_FETCH_TIMEOUT_MS,
+      );
+      if (!isLatestThreadListRequest()) {
+        return;
+      }
+      if (ompResult === null) {
+        onDebug?.({
+          id: `${Date.now()}-client-omp-session-timeout`,
+          timestamp: Date.now(),
+          source: "client",
+          label: "thread/list omp timeout",
+          payload: {
+            workspaceId: workspace.id,
+            timeoutMs: OMP_SESSION_FETCH_TIMEOUT_MS,
+          },
+        });
+        return;
+      }
+      const normalizedOmpSessions = normalizeOmpSessionSummaries(ompResult);
+      ompSessionCacheRef.current[workspace.id] = {
+        fetchedAt: Date.now(),
+        sessions: normalizedOmpSessions,
+      };
+      const currentSnapshot =
+        latestThreadsByWorkspaceRef.current[workspace.id] ?? [];
+      const baselineSummaries =
+        currentSnapshot.length > 0 ? currentSnapshot : allSummaries;
+      const ompHiddenBindingIds = expandHiddenSharedBindingIds([
+        ...hiddenSharedBindingIds,
+        ...getCollabWorkerNativeHideIds(),
+      ]);
+      const nextSummaries = mergeOmpSessionSummaries(
+        baselineSummaries,
+        normalizedOmpSessions.filter(
+          (session) =>
+            !threadIdInHiddenSharedBindingSet(
+              `omp:${session.sessionId}`,
+              ompHiddenBindingIds,
+            ),
+        ),
+        workspace.id,
+        mappedTitles,
+        getCustomName,
+        ompHiddenBindingIds,
+      );
+      const visibleNextSummaries = applySessionArchiveState(
+        stripHiddenSharedBindingSummaries(
+          nextSummaries,
+          ompHiddenBindingIds,
         ),
         await archivedSessionMapPromise,
       );

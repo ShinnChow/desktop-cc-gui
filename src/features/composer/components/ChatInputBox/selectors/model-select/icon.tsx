@@ -136,6 +136,8 @@ export const ModelIcon = ({
       return <EngineIcon engine="opencode" size={size} style={imgStyle} />;
     case "pi":
       return <EngineIcon engine="pi" size={size} style={imgStyle} />;
+    case "omp":
+      return <EngineIcon engine="omp" size={size} style={imgStyle} />;
     case "qoder":
       return <EngineIcon engine="qoder" size={size} style={imgStyle} />;
     case "claude":

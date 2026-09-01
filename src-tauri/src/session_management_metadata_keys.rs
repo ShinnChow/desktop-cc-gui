@@ -689,7 +689,7 @@ pub(crate) fn is_stable_catalog_metadata_key(session_id: &str) -> bool {
     }
     matches!(
         engine,
-        "codex" | "claude" | "gemini" | "grok" | "kimi" | "pi" | "opencode" | "shared"
+        "codex" | "claude" | "gemini" | "grok" | "kimi" | "pi" | "omp" | "opencode" | "shared"
     ) && !workspace_id.trim().is_empty()
         && !canonical_session_id.trim().is_empty()
 }

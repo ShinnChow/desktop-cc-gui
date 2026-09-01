@@ -240,7 +240,7 @@ export function WorkspaceSessionRadarPanel({
     });
   };
 
-  const resolveEngine = (entry: SessionRadarEntry): "codex" | "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" => {
+  const resolveEngine = (entry: SessionRadarEntry): "codex" | "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" => {
     const normalizedEngine = entry.engine.toUpperCase();
     if (normalizedEngine === "CLAUDE") {
       return "claude";
@@ -265,6 +265,9 @@ export function WorkspaceSessionRadarPanel({
     }
     if (normalizedEngine === "PI") {
       return "pi";
+    }
+    if (normalizedEngine === "OMP") {
+      return "omp";
     }
     return "codex";
   };

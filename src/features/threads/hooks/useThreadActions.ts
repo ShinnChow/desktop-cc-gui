@@ -83,6 +83,7 @@ import {
   mergeGeminiSessionSummaries,
   mergeGrokSessionSummaries,
   mergeKimiSessionSummaries,
+  mergeOmpSessionSummaries,
   mergePiSessionSummaries,
   mergeQoderSessionSummaries,
   mergeDshSessionSummaries,
@@ -103,6 +104,7 @@ import {
   type GeminiSessionSummary,
   type GrokSessionSummary,
   type KimiSessionSummary,
+  type OmpSessionSummary,
   type PiSessionSummary,
   type QoderSessionSummary,
   type DshSessionSummary,
@@ -124,6 +126,7 @@ import {
   GROK_SESSION_CACHE_TTL_MS,
   KIMI_SESSION_CACHE_TTL_MS,
   DSH_SESSION_CACHE_TTL_MS,
+  OMP_SESSION_CACHE_TTL_MS,
   PI_SESSION_CACHE_TTL_MS,
   QODER_SESSION_CACHE_TTL_MS,
   NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
@@ -202,6 +205,10 @@ export function useThreadActions({
     Record<string, { fetchedAt: number; sessions: PiSessionSummary[] }>
   >({});
   const piRefreshAttemptedRef = useRef<Record<string, boolean>>({});
+  const ompSessionCacheRef = useRef<
+    Record<string, { fetchedAt: number; sessions: OmpSessionSummary[] }>
+  >({});
+  const ompRefreshAttemptedRef = useRef<Record<string, boolean>>({});
   const qoderSessionCacheRef = useRef<
     Record<string, { fetchedAt: number; sessions: QoderSessionSummary[] }>
   >({});
@@ -381,6 +388,8 @@ export function useThreadActions({
          * 其它引擎仍只在 full-catalog 才扫。
          */
         includePiDiskList?: boolean;
+        /** 与 includePiDiskList 同形：首刷后后台软刷补 omp 单引擎盘扫。 */
+        includeOmpDiskList?: boolean;
         deletedThreadIds?: string[];
         /**
          * 仅做本地摘行（归档/软隐藏路径）：执行 deletedThreadIds 的本地清理后
@@ -438,6 +447,9 @@ export function useThreadActions({
       // pi 盘扫可被独立允许（后台软刷补全独立 main），不等 full-catalog。
       const includePiDiskList =
         includeEngineDiskLists || options?.includePiDiskList === true;
+      // omp 盘扫与 pi 同形（pi-family 独立 main 后台补全）。
+      const includeOmpDiskList =
+        includeEngineDiskLists || options?.includeOmpDiskList === true;
       const deletedThreadIds = [
         ...new Set(
           (options?.deletedThreadIds ?? [])
@@ -682,6 +694,20 @@ export function useThreadActions({
         const hasFreshPiCache =
           !!cachedPi &&
           Date.now() - cachedPi.fetchedAt <= PI_SESSION_CACHE_TTL_MS;
+        const hasOmpSignal =
+          existingThreads.some(
+            (thread) =>
+              thread.engineSource === "omp" ||
+              thread.id.startsWith("omp:") ||
+              thread.id.startsWith("omp-pending-"),
+          ) ||
+          activeThreadId.startsWith("omp:") ||
+          activeThreadId.startsWith("omp-pending-") ||
+          Object.keys(mappedTitles).some((id) => id.startsWith("omp:"));
+        const cachedOmp = ompSessionCacheRef.current[workspace.id];
+        const hasFreshOmpCache =
+          !!cachedOmp &&
+          Date.now() - cachedOmp.fetchedAt <= OMP_SESSION_CACHE_TTL_MS;
         const hasQoderSignal =
           existingThreads.some(
             (thread) =>
@@ -1711,6 +1737,23 @@ export function useThreadActions({
           );
           allSummaries = mergedFromCache;
         }
+        if (hasFreshOmpCache && cachedOmp.sessions.length > 0) {
+          // omp 无 fork/tree 派生血缘：无 pi 的 derived-hide 自愈/诊断。
+          allSummaries = mergeOmpSessionSummaries(
+            allSummaries,
+            cachedOmp.sessions.filter(
+              (session) =>
+                !threadIdInHiddenSharedBindingSet(
+                  `omp:${session.sessionId}`,
+                  hiddenSharedBindingIds,
+                ),
+            ),
+            workspace.id,
+            mappedTitles,
+            getCustomName,
+            hiddenSharedBindingIds,
+          );
+        }
         if (hasFreshQoderCache && cachedQoder.sessions.length > 0) {
           allSummaries = mergeQoderSessionSummaries(
             allSummaries,
@@ -2040,27 +2083,32 @@ export function useThreadActions({
           archivedSessionMapPromise,
           includeEngineDiskLists,
           includePiDiskList,
+          includeOmpDiskList,
           hasGeminiSignal,
           hasKimiSignal,
           hasPiSignal,
+          hasOmpSignal,
           hasQoderSignal,
           hasGrokSignal,
           hasDshSignal,
           cachedGemini,
           cachedKimi,
           cachedPi,
+          cachedOmp,
           cachedQoder,
           cachedGrok,
           cachedDsh,
           geminiSessionCacheRef,
           kimiSessionCacheRef,
           piSessionCacheRef,
+          ompSessionCacheRef,
           qoderSessionCacheRef,
           grokSessionCacheRef,
           dshSessionCacheRef,
           geminiRefreshAttemptedRef,
           kimiRefreshAttemptedRef,
           piRefreshAttemptedRef,
+          ompRefreshAttemptedRef,
           qoderRefreshAttemptedRef,
           grokRefreshAttemptedRef,
           dshRefreshAttemptedRef,

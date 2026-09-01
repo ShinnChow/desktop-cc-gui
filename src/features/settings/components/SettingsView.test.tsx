@@ -230,6 +230,7 @@ const baseSettings: AppSettings = {
   claudeBin: null,
   kimiBin: null,
   piBin: null,
+  ompBin: null,
   qoderBin: null,
   qoderConfigDir: null,
   qoderCnBin: null,

@@ -54,7 +54,8 @@ export function resolvePresentationProfile(
   }
   // pi 的 RPC prefill 静默窗口可达 20-50s（零事件），开启 12s 安抚提示与
   // heartbeat pulse（pi first-packet diagnosis 2026-08-28）；其余展示面保持默认。
-  if (engine === "pi") {
+  // omp 与 pi 同协议（pi-rpc resident runtime），共享同一 heartbeat profile。
+  if (engine === "pi" || engine === "omp") {
     return {
       engine,
       preferCommandSummary: false,

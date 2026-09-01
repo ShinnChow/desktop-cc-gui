@@ -54,6 +54,8 @@ pub mod opencode;
 pub(crate) mod opencode_native_artifact;
 #[path = "../../engine/opencode_provider_profile.rs"]
 pub(crate) mod opencode_provider_profile;
+#[path = "../../engine/omp_provider_profile.rs"]
+pub(crate) mod omp_provider_profile;
 #[path = "../../engine/pi.rs"]
 pub mod pi;
 #[path = "../../engine/pi_auth.rs"]
@@ -531,6 +533,8 @@ pub enum EngineType {
     OpenCode,
     Kimi,
     Pi,
+    /// OMP CLI (oh-my-pi, pi fork — 与 src/engine/mod.rs 的 EngineType 保持平行)
+    Omp,
     Dsh,
     Qoder,
 }
@@ -545,6 +549,7 @@ impl EngineType {
             EngineType::OpenCode => "OpenCode",
             EngineType::Kimi => "Kimi CLI",
             EngineType::Pi => "PI CLI",
+            EngineType::Omp => "OMP CLI",
             EngineType::Dsh => "DeepSeek Harness",
             EngineType::Qoder => "Qoder CLI",
         }
@@ -559,8 +564,63 @@ impl EngineType {
             EngineType::OpenCode => "opencode",
             EngineType::Kimi => "kimi",
             EngineType::Pi => "pi",
+            EngineType::Omp => "omp",
             EngineType::Dsh => "dsh",
             EngineType::Qoder => "qoder",
+        }
+    }
+}
+
+/// pi 族身份 spec（与 src/engine/mod.rs 的 PiFamilySpec 保持平行，
+/// add-omp-engine；daemon 影子编译 pi 族模块需要同一 API 面）。
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PiFamilySpec {
+    pub engine: EngineType,
+    pub bin_name: &'static str,
+    pub home_dir_name: &'static str,
+    pub cli_label: &'static str,
+    pub local_profile_id: &'static str,
+}
+
+impl EngineType {
+    pub(crate) fn pi_family_spec(self) -> Option<PiFamilySpec> {
+        match self {
+            EngineType::Pi => Some(PiFamilySpec {
+                engine: EngineType::Pi,
+                bin_name: "pi",
+                home_dir_name: ".pi",
+                cli_label: "PI",
+                local_profile_id: pi_provider_profile::PI_LOCAL_PROVIDER_PROFILE_ID,
+            }),
+            EngineType::Omp => Some(PiFamilySpec {
+                engine: EngineType::Omp,
+                bin_name: "omp",
+                home_dir_name: ".omp",
+                cli_label: "OMP",
+                local_profile_id: omp_provider_profile::OMP_LOCAL_PROVIDER_PROFILE_ID,
+            }),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn is_pi_family(self) -> bool {
+        self.pi_family_spec().is_some()
+    }
+
+    /// 与 src/engine/mod.rs 的 EngineType::features() 平行。
+    #[allow(dead_code)]
+    pub(crate) fn features(self) -> EngineFeatures {
+        match self {
+            EngineType::Claude => EngineFeatures::claude(),
+            EngineType::Codex => EngineFeatures::codex(),
+            EngineType::Gemini => EngineFeatures::gemini(),
+            EngineType::Grok => EngineFeatures::grok(),
+            EngineType::OpenCode => EngineFeatures::opencode(),
+            EngineType::Kimi => EngineFeatures::kimi(),
+            EngineType::Pi => EngineFeatures::pi(),
+            EngineType::Omp => EngineFeatures::omp(),
+            EngineType::Dsh => EngineFeatures::dsh(),
+            EngineType::Qoder => EngineFeatures::qoder(),
         }
     }
 }
@@ -583,6 +643,7 @@ pub(crate) fn engine_enabled_in_settings(
         | EngineType::Grok
         | EngineType::Kimi
         | EngineType::Pi
+        | EngineType::Omp
         | EngineType::Dsh
         | EngineType::Qoder => true,
     }
@@ -600,6 +661,7 @@ pub(crate) fn detection_disabled_engines(settings: &crate::types::AppSettings) -
         EngineType::OpenCode,
         EngineType::Kimi,
         EngineType::Pi,
+        EngineType::Omp,
         EngineType::Dsh,
         EngineType::Qoder,
     ]
@@ -622,6 +684,7 @@ pub(crate) fn engine_disabled_diagnostic(engine_type: EngineType) -> Option<&'st
         | EngineType::Grok
         | EngineType::Kimi
         | EngineType::Pi
+        | EngineType::Omp
         | EngineType::Dsh
         | EngineType::Qoder => None,
     }
@@ -893,6 +956,11 @@ impl EngineFeatures {
         }
     }
 
+    /// OMP CLI：与 pi 协议全等的 fork（mossx-omp-capability-spike）。
+    pub fn omp() -> Self {
+        Self::pi()
+    }
+
     pub fn dsh() -> Self {
         Self {
             reasoning_effort: true,
@@ -927,6 +995,7 @@ pub(crate) fn disabled_engine_status(engine_type: EngineType) -> EngineStatus {
         EngineType::Grok => EngineFeatures::grok(),
         EngineType::Kimi => EngineFeatures::kimi(),
         EngineType::Pi => EngineFeatures::pi(),
+        EngineType::Omp => EngineFeatures::omp(),
         EngineType::Dsh => EngineFeatures::dsh(),
         EngineType::Qoder => EngineFeatures::qoder(),
     };

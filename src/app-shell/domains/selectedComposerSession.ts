@@ -31,7 +31,7 @@ const PI_REASONING_EFFORTS = new Set([
 
 export function resolveThreadEngine(
   threadId: string,
-): "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | "codex" | null {
+): "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | "codex" | null {
   if (
     threadId.startsWith("claude:") ||
     threadId.startsWith("claude-pending-") ||
@@ -56,6 +56,9 @@ export function resolveThreadEngine(
   }
   if (threadId.startsWith("pi:") || threadId.startsWith("pi-pending-")) {
     return "pi";
+  }
+  if (threadId.startsWith("omp:") || threadId.startsWith("omp-pending-")) {
+    return "omp";
   }
   if (threadId.startsWith("qoder:") || threadId.startsWith("qoder-pending-")) {
     return "qoder";
@@ -119,7 +122,8 @@ export function normalizeComposerSessionSelectionForThread(
     effort = effort && DSH_REASONING_EFFORTS.has(effort) ? effort : null;
   } else if (engine === "qoder") {
     effort = effort || null;
-  } else if (engine === "pi") {
+  } else if (engine === "pi" || engine === "omp") {
+    // omp 与 pi 共享 thinking levels（off/minimal/low/medium/high/xhigh/max）。
     effort = effort && PI_REASONING_EFFORTS.has(effort) ? effort : null;
   } else if (engine === "gemini" || engine === "kimi" || engine === "opencode") {
     effort = null;

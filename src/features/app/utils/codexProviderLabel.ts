@@ -6,6 +6,7 @@ import {
   GROK_LOCAL_PROVIDER_PROFILE_ID,
   KIMI_LOCAL_PROVIDER_PROFILE_ID,
   OPENCODE_LOCAL_PROVIDER_PROFILE_ID,
+  OMP_LOCAL_PROVIDER_PROFILE_ID,
   PI_LOCAL_PROVIDER_PROFILE_ID,
   QODER_LOCAL_PROVIDER_PROFILE_ID,
 } from "../../threads/constants/codexProviderProfiles";
@@ -17,6 +18,7 @@ const LABELABLE_ENGINES = new Set([
   "kimi",
   "opencode",
   "pi",
+  "omp",
   "dsh",
   "qoder",
   "gemini",
@@ -29,6 +31,7 @@ const LOCAL_PROVIDER_PROFILE_IDS = new Set([
   GROK_LOCAL_PROVIDER_PROFILE_ID,
   OPENCODE_LOCAL_PROVIDER_PROFILE_ID,
   PI_LOCAL_PROVIDER_PROFILE_ID,
+  OMP_LOCAL_PROVIDER_PROFILE_ID,
   DSH_LOCAL_PROVIDER_PROFILE_ID,
   QODER_LOCAL_PROVIDER_PROFILE_ID,
 ]);
@@ -54,6 +57,7 @@ export function resolveEngineProviderLabel(thread: ThreadSummary) {
   // 没有 binding 的这些引擎按官方本地配置显示。
   if (
     engine === "pi" ||
+    engine === "omp" ||
     engine === "dsh" ||
     engine === "grok" ||
     engine === "kimi" ||

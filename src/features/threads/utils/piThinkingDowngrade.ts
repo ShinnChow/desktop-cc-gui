@@ -21,7 +21,8 @@ export function resolvePiFirstMessageEffort(input: {
   promptText: string;
 }): string | null {
   const effort = input.effort?.trim() ? input.effort!.trim() : null;
-  if (input.engine !== "pi") {
+  // omp 与 pi 共享 thinking levels（pi-family），同一降档门禁。
+  if (input.engine !== "pi" && input.engine !== "omp") {
     return effort;
   }
   if (input.hasSession) {

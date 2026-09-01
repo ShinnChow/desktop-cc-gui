@@ -55,7 +55,7 @@ interface GenericToolBlockProps {
   isExpanded: boolean;
   onToggle: (id: string) => void;
   activeCollaborationModeId?: string | null;
-  activeEngine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+  activeEngine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   hasPendingUserInputRequest?: boolean;
   onOpenFilePath?: (path: string) => void;
   onOpenDiffPath?: (path: string) => void;

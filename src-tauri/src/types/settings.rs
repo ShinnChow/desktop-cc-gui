@@ -27,6 +27,8 @@ pub(crate) struct AppSettings {
     pub(crate) kimi_bin: Option<String>,
     #[serde(default, rename = "piBin")]
     pub(crate) pi_bin: Option<String>,
+    #[serde(default, rename = "ompBin")]
+    pub(crate) omp_bin: Option<String>,
     #[serde(default, rename = "dshBin")]
     pub(crate) dsh_bin: Option<String>,
     #[serde(default, rename = "qoderBin")]
@@ -1158,6 +1160,7 @@ impl Default for AppSettings {
             claude_bin: None,
             kimi_bin: None,
             pi_bin: None,
+            omp_bin: None,
             dsh_bin: None,
             qoder_bin: None,
             qoder_config_dir: None,

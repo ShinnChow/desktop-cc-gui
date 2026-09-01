@@ -27,6 +27,7 @@ export const PROMPT_ENHANCER_ENGINE_OPTIONS: EngineType[] = [
   'kimi',
   'opencode',
   'pi',
+  'omp',
   'dsh',
   'qoder',
 ];
@@ -343,7 +344,7 @@ export function resolveEnhancerModelForSend(
     });
   }
 
-  if ((engine === 'pi' || engine === 'opencode') && catalogId.includes('/')) {
+  if ((engine === 'pi' || engine === 'opencode' || engine === 'omp') && catalogId.includes('/')) {
     return catalogId;
   }
 

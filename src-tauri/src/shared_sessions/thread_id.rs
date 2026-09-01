@@ -74,7 +74,8 @@ pub(crate) fn is_pending_shared_binding_thread_id(engine: EngineType, thread_id:
         EngineType::Grok => normalized.starts_with("grok-pending-shared-"),
         EngineType::OpenCode => normalized.starts_with("opencode-pending-shared-"),
         EngineType::Qoder => normalized.starts_with("qoder-pending-shared-"),
-        EngineType::Gemini | EngineType::Dsh => false,
+        // omp 不在 Shared 支持集合（add-omp-engine 显式决策），与 gemini/dsh 同形态。
+        EngineType::Gemini | EngineType::Dsh | EngineType::Omp => false,
     }
 }
 
@@ -88,6 +89,7 @@ pub(crate) fn binding_uses_established_native_thread(engine: EngineType, thread_
         EngineType::Claude
         | EngineType::Kimi
         | EngineType::Pi
+        | EngineType::Omp
         | EngineType::Grok
         | EngineType::OpenCode
         | EngineType::Dsh
@@ -111,7 +113,7 @@ pub(crate) fn binding_uses_established_native_thread(engine: EngineType, thread_
         | EngineType::Grok
         | EngineType::OpenCode
         | EngineType::Qoder => true,
-        EngineType::Gemini | EngineType::Dsh => false,
+        EngineType::Gemini | EngineType::Dsh | EngineType::Omp => false,
     }
 }
 
@@ -128,6 +130,8 @@ pub(crate) fn engine_binding_thread_id(engine: EngineType, seed: &str) -> String
         // Qoder Shared bindings retain their distribution identity; this id is only provisional
         // until the corresponding native session is established.
         EngineType::Qoder => format!("qoder-pending-shared-{seed}"),
+        // omp 不进 Shared（add-omp-engine）；arm 仅为保持函数全域性。
+        EngineType::Omp => format!("omp-pending-shared-{seed}"),
     }
 }
 

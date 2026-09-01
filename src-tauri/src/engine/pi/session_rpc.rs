@@ -109,19 +109,22 @@ impl PiRpcRun {
     /// pi 自唤醒 turn 的承接 run：main turn id 合成、waiter 无接收方
     /// （settle 时 send 失败静默跳过）。事件发往合成 id，被 daemon
     /// forwarder 按 turn_id 过滤天然丢弃，不污染任何真实会话 UI。
-    pub(crate) fn new_orphan() -> Self {
+    pub(crate) fn new_orphan(engine: EngineType) -> Self {
         let (tx, _rx) = oneshot::channel();
-        let mut run = Self::new(&next_pi_external_turn_id(), tx, None);
+        let mut run = Self::new(&next_pi_external_turn_id(engine), tx, None);
         run.orphan = true;
         run
     }
 }
 
-pub(crate) fn next_pi_external_turn_id() -> String {
+/// pi 族外部唤醒 turn id：`<engine>-external-*`（omp 与 pi 前缀分列，
+/// daemon/app 门控按引擎各自放行，add-omp-engine）。
+pub(crate) fn next_pi_external_turn_id(engine: EngineType) -> String {
     static EXTERNAL_TURN_SEQ: AtomicU64 = AtomicU64::new(0);
     let seq = EXTERNAL_TURN_SEQ.fetch_add(1, Ordering::SeqCst);
     format!(
-        "pi-external-{}-{seq}",
+        "{}-external-{}-{seq}",
+        engine.icon(),
         unix_timestamp_ms_for_process_diagnostics()
     )
 }
@@ -129,12 +132,12 @@ pub(crate) fn next_pi_external_turn_id() -> String {
 /// Bind the next native turn inside an active run.
 ///
 /// 用户 steer 的真实 turn id 优先（pending 队列）。没有排队 turn 时：
-/// - orphan run（pi 自唤醒）→ 合成 `pi-external-*` id，由 daemon 的外部
-///   turn 门控决定是否投影；
+/// - orphan run（pi 自唤醒）→ 合成 `<engine>-external-*` id，由 daemon 的
+///   外部 turn 门控决定是否投影；
 /// - 用户自己的 run → 派生 `{main}:t{n}` id。这是**前台**流的一部分
 ///   （普通多轮工具对话里每个 assistant 回合都是一个新原生 turn，实测
 ///   0.84.4），daemon 必须无条件放行，不得套用外部门控。
-pub(crate) fn bind_next_native_turn_id(run: &mut PiRpcRun) -> String {
+pub(crate) fn bind_next_native_turn_id(engine: EngineType, run: &mut PiRpcRun) -> String {
     if let Some(turn_id) = run.pending_turn_ids.pop_front() {
         if run.orphan {
             // 外部唤醒期间 attach 的真实用户 turn 接管后续 run；否则下一
@@ -146,7 +149,7 @@ pub(crate) fn bind_next_native_turn_id(run: &mut PiRpcRun) -> String {
         return turn_id;
     }
     if run.orphan {
-        return next_pi_external_turn_id();
+        return next_pi_external_turn_id(engine);
     }
     run.native_turn_seq += 1;
     format!("{}:t{}", run.main_turn_id, run.native_turn_seq)
@@ -429,6 +432,7 @@ impl PiSession {
         let event_sender = self.event_sender.clone();
         let residents = self.residents.clone();
         let workspace_id = self.workspace_id.clone();
+        let engine = self.engine;
         tokio::spawn(async move {
             // 当前事件所属 run 的归属戳：pump 在每个事件处理时刷新（orphan
             // 建 run / turn_start 换绑不改变 main），emit 时随事件带出。
@@ -453,7 +457,18 @@ impl PiSession {
                 match pump_event {
                     PiRpcPumpEvent::Agent(value) => {
                         let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
-                        if event_type == "agent_settled" {
+                        // omp 无 `agent_settled` 事件（v18.0.11 实测：run 以
+                        // `agent_end` 收尾即终态）；pi 维持原生 agent_settled。
+                        // omp 的 agent_end 附带 errorMessage 时作为 fatal 结算
+                        // （auth 失败等），否则正常 settle。
+                        let omp_agent_end_settle =
+                            engine == EngineType::Omp && event_type == "agent_end";
+                        if event_type == "agent_settled" || omp_agent_end_settle {
+                            let settle_fatal = if omp_agent_end_settle {
+                                extract_error_message(&value)
+                            } else {
+                                None
+                            };
                             let run = rpc_run.write().await.take();
                             // 生命周期标记：run 彻底 settle（无重试/无排队
                             // continuation）。daemon forwarder 以此判定
@@ -463,26 +478,26 @@ impl PiSession {
                             let settled_marker_turn_id = run
                                 .as_ref()
                                 .map(|run| run.main_turn_id.clone())
-                                .unwrap_or_else(|| format!("pi-settled-{workspace_id}"));
+                                .unwrap_or_else(|| format!("{}-settled-{workspace_id}", engine.icon()));
                             if let Some(mut run) = run {
                                 // 自唤醒回合通常先收到 custom notification，因而会被
                                 // 标记为 tool activity；该回合的 assistant 正文仍可能只
                                 // 保存在 resident 的 last assistant message 中。
                                 // 普通 tool-only 回合继续禁止回读，避免把上一轮正文带入本轮。
-                                if should_backfill_last_assistant_text(&run) {
+                                if settle_fatal.is_none() && should_backfill_last_assistant_text(&run) {
                                     if let Ok(text) = client.get_last_assistant_text().await {
                                         if !text.trim().is_empty() {
                                             run.response_text = text;
                                         }
                                     }
                                 }
-                                settle_rpc_run(&workspace_id, run, None, &emit);
+                                settle_rpc_run(&workspace_id, run, settle_fatal, &emit);
                             }
                             emit(
                                 &settled_marker_turn_id,
                                 EngineEvent::Raw {
                                     workspace_id: workspace_id.clone(),
-                                    engine: EngineType::Pi,
+                                    engine,
                                     data: json!({
                                         "source": "pi_rpc",
                                         "kind": "agent_settled",
@@ -497,7 +512,7 @@ impl PiSession {
                                 guard.as_ref().map(|run| run.main_turn_id.clone())
                             };
                             let turn_id =
-                                turn_id.or_else(|| Some(format!("pi-compact-{}", workspace_id)));
+                                turn_id.or_else(|| Some(format!("{}-compact-{}", engine.icon(), workspace_id)));
                             if let Some(turn_id) = turn_id {
                                 let kind = if event_type == "compaction_start" {
                                     "compaction_start"
@@ -508,7 +523,7 @@ impl PiSession {
                                     &turn_id,
                                     EngineEvent::Raw {
                                         workspace_id: workspace_id.clone(),
-                                        engine: EngineType::Pi,
+                                        engine,
                                         data: json!({
                                             "source": "pi_rpc",
                                             "kind": kind,
@@ -524,7 +539,7 @@ impl PiSession {
                             // pi 自唤醒 turn（bg 任务完成通知注入等）不经过
                             // ccgui 发送路径：建 orphan run 承接事件流；真实
                             // 用户消息稍后只排队到下一个原生 turn。
-                            *guard = Some(PiRpcRun::new_orphan());
+                            *guard = Some(PiRpcRun::new_orphan(engine));
                         }
                         let Some(run) = guard.as_mut() else {
                             continue;
@@ -546,7 +561,7 @@ impl PiSession {
                                         );
                                     }
                                 } else {
-                                    run.active_turn_id = bind_next_native_turn_id(run);
+                                    run.active_turn_id = bind_next_native_turn_id(engine, run);
                                     run.response_text.clear();
                                     run.authoritative_text = None;
                                     if !run.completed_turn_ids.contains(&run.active_turn_id) {
@@ -1102,7 +1117,7 @@ impl PiSession {
         {
             let mut guard = resident.run.write().await;
             if guard.is_none() {
-                *guard = Some(PiRpcRun::new_orphan());
+                *guard = Some(PiRpcRun::new_orphan(self.engine));
             }
             let run = guard.as_mut().expect("run just ensured");
             run.pending_turn_ids.push_back(turn_id.to_string());
@@ -1144,7 +1159,7 @@ impl PiSession {
             EngineEvent::SessionStarted {
                 workspace_id: self.workspace_id.clone(),
                 session_id,
-                engine: EngineType::Pi,
+                engine: self.engine,
                 turn_id: Some(turn_id.to_string()),
             },
         );
@@ -1205,7 +1220,8 @@ impl PiSession {
                         "当前 turn 仍在进行中，无法切换会话文件；请等待完成或先停止。".to_string(),
                     );
                 }
-                let file = match crate::engine::pi_history::resolve_pi_session_file_by_id(
+                let file = match crate::engine::pi_history::resolve_pi_family_session_file_by_id(
+                    self.engine,
                     self.home_dir.as_deref(),
                     target,
                     &self.workspace_path,

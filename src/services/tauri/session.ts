@@ -428,6 +428,47 @@ export async function deletePiSession(
   });
 }
 
+export async function loadOmpSession(
+  workspacePath: string,
+  sessionId: string,
+): Promise<Record<string, unknown> | null> {
+  // 与 load_pi_session 同桥（pi-family 同协议）：载荷以单一 JSON string 过桥，
+  // remote/legacy 对象图形态直接透传兼容。非法 JSON 抛错走既有恢复路径。
+  const payload = await invoke<string | Record<string, unknown> | null>(
+    "load_omp_session",
+    {
+      workspacePath,
+      sessionId,
+    },
+  );
+  if (payload == null || typeof payload !== "string") {
+    return payload;
+  }
+  return JSON.parse(payload) as Record<string, unknown>;
+}
+
+export async function listOmpSessions(
+  workspacePath: string,
+  limit?: number | null,
+): Promise<Record<string, unknown> | unknown[] | null> {
+  return traceStartupInvoke("list_omp_sessions", "global", () =>
+    invoke<Record<string, unknown> | unknown[] | null>("list_omp_sessions", {
+      workspacePath,
+      limit: limit ?? null,
+    }),
+  );
+}
+
+export async function deleteOmpSession(
+  workspacePath: string,
+  sessionId: string,
+): Promise<void> {
+  return invoke<void>("delete_omp_session", {
+    workspacePath,
+    sessionId,
+  });
+}
+
 export async function listQoderSessions(
   workspacePath: string,
   limit?: number | null,

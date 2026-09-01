@@ -1,4 +1,4 @@
-export type TurnSettlementEngine = "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+export type TurnSettlementEngine = "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
 
 export type TurnSettlementTerminalKind =
   | "completed"

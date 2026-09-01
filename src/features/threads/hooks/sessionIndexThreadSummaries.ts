@@ -19,7 +19,7 @@ import {
 } from "../utils/qoderSessionIdentity";
 
 const GENERIC_EMPTY_SESSION_TITLE =
-  /^(?:(?:claude|codex|gemini|grok|kimi|pi|qoder|opencode|dsh) session(?:\s+[a-f0-9-]{4,40})?|deepseek harness session)$/i;
+  /^(?:(?:claude|codex|gemini|grok|kimi|pi|omp|qoder|opencode|dsh) session(?:\s+[a-f0-9-]{4,40})?|deepseek harness session)$/i;
 
 const PLACEHOLDER_DRAFT_ENGINES = new Set([
   "claude",
@@ -28,6 +28,7 @@ const PLACEHOLDER_DRAFT_ENGINES = new Set([
   "grok",
   "kimi",
   "pi",
+  "omp",
   "qoder",
   "opencode",
   "dsh",
@@ -107,6 +108,7 @@ function normalizeEngine(
     value === "grok" ||
     value === "kimi" ||
     value === "pi" ||
+    value === "omp" ||
     value === "qoder" ||
     value === "opencode" ||
     value === "dsh"
@@ -187,6 +189,8 @@ export function sessionIndexRowsToThreadSummaries(
                 ? "Grok Session"
                 : engine === "pi"
                   ? "PI Session"
+                  : engine === "omp"
+                  ? "OMP Session"
                   : engine === "qoder"
                     ? "Qoder Session"
                     : engine === "dsh"

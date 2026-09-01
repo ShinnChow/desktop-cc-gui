@@ -86,7 +86,7 @@ export function emitReasoningSummaryDelta(
   threadId: string,
   itemId: string,
   delta: string,
-  engineHint: "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder" | null,
+  engineHint: "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder" | null,
   turnId: string | null,
 ): void {
   if (turnId) {
@@ -118,7 +118,7 @@ export function emitReasoningSummaryBoundary(
   workspaceId: string,
   threadId: string,
   itemId: string,
-  engineHint: "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder" | null,
+  engineHint: "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder" | null,
   turnId: string | null,
 ): void {
   if (turnId) {
@@ -149,7 +149,7 @@ export function emitReasoningTextDelta(
   threadId: string,
   itemId: string,
   delta: string,
-  engineHint: "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder" | null,
+  engineHint: "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder" | null,
   turnId: string | null,
 ): void {
   if (turnId) {

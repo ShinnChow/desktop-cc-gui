@@ -30,7 +30,7 @@ pub(crate) mod store {
     }
 
     pub(crate) const INDEX_LIST_ENGINES: &[&str] = &[
-        "claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "dsh", "qoder",
+        "claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "omp", "dsh", "qoder",
     ];
 
     #[derive(Debug, Clone)]

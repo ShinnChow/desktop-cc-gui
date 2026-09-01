@@ -699,6 +699,10 @@ fn parse_engine_type_string(value: Option<&str>) -> Option<engine::EngineType> {
         "opencode" => Some(engine::EngineType::OpenCode),
         "kimi" => Some(engine::EngineType::Kimi),
         "grok" => Some(engine::EngineType::Grok),
+        // pi 原本缺失（显式 engine:"pi" 曾静默回落 active engine）；omp 随
+        // add-omp-engine 一并补齐。
+        "pi" => Some(engine::EngineType::Pi),
+        "omp" => Some(engine::EngineType::Omp),
         "dsh" => Some(engine::EngineType::Dsh),
         "qoder" => Some(engine::EngineType::Qoder),
         _ => None,
@@ -1492,6 +1496,14 @@ async fn handle_rpc_request(
             let dsh_bin = parse_optional_string(&params, "dshBin");
             state.dsh_doctor(dsh_bin).await
         }
+        "pi_doctor" => {
+            let pi_bin = parse_optional_string(&params, "piBin");
+            state.pi_doctor(pi_bin).await
+        }
+        "omp_doctor" => {
+            let omp_bin = parse_optional_string(&params, "ompBin");
+            state.omp_doctor(omp_bin).await
+        }
         "qoder_doctor" => {
             let qoder_bin = parse_optional_string(&params, "qoderBin");
             let provider_profile_id = parse_optional_string(&params, "providerProfileId");
@@ -2259,6 +2271,25 @@ async fn handle_rpc_request(
         "pi_compact" => {
             state
                 .pi_compact(
+                    parse_string(&params, "workspaceId")?,
+                    parse_optional_string(&params, "sessionId"),
+                    parse_optional_string(&params, "customInstructions"),
+                    parse_optional_string(&params, "providerProfileId"),
+                )
+                .await
+        }
+        "omp_get_session_stats" => {
+            state
+                .omp_get_session_stats(
+                    parse_string(&params, "workspaceId")?,
+                    parse_optional_string(&params, "sessionId"),
+                    parse_optional_string(&params, "providerProfileId"),
+                )
+                .await
+        }
+        "omp_compact" => {
+            state
+                .omp_compact(
                     parse_string(&params, "workspaceId")?,
                     parse_optional_string(&params, "sessionId"),
                     parse_optional_string(&params, "customInstructions"),

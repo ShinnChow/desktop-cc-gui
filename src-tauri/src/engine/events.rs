@@ -516,17 +516,7 @@ pub fn engine_event_to_app_server_event_with_turn_context(
                 "threadId": thread_id,
                 "sessionId": session_id,
                 "turnId": turn_id,
-                "engine": match engine {
-                    EngineType::Claude => "claude",
-                    EngineType::Codex => "codex",
-                    EngineType::Gemini => "gemini",
-                    EngineType::Grok => "grok",
-                    EngineType::OpenCode => "opencode",
-                    EngineType::Kimi => "kimi",
-                    EngineType::Pi => "pi",
-                    EngineType::Dsh => "dsh",
-                    EngineType::Qoder => "qoder",
-                },
+                "engine": engine.icon(),
             }
         }),
         EngineEvent::TurnStarted { turn_id, .. } => json!({
@@ -1051,8 +1041,8 @@ pub fn engine_event_to_app_server_event_with_turn_context(
                         "params": Value::Object(params),
                     })
                 }
-            } else if matches!(engine, EngineType::Pi) {
-                // PI RPC compaction events → canonical thread/compaction methods
+            } else if engine.is_pi_family() {
+                // pi 族 RPC compaction events → canonical thread/compaction methods
                 // (same surface Claude uses, so curtain rendering is shared).
                 let kind = data.get("kind").and_then(Value::as_str).unwrap_or("");
                 let payload = data.get("payload").cloned().unwrap_or(Value::Null);
@@ -1132,10 +1122,10 @@ pub fn engine_event_to_app_server_event_with_turn_context(
                     }
                 }
             } else {
-                // pi：agent_settled 生命周期标记 → thread/runSettled 信号。
+                // pi 族：agent_settled 生命周期标记 → thread/runSettled 信号。
                 // pi 的 run 含多个原生 turn，每 turn 一次 turn/completed 会让
                 // 完成音等「整轮结束」语义连响；整轮粒度的消费者监听本信号。
-                if matches!(engine, EngineType::Pi)
+                if engine.is_pi_family()
                     && data.get("kind").and_then(Value::as_str) == Some("agent_settled")
                 {
                     return Some(AppServerEvent {

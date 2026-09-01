@@ -1620,6 +1620,16 @@ export function useSidebarMenus({
             await handleCreatedSession(threadId);
           },
         },
+        {
+          id: "new-session-omp",
+          label: t("workspace.engineOmp"),
+          iconKind: "engine-omp",
+          ...resolveEngineActionMeta(workspace, "omp"),
+          onSelect: async () => {
+            const threadId = await runAddAgent("omp");
+            await handleCreatedSession(threadId);
+          },
+        },
         // Qoder 发行版入口：与 Shared 组同形，CLI 列表层直接平铺 Global/CN，
         // 点击即带显式 profile 建会话（不再有二级发行版弹层）。
         ...QODER_DISTRIBUTION_PROFILES.map((profile) => ({

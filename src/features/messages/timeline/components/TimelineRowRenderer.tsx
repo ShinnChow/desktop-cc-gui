@@ -432,6 +432,7 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({
                   activeEngine === "opencode" ||
                   activeEngine === "dsh" ||
                   activeEngine === "pi" ||
+                  activeEngine === "omp" ||
                   activeEngine === "qoder") &&
                 renderItem.role === "assistant" &&
                 renderItem.recoveredFromLiveShadow !== true &&

@@ -49,7 +49,7 @@ export type AppServerEventHandlers = {
     workspaceId: string,
     threadId: string,
     sessionId: string,
-    engine?: "claude" | "opencode" | "codex" | "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder" | null,
+    engine?: "claude" | "opencode" | "codex" | "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder" | null,
     turnId?: string | null,
   ) => void;
   onBackgroundThreadAction?: (
@@ -188,14 +188,14 @@ export type AppServerEventHandlers = {
     threadId: string,
     itemId: string,
     delta: string,
-    engineHint?: "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder" | null,
+    engineHint?: "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder" | null,
     turnId?: string | null,
   ) => void;
   onReasoningSummaryBoundary?: (
     workspaceId: string,
     threadId: string,
     itemId: string,
-    engineHint?: "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder" | null,
+    engineHint?: "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder" | null,
     turnId?: string | null,
   ) => void;
   onReasoningTextDelta?: (
@@ -203,7 +203,7 @@ export type AppServerEventHandlers = {
     threadId: string,
     itemId: string,
     delta: string,
-    engineHint?: "gemini" | "grok" | "kimi" | "pi" | "dsh" | "qoder" | null,
+    engineHint?: "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh" | "qoder" | null,
     turnId?: string | null,
   ) => void;
   onCommandOutputDelta?: (

@@ -44,6 +44,7 @@ function isEngineType(value: unknown): value is EngineType {
     value === "kimi" ||
     value === "opencode" ||
     value === "pi" ||
+    value === "omp" ||
     value === "dsh"
   );
 }
@@ -159,6 +160,8 @@ export function formatSessionQuotaTargetTitle(target: SessionQuotaTarget): strin
                   ? "DSH"
                   : target.engine === "pi"
                     ? "PI"
+                    : target.engine === "omp"
+                    ? "OMP"
                     : target.engine === "qoder"
                       ? "Qoder"
                       : target.engine;

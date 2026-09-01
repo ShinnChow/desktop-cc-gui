@@ -67,6 +67,8 @@ const SUBMENU_FOOTER_BUTTON_CLASS =
  * 见 openspec/changes/fix-pi-degraded-thinking-catalog-self-heal。
  */
 const PI_LIST_MODELS_PROVENANCE = "cli:pi-list-models";
+/** OMP 复用 pi-family 探测链，降级源 provenance 按 bin_name 参数化（add-omp-engine）。 */
+const OMP_LIST_MODELS_PROVENANCE = "cli:omp-list-models";
 
 interface ModelSelectProps {
   value: string;
@@ -765,13 +767,16 @@ export const ModelSelect = memo(
           // 是「健康可缓存」数据，cache-first 不会自愈，只能在这里补拉一次；
           // RPC 探测成功后整组 provenance 变为 cli:pi-available-models，判定失效。
           const isCapabilityDegradedPi =
-            currentProvider === "pi" &&
+            (currentProvider === "pi" || currentProvider === "omp") &&
             !isFallbackOnly &&
             groupModels.length > 0 &&
             groupModels.every(
               (model) =>
                 (model.source ?? "") === "detected" &&
-                model.provenance === PI_LIST_MODELS_PROVENANCE,
+                model.provenance ===
+                  (currentProvider === "omp"
+                    ? OMP_LIST_MODELS_PROVENANCE
+                    : PI_LIST_MODELS_PROVENANCE),
             );
           if (isFallbackOnly || isCapabilityDegradedPi) {
             handleRefreshConfig();

@@ -35,6 +35,7 @@ const ENGINE_LABELS: Record<EngineType, string> = {
   kimi: "Kimi CLI",
   opencode: "OpenCode",
   pi: "PI CLI",
+  omp: "OMP CLI",
   dsh: "DeepSeek Harness",
   qoder: "Qoder CLI",
 };

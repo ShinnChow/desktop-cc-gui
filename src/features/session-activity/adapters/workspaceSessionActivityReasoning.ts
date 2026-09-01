@@ -588,6 +588,9 @@ export function inferReasoningPresentationEngine(threadId: string) {
   if (threadId.startsWith("pi:") || threadId.startsWith("pi-pending-")) {
     return "pi";
   }
+  if (threadId.startsWith("omp:") || threadId.startsWith("omp-pending-")) {
+    return "omp";
+  }
   if (threadId.startsWith("qoder:") || threadId.startsWith("qoder-pending-")) {
     return "qoder";
   }
@@ -605,14 +608,14 @@ export function normalizeReasoningItemsForTimeline(threadId: string, items: Conv
     return parsed.hasBody || Boolean(parsed.workingLabel);
   });
   const engine = inferReasoningPresentationEngine(threadId);
-  const appendReasoningRuns = engine === "claude" || engine === "codex" || engine === "gemini" || engine === "grok" || engine === "kimi" || engine === "dsh" || engine === "pi" || engine === "qoder";
+  const appendReasoningRuns = engine === "claude" || engine === "codex" || engine === "gemini" || engine === "grok" || engine === "kimi" || engine === "dsh" || engine === "pi" || engine === "omp" || engine === "qoder";
   const deduped = dedupeAdjacentReasoningItems(
     filtered,
     sourceReasoningMetaById,
     appendReasoningRuns,
   );
   const collapseReasoningRuns =
-    engine === "claude" || engine === "codex" || engine === "opencode" || engine === "gemini" || engine === "grok" || engine === "kimi" || engine === "pi" || engine === "qoder";
+    engine === "claude" || engine === "codex" || engine === "opencode" || engine === "gemini" || engine === "grok" || engine === "kimi" || engine === "pi" || engine === "omp" || engine === "qoder";
   const normalized = collapseConsecutiveReasoningRuns(
     deduped,
     collapseReasoningRuns,

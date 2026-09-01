@@ -93,6 +93,8 @@ type ListThreadsForWorkspace = (
     includeEngineDiskLists?: boolean;
     /** 只补 pi 单引擎盘扫（首刷后后台软刷）：独立 pi main 必须可达。 */
     includePiDiskList?: boolean;
+    /** 与 includePiDiskList 同形：omp 单引擎盘扫（pi-family 独立 main）。 */
+    includeOmpDiskList?: boolean;
     /** Importer refresh: merge SQLite rows onto the current list. */
     mergeExistingThreads?: boolean;
     /** When true mid-flight, list apply must no-op (workspace cancelled/switched). */
@@ -494,6 +496,8 @@ export function useWorkspaceThreadListHydration({
           // 之外也必须可达（fork/Shared 认领行仍按契约隐藏）。单目录
           // header 读，远轻于 full-catalog 多引擎 fan-out。
           includePiDiskList: true,
+          // omp 与 pi 同形（pi-family 独立 main 后台补全）。
+          includeOmpDiskList: true,
           // Pointer soft-cancel bumps the generation: the orphan IPC still
           // finishes but its late setThreads no-op (soft-ignore semantics).
           isStale: () =>

@@ -293,6 +293,7 @@ export type ThreadSummary = {
     | "kimi"
     | "opencode"
     | "pi"
+    | "omp"
     | "dsh"
     | "qoder";
   selectedEngine?:
@@ -303,6 +304,7 @@ export type ThreadSummary = {
     | "kimi"
     | "opencode"
     | "pi"
+    | "omp"
     | "dsh"
     | "qoder";
   source?: string;

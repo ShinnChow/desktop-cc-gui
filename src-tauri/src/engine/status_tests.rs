@@ -773,6 +773,7 @@ async fn resolve_engine_type_supports_opencode() {
         None,
         None,
         None,
+        None,
         &[],
     )
     .await;
@@ -784,6 +785,7 @@ async fn resolve_engine_type_normalizes_retired_workspace_gemini_to_allowed_defa
     let resolved = resolve_engine_type(
         Some("gemini"),
         Some("claude"),
+        None,
         None,
         None,
         None,
@@ -818,6 +820,7 @@ async fn preferred_engine_detection_never_spawns_or_selects_disabled_gemini() {
         None,
         None,
         Some(script_path.to_string_lossy().as_ref()),
+        None,
         None,
         None,
         None,
@@ -864,6 +867,7 @@ async fn add_workspace_resolver_normalizes_legacy_gemini_default_without_spawn()
         None,
         None,
         None,
+        None,
         &[],
     )
     .await;
@@ -891,6 +895,7 @@ async fn resolve_engine_type_supports_kimi() {
         None,
         None,
         None,
+        None,
         &[],
     )
     .await;
@@ -902,6 +907,7 @@ async fn resolve_engine_type_supports_grok() {
     let resolved = resolve_engine_type(
         Some("grok"),
         Some("claude"),
+        None,
         None,
         None,
         None,
@@ -1038,6 +1044,7 @@ async fn detect_all_engines_skips_opencode_model_listing() {
         None,
         None,
         None,
+        None,
         &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
         false,
     )
@@ -1084,6 +1091,7 @@ async fn detect_all_engines_skips_pi_model_probe_chain() {
         None,
         Some(&pi_bin),
         None,
+        None,
         &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
         false,
     )
@@ -1122,6 +1130,7 @@ async fn detect_all_engines_skips_qoder_acp_model_probe() {
     let qoder_bin = script_path.to_string_lossy().to_string();
 
     let statuses = detect_all_engines(
+        None,
         None,
         None,
         None,
@@ -1177,6 +1186,7 @@ async fn detect_all_engines_scoped_skips_disabled_engines_without_spawning() {
         None,
         None,
         Some(&kimi_bin),
+        None,
         None,
         None,
         None,
@@ -1275,6 +1285,7 @@ async fn detect_all_engines_qoder_phase1_never_spawns_login_probe() {
         None,
         None,
         None,
+        None,
         Some(&qoder_bin),
         &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
         false,
@@ -1363,6 +1374,7 @@ async fn detect_all_engines_emits_per_engine_status_events() {
         None,
         None,
         None,
+        None,
         &crate::engine::dsh::supervisor::DshRuntimeSettings::default(),
         false,
         &[
@@ -1371,6 +1383,7 @@ async fn detect_all_engines_emits_per_engine_status_events() {
             EngineType::OpenCode,
             EngineType::Grok,
             EngineType::Pi,
+            EngineType::Omp,
             EngineType::Qoder,
             EngineType::Dsh,
         ],

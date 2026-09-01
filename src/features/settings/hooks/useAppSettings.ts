@@ -9,6 +9,7 @@ import {
   runGrokDoctor,
   runKimiDoctor,
   runOpenCodeDoctor,
+  runOmpDoctor,
   runPiDoctor,
   runQoderDoctor,
   takeSettingsRecoveryNotice,
@@ -243,6 +244,7 @@ const defaultSettings: AppSettings = {
   claudeBin: null,
   kimiBin: null,
   piBin: null,
+  ompBin: null,
   qoderBin: null,
   qoderConfigDir: null,
   qoderCnBin: null,
@@ -442,6 +444,7 @@ function normalizeAppSettings(
     claudeBin: settings.claudeBin?.trim() ? settings.claudeBin.trim() : null,
     kimiBin: settings.kimiBin?.trim() ? settings.kimiBin.trim() : null,
     piBin: settings.piBin?.trim() ? settings.piBin.trim() : null,
+    ompBin: settings.ompBin?.trim() ? settings.ompBin.trim() : null,
     qoderBin: settings.qoderBin?.trim() ? settings.qoderBin.trim() : null,
     qoderConfigDir: settings.qoderConfigDir?.trim()
       ? settings.qoderConfigDir.trim()
@@ -801,6 +804,10 @@ export function useAppSettings() {
     return runPiDoctor(piBin);
   }, []);
 
+  const ompDoctor = useCallback(async (ompBin: string | null) => {
+    return runOmpDoctor(ompBin);
+  }, []);
+
   const qoderDoctor = useCallback(async (
     qoderBin: string | null,
     providerProfileId?: string | null,
@@ -818,6 +825,7 @@ export function useAppSettings() {
     grokDoctor,
     opencodeDoctor,
     piDoctor,
+    ompDoctor,
     qoderDoctor,
     isLoading,
   };

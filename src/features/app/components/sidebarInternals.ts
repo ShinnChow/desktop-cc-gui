@@ -121,7 +121,7 @@ export function isSessionCatalogNotReadyError(error: unknown): boolean {
 
 export function resolveEnginePrefix(
   threadId: string,
-): "claude" | "gemini" | "kimi" | "grok" | "opencode" | "pi" | "dsh" | "qoder" | "codex" {
+): "claude" | "gemini" | "kimi" | "grok" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | "codex" {
   if (threadId.startsWith("claude:") || threadId.startsWith("claude-pending-")) {
     return "claude";
   }
@@ -133,6 +133,9 @@ export function resolveEnginePrefix(
   }
   if (threadId.startsWith("pi:") || threadId.startsWith("pi-pending-")) {
     return "pi";
+  }
+  if (threadId.startsWith("omp:") || threadId.startsWith("omp-pending-")) {
+    return "omp";
   }
   if (threadId.startsWith("grok:") || threadId.startsWith("grok-pending-")) {
     return "grok";

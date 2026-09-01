@@ -79,7 +79,7 @@ export type HandleFusionStalledOptions = {
 export type RunWithCreateSessionLoading = <T>(
   params: {
     workspace: WorkspaceInfo;
-    engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+    engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   },
   action: () => Promise<T>,
 ) => Promise<T>;
@@ -103,7 +103,7 @@ export type UseThreadMessagingOptions = {
   claudeThinkingVisible?: boolean;
   steerEnabled: boolean;
   customPrompts: CustomPromptOption[];
-  activeEngine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+  activeEngine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   threadStatusById: ThreadState["threadStatusById"];
   itemsByThread: ThreadState["itemsByThread"];
   activeTurnIdByThread: ThreadState["activeTurnIdByThread"];
@@ -120,7 +120,7 @@ export type UseThreadMessagingOptions = {
   getThreadEngine: (
     workspaceId: string,
     threadId: string,
-  ) => "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | undefined;
+  ) => "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | undefined;
   getThreadKind?: (
     workspaceId: string,
     threadId: string,
@@ -164,7 +164,7 @@ export type UseThreadMessagingOptions = {
     workspaceId: string,
     options?: {
       activate?: boolean;
-      engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+      engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
       folderId?: string | null;
       autoSession?: AutoSessionMetadata | null;
       providerProfileId?: string | null;

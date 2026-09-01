@@ -20,6 +20,7 @@ type UseThreadsCompletionEmailOptions = {
     | "kimi"
     | "opencode"
     | "pi"
+    | "omp"
     | "dsh"
     | "qoder";
   activeTurnIdByThreadRef: MutableRefObject<Record<string, string | null>>;

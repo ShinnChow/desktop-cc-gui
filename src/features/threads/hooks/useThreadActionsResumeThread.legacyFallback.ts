@@ -6,6 +6,7 @@ import {
   loadGeminiSession as loadGeminiSessionService,
   loadGrokSession as loadGrokSessionService,
   loadKimiSession as loadKimiSessionService,
+  loadOmpSession as loadOmpSessionService,
   loadPiSession as loadPiSessionService,
   loadQoderSession as loadQoderSessionService,
 } from "../../../services/tauri";
@@ -569,6 +570,87 @@ export async function runLegacyEngineHistoryFallback(
         //（不走 markHistoryRecoveryFailure：那会置 automatic-recovery-
         // failed 拦截后续 resume，关死重试通道）；连续失败达上限后置
         // loaded 防风暴。
+        const failureCount =
+          (piHistoryLoadFailureCountByThreadRef.current[threadId] ?? 0) + 1;
+        piHistoryLoadFailureCountByThreadRef.current[threadId] =
+          failureCount;
+        onDebug?.(
+          createThreadHistoryReadableSurfaceDebugEntry({
+            workspaceId,
+            threadId,
+            sourceThreadId: threadId,
+            reopenOutcome:
+              (itemsByThread[threadId]?.length ?? 0) > 0
+                ? "degraded-readable"
+                : "failed",
+            reasonCode:
+              (itemsByThread[threadId]?.length ?? 0) > 0
+                ? "last-good-local-items-preserved"
+                : "pi-history-load-failed",
+            localItemCount: itemsByThread[threadId]?.length ?? 0,
+            snapshotItemCount: 0,
+            fallbackWarningCount: failureCount,
+          }),
+        );
+        if (failureCount >= PI_HISTORY_LOAD_MAX_ATTEMPTS) {
+          setThreadLoaded(threadId, true);
+        }
+      }
+    }
+    if (!piHistoryLoadFailureCountByThreadRef.current[threadId]) {
+      loadedThreadsRef.current[threadId] = true;
+    }
+    return threadId;
+  }
+  if (threadId.startsWith("omp:")) {
+    dispatch({
+      type: "ensureThread",
+      workspaceId,
+      threadId,
+      engine: "omp",
+    });
+    if (workspacePath && !loadedThreadsRef.current[threadId]) {
+      const realSessionId = threadId.slice("omp:".length);
+      try {
+        await runNativeHistoryOpenStages({
+          report: (progress) => {
+            if (!isCurrentResumeRequest()) {
+              return;
+            }
+            setThreadHistoryLoadingProgress?.(threadId, progress);
+          },
+          shouldContinue: isCurrentResumeRequest,
+          load: () => loadOmpSessionService(workspacePath, realSessionId),
+          extractMessages: (payload) => {
+            const rawMessages =
+              (payload as { messages?: unknown }).messages ?? payload;
+            hydrateBackgroundTasksFromHistory(
+              workspaceId,
+              threadId,
+              collectPiHistoryBackgroundTasks(rawMessages),
+            );
+            return rawMessages;
+          },
+          // omp 与 pi 的 history 载荷同构（pi-family），解析零复制。
+          parse: parsePiHistoryMessages,
+          hydrate: async (items) => {
+            if (items.length > 0) {
+              await applyHydratedItems(threadId, items);
+            }
+          },
+        });
+        if (!isCurrentResumeRequest()) {
+          return threadId;
+        }
+        dispatch({
+          type: "setThreadHistoryRestoredAt",
+          threadId,
+          timestamp: Date.now(),
+        });
+        delete piHistoryLoadFailureCountByThreadRef.current[threadId];
+      } catch {
+        // 与 pi 同纪律（harden-pi-session-curtain-fidelity）：load 失败不
+        // 无条件置 loaded；omp: 前缀与 pi: 永不冲突，复用同一按线程计数。
         const failureCount =
           (piHistoryLoadFailureCountByThreadRef.current[threadId] ?? 0) + 1;
         piHistoryLoadFailureCountByThreadRef.current[threadId] =

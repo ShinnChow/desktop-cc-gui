@@ -225,7 +225,7 @@ export {
   validateBrowserAgentUrl,
 } from "./tauri/browserAgent";
 
-export { previewCodexLaunchProfile, runClaudeDoctor, runCodexDoctor, runDshDoctor, runGrokDoctor, runKimiDoctor, runOpenCodeDoctor, runPiDoctor, runQoderDoctor } from "./tauri/doctor";
+export { previewCodexLaunchProfile, runClaudeDoctor, runCodexDoctor, runDshDoctor, runGrokDoctor, runKimiDoctor, runOmpDoctor, runOpenCodeDoctor, runPiDoctor, runQoderDoctor } from "./tauri/doctor";
 export { cancelDshHost, ensureDshHost } from "./tauri/dshHost";
 export type { DshHostEnsureResult } from "./tauri/dshHost";
 export { getCliInstallPlan, getCliVersionStatus, runCliInstaller } from "./tauri/cliInstaller";
@@ -505,6 +505,7 @@ export {
   deleteKimiSession,
   deleteOpenCodeSession,
   deletePiSession,
+  deleteOmpSession,
   forkClaudeSession,
   forkDshSession,
   forkClaudeSessionFromMessage,
@@ -517,6 +518,7 @@ export {
   listGrokSessions,
   listKimiSessions,
   listPiSessions,
+  listOmpSessions,
   listDshSessions,
   listQoderSessions,
   listMcpServerStatus,
@@ -527,6 +529,7 @@ export {
   loadGrokSession,
   loadKimiSession,
   loadPiSession,
+  loadOmpSession,
   loadDshSession,
   loadQoderSession,
   resumeThread,

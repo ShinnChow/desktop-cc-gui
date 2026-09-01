@@ -260,7 +260,7 @@ export const MessagesCore = memo(function MessagesCore({
     runningCount: backgroundTaskRunningCount,
     earliestRunningStartTime: backgroundTaskEarliestStartTime,
   } = useBackgroundTaskRunningSnapshot({
-    enabled: conversationState.meta.engine === "pi",
+    enabled: conversationState.meta.engine === "pi" || conversationState.meta.engine === "omp",
     workspaceId,
     threadId,
     items,
@@ -563,6 +563,8 @@ export const MessagesCore = memo(function MessagesCore({
                       ? "workspace.engineOpenCode"
                       : activeEngine === "pi"
                         ? "workspace.enginePi"
+                        : activeEngine === "omp"
+                          ? "workspace.engineOmp"
                         : activeEngine === "dsh"
                           ? "workspace.engineDsh"
                           : activeEngine === "qoder"
@@ -572,7 +574,9 @@ export const MessagesCore = memo(function MessagesCore({
             defaultValue:
               activeEngine === "qoder"
                 ? "Qoder CLI"
-                : activeEngine === "dsh"
+                : activeEngine === "omp"
+                  ? "OMP CLI"
+                  : activeEngine === "dsh"
                   ? "DeepSeek Harness"
                   : activeEngine === "opencode"
                     ? "OpenCode"

@@ -685,7 +685,7 @@ export function useTurnDiagnosticsRuntime({
 
   const shouldSkipCodexTurnEvent = useCallback(
     (input: {
-      engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+      engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
       workspaceId: string;
       threadId: string;
       turnId: string;

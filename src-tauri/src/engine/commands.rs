@@ -31,14 +31,17 @@ use super::events::{engine_event_to_app_server_event_with_turn_context, EngineEv
 use super::grok::resolve_grok_session_id_for_engine_send;
 use super::kimi::resolve_kimi_session_id_for_engine_send;
 use super::pi::{
-    is_pi_agent_settled_marker, is_pi_external_wakeup_allowed, is_pi_forwardable_send_turn,
-    resolve_pi_session_id_for_engine_send,
+    is_pi_agent_settled_marker, is_pi_family_external_wakeup_allowed,
+    is_pi_forwardable_send_turn, resolve_pi_session_id_for_engine_send,
 };
 use super::remote_bridge::{
     call_remote_typed, remote_detect_engines_request, remote_engine_interrupt_request,
     remote_engine_send_message_sync_request,
 };
-use super::status::{detect_grok_status, detect_kimi_status, detect_pi_status, load_opencode_models};
+use super::status::{
+    detect_grok_status, detect_kimi_status, detect_omp_status, detect_pi_status,
+    load_opencode_models,
+};
 use super::{
     engine_disabled_diagnostic, engine_enabled_in_settings, EngineConfig, EngineStatus, EngineType,
 };
@@ -157,17 +160,7 @@ fn has_non_empty_images(images: &Option<Vec<String>>) -> bool {
 }
 
 fn features_for_engine(engine: EngineType) -> super::EngineFeatures {
-    match engine {
-        EngineType::Claude => super::EngineFeatures::claude(),
-        EngineType::Codex => super::EngineFeatures::codex(),
-        EngineType::Gemini => super::EngineFeatures::gemini(),
-        EngineType::Grok => super::EngineFeatures::grok(),
-        EngineType::OpenCode => super::EngineFeatures::opencode(),
-        EngineType::Kimi => super::EngineFeatures::kimi(),
-        EngineType::Pi => super::EngineFeatures::pi(),
-        EngineType::Dsh => super::EngineFeatures::dsh(),
-        EngineType::Qoder => super::EngineFeatures::qoder(),
-    }
+    engine.features()
 }
 
 /// Reject non-empty image payloads when `EngineFeatures.image_input = false`.
@@ -238,6 +231,7 @@ fn collect_stale_child_candidates(
                 | EngineType::Grok
                 | EngineType::Kimi
                 | EngineType::Pi
+                | EngineType::Omp
                 | EngineType::Qoder
                 | EngineType::Dsh => "unsupported",
                 // Codex is intentionally not part of this child-process parity
@@ -259,17 +253,7 @@ fn collect_stale_child_candidates(
 }
 
 fn engine_type_label(engine: EngineType) -> &'static str {
-    match engine {
-        EngineType::Claude => "claude",
-        EngineType::OpenCode => "opencode",
-        EngineType::Gemini => "gemini",
-        EngineType::Codex => "codex",
-        EngineType::Grok => "grok",
-        EngineType::Kimi => "kimi",
-        EngineType::Pi => "pi",
-        EngineType::Dsh => "dsh",
-        EngineType::Qoder => "qoder",
-    }
+    engine.icon()
 }
 
 async fn record_auto_session_metadata_if_present(
@@ -815,10 +799,10 @@ where
         .await
         .map(|status| status.models)
         .filter(|models| !models.is_empty());
-    // 防中毒判定仅圈 PI：只有 PI 的 parse 层会在探测失败时合成 source=fallback
-    // 兜底条目（auto），「非空」唯独对 PI 失去健康意义；Kimi / Grok 等共用此
-    // 函数的引擎没有合成兜底语义，cached 命中行为必须保持不变。
-    let guard_fallback_poison = engine_type == EngineType::Pi;
+    // 防中毒判定仅圈 pi 族：只有 pi/omp 的 parse 层会在探测失败时合成
+    // source=fallback 兜底条目（auto），「非空」唯独对 pi 族失去健康意义；
+    // Kimi / Grok 等共用此函数的引擎没有合成兜底语义，cached 命中行为必须保持不变。
+    let guard_fallback_poison = engine_type.is_pi_family();
     let cached_is_usable = cached_models
         .as_ref()
         .map(|models| !guard_fallback_poison || !is_fallback_only_catalog(models))
@@ -920,6 +904,17 @@ pub async fn get_engine_models(
                 EngineType::Pi,
                 force_refresh,
                 move || async move { detect_pi_status(custom_bin.as_deref()).await },
+            )
+            .await)
+        }
+        EngineType::Omp => {
+            let config = manager.get_engine_config(EngineType::Omp).await;
+            let custom_bin = config.as_ref().and_then(|cfg| cfg.bin_path.clone());
+            Ok(resolve_engine_models_cache_first(
+                manager,
+                EngineType::Omp,
+                force_refresh,
+                move || async move { detect_omp_status(custom_bin.as_deref()).await },
             )
             .await)
         }
@@ -1059,6 +1054,9 @@ fn build_provider_engine_dispatch_receipt(
                 ) | (
                     EngineType::Pi,
                     super::pi_provider_profile::PI_LOCAL_PROVIDER_PROFILE_ID
+                ) | (
+                    EngineType::Omp,
+                    super::omp_provider_profile::OMP_LOCAL_PROVIDER_PROFILE_ID
                 )
             )
         })
@@ -1133,7 +1131,7 @@ pub async fn engine_prewarm(
     let manager = &state.engine_manager;
     let active_engine = manager.get_active_engine().await;
     let effective_engine = engine.unwrap_or(active_engine);
-    if !matches!(effective_engine, EngineType::Pi) {
+    if !effective_engine.is_pi_family() {
         return Ok(false);
     }
     let Some(session_id) = session_id
@@ -1158,17 +1156,19 @@ pub async fn engine_prewarm(
             state.storage_path.as_path(),
             &workspace_id,
             Some(&session_id),
-            "pi",
+            effective_engine.icon(),
             provider_profile_id.as_deref(),
         )?;
     let provider_launch_profile =
-        crate::engine::pi_provider_profile::resolve_pi_provider_launch_profile(
+        crate::engine::pi_provider_profile::resolve_pi_family_provider_launch_profile(
+            effective_engine,
             &workspace_id,
             effective_provider_profile_id.as_deref(),
             None,
         )?;
     let session = manager
-        .get_or_create_pi_session_for_runtime(
+        .get_or_create_pi_family_session_for_runtime(
+            effective_engine,
             &workspace_id,
             &workspace_path,
             &provider_launch_profile.runtime_key,
@@ -1223,6 +1223,7 @@ pub async fn engine_interrupt(
         }
         EngineType::Kimi => manager.interrupt_kimi_sessions(&workspace_id, None).await,
         EngineType::Pi => manager.interrupt_pi_sessions(&workspace_id, None).await,
+        EngineType::Omp => manager.interrupt_omp_sessions(&workspace_id, None).await,
         EngineType::Qoder => manager.interrupt_qoder_sessions(&workspace_id, None).await,
         EngineType::Grok => manager.interrupt_grok_sessions(&workspace_id, None).await,
         EngineType::Dsh => {
@@ -1311,6 +1312,11 @@ pub async fn engine_interrupt_turn(
         EngineType::Pi => {
             manager
                 .interrupt_pi_sessions(&workspace_id, Some(&turn_id))
+                .await
+        }
+        EngineType::Omp => {
+            manager
+                .interrupt_omp_sessions(&workspace_id, Some(&turn_id))
                 .await
         }
         EngineType::Qoder => {

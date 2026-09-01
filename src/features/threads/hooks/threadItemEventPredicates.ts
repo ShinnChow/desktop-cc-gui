@@ -20,6 +20,7 @@ export function canProgressEventStartProcessing(
     | "kimi"
     | "opencode"
     | "pi"
+    | "omp"
     | "dsh"
     | "qoder",
 ) {
@@ -54,6 +55,10 @@ export function isPiThread(threadId: string) {
   return threadId.startsWith("pi:") || threadId.startsWith("pi-pending-");
 }
 
+export function isOmpThread(threadId: string) {
+  return threadId.startsWith("omp:") || threadId.startsWith("omp-pending-");
+}
+
 export function isQoderThread(threadId: string) {
   return threadId.startsWith("qoder:") || threadId.startsWith("qoder-pending-");
 }
@@ -67,6 +72,7 @@ export type ReasoningEngineHint =
   | "grok"
   | "kimi"
   | "pi"
+  | "omp"
   | "dsh"
   | "qoder"
   | null;
@@ -94,6 +100,10 @@ export function isPiEventThread(threadId: string, engineHint?: ReasoningEngineHi
   return engineHint === "pi" || isPiThread(threadId);
 }
 
+export function isOmpEventThread(threadId: string, engineHint?: ReasoningEngineHint) {
+  return engineHint === "omp" || isOmpThread(threadId);
+}
+
 export function isQoderEventThread(
   threadId: string,
   engineHint?: ReasoningEngineHint,
@@ -112,6 +122,7 @@ export function inferItemEngineSource(
   | "kimi"
   | "opencode"
   | "pi"
+  | "omp"
   | "dsh"
   | "qoder" {
   const rawEngineSource = asString(
@@ -127,6 +138,7 @@ export function inferItemEngineSource(
     rawEngineSource === "kimi" ||
     rawEngineSource === "opencode" ||
     rawEngineSource === "pi" ||
+    rawEngineSource === "omp" ||
     rawEngineSource === "dsh" ||
     rawEngineSource === "qoder"
   ) {

@@ -57,8 +57,10 @@ impl DaemonState {
         .await
     }
 
-    async fn resolve_pi_session_for_rpc(
+    /// pi 族共享解析（add-omp-engine，与 app 侧 commands_pi_rpc.rs 同形同步）。
+    async fn resolve_pi_family_session_for_rpc(
         &self,
+        engine: engine::EngineType,
         workspace_id: &str,
         provider_profile_id: Option<&str>,
     ) -> Result<std::sync::Arc<engine::pi::PiSession>, String> {
@@ -73,24 +75,39 @@ impl DaemonState {
             self.storage_path.as_path(),
             workspace_id,
             None,
-            "pi",
+            engine.icon(),
             provider_profile_id,
         )?;
         let provider_launch_profile =
-            engine::pi_provider_profile::resolve_pi_provider_launch_profile(
+            engine::pi_provider_profile::resolve_pi_family_provider_launch_profile(
+                engine,
                 workspace_id,
                 effective_provider_profile_id.as_deref(),
                 None,
             )?;
         Ok(self
             .engine_manager
-            .get_or_create_pi_session_for_runtime(
+            .get_or_create_pi_family_session_for_runtime(
+                engine,
                 workspace_id,
                 &workspace_path,
                 &provider_launch_profile.runtime_key,
                 provider_launch_profile.home_dir.as_deref(),
             )
             .await)
+    }
+
+    async fn resolve_pi_session_for_rpc(
+        &self,
+        workspace_id: &str,
+        provider_profile_id: Option<&str>,
+    ) -> Result<std::sync::Arc<engine::pi::PiSession>, String> {
+        self.resolve_pi_family_session_for_rpc(
+            engine::EngineType::Pi,
+            workspace_id,
+            provider_profile_id,
+        )
+        .await
     }
 
     pub(crate) async fn pi_get_session_stats(
@@ -117,6 +134,47 @@ impl DaemonState {
     ) -> Result<Value, String> {
         let session = self
             .resolve_pi_session_for_rpc(&workspace_id, provider_profile_id.as_deref())
+            .await?;
+        session
+            .with_exclusive_rpc_command(session_id.as_deref(), |client| async move {
+                client.compact(custom_instructions.as_deref()).await
+            })
+            .await
+    }
+
+    /// omp RPC 命令面（add-omp-engine）：omp 无 fork/tree，仅 stats/compact。
+    pub(crate) async fn omp_get_session_stats(
+        &self,
+        workspace_id: String,
+        session_id: Option<String>,
+        provider_profile_id: Option<String>,
+    ) -> Result<Value, String> {
+        let session = self
+            .resolve_pi_family_session_for_rpc(
+                engine::EngineType::Omp,
+                &workspace_id,
+                provider_profile_id.as_deref(),
+            )
+            .await?;
+        let client = session
+            .rpc_client_for_commands(session_id.as_deref())
+            .await?;
+        client.get_session_stats().await
+    }
+
+    pub(crate) async fn omp_compact(
+        &self,
+        workspace_id: String,
+        session_id: Option<String>,
+        custom_instructions: Option<String>,
+        provider_profile_id: Option<String>,
+    ) -> Result<Value, String> {
+        let session = self
+            .resolve_pi_family_session_for_rpc(
+                engine::EngineType::Omp,
+                &workspace_id,
+                provider_profile_id.as_deref(),
+            )
             .await?;
         session
             .with_exclusive_rpc_command(session_id.as_deref(), |client| async move {

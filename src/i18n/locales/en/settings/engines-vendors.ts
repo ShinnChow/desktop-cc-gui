@@ -756,6 +756,7 @@ const enginesVendors = {
     cliValidationTabGrokCli: "Grok CLI",
     cliValidationTabDshCli: "DeepSeek Harness",
     cliValidationTabPiCli: "PI CLI",
+    cliValidationTabOmpCli: "OMP CLI",
     cliValidationTabQoderCli: "Qoder CLI",
     cliEngineEnabledLabel: "Engine enabled",
     geminiCliDisableDescription:
@@ -782,6 +783,10 @@ const enginesVendors = {
     piDescription: "Configure PI CLI auth and models. Credentials stay in ~/.pi.",
     piCliLifecycleHint:
       "Install or update the local PI CLI via npm package @earendil-works/pi-coding-agent. Auth and models stay in ~/.pi.",
+    ompDescription:
+      "Install and configure the OMP CLI used by ccgui. Auth and models stay in ~/.omp.",
+    ompCliLifecycleHint:
+      "Install, update, or uninstall the local OMP CLI. Auth and models stay in ~/.omp.",
     qoderDescription:
       "One Qoder engine with isolated Global and CN distributions. Each distribution owns its CLI, config directory, account, PAT, and live ACP model catalog.",
     qoderCliLifecycleHint:
@@ -903,6 +908,9 @@ const enginesVendors = {
     runPiDoctor: "Run PI Doctor",
     piLooksGood: "PI CLI looks good",
     piIssueDetected: "PI CLI issue detected",
+    runOmpDoctor: "Run OMP Doctor",
+    ompLooksGood: "OMP CLI looks good",
+    ompIssueDetected: "OMP CLI issue detected",
     runQoderDoctor: "Run Qoder Doctor",
     qoderLooksGood: "Qoder CLI looks good",
     qoderIssueDetected: "Qoder CLI issue detected",

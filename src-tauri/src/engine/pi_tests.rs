@@ -116,7 +116,7 @@ fn rpc_disabled_latch_blocks_within_cooldown_and_allows_probe_after() {
 async fn send_gate_rpc_spawn_blocked_reads_latch_readonly() {
     let dir = std::env::temp_dir().join(format!("pi-send-gate-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     // 未置位：不拦。
     assert!(!session.rpc_spawn_blocked().await);
     // 置位后冷却期内：拦。
@@ -131,7 +131,7 @@ async fn send_gate_rpc_spawn_blocked_reads_latch_readonly() {
 async fn send_gate_print_json_fallback_blocked_empty_map_is_false() {
     let dir = std::env::temp_dir().join(format!("pi-send-gate-empty-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     // 无活跃子进程：任何 session（含 None / Some）都不 busy。
     assert!(!session.print_json_fallback_blocked(None).await);
     assert!(!session.print_json_fallback_blocked(Some("s1")).await);
@@ -142,7 +142,7 @@ async fn send_gate_print_json_fallback_blocked_empty_map_is_false() {
 async fn prewarm_resident_rejects_invalid_session_id_without_spawning() {
     let dir = std::env::temp_dir().join(format!("pi-prewarm-invalid-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     // 空 / flag 形态 / 非法字符：直接拒绝，不到 spawn。
     assert!(session.prewarm_resident("").await.is_err());
     assert!(session.prewarm_resident("--model").await.is_err());
@@ -155,7 +155,7 @@ async fn prewarm_resident_rejects_invalid_session_id_without_spawning() {
 async fn prewarm_resident_respects_rpc_disabled_latch() {
     let dir = std::env::temp_dir().join(format!("pi-prewarm-latch-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     // 闩冷却期内：合法 session id 同样拒绝（与 ensure_resident 同源 gate），
     // 且不得搅动闩自愈状态。
     *session.rpc_disabled_since.lock().await = Some(Instant::now());
@@ -220,8 +220,8 @@ fn rpc_busy_error_matches_only_pi_already_processing() {
 
 #[test]
 fn orphan_run_ids_are_unique_and_marked() {
-    let a = PiRpcRun::new_orphan();
-    let b = PiRpcRun::new_orphan();
+    let a = PiRpcRun::new_orphan(crate::engine::EngineType::Pi);
+    let b = PiRpcRun::new_orphan(crate::engine::EngineType::Pi);
     assert!(a.orphan && b.orphan);
     assert_ne!(a.main_turn_id, b.main_turn_id);
     assert!(a.main_turn_id.starts_with("pi-external-"));
@@ -229,7 +229,7 @@ fn orphan_run_ids_are_unique_and_marked() {
 
 #[test]
 fn orphan_run_backfills_last_assistant_text_after_notification() {
-    let mut run = PiRpcRun::new_orphan();
+    let mut run = PiRpcRun::new_orphan(crate::engine::EngineType::Pi);
     run.saw_tool_activity = true;
     assert!(should_backfill_last_assistant_text(&run));
 }
@@ -244,15 +244,15 @@ fn tool_only_foreground_run_does_not_backfill_stale_text() {
 
 #[test]
 fn orphan_run_adopts_user_turn_for_followups_without_rewriting_prior_stream() {
-    let mut run = PiRpcRun::new_orphan();
+    let mut run = PiRpcRun::new_orphan(crate::engine::EngineType::Pi);
     let synthetic_id = run.main_turn_id.clone();
     run.response_text.push_str("外部回合正文");
     run.pending_turn_ids.push_back("turn-user-1".to_string());
-    assert_eq!(bind_next_native_turn_id(&mut run), "turn-user-1");
+    assert_eq!(bind_next_native_turn_id(crate::engine::EngineType::Pi, &mut run), "turn-user-1");
     assert!(!run.orphan);
     assert_eq!(run.main_turn_id, "turn-user-1");
     assert_ne!(run.main_turn_id, synthetic_id);
-    assert_eq!(bind_next_native_turn_id(&mut run), "turn-user-1:t1");
+    assert_eq!(bind_next_native_turn_id(crate::engine::EngineType::Pi, &mut run), "turn-user-1:t1");
     assert_eq!(run.response_text, "外部回合正文");
 }
 
@@ -264,8 +264,8 @@ fn foreground_run_binds_derived_ids_for_followup_native_turns() {
     let (tx, _rx) = oneshot::channel();
     let mut run = PiRpcRun::new("pi-turn-primary", tx, None);
     assert!(!run.orphan);
-    assert_eq!(bind_next_native_turn_id(&mut run), "pi-turn-primary:t1");
-    assert_eq!(bind_next_native_turn_id(&mut run), "pi-turn-primary:t2");
+    assert_eq!(bind_next_native_turn_id(crate::engine::EngineType::Pi, &mut run), "pi-turn-primary:t1");
+    assert_eq!(bind_next_native_turn_id(crate::engine::EngineType::Pi, &mut run), "pi-turn-primary:t2");
 }
 
 #[test]
@@ -273,15 +273,15 @@ fn pending_user_turn_id_wins_over_derived_native_id() {
     let (tx, _rx) = oneshot::channel();
     let mut run = PiRpcRun::new("pi-turn-primary", tx, None);
     run.pending_turn_ids.push_back("turn-steer-1".to_string());
-    assert_eq!(bind_next_native_turn_id(&mut run), "turn-steer-1");
-    assert_eq!(bind_next_native_turn_id(&mut run), "pi-turn-primary:t1");
+    assert_eq!(bind_next_native_turn_id(crate::engine::EngineType::Pi, &mut run), "turn-steer-1");
+    assert_eq!(bind_next_native_turn_id(crate::engine::EngineType::Pi, &mut run), "pi-turn-primary:t1");
 }
 
 #[test]
 fn orphan_run_binds_external_ids_for_followup_native_turns() {
-    let mut run = PiRpcRun::new_orphan();
-    let first = bind_next_native_turn_id(&mut run);
-    let second = bind_next_native_turn_id(&mut run);
+    let mut run = PiRpcRun::new_orphan(crate::engine::EngineType::Pi);
+    let first = bind_next_native_turn_id(crate::engine::EngineType::Pi, &mut run);
+    let second = bind_next_native_turn_id(crate::engine::EngineType::Pi, &mut run);
     assert!(first.starts_with("pi-external-"));
     assert!(second.starts_with("pi-external-"));
     assert_ne!(first, second);
@@ -315,7 +315,7 @@ fn probe_replay_run1_two_native_turns_commit_per_turn() {
     run.authoritative_text = Some("好的，并行启动两个后台任务。".to_string());
     commit_rpc_turn("ws", &mut run, &emit);
     // turn 2：run 内第二个原生 turn，派生前台 id。
-    run.active_turn_id = bind_next_native_turn_id(&mut run);
+    run.active_turn_id = bind_next_native_turn_id(crate::engine::EngineType::Pi, &mut run);
     assert_eq!(run.active_turn_id, "pi-turn-primary:t1");
     run.response_text.push_str("两个任务已并行启动：");
     run.authoritative_text = Some("两个任务已并行启动：".to_string());
@@ -884,7 +884,7 @@ fn build_command_attaches_images_as_at_file_args_before_prompt() {
     std::fs::create_dir_all(&dir).unwrap();
     let image = dir.join("shot one.png");
     std::fs::write(&image, b"fake-png").unwrap();
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     let params = SendMessageParams {
         text: "look at this".to_string(),
         images: Some(vec![image.to_string_lossy().to_string()]),
@@ -915,7 +915,7 @@ fn build_command_attaches_images_as_at_file_args_before_prompt() {
 fn build_command_without_images_has_no_at_file_args() {
     let dir = std::env::temp_dir().join(format!("pi-cmd-test-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     let params = SendMessageParams {
         text: "plain".to_string(),
         ..Default::default()
@@ -932,7 +932,7 @@ fn build_command_without_images_has_no_at_file_args() {
 fn build_command_fails_when_all_images_unresolvable() {
     let dir = std::env::temp_dir().join(format!("pi-cmd-test-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     let params = SendMessageParams {
         text: "look".to_string(),
         images: Some(vec![dir.join("missing.png").to_string_lossy().to_string()]),
@@ -963,7 +963,7 @@ fn make_workspace_with_files(files: &[&str]) -> PathBuf {
 fn build_command_extracts_leading_at_file_reference_to_argv() {
     let dir = make_workspace_with_files(&["design.md"]);
     let file = dir.join("design.md");
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     let params = SendMessageParams {
         text: format!("@{} 总结一下", file.display()),
         ..Default::default()
@@ -996,7 +996,7 @@ fn build_command_extracts_leading_at_file_reference_to_argv() {
 fn build_command_resolves_at_reference_with_spaces_greedily() {
     let dir = make_workspace_with_files(&["shot one.png"]);
     let file = dir.join("shot one.png");
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     let params = SendMessageParams {
         text: format!("看下 @{} 这张图", file.display()),
         ..Default::default()
@@ -1021,7 +1021,7 @@ fn build_command_resolves_at_reference_with_spaces_greedily() {
 #[test]
 fn build_command_resolves_relative_at_reference_against_workspace() {
     let dir = make_workspace_with_files(&["docs/a.md"]);
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     let params = SendMessageParams {
         text: "@docs/a.md 读一下".to_string(),
         ..Default::default()
@@ -1040,7 +1040,7 @@ fn build_command_resolves_relative_at_reference_against_workspace() {
 fn build_command_keeps_folder_reference_as_plain_text() {
     let dir = make_workspace_with_files(&["sub/placeholder.txt"]);
     let folder = dir.join("sub");
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     let params = SendMessageParams {
         text: format!("@{} 这两个设计移到 docs", folder.display()),
         ..Default::default()
@@ -1068,7 +1068,7 @@ fn build_command_keeps_folder_reference_as_plain_text() {
 fn build_command_keeps_missing_path_and_mention_as_plain_text() {
     let dir = make_workspace_with_files(&[]);
     let missing = dir.join("missing.md");
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     let params = SendMessageParams {
         text: format!("@teammate 帮忙看下 @{}", missing.display()),
         ..Default::default()
@@ -1093,7 +1093,7 @@ fn build_command_keeps_missing_path_and_mention_as_plain_text() {
 fn build_command_dedupes_reference_against_image_attachment() {
     let dir = make_workspace_with_files(&["a.png"]);
     let file = dir.join("a.png");
-    let session = PiSession::new("ws".to_string(), dir.clone(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), dir.clone(), None);
     let params = SendMessageParams {
         text: format!("@{} 看看", file.display()),
         images: Some(vec![file.to_string_lossy().to_string()]),
@@ -1112,7 +1112,7 @@ fn build_command_dedupes_reference_against_image_attachment() {
 
 #[tokio::test]
 async fn interrupt_unknown_turn_is_idempotent() {
-    let session = PiSession::new("ws".to_string(), std::env::temp_dir(), None);
+    let session = PiSession::new(crate::engine::EngineType::Pi, "ws".to_string(), std::env::temp_dir(), None);
     session.interrupt_turn("missing").await.expect("idempotent");
     assert!(session.interrupted_turns.lock().await.is_empty());
 }

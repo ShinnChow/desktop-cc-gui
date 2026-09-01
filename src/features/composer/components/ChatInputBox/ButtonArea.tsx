@@ -77,6 +77,7 @@ const ENGINE_TYPES: ReadonlySet<string> = new Set([
   'opencode',
   'dsh',
   'pi',
+  'omp',
   'qoder',
 ]);
 
@@ -544,7 +545,7 @@ export const ButtonArea = ({
         ) : null}
 
         <div className="button-area-inline-controls">
-          {currentProvider !== 'pi' ? (
+          {currentProvider !== 'pi' && currentProvider !== 'omp' ? (
             <ModeSelect
               value={permissionMode}
               onChange={onModeSelect ?? NOOP_MODE}
@@ -568,7 +569,8 @@ export const ButtonArea = ({
             // 时才显示思考强度；切到无档位模型时隐藏。
             (currentProvider === 'dsh' && (reasoningOptions?.length ?? 0) > 0) ||
             (currentProvider === 'qoder' && (reasoningOptions?.length ?? 0) > 0) ||
-            (currentProvider === 'pi' && (reasoningOptions?.length ?? 0) > 0)) && (
+            (currentProvider === 'pi' && (reasoningOptions?.length ?? 0) > 0) ||
+            (currentProvider === 'omp' && (reasoningOptions?.length ?? 0) > 0)) && (
             <ReasoningSelect
               value={reasoningEffort}
               onChange={onReasoningChange ?? NOOP_REASONING}
@@ -578,7 +580,8 @@ export const ButtonArea = ({
                 currentProvider === 'grok' ||
                 currentProvider === 'dsh' ||
                 currentProvider === 'qoder' ||
-                currentProvider === 'pi'
+                currentProvider === 'pi' ||
+                currentProvider === 'omp'
               }
               defaultLabel={
                 currentProvider === 'claude'
@@ -587,7 +590,8 @@ export const ButtonArea = ({
                     ? t('reasoning.grokDefault', { defaultValue: 'Default' })
                     : currentProvider === 'dsh' ||
                         currentProvider === 'qoder' ||
-                        currentProvider === 'pi'
+                        currentProvider === 'pi' ||
+                        currentProvider === 'omp'
                       ? t('reasoning.default', { defaultValue: 'Default' })
                       : undefined
               }

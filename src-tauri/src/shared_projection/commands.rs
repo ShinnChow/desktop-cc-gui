@@ -73,6 +73,8 @@ fn is_legacy_local_provider(engine: EngineType, provider_profile_id: &str) -> bo
         }
         // Native-only engines are never Shared local providers.
         EngineType::Gemini | EngineType::Dsh => false,
+        // omp 不在 Shared 支持集合（add-omp-engine 显式决策）。
+        EngineType::Omp => false,
     }
 }
 

@@ -169,7 +169,9 @@ export function reduceEnsureThread(
           ? "kimi"
           : action.threadId.startsWith("pi:")
             ? "pi"
-            : action.threadId.startsWith("qoder:")
+            : action.threadId.startsWith("omp:")
+              ? "omp"
+              : action.threadId.startsWith("qoder:")
               ? "qoder"
               : action.threadId.startsWith("opencode:")
                 ? "opencode"

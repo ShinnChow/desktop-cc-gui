@@ -5,6 +5,7 @@ import {
   listGrokSessions as listGrokSessionsService,
   listKimiSessions as listKimiSessionsService,
   listPiSessions as listPiSessionsService,
+  listOmpSessions as listOmpSessionsService,
   listQoderSessions as listQoderSessionsService,
   invalidateSessionIndexForWorkspace as invalidateSessionIndexForWorkspaceService,
 } from "../../../services/tauri";
@@ -31,6 +32,7 @@ export type PendingSessionCacheContext = {
   kimiSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
   dshSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
   piSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
+  ompSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
   qoderSessionIdByPendingThreadRef: MutableRefObject<Map<string, string>>;
   onDebug: UseThreadMessagingOptions["onDebug"];
 };
@@ -55,6 +57,7 @@ export async function cachePendingEngineSessionFromResponse(
     kimiSessionIdByPendingThreadRef,
     dshSessionIdByPendingThreadRef,
     piSessionIdByPendingThreadRef,
+    ompSessionIdByPendingThreadRef,
     qoderSessionIdByPendingThreadRef,
     onDebug,
   } = ctx;
@@ -301,6 +304,56 @@ export async function cachePendingEngineSessionFromResponse(
           threadId,
           sessionId: responseSessionId,
           source: "piSessionListFallback",
+        },
+      });
+    }
+  }
+  if (
+    resolvedEngine === "omp" &&
+    threadId.startsWith("omp-pending-")
+  ) {
+    let responseSessionId =
+      extractSessionIdFromEngineSendResponse(response);
+    if (!responseSessionId) {
+      const workspacePath = workspace.path?.trim();
+      if (workspacePath) {
+        try {
+          const sessions = await listOmpSessionsService(
+            workspacePath,
+            6,
+          );
+          // omp 与 pi 的 list 载荷同构（pi-family），挑选逻辑零复制。
+          responseSessionId = pickLikelyPiSessionId(
+            sessions,
+            sendRequestedAt - 120_000,
+          );
+        } catch {
+          responseSessionId = null;
+        }
+      }
+    }
+    if (responseSessionId) {
+      ompSessionIdByPendingThreadRef.current.set(
+        threadId,
+        responseSessionId,
+      );
+      if (
+        typeof invalidateSessionIndexForWorkspaceService === "function"
+      ) {
+        void invalidateSessionIndexForWorkspaceService(
+          workspace.id,
+        ).catch(() => undefined);
+      }
+      onDebug?.({
+        id: `${Date.now()}-client-omp-session-cache`,
+        timestamp: Date.now(),
+        source: "client",
+        label: "thread/session cached",
+        payload: {
+          workspaceId: workspace.id,
+          threadId,
+          sessionId: responseSessionId,
+          source: "ompSessionListFallback",
         },
       });
     }

@@ -15,6 +15,9 @@ pub struct PiTurnEvent {
 pub struct PiSession {
     pub workspace_id: String,
     pub workspace_path: PathBuf,
+    /// pi 族引擎身份（Pi | Omp）：事件标签 / bin 解析 / 前缀判定全走此字段
+    /// （add-omp-engine；omp 与 pi 共享本实现）。
+    pub(crate) engine: EngineType,
     pub(crate) session_id: RwLock<Option<String>>,
     pub(crate) event_sender: broadcast::Sender<PiTurnEvent>,
     pub(crate) bin_path: Option<String>,
@@ -37,15 +40,18 @@ pub struct PiSession {
 
 impl PiSession {
     pub fn new(
+        engine: EngineType,
         workspace_id: String,
         workspace_path: PathBuf,
         config: Option<EngineConfig>,
     ) -> Self {
+        debug_assert!(engine.is_pi_family(), "PiSession requires a pi-family engine");
         let (event_sender, _) = broadcast::channel(8192);
         let config = config.unwrap_or_default();
         Self {
             workspace_id,
             workspace_path,
+            engine,
             session_id: RwLock::new(None),
             event_sender,
             bin_path: config.bin_path,
@@ -91,12 +97,17 @@ impl PiSession {
     }
 
     pub(crate) fn resolve_bin_path(&self) -> String {
-        if let Some(ref custom) = self.bin_path {
+        let bin_name = self
+            .engine
+            .pi_family_spec()
+            .map(|spec| spec.bin_name)
+            .unwrap_or("pi");
+        if let Some(custom) = &self.bin_path {
             custom.clone()
         } else {
-            crate::backend::app_server::find_cli_binary("pi", None)
+            crate::backend::app_server::find_cli_binary(bin_name, None)
                 .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|| "pi".to_string())
+                .unwrap_or_else(|| bin_name.to_string())
         }
     }
 

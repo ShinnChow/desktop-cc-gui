@@ -21,6 +21,7 @@ const PROVIDER_SCOPED_ENGINES = new Set<EngineType>([
   "kimi",
   "opencode",
   "pi",
+  "omp",
   "dsh",
   "gemini",
   "qoder",

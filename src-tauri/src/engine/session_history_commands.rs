@@ -447,7 +447,8 @@ pub async fn list_pi_sessions(
     }
     let path = std::path::PathBuf::from(&workspace_path);
     let config = state.engine_manager.get_engine_config(EngineType::Pi).await;
-    let mut sessions = super::pi_history::list_pi_sessions(
+    let mut sessions = super::pi_history::list_pi_family_sessions(
+        EngineType::Pi,
         &path,
         limit,
         config.as_ref().and_then(|item| item.home_dir.as_deref()),
@@ -455,6 +456,40 @@ pub async fn list_pi_sessions(
     .await?;
     crate::session_index::tombstone_filter::TombstoneFilter::load_fail_open().retain(
         "pi",
+        &mut sessions,
+        |session| &session.session_id,
+    );
+    serde_json::to_value(sessions).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn list_omp_sessions(
+    workspace_path: String,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        let workspace_path = remote_backend::normalize_path_for_remote(workspace_path);
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "list_omp_sessions",
+            json!({ "workspacePath": workspace_path, "limit": limit }),
+        )
+        .await;
+    }
+    let path = std::path::PathBuf::from(&workspace_path);
+    let config = state.engine_manager.get_engine_config(EngineType::Omp).await;
+    let mut sessions = super::pi_history::list_pi_family_sessions(
+        EngineType::Omp,
+        &path,
+        limit,
+        config.as_ref().and_then(|item| item.home_dir.as_deref()),
+    )
+    .await?;
+    crate::session_index::tombstone_filter::TombstoneFilter::load_fail_open().retain(
+        "omp",
         &mut sessions,
         |session| &session.session_id,
     );
@@ -487,7 +522,41 @@ pub async fn load_pi_session(
     }
     let path = std::path::PathBuf::from(&workspace_path);
     let config = state.engine_manager.get_engine_config(EngineType::Pi).await;
-    super::pi_history::load_pi_session_payload_json(
+    super::pi_history::load_pi_family_session_payload_json(
+        EngineType::Pi,
+        &path,
+        &session_id,
+        config.as_ref().and_then(|item| item.home_dir.as_deref()),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn load_omp_session(
+    workspace_path: String,
+    session_id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<String, String> {
+    // 同 load_pi_session 的 F1 raw-string 通道纪律（fix-session-load-bridge-freeze）。
+    if remote_backend::is_remote_mode(&*state).await {
+        let workspace_path = remote_backend::normalize_path_for_remote(workspace_path);
+        let value = remote_backend::call_remote(
+            &*state,
+            app,
+            "load_omp_session",
+            json!({ "workspacePath": workspace_path, "sessionId": session_id }),
+        )
+        .await?;
+        return match value {
+            Value::String(text) => Ok(text),
+            other => serde_json::to_string(&other).map_err(|error| error.to_string()),
+        };
+    }
+    let path = std::path::PathBuf::from(&workspace_path);
+    let config = state.engine_manager.get_engine_config(EngineType::Omp).await;
+    super::pi_history::load_pi_family_session_payload_json(
+        EngineType::Omp,
         &path,
         &session_id,
         config.as_ref().and_then(|item| item.home_dir.as_deref()),
@@ -511,7 +580,33 @@ pub async fn delete_pi_session(
         .engine_manager
         .drop_pi_resident_by_session_id(&session_id)
         .await;
-    super::pi_history::delete_pi_session(
+    super::pi_history::delete_pi_family_session(
+        EngineType::Pi,
+        &path,
+        &session_id,
+        config.as_ref().and_then(|item| item.home_dir.as_deref()),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_omp_session(
+    workspace_path: String,
+    session_id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return Err("delete_omp_session is unavailable through the remote backend".to_string());
+    }
+    let path = std::path::PathBuf::from(&workspace_path);
+    let config = state.engine_manager.get_engine_config(EngineType::Omp).await;
+    state
+        .engine_manager
+        .drop_omp_resident_by_session_id(&session_id)
+        .await;
+    super::pi_history::delete_pi_family_session(
+        EngineType::Omp,
         &path,
         &session_id,
         config.as_ref().and_then(|item| item.home_dir.as_deref()),

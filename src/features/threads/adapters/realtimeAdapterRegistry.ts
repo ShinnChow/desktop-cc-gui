@@ -6,6 +6,7 @@ import { grokRealtimeAdapter } from "./grokRealtimeAdapter";
 import { kimiRealtimeAdapter } from "./kimiRealtimeAdapter";
 import { dshRealtimeAdapter } from "./dshRealtimeAdapter";
 import { opencodeRealtimeAdapter } from "./opencodeRealtimeAdapter";
+import { ompRealtimeAdapter } from "./ompRealtimeAdapter";
 import { piRealtimeAdapter } from "./piRealtimeAdapter";
 import { qoderRealtimeAdapter } from "./qoderRealtimeAdapter";
 import { inferEngineFromThreadId } from "./sharedRealtimeAdapter";
@@ -19,6 +20,7 @@ const ADAPTERS: Record<ConversationEngine, RealtimeAdapter> = {
   dsh: dshRealtimeAdapter,
   opencode: opencodeRealtimeAdapter,
   pi: piRealtimeAdapter,
+  omp: ompRealtimeAdapter,
   qoder: qoderRealtimeAdapter,
 };
 

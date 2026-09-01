@@ -26,6 +26,8 @@ import {
   KIMI_LOCAL_PROVIDER_PROFILE_NAME,
   OPENCODE_LOCAL_PROVIDER_PROFILE_ID,
   OPENCODE_LOCAL_PROVIDER_PROFILE_NAME,
+  OMP_LOCAL_PROVIDER_PROFILE_ID,
+  OMP_LOCAL_PROVIDER_PROFILE_NAME,
   PI_LOCAL_PROVIDER_PROFILE_ID,
   PI_LOCAL_PROVIDER_PROFILE_NAME,
   QODER_CN_PROVIDER_PROFILE_ID,
@@ -64,7 +66,7 @@ export type ProviderTargetGroup = {
 
 type ProfileCatalog = Partial<
   Record<
-    "claude" | "codex" | "kimi" | "grok" | "opencode" | "pi" | "qoder",
+    "claude" | "codex" | "kimi" | "grok" | "opencode" | "pi" | "omp" | "qoder",
     EngineProviderProfileOption[]
   >
 >;
@@ -78,6 +80,7 @@ const PROVIDER_PROFILE_ENGINES: readonly ProviderProfileEngine[] = [
   "kimi",
   "opencode",
   "pi",
+  "omp",
   "qoder",
 ];
 
@@ -130,6 +133,13 @@ const DEFAULT_PROFILES: ProfileCatalog = {
       source: "disk",
     },
   ],
+  omp: [
+    {
+      id: OMP_LOCAL_PROVIDER_PROFILE_ID,
+      name: OMP_LOCAL_PROVIDER_PROFILE_NAME,
+      source: "disk",
+    },
+  ],
   qoder: [
     {
       id: QODER_GLOBAL_PROVIDER_PROFILE_ID,
@@ -176,7 +186,7 @@ type AtomicProviderTargetCatalogOptions =
   };
 
 function normalizeProfiles(
-  engine: "claude" | "codex" | "kimi" | "grok" | "opencode" | "pi" | "qoder",
+  engine: "claude" | "codex" | "kimi" | "grok" | "opencode" | "pi" | "omp" | "qoder",
   providers: Array<{
     id: string;
     name: string;
@@ -259,6 +269,8 @@ async function loadProfileCatalog(): Promise<ProfileCatalog> {
               : DEFAULT_PROFILES.opencode,
           // PI has no multi-provider store; always surface native ~/.pi profile.
           pi: DEFAULT_PROFILES.pi,
+          // OMP（pi fork）同样无多供应商存储：始终展示本地 ~/.omp profile。
+          omp: DEFAULT_PROFILES.omp,
           // Qoder is one engine with two fixed distributions. These bindings
           // are intentionally static, not vendor CRUD profiles.
           qoder: DEFAULT_PROFILES.qoder,
@@ -293,6 +305,8 @@ function isLocalProviderProfile(
       return providerProfileId === OPENCODE_LOCAL_PROVIDER_PROFILE_ID;
     case "pi":
       return providerProfileId === PI_LOCAL_PROVIDER_PROFILE_ID;
+    case "omp":
+      return providerProfileId === OMP_LOCAL_PROVIDER_PROFILE_ID;
     case "dsh":
       return providerProfileId === DSH_LOCAL_PROVIDER_PROFILE_ID;
     case "qoder":
@@ -575,7 +589,7 @@ function useProviderTargetCatalogOwner({
     ): Promise<ModelInfo[]> => {
       if (
         !enabled ||
-        !["claude", "codex", "kimi", "grok", "opencode", "pi", "dsh", "qoder"].includes(
+        !["claude", "codex", "kimi", "grok", "opencode", "pi", "omp", "dsh", "qoder"].includes(
           engine,
         )
       ) {

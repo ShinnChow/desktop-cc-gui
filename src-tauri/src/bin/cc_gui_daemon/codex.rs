@@ -4,7 +4,7 @@ pub(crate) use crate::codex_doctor::{
     dsh_node_requirement_error, node_satisfies_dsh_requirement,
     run_claude_doctor_with_settings, run_codex_doctor_with_settings,
     run_dsh_doctor_with_settings, run_grok_doctor_with_settings, run_kimi_doctor_with_settings,
-    run_opencode_doctor_with_settings, run_pi_doctor_with_settings,
+    run_omp_doctor_with_settings, run_opencode_doctor_with_settings, run_pi_doctor_with_settings,
     run_qoder_doctor_for_profile_with_settings, run_qoder_doctor_with_settings,
 };
 pub(crate) use crate::codex_installer::{

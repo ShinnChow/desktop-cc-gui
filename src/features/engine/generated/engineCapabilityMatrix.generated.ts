@@ -149,6 +149,23 @@ export const GENERATED_ENGINE_CAPABILITY_MATRIX: Readonly<
     "session.tree": "supported",
     "rpc.server": "supported"
   },
+  "omp": {
+    "streaming.text": "supported",
+    "streaming.reasoning": "supported",
+    "streaming.tool-output": "unsupported",
+    "tool.use": "supported",
+    "tool.mcp": "unsupported",
+    "reasoning.effort": "supported",
+    "collaboration.mode": "unsupported",
+    "session.continuation": "supported",
+    "image.input": "supported",
+    "input.mid-turn": "supported",
+    "session.resume": "supported",
+    "session.fork": "unsupported",
+    "session.switch": "unknown",
+    "session.tree": "unsupported",
+    "rpc.server": "supported"
+  },
   "dsh": {
     "streaming.text": "supported",
     "streaming.reasoning": "supported",

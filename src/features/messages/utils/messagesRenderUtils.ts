@@ -46,6 +46,7 @@ export type MessagesEngine =
   | "kimi"
   | "opencode"
   | "pi"
+  | "omp"
   | "dsh"
   | "qoder";
 
@@ -163,7 +164,7 @@ export function resolveAgentTaskDisplaySummary(summary: string | null | undefine
 }
 
 export function toConversationEngine(engine: MessagesEngine): ConversationEngine {
-  if (engine === "claude" || engine === "gemini" || engine === "grok" || engine === "kimi" || engine === "opencode" || engine === "pi" || engine === "dsh" || engine === "qoder") {
+  if (engine === "claude" || engine === "gemini" || engine === "grok" || engine === "kimi" || engine === "opencode" || engine === "pi" || engine === "omp" || engine === "dsh" || engine === "qoder") {
     return engine;
   }
   return "codex";

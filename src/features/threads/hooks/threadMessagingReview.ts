@@ -22,6 +22,7 @@ type ThreadEngine =
   | "kimi"
   | "opencode"
   | "pi"
+  | "omp"
   | "dsh"
   | "qoder";
 

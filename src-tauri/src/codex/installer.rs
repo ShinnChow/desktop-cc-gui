@@ -32,6 +32,7 @@ pub(crate) enum CliInstallEngine {
     #[serde(rename = "opencode")]
     OpenCode,
     Pi,
+    Omp,
     #[serde(rename = "dsh")]
     Dsh,
     #[serde(rename = "qoder")]
@@ -157,6 +158,7 @@ pub(crate) fn resolve_effective_strategy(
         | CliInstallEngine::Kimi
         | CliInstallEngine::OpenCode
         | CliInstallEngine::Pi
+        | CliInstallEngine::Omp
         | CliInstallEngine::Dsh => {
             match requested {
                 CliInstallStrategy::NpmGlobal => CliInstallStrategy::NpmGlobal,
@@ -187,6 +189,7 @@ pub(crate) fn package_name_for_engine(engine: CliInstallEngine) -> &'static str 
         CliInstallEngine::Claude => "@anthropic-ai/claude-code@latest",
         CliInstallEngine::Kimi => "@moonshot-ai/kimi-code@latest",
         CliInstallEngine::Pi => "@earendil-works/pi-coding-agent@latest",
+        CliInstallEngine::Omp => "@oh-my-pi/pi-coding-agent@latest",
         CliInstallEngine::OpenCode => "opencode-ai@latest",
         CliInstallEngine::Dsh => "@deepseek-ai/dsh@latest",
         // Grok CLI is not distributed via npm; it uses the official curl installer.
@@ -202,6 +205,7 @@ fn uninstall_package_name_for_engine(engine: CliInstallEngine) -> &'static str {
         CliInstallEngine::Claude => "@anthropic-ai/claude-code",
         CliInstallEngine::Kimi => "@moonshot-ai/kimi-code",
         CliInstallEngine::Pi => "@earendil-works/pi-coding-agent",
+        CliInstallEngine::Omp => "@oh-my-pi/pi-coding-agent",
         // Grok CLI is not distributed via npm; it uses the official curl installer.
         CliInstallEngine::Grok => unreachable!("grok is not distributed via npm"),
         // Qoder CLI is not distributed via npm; uninstall is intentionally not supported.
@@ -385,7 +389,7 @@ fn command_preview_for(engine: CliInstallEngine, action: CliInstallAction) -> Ve
                     .to_string(),
             ],
         },
-        CliInstallEngine::Codex | CliInstallEngine::Kimi | CliInstallEngine::Pi => match action {
+        CliInstallEngine::Codex | CliInstallEngine::Kimi | CliInstallEngine::Pi | CliInstallEngine::Omp => match action {
             CliInstallAction::InstallLatest | CliInstallAction::UpdateLatest => vec![
                 "npm".to_string(),
                 "install".to_string(),
@@ -447,6 +451,7 @@ fn engine_binary_name(engine: CliInstallEngine) -> &'static str {
         CliInstallEngine::Grok => "grok",
         CliInstallEngine::OpenCode => "opencode",
         CliInstallEngine::Pi => "pi",
+        CliInstallEngine::Omp => "omp",
         CliInstallEngine::Dsh => "dsh",
         CliInstallEngine::Qoder => "qodercli",
     }
@@ -472,6 +477,7 @@ fn engine_explicit_bin(engine: CliInstallEngine, settings: &AppSettings) -> Opti
         CliInstallEngine::Grok => settings.grok_bin.as_deref(),
         CliInstallEngine::OpenCode => settings.opencode_bin.as_deref(),
         CliInstallEngine::Pi => settings.pi_bin.as_deref(),
+        CliInstallEngine::Omp => settings.omp_bin.as_deref(),
         CliInstallEngine::Dsh => settings.dsh_bin.as_deref(),
         CliInstallEngine::Qoder => settings.qoder_bin.as_deref(),
     }
@@ -1122,7 +1128,8 @@ pub(crate) async fn resolve_cli_version_status(
         CliInstallEngine::Codex
         | CliInstallEngine::Kimi
         | CliInstallEngine::OpenCode
-        | CliInstallEngine::Pi => registry_ok,
+        | CliInstallEngine::Pi
+        | CliInstallEngine::Omp => registry_ok,
         CliInstallEngine::Dsh => registry_ok && dsh_node_requirement_ok,
     };
 
@@ -1144,6 +1151,7 @@ pub(crate) async fn resolve_cli_version_status(
         | CliInstallEngine::Grok
         | CliInstallEngine::OpenCode
         | CliInstallEngine::Pi
+        | CliInstallEngine::Omp
         | CliInstallEngine::Dsh
         | CliInstallEngine::Qoder => {
             match check_installed_engine_binary(engine, path_env.clone()).await {
@@ -1751,6 +1759,7 @@ async fn run_post_install_doctor(
             crate::codex::run_opencode_doctor_with_settings(None, settings).await
         }
         CliInstallEngine::Pi => crate::codex::run_pi_doctor_with_settings(None, settings).await,
+        CliInstallEngine::Omp => crate::codex::run_omp_doctor_with_settings(None, settings).await,
         CliInstallEngine::Dsh => crate::codex::run_dsh_doctor_with_settings(None, settings).await,
         CliInstallEngine::Qoder => {
             crate::codex::run_qoder_doctor_with_settings(None, settings).await

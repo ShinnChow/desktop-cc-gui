@@ -895,6 +895,7 @@ pub async fn send_shared_session_message(
         | EngineType::Kimi
         | EngineType::Pi
         | EngineType::Dsh
+        | EngineType::Omp
         | EngineType::Qoder => {
             return Err(format!(
                 "Unsupported shared session engine: {}",

@@ -149,6 +149,7 @@ export type AppSettings = {
   claudeBin: string | null;
   kimiBin: string | null;
   piBin: string | null;
+  ompBin: string | null;
   qoderBin: string | null;
   qoderConfigDir: string | null;
   qoderCnBin: string | null;

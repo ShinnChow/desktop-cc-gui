@@ -33,6 +33,11 @@ impl DaemonState {
                     .interrupt_pi_sessions(&workspace_id, None)
                     .await
             }
+            engine::EngineType::Omp => {
+                self.engine_manager
+                    .interrupt_omp_sessions(&workspace_id, None)
+                    .await
+            }
             engine::EngineType::Qoder => {
                 self.engine_manager
                     .interrupt_qoder_sessions(&workspace_id, None)
@@ -111,6 +116,11 @@ impl DaemonState {
             engine::EngineType::Pi => {
                 self.engine_manager
                     .interrupt_pi_sessions(&workspace_id, Some(&turn_id))
+                    .await
+            }
+            engine::EngineType::Omp => {
+                self.engine_manager
+                    .interrupt_omp_sessions(&workspace_id, Some(&turn_id))
                     .await
             }
             engine::EngineType::Qoder => {

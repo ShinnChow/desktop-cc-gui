@@ -156,7 +156,11 @@ pub(crate) fn normalize_native_session_identity(
             }
             Some(identity.canonical_id())
         }
-        EngineType::Codex | EngineType::Gemini | EngineType::Dsh => Some(normalized.to_string()),
+        // omp 不进 Shared（add-omp-engine）：不会经 runtime ingress 到达此处，
+        // 到达即按 raw 透传，与 codex/gemini/dsh 同形态。
+        EngineType::Codex | EngineType::Gemini | EngineType::Dsh | EngineType::Omp => {
+            Some(normalized.to_string())
+        }
     }
 }
 
@@ -167,15 +171,5 @@ pub(crate) fn is_missing_native_session_error(error: &str) -> bool {
 }
 
 pub(crate) fn engine_token(engine: EngineType) -> &'static str {
-    match engine {
-        EngineType::Claude => "claude",
-        EngineType::Codex => "codex",
-        EngineType::Gemini => "gemini",
-        EngineType::OpenCode => "opencode",
-        EngineType::Kimi => "kimi",
-        EngineType::Pi => "pi",
-        EngineType::Grok => "grok",
-        EngineType::Dsh => "dsh",
-        EngineType::Qoder => "qoder",
-    }
+    engine.icon()
 }

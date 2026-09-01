@@ -213,7 +213,7 @@ export function routeNormalizedRealtimeEvent({
         threadId,
         itemId,
         delta,
-        event.engine === "gemini" || event.engine === "grok" || event.engine === "kimi" || event.engine === "pi" || event.engine === "qoder" ? event.engine : null,
+        event.engine === "gemini" || event.engine === "grok" || event.engine === "kimi" || event.engine === "pi" || event.engine === "omp" || event.engine === "qoder" ? event.engine : null,
         turnId,
       );
       return true;
@@ -228,7 +228,7 @@ export function routeNormalizedRealtimeEvent({
         workspaceId,
         threadId,
         itemId,
-        event.engine === "gemini" || event.engine === "grok" || event.engine === "kimi" || event.engine === "pi" || event.engine === "qoder" ? event.engine : null,
+        event.engine === "gemini" || event.engine === "grok" || event.engine === "kimi" || event.engine === "pi" || event.engine === "omp" || event.engine === "qoder" ? event.engine : null,
         turnId,
       );
       return true;
@@ -257,7 +257,7 @@ export function routeNormalizedRealtimeEvent({
         threadId,
         itemId,
         delta,
-        event.engine === "gemini" || event.engine === "grok" || event.engine === "kimi" || event.engine === "pi" || event.engine === "qoder" ? event.engine : null,
+        event.engine === "gemini" || event.engine === "grok" || event.engine === "kimi" || event.engine === "pi" || event.engine === "omp" || event.engine === "qoder" ? event.engine : null,
         turnId,
       );
       return true;
@@ -318,7 +318,7 @@ export function tryRouteNormalizedRealtimeEvent({
   handlers: AppServerEventHandlers;
   workspaceId: string;
   message: Record<string, unknown>;
-  engineOverride?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+  engineOverride?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   threadIdOverride?: string;
   sharedBinding?: SharedSessionNativeBinding | null;
   threadAgentDeltaSeenRef: MutableRefObject<Record<string, true>>;

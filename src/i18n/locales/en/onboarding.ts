@@ -83,6 +83,10 @@ const onboarding = {
         title: "PI CLI",
         hint: "Optional. Install only if you need it.",
       },
+      omp: {
+        title: "OMP CLI",
+        hint: "Optional. Install only if you need it.",
+      },
       qoder: {
         title: "Qoder CLI",
         hint: "Optional. Install only if you need it.",

@@ -44,7 +44,7 @@ export type QuickSwitcherSession = {
   id: string;
   title: string;
   updatedAt: number;
-  engine: "codex" | "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+  engine: "codex" | "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   isShared: boolean;
 };
 

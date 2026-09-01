@@ -11,7 +11,9 @@ use tokio::process::Command;
 use tokio::time::timeout;
 
 use super::pi_rpc::PiRpcClient;
-use super::{disabled_engine_status, EngineFeatures, EngineStatus, EngineType, ModelInfo};
+use super::{
+    disabled_engine_status, EngineFeatures, EngineStatus, EngineType, ModelInfo, PiFamilySpec,
+};
 use crate::app_paths;
 use crate::backend::app_server::{
     build_codex_path_env, claude_cached_version_text, find_claude_code_binary, find_cli_binary,
@@ -48,6 +50,8 @@ mod kimi;
 mod grok;
 #[path = "status/pi.rs"]
 mod pi;
+#[path = "status/omp.rs"]
+mod omp;
 #[path = "status/qoder.rs"]
 mod qoder;
 #[path = "status/orchestration.rs"]
@@ -62,6 +66,7 @@ pub use gemini::*;
 pub use kimi::*;
 pub use grok::*;
 pub use pi::*;
+pub use omp::*;
 pub use qoder::*;
 pub use orchestration::*;
 

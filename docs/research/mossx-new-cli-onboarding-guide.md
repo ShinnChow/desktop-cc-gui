@@ -12,7 +12,7 @@ status: active
 > 初始日期：2026-07-27
 > 内容类型：How-to + conceptual integration contract + 全量注册点核对矩阵
 > 生命周期：accepted；流程有效，注册点已按 2026-08-24 代码校准
-> 最近校准：2026-08-24 · mossx `0.9.3` · HEAD `d387afce4`（Qoder 双分发 identity + PI RPC resident 收口批次实证回写）
+> 最近校准：2026-09-01 · OMP CLI 接入（`add-omp-engine`，pi-family 参数化复用样例：omp 与 pi 协议全等 → 运行时零复制，身份差异收敛 `pi_family_spec`；omp RPC 无 fork/tree/agent_settled 的实测差异处理）；上一校准：2026-08-24 · mossx `0.9.3`（Qoder 双分发 + PI RPC resident 收口批次）
 > 上游契约：[`mossx-multi-cli-provider-session-foundation-design.md`](./mossx-multi-cli-provider-session-foundation-design.md)（下称**基石设计**）
 > 适用读者：要为 mossx 接入新 Agent CLI（如 Auggie、未来任意 CLI）的工程师
 > 核心结论：接入一个新 CLI = **一次 Capability Spike + 按 §0 核对矩阵逐层勾选 + 15 项 Contract Tests**。矩阵中标注 ⚠ 的点**不会编译报错、不会测试失败，只会静默缺功能**——历史接入事故（幕布缺 streaming 态、provider 图标错位、Shared 目标被静默改写）全部出自这组点；2026-08 Qoder / PI 接入又补齐一批新形态（跨分发身份撞车、stored 凭据被 env 遮蔽、resident 进程误伤并行、进程退出码误判终态、中文路径附件 panic、fork 派生行挤占侧栏），已回写为 A7 / B11 / B12 / B13 / D11 / G8 六行，并新增「事故 → 自动化闸门」转化纪律（矩阵使用纪律第 4 条）——文档行只兜底无法自动化的部分。
@@ -62,9 +62,9 @@ status: active
 | # | 文件 | 职责 | 漏掉的后果 |
 |---|------|------|------------|
 | C1 🔴 | `openspec/specs/engine-capability-matrix/fixtures/matrix.json` | capability 事实源，加新引擎行（15 个 capability key 全填） | matrix gate 失败 |
-| C2 ⚠ | `scripts/check-engine-capability-matrix.mjs` | **`ENGINE_VARIANTS` 硬编码引擎表（2026-08 校准：九引擎 claude/codex/gemini/grok/opencode/kimi/pi/dsh/qoder），必须同步改脚本本体**，然后 `--write` 重新生成 `src/features/engine/generated/engineCapabilityMatrix.generated.ts` 与 `src-tauri/src/engine/capability_matrix.generated.rs` | 只改 fixture 不改脚本 → 生成物缺新引擎段，**所有 capability 查询对该引擎返回 `unknown`**，UI 能力降级全失效 |
-| C3 ⚠ | `scripts/check-engine-adapter-registry.mjs` | `expectedBuiltins` 硬编码 id 列表（2026-08 校准：九 id），同步改脚本本体 | 同 C2，gate 变绿但 registry 实际不齐 |
-| C4 ⚠ | `scripts/check-model-provider-catalog.mjs` | **双列表硬编码**（2026-08 校准）：`STATIC_FALLBACK_ENGINES`（codex/gemini/grok/kimi/opencode）生成静态 fallback roster；`RUNTIME_ONLY_ENGINES`（dsh/qoder）只校验运行时目录；pi 当前**不在任一列表**（catalog JSON 有静态条目、无 fallback roster，模型主通道是运行时 pi 自身 provider 配置 auth.json/models.json）。新引擎必须显式决策进哪一段并写决策记录；同步后更新 `src/features/models/generatedModelCatalog.json` + `generatedModelFallbacks.ts` | 模型 fallback roster 缺失，模型选择器空白；不进列表又不写理由 → 后人无法分辨「有意」还是「漏了」 |
+| C2 ⚠ | `scripts/check-engine-capability-matrix.mjs` | **`ENGINE_VARIANTS` 硬编码引擎表（2026-09 校准：十引擎 claude/codex/gemini/grok/opencode/kimi/pi/omp/dsh/qoder），必须同步改脚本本体**，然后 `--write` 重新生成 `src/features/engine/generated/engineCapabilityMatrix.generated.ts` 与 `src-tauri/src/engine/capability_matrix.generated.rs` | 只改 fixture 不改脚本 → 生成物缺新引擎段，**所有 capability 查询对该引擎返回 `unknown`**，UI 能力降级全失效 |
+| C3 ⚠ | `scripts/check-engine-adapter-registry.mjs` | `expectedBuiltins` 硬编码 id 列表（2026-09 校准：十 id），同步改脚本本体 | 同 C2，gate 变绿但 registry 实际不齐 |
+| C4 ⚠ | `scripts/check-model-provider-catalog.mjs` | **双列表硬编码**（2026-09 校准）：`STATIC_FALLBACK_ENGINES`（codex/gemini/grok/kimi/opencode）生成静态 fallback roster；`RUNTIME_ONLY_ENGINES`（dsh/qoder）只校验运行时目录；pi/omp 当前**不在任一列表**（catalog JSON 有静态 `auto` 条目、无 fallback roster，模型主通道是运行时 CLI 自身 provider 配置；omp 用 config.yml+SQLite 而非 pi 的 auth.json/models.json）。新引擎必须显式决策进哪一段并写决策记录；同步后更新 `src/features/models/generatedModelCatalog.json` + `generatedModelFallbacks.ts` | 模型 fallback roster 缺失，模型选择器空白；不进列表又不写理由 → 后人无法分辨「有意」还是「漏了」 |
 | C5 ⚠ | `scripts/scan-engine-name-branches.mjs` | 扫描 `engine === "<id>"` 型分支生成 inventory；**exit 0 只代表扫描成功**，review 必须核对 finding count，新分支要进 capability policy 或加 `capability-router-allow-engine-branch` 豁免注释 | 散落的 engine-name 分支脱离治理 |
 
 自检：`pnpm check:engine-capability-matrix && pnpm check:engine-adapter-registry && pnpm check:model-provider-catalog && pnpm check:capability-aware-policy-router && pnpm check:engine-controller-facade`

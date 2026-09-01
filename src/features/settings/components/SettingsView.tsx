@@ -191,6 +191,7 @@ export type SettingsViewProps = {
     opencodeBin: string | null,
   ) => Promise<CodexDoctorResult>;
   onRunPiDoctor?: (piBin: string | null) => Promise<CodexDoctorResult>;
+  onRunOmpDoctor?: (ompBin: string | null) => Promise<CodexDoctorResult>;
   onRunQoderDoctor?: (qoderBin: string | null) => Promise<CodexDoctorResult>;
   onRunDoctor?: (
     codexBin: string | null,
@@ -342,6 +343,7 @@ export function SettingsView({
   onRunGrokDoctor,
   onRunOpenCodeDoctor,
   onRunPiDoctor,
+  onRunOmpDoctor,
   onRunQoderDoctor,
   onRunDoctor,
   activeWorkspace,
@@ -469,6 +471,11 @@ export function SettingsView({
         resolveBin: () => appSettings.piBin ?? null,
         runDoctor: onRunPiDoctor ?? null,
         unavailableMessage: "PI doctor is not available.",
+      },
+      omp: {
+        resolveBin: () => appSettings.ompBin ?? null,
+        runDoctor: onRunOmpDoctor ?? null,
+        unavailableMessage: "OMP doctor is not available.",
       },
       qoder: {
         resolveBin: () => appSettings.qoderBin ?? null,
@@ -1500,6 +1507,8 @@ export function SettingsView({
                 dshDoctorState={doctorRunners.dsh.state}
                 handleRunPiDoctor={doctorRunners.pi.run}
                 piDoctorState={doctorRunners.pi.state}
+                handleRunOmpDoctor={doctorRunners.omp.run}
+                ompDoctorState={doctorRunners.omp.state}
                 handleRunQoderDoctor={doctorRunners.qoder.run}
                 qoderDoctorState={doctorRunners.qoder.state}
                 handleRunDoctor={doctorRunners.codex.run}

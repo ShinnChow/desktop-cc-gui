@@ -15,6 +15,7 @@ import { createGrokHistoryLoader } from "./grokHistoryLoader";
 import { createDshHistoryLoader } from "./dshHistoryLoader";
 import { createKimiHistoryLoader } from "./kimiHistoryLoader";
 import { createPiHistoryLoader } from "./piHistoryLoader";
+import { createOmpHistoryLoader } from "./ompHistoryLoader";
 import { createQoderHistoryLoader } from "./qoderHistoryLoader";
 
 describe("history loaders", () => {
@@ -1142,6 +1143,83 @@ describe("history loaders", () => {
     expect(loadPiSession).not.toHaveBeenCalled();
     expect(snapshot.engine).toBe("pi");
     expect(snapshot.threadId).toBe("pi:session-1");
+    expect(snapshot.items).toHaveLength(0);
+  });
+
+  it("loads omp history into normalized snapshot identical to pi (pi-family parser reuse)", async () => {
+    const fixture = {
+      messages: [
+        {
+          id: "omp-user-1",
+          kind: "message",
+          role: "user",
+          text: "1+1",
+        },
+        {
+          id: "omp-assistant-1",
+          kind: "message",
+          role: "assistant",
+          text: "2",
+        },
+      ],
+    };
+    const loadPiSession = vi.fn().mockResolvedValue(fixture);
+    const loadOmpSession = vi.fn().mockResolvedValue(fixture);
+    const piLoader = createPiHistoryLoader({
+      workspaceId: "ws-pi",
+      workspacePath: "/tmp/workspace",
+      loadPiSession,
+    });
+    const ompLoader = createOmpHistoryLoader({
+      workspaceId: "ws-omp",
+      workspacePath: "/tmp/workspace",
+      loadOmpSession,
+    });
+
+    const piSnapshot = await piLoader.load(
+      "pi:019ffb7b-dedc-7b36-8d2f-f85f35501036",
+    );
+    const ompSnapshot = await ompLoader.load(
+      "omp:019ffb7b-dedc-7b36-8d2f-f85f35501036",
+    );
+    expect(loadOmpSession).toHaveBeenCalledWith(
+      "/tmp/workspace",
+      "019ffb7b-dedc-7b36-8d2f-f85f35501036",
+    );
+    expect(ompSnapshot.engine).toBe("omp");
+    expect(ompSnapshot.threadId).toBe(
+      "omp:019ffb7b-dedc-7b36-8d2f-f85f35501036",
+    );
+    expect(ompSnapshot.meta.historyHasMore).toBe(false);
+    expect(ompSnapshot.meta.historyNextCursor).toBeNull();
+    // 同 fixture 经共享 parser 产出与 pi 完全一致的 items。
+    expect(ompSnapshot.items).toEqual(piSnapshot.items);
+    expect(ompSnapshot.items).toEqual([
+      expect.objectContaining({
+        kind: "message",
+        role: "user",
+        text: "1+1",
+      }),
+      expect.objectContaining({
+        kind: "message",
+        role: "assistant",
+        text: "2",
+      }),
+    ]);
+  });
+
+  it("returns an empty omp snapshot when workspace path is missing", async () => {
+    const loadOmpSession = vi.fn();
+    const loader = createOmpHistoryLoader({
+      workspaceId: "ws-omp",
+      workspacePath: null,
+      loadOmpSession,
+    });
+
+    const snapshot = await loader.load("omp:session-1");
+    expect(loadOmpSession).not.toHaveBeenCalled();
+    expect(snapshot.engine).toBe("omp");
+    expect(snapshot.threadId).toBe("omp:session-1");
     expect(snapshot.items).toHaveLength(0);
   });
 

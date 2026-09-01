@@ -150,9 +150,10 @@ impl DaemonState {
                 )
                 .await
             }
-            engine::EngineType::Pi => {
-                engine_send_message_pi(
+            engine @ (engine::EngineType::Pi | engine::EngineType::Omp) => {
+                engine_send_message_pi_family(
                     self,
+                    engine,
                     workspace_id,
                     text,
                     model,
@@ -567,6 +568,9 @@ async fn engine_send_message_claude(
                         }
                         engine::EngineType::Pi => {
                             current_thread_id = format!("pi:{}", session_id);
+                        }
+                        engine::EngineType::Omp => {
+                            current_thread_id = format!("omp:{}", session_id);
                         }
                         engine::EngineType::Grok => {
                             current_thread_id = format!("grok:{}", session_id);
@@ -1359,10 +1363,12 @@ async fn engine_send_message_kimi(
     }))
 }
 
+/// pi 族共享发送路径（add-omp-engine，与 app 侧 commands_send.rs 同形同步）。
 #[allow(clippy::too_many_arguments)]
 #[allow(unused_variables)]
-async fn engine_send_message_pi(
+async fn engine_send_message_pi_family(
     state: &DaemonState,
+    engine: engine::EngineType,
     workspace_id: String,
     text: String,
     model: Option<String>,
@@ -1391,17 +1397,20 @@ async fn engine_send_message_pi(
         state.storage_path.as_path(),
         &workspace_id,
         provider_binding_lookup_session_id.as_deref(),
-        "pi",
+        engine.icon(),
         provider_profile_id.as_deref(),
     )?;
-    let provider_launch_profile = engine::pi_provider_profile::resolve_pi_provider_launch_profile(
-        &workspace_id,
-        effective_provider_profile_id.as_deref(),
-        None,
-    )?;
+    let provider_launch_profile =
+        engine::pi_provider_profile::resolve_pi_family_provider_launch_profile(
+            engine,
+            &workspace_id,
+            effective_provider_profile_id.as_deref(),
+            None,
+        )?;
     let session = state
         .engine_manager
-        .get_or_create_pi_session_for_runtime(
+        .get_or_create_pi_family_session_for_runtime(
+            engine,
             &workspace_id,
             &workspace_path,
             &provider_launch_profile.runtime_key,
@@ -1436,7 +1445,7 @@ async fn engine_send_message_pi(
         custom_spec_root: normalized_custom_spec_root.clone(),
     };
 
-    let turn_id = format!("pi-turn-{}", uuid::Uuid::new_v4());
+    let turn_id = format!("{}-turn-{}", engine.icon(), uuid::Uuid::new_v4());
     let thread_id = thread_id.unwrap_or_else(|| turn_id.clone());
     let binding_session_id = response_session_id
         .as_deref()
@@ -1448,12 +1457,12 @@ async fn engine_send_message_pi(
             state.storage_path.as_path(),
             workspace_id.clone(),
             binding_session_id.to_string(),
-            "pi".to_string(),
+            engine.icon().to_string(),
             binding.clone(),
         )
         .await?;
     }
-    let item_id = format!("pi-item-{}", uuid::Uuid::new_v4());
+    let item_id = format!("{}-item-{}", engine.icon(), uuid::Uuid::new_v4());
 
     let mut receiver = session.subscribe();
     let event_sink = state.event_sink.clone();
@@ -1461,6 +1470,7 @@ async fn engine_send_message_pi(
     let mut current_thread_id = thread_id.clone();
     let item_id_clone = item_id.clone();
     let turn_id_for_forwarder = turn_id.clone();
+    let engine_for_forwarder = engine;
     let mut accumulated_agent_text = String::new();
     let provider_binding_for_forwarder = provider_launch_profile.binding.clone();
     let provider_binding_storage_path = state.storage_path.clone();
@@ -1485,10 +1495,13 @@ async fn engine_send_message_pi(
                     continue;
                 }
             };
-            let is_external_turn = turn_event.turn_id.starts_with("pi-external-");
+            let is_external_turn = turn_event
+                .turn_id
+                .starts_with(&format!("{}-external-", engine_for_forwarder.icon()));
             let is_known_external_wakeup =
                 active_external_wakeup_turn_ids.contains(&turn_event.turn_id);
-            let is_external_wakeup = is_pi_external_wakeup_allowed(
+            let is_external_wakeup = is_pi_family_external_wakeup_allowed(
+                engine_for_forwarder,
                 &turn_event.turn_id,
                 &turn_id_for_forwarder,
                 &turn_event.event,
@@ -1606,7 +1619,7 @@ async fn engine_send_message_pi(
                 _ => {}
             }
             agent_event_bus.publish_engine_event(
-                engine::EngineType::Pi,
+                engine_for_forwarder,
                 &current_thread_id,
                 None,
                 event_turn_id,
@@ -1618,17 +1631,22 @@ async fn engine_send_message_pi(
                 Some(binding),
                 engine::events::EngineEvent::SessionStarted {
                     session_id,
-                    engine: engine::EngineType::Pi,
+                    engine: event_engine,
                     ..
                 },
             ) = (provider_binding_for_forwarder.as_ref(), &event)
             {
-                if !session_id.is_empty() && session_id != "pending" {
+                // 与原 `engine: EngineType::Pi` 字面 pattern 同语义：只认本
+                // send 引擎的 SessionStarted（防跨引擎串绑）。
+                if *event_engine == engine_for_forwarder
+                    && !session_id.is_empty()
+                    && session_id != "pending"
+                {
                     session_management::schedule_engine_provider_binding_record(
                         provider_binding_storage_path.clone(),
                         provider_binding_workspace_id.clone(),
                         session_id.clone(),
-                        "pi".to_string(),
+                        engine_for_forwarder.icon().to_string(),
                         binding.clone(),
                     );
                 }
@@ -1720,9 +1738,10 @@ async fn engine_send_message_pi(
             {
                 if !session_id.is_empty()
                     && session_id != "pending"
-                    && matches!(engine, engine::EngineType::Pi)
+                    && *engine == engine_for_forwarder
+                    && engine.is_pi_family()
                 {
-                    current_thread_id = format!("pi:{}", session_id);
+                    current_thread_id = format!("{}:{}", engine.icon(), session_id);
                 }
             }
 
@@ -1751,7 +1770,7 @@ async fn engine_send_message_pi(
     let turn_id_clone = turn_id.clone();
     tokio::spawn(async move {
         if let Err(error) = session_clone.send_message(params, &turn_id_clone).await {
-            eprintln!("PI send_message failed: {error}");
+            eprintln!("pi-family send_message failed: {error}");
         }
     });
     state
@@ -1759,12 +1778,12 @@ async fn engine_send_message_pi(
             &workspace_id,
             response_session_id.as_deref(),
             auto_session,
-            "pi",
+            engine.icon(),
         )
         .await;
 
     Ok(json!({
-        "engine": "pi",
+        "engine": engine.icon(),
         "sessionId": response_session_id,
         "result": {
             "turn": {

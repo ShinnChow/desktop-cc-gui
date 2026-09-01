@@ -41,6 +41,7 @@ pub async fn detect_all_engines(
     kimi_bin: Option<&str>,
     grok_bin: Option<&str>,
     pi_bin: Option<&str>,
+    omp_bin: Option<&str>,
     qoder_bin: Option<&str>,
     dsh_settings: &crate::engine::dsh::supervisor::DshRuntimeSettings,
     gemini_enabled: bool,
@@ -53,6 +54,7 @@ pub async fn detect_all_engines(
         kimi_bin,
         grok_bin,
         pi_bin,
+        omp_bin,
         qoder_bin,
         dsh_settings,
         gemini_enabled,
@@ -74,6 +76,7 @@ pub async fn detect_all_engines_scoped(
     kimi_bin: Option<&str>,
     grok_bin: Option<&str>,
     pi_bin: Option<&str>,
+    omp_bin: Option<&str>,
     qoder_bin: Option<&str>,
     dsh_settings: &crate::engine::dsh::supervisor::DshRuntimeSettings,
     gemini_enabled: bool,
@@ -89,6 +92,7 @@ pub async fn detect_all_engines_scoped(
     let kimi_bin = kimi_bin.map(str::to_string);
     let grok_bin = grok_bin.map(str::to_string);
     let pi_bin = pi_bin.map(str::to_string);
+    let omp_bin = omp_bin.map(str::to_string);
     let qoder_bin = qoder_bin.map(str::to_string);
     let dsh_settings = dsh_settings.clone();
 
@@ -181,6 +185,17 @@ pub async fn detect_all_engines_scoped(
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Pi)))
         };
+    let omp_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Omp) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Omp,
+                move || async move { detect_omp_status_with_options(omp_bin.as_deref(), false).await },
+                detect_run_id,
+                on_status.clone(),
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Omp)))
+        };
     let qoder_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
         if is_enabled(EngineType::Qoder) {
             Box::pin(run_engine_detection_isolated(
@@ -216,6 +231,7 @@ pub async fn detect_all_engines_scoped(
         kimi_status,
         grok_status,
         pi_status,
+        omp_status,
         qoder_status,
         dsh_status,
     ) = tokio::join!(
@@ -226,6 +242,7 @@ pub async fn detect_all_engines_scoped(
         kimi_status,
         grok_status,
         pi_status,
+        omp_status,
         qoder_status,
         dsh_status,
     );
@@ -238,6 +255,7 @@ pub async fn detect_all_engines_scoped(
         kimi_status,
         grok_status,
         pi_status,
+        omp_status,
         qoder_status,
         dsh_status,
     ];
@@ -263,6 +281,7 @@ pub async fn detect_preferred_engine(
     kimi_bin: Option<&str>,
     grok_bin: Option<&str>,
     pi_bin: Option<&str>,
+    omp_bin: Option<&str>,
     qoder_bin: Option<&str>,
     dsh_settings: Option<&crate::engine::dsh::supervisor::DshRuntimeSettings>,
 ) -> EngineType {
@@ -274,6 +293,7 @@ pub async fn detect_preferred_engine(
         kimi_bin,
         grok_bin,
         pi_bin,
+        omp_bin,
         qoder_bin,
         dsh_settings,
         &[],
@@ -293,6 +313,7 @@ pub async fn detect_preferred_engine_scoped(
     kimi_bin: Option<&str>,
     grok_bin: Option<&str>,
     pi_bin: Option<&str>,
+    omp_bin: Option<&str>,
     qoder_bin: Option<&str>,
     dsh_settings: Option<&crate::engine::dsh::supervisor::DshRuntimeSettings>,
     disabled_engines: &[EngineType],
@@ -309,6 +330,7 @@ pub async fn detect_preferred_engine_scoped(
     let kimi_bin = kimi_bin.map(str::to_string);
     let grok_bin = grok_bin.map(str::to_string);
     let pi_bin = pi_bin.map(str::to_string);
+    let omp_bin = omp_bin.map(str::to_string);
     let qoder_bin = qoder_bin.map(str::to_string);
     let dsh_settings = dsh_settings.clone();
     let is_enabled = |engine_type: EngineType| !disabled_engines.contains(&engine_type);
@@ -400,6 +422,17 @@ pub async fn detect_preferred_engine_scoped(
         } else {
             Box::pin(std::future::ready(disabled_engine_status(EngineType::Pi)))
         };
+    let omp_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
+        if is_enabled(EngineType::Omp) {
+            Box::pin(run_engine_detection_isolated(
+                EngineType::Omp,
+                move || async move { detect_omp_status_with_options(omp_bin.as_deref(), false).await },
+                detect_run_id,
+                on_status.clone(),
+            ))
+        } else {
+            Box::pin(std::future::ready(disabled_engine_status(EngineType::Omp)))
+        };
     let qoder_status: std::pin::Pin<Box<dyn std::future::Future<Output = EngineStatus> + Send>> =
         if is_enabled(EngineType::Qoder) {
             Box::pin(run_engine_detection_isolated(
@@ -435,6 +468,7 @@ pub async fn detect_preferred_engine_scoped(
         kimi_status,
         grok_status,
         pi_status,
+        omp_status,
         qoder_status,
         dsh_status,
     ) = tokio::join!(
@@ -445,6 +479,7 @@ pub async fn detect_preferred_engine_scoped(
         kimi_status,
         grok_status,
         pi_status,
+        omp_status,
         qoder_status,
         dsh_status,
     );
@@ -470,6 +505,9 @@ pub async fn detect_preferred_engine_scoped(
     }
     if pi_status.installed {
         return EngineType::Pi;
+    }
+    if omp_status.installed {
+        return EngineType::Omp;
     }
     if dsh_status.installed {
         return EngineType::Dsh;
@@ -497,6 +535,7 @@ pub async fn resolve_engine_type(
     kimi_bin: Option<&str>,
     grok_bin: Option<&str>,
     pi_bin: Option<&str>,
+    omp_bin: Option<&str>,
     qoder_bin: Option<&str>,
     disabled_engines: &[EngineType],
 ) -> EngineType {
@@ -511,6 +550,7 @@ pub async fn resolve_engine_type(
             "kimi" => return EngineType::Kimi,
             "grok" => return EngineType::Grok,
             "pi" => return EngineType::Pi,
+            "omp" => return EngineType::Omp,
             "dsh" => return EngineType::Dsh,
             "qoder" => return EngineType::Qoder,
             _ => {} // Invalid value, fall through
@@ -528,6 +568,7 @@ pub async fn resolve_engine_type(
             "kimi" => return EngineType::Kimi,
             "grok" => return EngineType::Grok,
             "pi" => return EngineType::Pi,
+            "omp" => return EngineType::Omp,
             "dsh" => return EngineType::Dsh,
             "qoder" => return EngineType::Qoder,
             _ => {} // Invalid value, fall through
@@ -544,6 +585,7 @@ pub async fn resolve_engine_type(
         kimi_bin,
         grok_bin,
         pi_bin,
+        omp_bin,
         qoder_bin,
         None,
         disabled_engines,

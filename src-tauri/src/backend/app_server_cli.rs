@@ -341,6 +341,10 @@ fn build_windows_extra_search_paths(
     if let Some(appdata) = appdata {
         paths.push(appdata.join("npm"));
     }
+    if let Some(local_app_data) = local_app_data {
+        // Official OMP CLI Windows installer layout: %LOCALAPPDATA%\omp\omp.exe.
+        paths.push(local_app_data.join("omp"));
+    }
     if let Some(user_profile) = user_profile {
         // Fallback: npm global install path via USERPROFILE
         paths.push(user_profile.join("AppData\\Roaming\\npm"));
@@ -353,6 +357,8 @@ fn build_windows_extra_search_paths(
         // Official Qoder CLI Windows layout: %USERPROFILE%\.qoder\bin\qodercli\qodercli.exe.
         // Installer writes User PATH, but GUI/dev processes often keep a stale PATH.
         paths.push(user_profile.join(".qoder\\bin\\qodercli"));
+        // OMP CLI user-local bin layout: %USERPROFILE%\.omp\bin\omp.exe.
+        paths.push(user_profile.join(".omp\\bin"));
         // Cargo bin
         paths.push(user_profile.join(".cargo\\bin"));
         // Bun
@@ -477,6 +483,7 @@ fn get_extra_search_paths() -> Vec<PathBuf> {
             paths.push(home.join(".bun/bin"));
             paths.push(home.join(".volta/bin"));
             paths.push(home.join(".qoder/bin/qodercli"));
+            paths.push(home.join(".omp/bin"));
             // nvm
             let nvm_root = home.join(".nvm/versions/node");
             if let Ok(entries) = std::fs::read_dir(nvm_root) {
