@@ -6,41 +6,13 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
-  type SyntheticEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
 import ArrowRight from "lucide-react/dist/esm/icons/arrow-right";
-import Columns2 from "lucide-react/dist/esm/icons/columns-2";
-import Pencil from "lucide-react/dist/esm/icons/pencil";
-import Eye from "lucide-react/dist/esm/icons/eye";
-import Code from "lucide-react/dist/esm/icons/code";
-import FileSearch from "lucide-react/dist/esm/icons/file-search";
-import GitCommitHorizontal from "lucide-react/dist/esm/icons/git-commit-horizontal";
-import GitBranch from "lucide-react/dist/esm/icons/git-branch";
-import History from "lucide-react/dist/esm/icons/history";
-import Copy from "lucide-react/dist/esm/icons/copy";
-import CopyX from "lucide-react/dist/esm/icons/copy-x";
-import ClipboardPaste from "lucide-react/dist/esm/icons/clipboard-paste";
-import Scissors from "lucide-react/dist/esm/icons/scissors";
-import PanelTopClose from "lucide-react/dist/esm/icons/panel-top-close";
-import ExternalLink from "lucide-react/dist/esm/icons/external-link";
-import Maximize2 from "lucide-react/dist/esm/icons/maximize-2";
-import Minimize2 from "lucide-react/dist/esm/icons/minimize-2";
-import Rows2 from "lucide-react/dist/esm/icons/rows-2";
-import Save from "lucide-react/dist/esm/icons/save";
-import Search from "lucide-react/dist/esm/icons/search";
-import TextSelect from "lucide-react/dist/esm/icons/text-select";
-import NotebookPen from "lucide-react/dist/esm/icons/notebook-pen";
-import MessageSquare from "lucide-react/dist/esm/icons/message-square";
-import LocateFixed from "lucide-react/dist/esm/icons/locate-fixed";
-import X from "lucide-react/dist/esm/icons/x";
 import type { ReactCodeMirrorProps } from "@uiw/react-codemirror";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   getGitFileFullDiff,
-  readLocalImageDataUrl,
   readWorkspaceFilePreview,
 } from "../../../services/tauri";
 import { pushErrorToast } from "../../../services/toasts";
@@ -51,13 +23,8 @@ import {
   matchesShortcutForPlatform,
 } from "../../../utils/shortcuts";
 import { highlightLine } from "../../../utils/syntax";
-import { OpenAppMenu } from "../../app/components/OpenAppMenu";
 import {
-  clampRendererContextMenuPosition,
-  estimateRendererContextMenuHeight,
   RendererContextMenu,
-  type RendererContextMenuItem,
-  type RendererContextMenuLeafItem,
   type RendererContextMenuState,
 } from "../../../components/ui/RendererContextMenu";
 import type { CodeAnnotationLineRange } from "../../code-annotations/types";
@@ -76,18 +43,8 @@ import {
   resolveGitStatusPathCandidates,
   resolveWorkspacePathCandidates,
 } from "../../../utils/workspacePaths";
-import { reorderTabPathsAtTarget } from "../utils/fileTabOrder";
-import { getFileTreeIconSvg } from "../utils/fileTreeIcons";
 import { FILE_CONTEXT_MENU_SHORTCUTS } from "../utils/fileContextMenuShortcuts";
-import {
-  buildCodeSelectionChatSnippet,
-  buildFileChatReference,
-} from "../utils/codeSelectionChatSnippet";
-import {
-  formatOpenHtmlInBrowserError,
-  isHtmlFilePath,
-  openHtmlInBrowser,
-} from "../utils/openHtmlInBrowser";
+import { buildCodeSelectionChatSnippet } from "../utils/codeSelectionChatSnippet";
 import { reduceExternalChangeSyncState } from "../externalChangeStateMachine";
 import { resolveFileRenderProfile } from "../utils/fileRenderProfile";
 import { getFileDocumentSnapshotMetrics } from "../utils/fileDocumentSnapshot";
@@ -102,11 +59,20 @@ import type { FileCodeMirrorEditorHandle } from "./FileCodeMirrorEditor";
 import type { NoteCaptureDraft } from "../../note-cards/types";
 import { buildCodeSelectionNoteDraft } from "../../note-cards/utils/noteCapture";
 import { FileViewNavigationPanel } from "./FileViewNavigationPanel";
+import { FileViewExternalChangeOverlays } from "./FileViewExternalChangeOverlays";
+import { FileViewPanelFooter } from "./FileViewPanelFooter";
+import { FileViewPanelTabs } from "./FileViewPanelTabs";
+import {
+  buildFileViewContextMenu,
+  buildFileViewTabContextMenu,
+} from "./fileViewContextMenus";
 import { useFileDocumentState } from "../hooks/useFileDocumentState";
 import { useFileExternalSync } from "../hooks/useFileExternalSync";
 import { useFileGitBlame } from "../hooks/useFileGitBlame";
+import { useFileImagePreview } from "../hooks/useFileImagePreview";
 import { useFileNavigation } from "../hooks/useFileNavigation";
 import { useFilePreviewPayload } from "../hooks/useFilePreviewPayload";
+import { useFileTabDrag } from "../hooks/useFileTabDrag";
 import { isThemeMutationAttribute } from "../../theme/utils/themeAppearance";
 import { DEFAULT_FILE_RENDER_PRESSURE } from "../types/fileRenderPressure";
 import {
@@ -263,8 +229,6 @@ export function FileViewPanel({
   const [fileContextMenu, setFileContextMenu] =
     useState<RendererContextMenuState | null>(null);
   const pendingGitBlamePathRef = useRef<string | null>(null);
-  const [draggingTabPath, setDraggingTabPath] = useState<string | null>(null);
-  const [dragOverTabPath, setDragOverTabPath] = useState<string | null>(null);
   const activeAnnotationLineRange =
     annotationDraft?.source === "file-edit-mode"
       ? annotationDraft.lineRange
@@ -359,7 +323,6 @@ export function FileViewPanel({
     useState(false);
   const [fileReferenceVisible, setFileReferenceVisible] = useState(false);
   const usesSingleRowHeader = headerLayout === "single-row";
-  const splitResizeCleanupRef = useRef<(() => void) | null>(null);
   const pendingOpenFindPanelRef = useRef(false);
   const gitRootWorkspacePrefix = useMemo(
     () => resolveGitRootWorkspacePrefix(workspacePath, gitRoot),
@@ -831,88 +794,13 @@ export function FileViewPanel({
     [effectiveGitLineMarkers.modified],
   );
 
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [imageLoadError, setImageLoadError] = useState<string | null>(null);
-
-  const [imageInfo, setImageInfo] = useState<{
-    width: number;
-    height: number;
-    sizeBytes: number | null;
-  } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setImageSrc(null);
-    setImageInfo(null);
-    setImageLoadError(null);
-    if (!isImage) return;
-
-    const fallbackToAssetUrl = () => {
-      try {
-        return convertFileSrc(absolutePath);
-      } catch {
-        return null;
-      }
-    };
-
-    readLocalImageDataUrl(workspaceId, absolutePath)
-      .then((dataUrl) => {
-        if (cancelled) return;
-        setImageSrc(dataUrl ?? fallbackToAssetUrl());
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setImageSrc(fallbackToAssetUrl());
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [absolutePath, isImage, workspaceId]);
-
-  useEffect(() => {
-    setImageInfo(null);
-    if (!imageSrc) return;
-    let cancelled = false;
-    fetch(imageSrc)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Failed to read image bytes: ${res.status}`);
-        }
-        return res.blob();
-      })
-      .then((blob) => {
-        if (!cancelled) {
-          setImageInfo((prev) =>
-            prev
-              ? { ...prev, sizeBytes: blob.size }
-              : { width: 0, height: 0, sizeBytes: blob.size },
-          );
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setImageInfo(null);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [imageSrc]);
-
-  const handleImageLoad = useCallback((e: SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    setImageLoadError(null);
-    setImageInfo((prev) => ({
-      width: img.naturalWidth,
-      height: img.naturalHeight,
-      sizeBytes: prev?.sizeBytes ?? null,
-    }));
-  }, []);
-  const handleImageError = useCallback(() => {
-    setImageInfo(null);
-    setImageLoadError(t("files.imagePreviewLoadFailed"));
-  }, [t]);
+  const {
+    imageSrc,
+    imageLoadError,
+    imageInfo,
+    handleImageLoad,
+    handleImageError,
+  } = useFileImagePreview({ absolutePath, isImage, workspaceId, t });
 
   useEffect(() => {
     const normalizedStatus = (fileGitStatus ?? "").toUpperCase();
@@ -1389,430 +1277,46 @@ export function FileViewPanel({
       event: ReactMouseEvent<HTMLDivElement>,
       selectionNoteDraft?: NoteCaptureDraft,
     ) => {
-      const target = event.target instanceof Element ? event.target : null;
-      const isCodeMirrorTarget = Boolean(target?.closest(".cm-editor"));
-      const isIndependentEditableTarget = Boolean(
-        target?.closest('input, textarea, [contenteditable="true"]'),
-      );
-      if (!isCodeMirrorTarget && isIndependentEditableTarget) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      const editorView = mode === "edit" ? (cmRef.current?.view ?? null) : null;
-      const editorSelectionText = editorView
-        ? editorView.state.selection.ranges
-            .filter((range) => !range.empty)
-            .map((range) => editorView.state.sliceDoc(range.from, range.to))
-            .join(editorView.state.lineBreak)
-        : "";
-      const selectedText = editorView
-        ? editorSelectionText
-        : (window.getSelection()?.toString() ?? "");
-      const canMutateEditor = Boolean(
-        editorView && canEditDocument && mode === "edit" && !truncated,
-      );
-      const wholeFileNoteDraft =
-        !selectionNoteDraft && onCaptureNote && !skipTextRead && !truncated
-          ? buildCodeSelectionNoteDraft({
-              path: filePath,
-              content: editorView
-                ? editorView.state.doc.sliceString(
-                    0,
-                    editorView.state.doc.length,
-                  )
-                : content,
-              startLine: 1,
-              endLine: editorView
-                ? editorView.state.doc.lines
-                : documentSnapshot.lineCount,
-              language: renderProfile.previewLanguage,
-            })
-          : null;
-      const noteCaptureDraft = selectionNoteDraft ?? wholeFileNoteDraft;
-      const selectionSource =
-        selectionNoteDraft?.source.kind === "codeSelection"
-          ? selectionNoteDraft.source
-          : null;
-      // Preview mode keeps logical line selection outside window.getSelection();
-      // fall back to the snapshot range from note-capture draft when needed.
-      const selectionContentFromSnapshot = selectionSource
-        ? documentSnapshot
-            .getLines(selectionSource.startLine - 1, selectionSource.endLine)
-            .join("\n")
-        : "";
-      const selectionContent =
-        selectedText.trim().length > 0
-          ? selectedText
-          : selectionContentFromSnapshot;
-      const selectionChatSnippet =
-        onInsertText && selectionContent.trim().length > 0
-          ? selectionSource
-            ? buildCodeSelectionChatSnippet({
-                path: selectionSource.path,
-                content: selectionContent,
-                startLine: selectionSource.startLine,
-                endLine: selectionSource.endLine,
-                language:
-                  selectionSource.language ?? renderProfile.previewLanguage,
-              })
-            : editorView
-              ? (() => {
-                  const selection = editorView.state.selection.main;
-                  if (selection.empty) {
-                    return null;
-                  }
-                  const endOffset = Math.max(selection.from, selection.to - 1);
-                  return buildCodeSelectionChatSnippet({
-                    path: filePath,
-                    content: selectionContent,
-                    startLine: editorView.state.doc.lineAt(selection.from)
-                      .number,
-                    endLine: editorView.state.doc.lineAt(endOffset).number,
-                    language: renderProfile.previewLanguage,
-                  });
-                })()
-              : null
-          : null;
-
-      const writeClipboardText = async (action: string, text: string) => {
-        try {
-          if (!navigator.clipboard?.writeText) {
-            throw new Error(t("files.clipboardUnavailable"));
-          }
-          await navigator.clipboard.writeText(text);
-          return true;
-        } catch (error) {
-          showClipboardError(action, error);
-          return false;
-        }
-      };
-
-      const clipboardItems: RendererContextMenuItem[] = [
-        {
-          type: "item",
-          id: "cut-selection",
-          label: t("files.cutItem"),
-          icon: <Scissors size={15} />,
-          shortcut: formatShortcutForPlatform(FILE_CONTEXT_MENU_SHORTCUTS.cut),
-          disabled: !canMutateEditor || !selectedText,
-          onSelect: async () => {
-            if (
-              !editorView ||
-              !(await writeClipboardText(t("files.cutItem"), selectedText))
-            ) {
-              return;
-            }
-            editorView.dispatch(editorView.state.replaceSelection(""));
-            editorView.focus();
-          },
-        },
-        {
-          type: "item",
-          id: "copy-selection",
-          label: t("files.copyItem"),
-          icon: <Copy size={15} />,
-          shortcut: formatShortcutForPlatform(FILE_CONTEXT_MENU_SHORTCUTS.copy),
-          disabled: !selectedText,
-          onSelect: async () => {
-            await writeClipboardText(t("files.copyItem"), selectedText);
-          },
-        },
-        {
-          type: "item",
-          id: "paste-selection",
-          label: t("files.pasteItem"),
-          icon: <ClipboardPaste size={15} />,
-          shortcut: formatShortcutForPlatform(
-            FILE_CONTEXT_MENU_SHORTCUTS.paste,
-          ),
-          disabled: !canMutateEditor,
-          onSelect: async () => {
-            try {
-              if (!editorView || !navigator.clipboard?.readText) {
-                throw new Error(t("files.clipboardUnavailable"));
-              }
-              const clipboardText = await navigator.clipboard.readText();
-              editorView.dispatch(
-                editorView.state.replaceSelection(clipboardText),
-              );
-              editorView.focus();
-            } catch (error) {
-              showClipboardError(t("files.pasteItem"), error);
-            }
-          },
-        },
-      ];
-
-      const gitItems: RendererContextMenuLeafItem[] = [
-        ...(activeFileGitScope && onOpenFileHistory
-          ? [
-              {
-                type: "item" as const,
-                id: "show-file-history",
-                label: t("files.tabShowFileHistory"),
-                icon: <History size={15} />,
-                shortcut: formatShortcutForPlatform(
-                  FILE_CONTEXT_MENU_SHORTCUTS.showFileHistory,
-                ),
-                onSelect: () =>
-                  onOpenFileHistory({
-                    workspaceId,
-                    workspacePath,
-                    repositoryRoot: activeFileGitScope.repositoryRoot,
-                    path: activeFileGitScope.path,
-                    displayPath: filePath,
-                  }),
-              },
-            ]
-          : []),
-        ...(mode === "edit" && (gitBlameEligible || gitBlame.enabled)
-          ? [
-              {
-                type: "item" as const,
-                id: "toggle-file-git-blame",
-                label: gitBlameActionLabel,
-                icon: <GitCommitHorizontal size={15} />,
-                shortcut: formatShortcutForPlatform(
-                  FILE_CONTEXT_MENU_SHORTCUTS.toggleGitBlame,
-                ),
-                disabled: !gitBlameEligible && !gitBlame.enabled,
-                onSelect: gitBlame.toggle,
-              },
-            ]
-          : []),
-      ];
-
-      const commandItems: RendererContextMenuItem[] = !canEditDocument
-        ? []
-        : mode === "preview"
-          ? [
-              {
-                type: "item",
-                id: "enter-edit-mode",
-                label: t("files.edit"),
-                icon: <Pencil size={15} />,
-                shortcut: formatShortcutForPlatform(
-                  FILE_CONTEXT_MENU_SHORTCUTS.togglePreview,
-                ),
-                disabled: truncated,
-                onSelect: handleEnterEdit,
-              },
-            ]
-          : [
-              ...(onAssociateIntentCanvasCodeAnchor
-                ? [
-                    {
-                      type: "item" as const,
-                      id: "associate-intent-canvas",
-                      label: t("files.associateIntentCanvas"),
-                      icon: <ExternalLink size={15} />,
-                      shortcut: formatShortcutForPlatform(
-                        FILE_CONTEXT_MENU_SHORTCUTS.associateIntentCanvas,
-                      ),
-                      onSelect: handleAssociateIntentCanvasCodeAnchor,
-                    },
-                  ]
-                : []),
-              ...(editorView && canMutateEditor
-                ? [
-                    {
-                      type: "item" as const,
-                      id: "expand-selection",
-                      label: t("files.expandSelection"),
-                      icon: <TextSelect size={15} />,
-                      shortcut: expandSelectionShortcut
-                        ? formatShortcutForPlatform(expandSelectionShortcut)
-                        : undefined,
-                      onSelect: () => {
-                        cmRef.current?.expandSelection();
-                      },
-                    },
-                  ]
-                : []),
-              {
-                type: "item",
-                id: "goto-definition",
-                label: isDefinitionLoading
-                  ? t("files.navigating")
-                  : t("files.gotoDefinition"),
-                icon: <Code size={15} />,
-                shortcut: formatShortcutForPlatform(
-                  FILE_CONTEXT_MENU_SHORTCUTS.gotoDefinition,
-                ),
-                onSelect: runDefinitionFromCursor,
-              },
-              {
-                type: "item",
-                id: "goto-implementations",
-                label: isImplementationsLoading
-                  ? t("files.navigating")
-                  : t("files.gotoImplementations"),
-                icon: <Code size={15} />,
-                shortcut: formatShortcutForPlatform(
-                  FILE_CONTEXT_MENU_SHORTCUTS.gotoImplementations,
-                ),
-                onSelect: runImplementationsFromCursor,
-              },
-              {
-                type: "item",
-                id: "find-references",
-                label: isReferencesLoading
-                  ? t("files.searchingReferences")
-                  : t("files.findReferences"),
-                icon: <Search size={15} />,
-                shortcut: formatShortcutForPlatform(
-                  FILE_CONTEXT_MENU_SHORTCUTS.findReferences,
-                ),
-                onSelect: runReferencesFromCursor,
-              },
-              {
-                type: "item",
-                id: "enter-preview-mode",
-                label: t("files.preview"),
-                icon: <Eye size={15} />,
-                shortcut: formatShortcutForPlatform(
-                  FILE_CONTEXT_MENU_SHORTCUTS.togglePreview,
-                ),
-                onSelect: handleEnterPreview,
-              },
-              {
-                type: "item",
-                id: "save-file",
-                label: isSaving
-                  ? t("files.saving")
-                  : effectiveIsDirty
-                    ? t("files.save")
-                    : t("files.saved"),
-                icon: <Save size={15} />,
-                shortcut: saveFileShortcut
-                  ? formatShortcutForPlatform(saveFileShortcut)
-                  : undefined,
-                disabled: !effectiveIsDirty || isSaving,
-                onSelect: handleSave,
-              },
-            ];
-
-      const itemGroups: RendererContextMenuItem[][] = [
-        ...(noteCaptureDraft && onCaptureNote
-          ? [
-              [
-                {
-                  type: "item" as const,
-                  id: "capture-file-note",
-                  label: selectionNoteDraft
-                    ? t("noteCards.captureSelection")
-                    : t("noteCards.captureWholeFile"),
-                  icon: <NotebookPen size={15} />,
-                  shortcut:
-                    mode === "edit"
-                      ? formatShortcutForPlatform(
-                          FILE_CONTEXT_MENU_SHORTCUTS.captureNote,
-                        )
-                      : undefined,
-                  onSelect: () => onCaptureNote(noteCaptureDraft),
-                },
-              ],
-            ]
-          : []),
-        ...(selectionChatSnippet && onInsertText
-          ? [
-              [
-                {
-                  type: "item" as const,
-                  id: "add-selection-to-chat",
-                  label: t("files.addToChat"),
-                  icon: <MessageSquare size={15} />,
-                  shortcut: formatShortcutForPlatform(
-                    FILE_CONTEXT_MENU_SHORTCUTS.addToChat,
-                  ),
-                  onSelect: () => onInsertText(selectionChatSnippet),
-                },
-              ],
-            ]
-          : []),
-        clipboardItems,
-        ...(gitItems.length > 0
-          ? [
-              [
-                {
-                  type: "submenu" as const,
-                  id: "git-actions",
-                  label: t("files.tabGitActions"),
-                  icon: <GitBranch size={15} />,
-                  items: gitItems,
-                },
-              ],
-            ]
-          : []),
-        ...(onRevealInFileTree
-          ? [
-              [
-                {
-                  type: "item" as const,
-                  id: "reveal-in-file-tree",
-                  label: t("files.revealInFileTree"),
-                  icon: <LocateFixed size={15} />,
-                  shortcut: formatShortcutForPlatform(
-                    FILE_CONTEXT_MENU_SHORTCUTS.revealInFileTree,
-                  ),
-                  onSelect: () => onRevealInFileTree(filePath),
-                },
-              ],
-            ]
-          : []),
-        ...(isHtmlFilePath(filePath)
-          ? [
-              [
-                {
-                  type: "item" as const,
-                  id: "open-in-browser",
-                  label: t("files.openInBrowser"),
-                  icon: <ExternalLink size={15} />,
-                  onSelect: () => {
-                    void openHtmlInBrowser(
-                      resolveAbsolutePath(workspacePath, filePath),
-                      { workspaceId },
-                    ).catch((error) => {
-                      console.warn("[file-view] openHtmlInBrowser failed", error);
-                      pushErrorToast({
-                        title: t("files.openInBrowser"),
-                        message: formatOpenHtmlInBrowserError(error, t),
-                      });
-                    });
-                  },
-                },
-              ],
-            ]
-          : []),
-        ...(commandItems.length > 0 ? [commandItems] : []),
-      ];
-      const items = itemGroups.flatMap((group, groupIndex) =>
-        groupIndex === 0
-          ? group
-          : [
-              {
-                type: "separator" as const,
-                id: `file-command-separator-${groupIndex}`,
-              },
-              ...group,
-            ],
-      );
-      const position = clampRendererContextMenuPosition(
-        event.clientX,
-        event.clientY,
-        {
-          width: 248,
-          height: estimateRendererContextMenuHeight(items),
-          padding: 10,
-        },
-      );
-      setFileContextMenu({
-        ...position,
-        label: t("files.fileContextMenu"),
-        items,
+      buildFileViewContextMenu({
+        activeFileGitScope,
+        canEditDocument,
+        cmRef,
+        content,
+        documentSnapshot,
+        effectiveIsDirty,
+        event,
+        expandSelectionShortcut,
+        filePath,
+        gitBlame,
+        gitBlameActionLabel,
+        gitBlameEligible,
+        handleAssociateIntentCanvasCodeAnchor,
+        handleEnterEdit,
+        handleEnterPreview,
+        handleSave,
+        isDefinitionLoading,
+        isImplementationsLoading,
+        isReferencesLoading,
+        isSaving,
+        mode,
+        onAssociateIntentCanvasCodeAnchor,
+        onCaptureNote,
+        onInsertText,
+        onOpenFileHistory,
+        onRevealInFileTree,
+        renderProfile,
+        runDefinitionFromCursor,
+        runImplementationsFromCursor,
+        runReferencesFromCursor,
+        saveFileShortcut,
+        selectionNoteDraft,
+        setFileContextMenu,
+        showClipboardError,
+        skipTextRead,
+        t,
+        truncated,
+        workspaceId,
+        workspacePath,
       });
     },
     [
@@ -2139,107 +1643,15 @@ export function FileViewPanel({
     setTabContextMenu(null);
   }, []);
 
-  // Tab reordering uses pointer events rather than native HTML5 drag-and-drop:
-  // the macOS Tauri webview (WKWebView) does not reliably start an HTML5 drag
-  // that originates on the inner <button>, so a pointer-driven gesture is used.
-  const tabDragOriginRef = useRef<{
-    tabPath: string;
-    pointerId: number;
-    startX: number;
-    moved: boolean;
-  } | null>(null);
-  const suppressTabClickRef = useRef(false);
-
-  const resolveTabPathAtPoint = useCallback(
-    (clientX: number, clientY: number) => {
-      const element = document.elementFromPoint(clientX, clientY);
-      const tab = element?.closest<HTMLElement>(".fvp-tab");
-      return tab?.dataset.tabPath ?? null;
-    },
-    [],
-  );
-
-  const endTabDrag = useCallback(() => {
-    tabDragOriginRef.current = null;
-    setDraggingTabPath(null);
-    setDragOverTabPath(null);
-  }, []);
-
-  const handleTabPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>, tabPath: string) => {
-      suppressTabClickRef.current = false;
-      if (!canReorderTabs || event.button !== 0) {
-        return;
-      }
-      // Let the close/detach buttons own their own gestures.
-      if (
-        (event.target as HTMLElement).closest(".fvp-tab-close, .fvp-tab-detach")
-      ) {
-        return;
-      }
-      tabDragOriginRef.current = {
-        tabPath,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        moved: false,
-      };
-    },
-    [canReorderTabs],
-  );
-
-  const handleTabPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      const origin = tabDragOriginRef.current;
-      if (!origin || event.pointerId !== origin.pointerId) {
-        return;
-      }
-      if (!origin.moved) {
-        if (Math.abs(event.clientX - origin.startX) < 4) {
-          return;
-        }
-        origin.moved = true;
-        setDraggingTabPath(origin.tabPath);
-        try {
-          event.currentTarget.setPointerCapture(origin.pointerId);
-        } catch {
-          // Pointer capture is best-effort.
-        }
-      }
-      const overPath = resolveTabPathAtPoint(event.clientX, event.clientY);
-      setDragOverTabPath((current) =>
-        current === overPath ? current : overPath,
-      );
-    },
-    [resolveTabPathAtPoint],
-  );
-
-  const handleTabPointerUp = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      const origin = tabDragOriginRef.current;
-      if (!origin || event.pointerId !== origin.pointerId) {
-        return;
-      }
-      if (origin.moved) {
-        // Swallow the click that the browser fires after the drag gesture so a
-        // reorder never doubles as a tab activation.
-        suppressTabClickRef.current = true;
-        const source = origin.tabPath;
-        const targetPath = resolveTabPathAtPoint(event.clientX, event.clientY);
-        if (targetPath && targetPath !== source) {
-          const nextOrder = reorderTabPathsAtTarget(
-            visibleTabs,
-            source,
-            targetPath,
-          );
-          if (nextOrder.some((path, index) => path !== visibleTabs[index])) {
-            onReorderTabs?.(nextOrder);
-          }
-        }
-      }
-      endTabDrag();
-    },
-    [endTabDrag, onReorderTabs, resolveTabPathAtPoint, visibleTabs],
-  );
+  const {
+    draggingTabPath,
+    dragOverTabPath,
+    suppressTabClickRef,
+    endTabDrag,
+    handleTabPointerDown,
+    handleTabPointerMove,
+    handleTabPointerUp,
+  } = useFileTabDrag({ canReorderTabs, onReorderTabs, visibleTabs });
 
   const handleOpenDetachedTab = useCallback(
     (tabPath: string) => {
@@ -2317,113 +1729,26 @@ export function FileViewPanel({
 
   const openTabContextMenu = useCallback(
     (event: ReactMouseEvent, tabPath: string) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const gitScope = resolveTabGitScope(tabPath);
-      const canOpenHistory = Boolean(gitScope && onOpenFileHistory);
-      const canToggleBlame = Boolean(
-        gitScope &&
-        (tabPath === filePath
-          ? gitBlameEligible || gitBlame.enabled
-          : onActivateTab),
-      );
-      const gitItems: RendererContextMenuLeafItem[] = [
-        ...(canOpenHistory
-          ? [
-              {
-                type: "item" as const,
-                id: "show-file-history",
-                label: t("files.tabShowFileHistory"),
-                icon: <History size={15} />,
-                onSelect: () => {
-                  if (!gitScope || !onOpenFileHistory) {
-                    return;
-                  }
-                  onOpenFileHistory({
-                    workspaceId,
-                    workspacePath,
-                    repositoryRoot: gitScope.repositoryRoot,
-                    path: gitScope.path,
-                    displayPath: tabPath,
-                  });
-                },
-              },
-            ]
-          : []),
-        ...(canToggleBlame
-          ? [
-              {
-                type: "item" as const,
-                id: "toggle-git-blame",
-                label:
-                  tabPath === filePath && gitBlame.enabled
-                    ? t("files.gitBlameDisable")
-                    : t("files.gitBlameEnable"),
-                icon: <GitCommitHorizontal size={15} />,
-                onSelect: () => handleTabGitBlame(tabPath),
-              },
-            ]
-          : []),
-      ];
-      const items: RendererContextMenuItem[] = [
-        ...(gitItems.length > 0
-          ? [
-              {
-                type: "submenu" as const,
-                id: "git-actions",
-                label: t("files.tabGitActions"),
-                icon: <GitBranch size={15} />,
-                items: gitItems,
-              },
-              { type: "separator" as const, id: "tab-close-separator" },
-            ]
-          : []),
-        {
-          type: "item",
-          id: "close-current-tab",
-          label: t("files.closeCurrentTab"),
-          icon: <X size={15} />,
-          disabled: !onCloseTab,
-          onSelect: () => onCloseTab?.(tabPath),
-        },
-        {
-          type: "item",
-          id: "close-other-tabs",
-          label: t("files.closeOtherTabs"),
-          icon: <CopyX size={15} />,
-          disabled: !onCloseOtherTabs || visibleTabs.length <= 1,
-          onSelect: () => onCloseOtherTabs?.(tabPath),
-        },
-        {
-          type: "item",
-          id: "close-all-tabs",
-          label: t("files.closeAllTabs"),
-          icon: <PanelTopClose size={15} />,
-          disabled: !canCloseAllTabs,
-          onSelect: () => onCloseAllTabs?.(),
-        },
-        { type: "separator", id: "tab-detach-separator" },
-        {
-          type: "item",
-          id: "open-detached-tab",
-          label: t("files.openDetachedTab"),
-          icon: <ExternalLink size={15} />,
-          onSelect: () => handleOpenDetachedTab(tabPath),
-        },
-      ];
-      const position = clampRendererContextMenuPosition(
-        event.clientX,
-        event.clientY,
-        {
-          width: 248,
-          height: estimateRendererContextMenuHeight(items),
-          padding: 10,
-        },
-      );
-      setTabContextMenu({
-        ...position,
-        label: t("files.tabContextMenu"),
-        items,
+      buildFileViewTabContextMenu({
+        canCloseAllTabs,
+        event,
+        filePath,
+        gitBlame,
+        gitBlameEligible,
+        handleOpenDetachedTab,
+        handleTabGitBlame,
+        onActivateTab,
+        onCloseAllTabs,
+        onCloseOtherTabs,
+        onCloseTab,
+        onOpenFileHistory,
+        resolveTabGitScope,
+        setTabContextMenu,
+        t,
+        tabPath,
+        visibleTabs,
+        workspaceId,
+        workspacePath,
       });
     },
     [
@@ -2446,329 +1771,9 @@ export function FileViewPanel({
     ],
   );
 
-  useEffect(() => {
-    return () => {
-      splitResizeCleanupRef.current?.();
-      splitResizeCleanupRef.current = null;
-    };
-  }, []);
 
-  const handleFooterPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) {
-        return;
-      }
-      const target = event.target as HTMLElement | null;
-      if (
-        target?.closest(
-          "button,a,input,textarea,select,[role='button'],[role='menuitem']",
-        )
-      ) {
-        return;
-      }
-      const footer = event.currentTarget;
-      const splitRoot = footer.closest(
-        ".content.is-editor-split-vertical",
-      ) as HTMLElement | null;
-      if (!splitRoot) {
-        return;
-      }
-      const editorLayer = splitRoot.querySelector(
-        ".content-layer--editor",
-      ) as HTMLElement | null;
-      const chatLayer = splitRoot.querySelector(
-        ".content-layer--editor-companion",
-      ) as HTMLElement | null;
-      if (!editorLayer || !chatLayer) {
-        return;
-      }
-      const editorRect = editorLayer.getBoundingClientRect();
-      const chatRect = chatLayer.getBoundingClientRect();
-      const totalHeight = editorRect.height + chatRect.height;
-      if (totalHeight <= 0) {
-        return;
-      }
 
-      event.preventDefault();
 
-      const startY = event.clientY;
-      const startEditorHeight = editorRect.height;
-      const minEditorHeight = Math.max(140, totalHeight * 0.28);
-      const maxEditorHeight = Math.min(totalHeight - 120, totalHeight * 0.82);
-      if (maxEditorHeight <= minEditorHeight) {
-        return;
-      }
-
-      document.body.classList.add("editor-split-resizing");
-
-      const cleanup = () => {
-        window.removeEventListener("pointermove", handlePointerMove);
-        window.removeEventListener("pointerup", handlePointerUp);
-        window.removeEventListener("pointercancel", handlePointerUp);
-        document.body.classList.remove("editor-split-resizing");
-        splitResizeCleanupRef.current = null;
-      };
-
-      const handlePointerMove = (moveEvent: PointerEvent) => {
-        const deltaY = moveEvent.clientY - startY;
-        const nextHeight = Math.min(
-          maxEditorHeight,
-          Math.max(minEditorHeight, startEditorHeight + deltaY),
-        );
-        const nextRatio = (nextHeight / totalHeight) * 100;
-        splitRoot.style.setProperty(
-          "--editor-split-ratio",
-          nextRatio.toFixed(2),
-        );
-      };
-
-      const handlePointerUp = () => {
-        cleanup();
-      };
-
-      splitResizeCleanupRef.current?.();
-      splitResizeCleanupRef.current = cleanup;
-      window.addEventListener("pointermove", handlePointerMove);
-      window.addEventListener("pointerup", handlePointerUp);
-      window.addEventListener("pointercancel", handlePointerUp);
-    },
-    [],
-  );
-
-  const renderExternalChangeNotice = () => {
-    if (externalChangeSyncState === "in-sync") {
-      return null;
-    }
-    if (externalPendingRefresh) {
-      return (
-        <div
-          className="fvp-external-change-banner is-pending"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="fvp-external-change-banner-copy">
-            <strong>{t("files.externalChangePendingTitle")}</strong>
-            <span>
-              {t("files.externalChangePendingBody", {
-                count: externalPendingRefresh.updateCount,
-              })}
-            </span>
-          </div>
-          <div className="fvp-external-change-banner-actions">
-            <button
-              type="button"
-              className="ghost fvp-action-btn"
-              onClick={handleExternalToggleCompare}
-            >
-              {externalCompareOpen
-                ? t("files.externalChangeHideCompare")
-                : t("files.externalChangeCompare")}
-            </button>
-            <button
-              type="button"
-              className="ghost fvp-action-btn"
-              onClick={handleExternalKeepLocal}
-            >
-              {t("files.externalChangeKeepCurrent")}
-            </button>
-            <button
-              type="button"
-              className="primary fvp-action-btn"
-              onClick={handleExternalApplyPendingRefresh}
-            >
-              {t("files.externalChangeRefreshPreview")}
-            </button>
-          </div>
-        </div>
-      );
-    }
-    if (
-      externalChangeSyncState !== "external-changed-dirty" ||
-      !externalChangeConflict
-    ) {
-      return (
-        <div
-          className="fvp-external-change-banner is-auto-sync"
-          role="status"
-          aria-live="polite"
-        >
-          {t("files.externalChangeAutoSynced")}
-        </div>
-      );
-    }
-    return (
-      <div
-        className="fvp-external-change-banner is-conflict"
-        role="status"
-        aria-live="polite"
-      >
-        <div className="fvp-external-change-banner-copy">
-          <strong>{t("files.externalChangeConflictTitle")}</strong>
-          <span>
-            {t("files.externalChangeConflictBody", {
-              count: externalChangeConflict.updateCount,
-            })}
-          </span>
-        </div>
-        <div className="fvp-external-change-banner-actions">
-          <button
-            type="button"
-            className="ghost fvp-action-btn"
-            onClick={handleExternalToggleCompare}
-          >
-            {externalCompareOpen
-              ? t("files.externalChangeHideCompare")
-              : t("files.externalChangeCompare")}
-          </button>
-          <button
-            type="button"
-            className="ghost fvp-action-btn"
-            onClick={handleExternalKeepLocal}
-          >
-            {t("files.externalChangeKeepLocal")}
-          </button>
-          <button
-            type="button"
-            className="primary fvp-action-btn"
-            onClick={handleExternalReloadFromDisk}
-          >
-            {t("files.externalChangeReload")}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderExternalComparePanel = () => {
-    const diskSnapshot = externalChangeConflict ?? externalPendingRefresh;
-    if (!externalCompareOpen || !diskSnapshot) {
-      return null;
-    }
-    const latestLocalContent = editorDraftContentRef.current;
-    const localPreview =
-      latestLocalContent.length > 6_000
-        ? `${latestLocalContent.slice(0, 6_000)}\n\n...`
-        : latestLocalContent;
-    const diskPreview =
-      diskSnapshot.diskContent.length > 6_000
-        ? `${diskSnapshot.diskContent.slice(0, 6_000)}\n\n...`
-        : diskSnapshot.diskContent;
-    return (
-      <div className="fvp-external-compare">
-        <div className="fvp-external-compare-column">
-          <header>{t("files.externalChangeCompareLocal")}</header>
-          <pre>{localPreview}</pre>
-        </div>
-        <div className="fvp-external-compare-column">
-          <header>{t("files.externalChangeCompareDisk")}</header>
-          <pre>{diskPreview}</pre>
-        </div>
-      </div>
-    );
-  };
-
-  const renderTabs = (className?: string) => (
-    <div
-      ref={tabsContainerRef}
-      className={`fvp-tabs${className ? ` ${className}` : ""}`}
-      role="tablist"
-      aria-label="Open files"
-    >
-      <div className="fvp-tabs-track">
-        {visibleTabs.map((tabPath) => {
-          const isActive = (activeTabPath ?? filePath) === tabPath;
-          const tabName = tabPath.split("/").pop() || tabPath;
-          const tabGitStatus =
-            resolveMatchedGitStatusByPath(tabPath)?.status ?? null;
-          const tabGitStatusClass = tabGitStatus
-            ? `git-${tabGitStatus.toLowerCase()}`
-            : "";
-          const isDragging = draggingTabPath === tabPath;
-          const isDragOver =
-            Boolean(draggingTabPath) &&
-            dragOverTabPath === tabPath &&
-            draggingTabPath !== tabPath;
-          return (
-            <div
-              key={tabPath}
-              className={`fvp-tab ${isActive ? "is-active" : ""} ${
-                isDragging ? "is-dragging" : ""
-              } ${isDragOver ? "is-drag-over" : ""} ${tabGitStatusClass}`
-                .replace(/\s+/g, " ")
-                .trim()}
-              role="presentation"
-              data-tab-path={tabPath}
-              data-tauri-drag-region={canReorderTabs ? "false" : undefined}
-              onPointerDown={
-                canReorderTabs
-                  ? (event) => handleTabPointerDown(event, tabPath)
-                  : undefined
-              }
-              onPointerMove={canReorderTabs ? handleTabPointerMove : undefined}
-              onPointerUp={canReorderTabs ? handleTabPointerUp : undefined}
-              onPointerCancel={canReorderTabs ? endTabDrag : undefined}
-            >
-              <button
-                type="button"
-                className="fvp-tab-main"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => {
-                  if (suppressTabClickRef.current) {
-                    suppressTabClickRef.current = false;
-                    return;
-                  }
-                  onActivateTab?.(tabPath);
-                }}
-                onDoubleClick={() => onToggleEditorFileMaximized?.()}
-                onContextMenu={(event) => openTabContextMenu(event, tabPath)}
-                title={tabPath}
-                data-tauri-drag-region="false"
-              >
-                <span className="fvp-tab-main-content">
-                  <span
-                    className="fvp-tab-icon"
-                    aria-hidden="true"
-                    dangerouslySetInnerHTML={{
-                      __html: getFileTreeIconSvg(tabName, false),
-                    }}
-                  />
-                  <span className="fvp-tab-main-label">{tabName}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="fvp-tab-detach"
-                aria-label={t("files.openDetachedTabFor", { name: tabName })}
-                title={t("files.openDetachedTab")}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  handleOpenDetachedTab(tabPath);
-                }}
-                onContextMenu={(event) => openTabContextMenu(event, tabPath)}
-                data-tauri-drag-region="false"
-              >
-                <ExternalLink size={11} aria-hidden />
-              </button>
-              {onCloseTab ? (
-                <button
-                  type="button"
-                  className="fvp-tab-close"
-                  aria-label={`Close ${tabName}`}
-                  onClick={() => onCloseTab(tabPath)}
-                  onContextMenu={(event) => openTabContextMenu(event, tabPath)}
-                  data-tauri-drag-region="false"
-                >
-                  <X size={11} aria-hidden />
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
 
   const renderHeader = () => (
     <div className="fvp-header-row">
@@ -2813,7 +1818,30 @@ export function FileViewPanel({
           </button>
         </>
       )}
-      <div className="fvp-header-row-tabs">{renderTabs("fvp-tabs-inline")}</div>
+      <div className="fvp-header-row-tabs">
+        <FileViewPanelTabs
+          className="fvp-tabs-inline"
+          tabsContainerRef={tabsContainerRef}
+          visibleTabs={visibleTabs}
+          activeTabPath={activeTabPath}
+          filePath={filePath}
+          resolveMatchedGitStatusByPath={resolveMatchedGitStatusByPath}
+          draggingTabPath={draggingTabPath}
+          dragOverTabPath={dragOverTabPath}
+          canReorderTabs={canReorderTabs}
+          handleTabPointerDown={handleTabPointerDown}
+          handleTabPointerMove={handleTabPointerMove}
+          handleTabPointerUp={handleTabPointerUp}
+          endTabDrag={endTabDrag}
+          suppressTabClickRef={suppressTabClickRef}
+          onActivateTab={onActivateTab}
+          onToggleEditorFileMaximized={onToggleEditorFileMaximized}
+          openTabContextMenu={openTabContextMenu}
+          handleOpenDetachedTab={handleOpenDetachedTab}
+          onCloseTab={onCloseTab}
+          t={t}
+        />
+      </div>
       <div className="fvp-header-row-right">
         {effectiveIsDirty ? (
           <span
@@ -2902,203 +1930,6 @@ export function FileViewPanel({
     />
   );
 
-  const navigationModeLabel =
-    navigationStatus?.phase === "loading"
-      ? t("files.navigationPreparing")
-      : navigationStatus?.phase === "indexing"
-        ? navigationStatus.lifecycle === "indexing"
-          ? t("files.navigationIndexing")
-          : t("files.navigationTemporarilyDegraded")
-        : navigationStatus?.mode === "semantic"
-          ? t("files.navigationModeSemantic")
-          : navigationStatus
-            ? navigationStatus.fallbackReasonCode
-              ? t("files.navigationModeFastSearchFallback")
-              : t("files.navigationModeFastSearch")
-            : null;
-  const renderFooter = () => (
-    <div
-      className="fvp-footer"
-      onPointerDown={handleFooterPointerDown}
-      title={t("layout.resizePlanPanel")}
-    >
-      <div className="fvp-footer-left">
-        {canEditDocument && mode === "edit" && effectiveIsDirty && (
-          <span className="fvp-footer-hint">
-            <span className="fvp-dirty-dot" />
-            {t("files.unsavedChanges")}
-            <span className="fvp-footer-shortcut">
-              {t("files.saveShortcut")}
-            </span>
-          </span>
-        )}
-        {canEditDocument && mode === "edit" && !effectiveIsDirty && (
-          <span className="fvp-footer-hint fvp-footer-saved">
-            {t("files.saved")}
-          </span>
-        )}
-        {mode === "preview" && (truncated || !canEditDocument) && (
-          <span className="fvp-footer-hint">{t("files.readOnly")}</span>
-        )}
-        {navigationStatus && navigationModeLabel ? (
-          <span
-            className={`fvp-navigation-mode is-${navigationStatus.phase}`}
-            title={navigationStatus.provider}
-          >
-            {navigationModeLabel}
-            {navigationStatus.language ? ` · ${navigationStatus.language}` : ""}
-          </span>
-        ) : null}
-      </div>
-      <div className="fvp-footer-right">
-        {fileReferenceShouldRender ? (
-          <div
-            className={`fvp-file-reference-bar${fileReferenceVisible ? " is-visible" : ""}`}
-            role="group"
-            aria-label={t("composer.fileReference")}
-          >
-            <span className="fvp-file-reference-label">
-              {t("composer.activeFile")}:
-            </span>
-            <code className="fvp-file-reference-path" title={filePath}>
-              {filePath.split("/").pop() || filePath}
-            </code>
-            {activeFileLineLabel ? (
-              <span className="fvp-file-reference-lines">
-                {activeFileLineLabel}
-              </span>
-            ) : null}
-            {viewSurface.kind === "editor" && activeAnnotationLineRange ? (
-              <button
-                type="button"
-                className="fvp-annotation-trigger fvp-file-reference-annotation"
-                onClick={handleStartEditorAnnotation}
-              >
-                {t("files.annotateForAi")}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        {mode === "edit" && (gitBlameEligible || gitBlame.enabled) ? (
-          <button
-            type="button"
-            className={`ghost fvp-action-btn fvp-git-blame-toggle${
-              gitBlame.enabled ? " is-active" : ""
-            }${gitBlame.status === "error" ? " is-error" : ""}`}
-            aria-label={gitBlameActionLabel}
-            aria-pressed={gitBlame.enabled}
-            title={gitBlameActionLabel}
-            onClick={gitBlame.toggle}
-            disabled={!gitBlameEligible && !gitBlame.enabled}
-          >
-            <GitCommitHorizontal size={12} aria-hidden />
-          </button>
-        ) : null}
-        {canEditDocument ? (
-          mode === "preview" ? (
-            <button
-              type="button"
-              className="ghost fvp-action-btn fvp-mode-toggle"
-              aria-label={t("files.edit")}
-              title={t("files.edit")}
-              onClick={handleEnterEdit}
-              disabled={truncated}
-            >
-              <Pencil size={12} aria-hidden />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="ghost fvp-action-btn fvp-mode-toggle"
-              aria-label={t("files.preview")}
-              title={t("files.preview")}
-              onClick={handleEnterPreview}
-            >
-              <Eye size={12} aria-hidden />
-            </button>
-          )
-        ) : null}
-        {mode === "preview" && onInsertText && content.trim().length > 0 && (
-          <button
-            type="button"
-            className="ghost fvp-action-btn"
-            onClick={() => {
-              const reference = buildFileChatReference(filePath);
-              if (reference) {
-                onInsertText(reference);
-              }
-            }}
-          >
-            {t("files.addToChat")}
-          </button>
-        )}
-        {!skipTextRead && !truncated ? (
-          <button
-            type="button"
-            className="ghost fvp-action-btn fvp-find-toggle"
-            aria-label={t("files.openFind")}
-            title={t("files.openFind")}
-            onClick={handleOpenFindPanel}
-          >
-            <FileSearch size={12} aria-hidden />
-          </button>
-        ) : null}
-        {onToggleEditorFileMaximized ? (
-          <button
-            type="button"
-            className="ghost fvp-action-btn fvp-maximize-toggle"
-            aria-label={
-              isEditorFileMaximized ? t("common.restore") : t("menu.maximize")
-            }
-            title={
-              isEditorFileMaximized ? t("common.restore") : t("menu.maximize")
-            }
-            onClick={onToggleEditorFileMaximized}
-          >
-            {isEditorFileMaximized ? (
-              <Minimize2 size={12} aria-hidden />
-            ) : (
-              <Maximize2 size={12} aria-hidden />
-            )}
-          </button>
-        ) : null}
-        {onToggleEditorSplitLayout ? (
-          <button
-            type="button"
-            className={`ghost fvp-action-btn fvp-layout-toggle${
-              editorSplitLayout === "horizontal" ? " is-side-by-side" : ""
-            }`}
-            aria-label={
-              editorSplitLayout === "horizontal"
-                ? t("files.switchToStackedSplit")
-                : t("files.switchToSideBySideSplit")
-            }
-            title={
-              editorSplitLayout === "horizontal"
-                ? t("files.switchToStackedSplit")
-                : t("files.switchToSideBySideSplit")
-            }
-            onClick={onToggleEditorSplitLayout}
-          >
-            {editorSplitLayout === "horizontal" ? (
-              <Rows2 size={12} aria-hidden />
-            ) : (
-              <Columns2 size={12} aria-hidden />
-            )}
-          </button>
-        ) : null}
-        <OpenAppMenu
-          path={absolutePath || workspacePath}
-          activeFilePath={absolutePath}
-          openTargets={openTargets}
-          selectedOpenAppId={selectedOpenAppId}
-          onSelectOpenAppId={onSelectOpenAppId}
-          iconById={openAppIconById}
-          menuPlacement="up"
-        />
-      </div>
-    </div>
-  );
 
   const renderNavigationPanel = () => (
     <FileViewNavigationPanel
@@ -3137,13 +1968,56 @@ export function FileViewPanel({
           className="renderer-context-menu fvp-tab-context-menu fvp-file-context-menu"
         />
       ) : null}
-      {renderExternalChangeNotice()}
-      {renderExternalComparePanel()}
+      <FileViewExternalChangeOverlays
+        externalChangeSyncState={externalChangeSyncState}
+        externalPendingRefresh={externalPendingRefresh}
+        externalChangeConflict={externalChangeConflict}
+        externalCompareOpen={externalCompareOpen}
+        handleExternalToggleCompare={handleExternalToggleCompare}
+        handleExternalKeepLocal={handleExternalKeepLocal}
+        handleExternalApplyPendingRefresh={handleExternalApplyPendingRefresh}
+        handleExternalReloadFromDisk={handleExternalReloadFromDisk}
+        editorDraftContentRef={editorDraftContentRef}
+        t={t}
+      />
       <div className="fvp-body" onContextMenu={openFileContextMenu}>
         {renderContent()}
       </div>
       {renderNavigationPanel()}
-      {renderFooter()}
+      <FileViewPanelFooter
+        canEditDocument={canEditDocument}
+        mode={mode}
+        effectiveIsDirty={effectiveIsDirty}
+        truncated={truncated}
+        navigationStatus={navigationStatus}
+        fileReferenceShouldRender={fileReferenceShouldRender}
+        fileReferenceVisible={fileReferenceVisible}
+        filePath={filePath}
+        activeFileLineLabel={activeFileLineLabel}
+        viewSurface={viewSurface}
+        activeAnnotationLineRange={activeAnnotationLineRange}
+        handleStartEditorAnnotation={handleStartEditorAnnotation}
+        gitBlameEligible={gitBlameEligible}
+        gitBlame={gitBlame}
+        gitBlameActionLabel={gitBlameActionLabel}
+        handleEnterEdit={handleEnterEdit}
+        handleEnterPreview={handleEnterPreview}
+        onInsertText={onInsertText}
+        content={content}
+        skipTextRead={skipTextRead}
+        handleOpenFindPanel={handleOpenFindPanel}
+        onToggleEditorFileMaximized={onToggleEditorFileMaximized}
+        isEditorFileMaximized={isEditorFileMaximized}
+        onToggleEditorSplitLayout={onToggleEditorSplitLayout}
+        editorSplitLayout={editorSplitLayout}
+        absolutePath={absolutePath}
+        workspacePath={workspacePath}
+        openTargets={openTargets}
+        selectedOpenAppId={selectedOpenAppId}
+        onSelectOpenAppId={onSelectOpenAppId}
+        openAppIconById={openAppIconById}
+        t={t}
+      />
     </div>
   );
 }

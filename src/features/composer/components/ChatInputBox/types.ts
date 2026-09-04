@@ -43,16 +43,7 @@ export interface Attachment {
 /**
  * Code snippet (from editor selection)
  */
-export interface CodeSnippet {
-  /** Unique identifier */
-  id: string;
-  /** File path (relative) */
-  filePath: string;
-  /** Start line number */
-  startLine?: number;
-  /** End line number */
-  endLine?: number;
-}
+
 
 /**
  * Image media type constants
@@ -370,7 +361,7 @@ export interface ProviderInfo {
   enabled: boolean;
 }
 
-export type ProviderId = "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+export type ProviderId = "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
 export type ProviderModelCatalogs = Partial<Record<ProviderId, ModelInfo[]>>;
 /** Atomic 双栏 catalog 语义：Shared 持久化 vs 首页/会话 create-session 投影。 */
 export type ProviderTargetPickerMode = 'shared' | 'create-session';
@@ -388,6 +379,7 @@ export const AVAILABLE_PROVIDERS: ProviderInfo[] = [
   { id: 'kimi', label: 'Kimi CLI', icon: 'codicon-terminal', enabled: false },
   { id: 'opencode', label: 'OpenCode', icon: 'codicon-terminal', enabled: true },
   { id: 'pi', label: 'PI CLI', icon: 'codicon-terminal', enabled: true },
+  { id: 'omp', label: 'OMP CLI', icon: 'codicon-terminal', enabled: true },
   { id: 'dsh', label: 'DeepSeek Harness', icon: 'codicon-terminal', enabled: true },
   { id: 'qoder', label: 'Qoder CLI', icon: 'codicon-terminal', enabled: true },
 ];
@@ -470,14 +462,7 @@ export const REASONING_LEVELS: ReasoningInfo[] = [
 /**
  * Usage information
  */
-export interface UsageInfo {
-  /** Usage percentage (0-100) */
-  percentage: number;
-  /** Used amount */
-  used?: number;
-  /** Total amount */
-  total?: number;
-}
+
 
 export type ContextCompactionState = 'idle' | 'compacting' | 'compacted';
 export type CodexCompactionSource = 'auto' | 'manual';

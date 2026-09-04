@@ -2,7 +2,6 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ProxyStatusBadge } from "../../../../components/ProxyStatusBadge";
 import type { PresentationProfile } from "../../../../conversation-presentation/presentationProfile";
-import { isWindowsPlatform } from "../../../../utils/platform";
 import {
   useActiveCanvasSelector,
   type ActiveCanvasSnapshot,
@@ -19,6 +18,7 @@ import {
   selectWorkingIndicatorLiveTokenSnapshot,
   type WorkingIndicatorLiveTokenSnapshot,
 } from "../../utils/workingIndicatorLiveTokens";
+import { AgentThinking } from "./AgentThinking";
 
 function selectLiveTokenSnapshot(
   snapshot: ActiveCanvasSnapshot,
@@ -36,92 +36,6 @@ function areLiveTokenSnapshotsEqual(
   return (
     left.tokenCount === right.tokenCount &&
     left.usageUpdatedAt === right.usageUpdatedAt
-  );
-}
-
-export const WORKING_GLYPH_FRAMES = [
-  "⠋",
-  "⠙",
-  "⠹",
-  "⠸",
-  "⠼",
-  "⠴",
-  "⠦",
-  "⠧",
-  "⠇",
-  "⠏",
-] as const;
-export const WORKING_GLYPH_FRAME_MS = 80;
-
-function SvgDashSpinner() {
-  return (
-    <svg
-      className="working-spinner working-spinner-dash"
-      viewBox="0 0 14 14"
-      width={14}
-      height={14}
-      aria-hidden
-    >
-      <circle cx="7" cy="7" r="5.2" />
-    </svg>
-  );
-}
-
-function GlyphFrameSpinner() {
-  const glyphRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const glyphNode = glyphRef.current;
-    if (!glyphNode) {
-      return undefined;
-    }
-    let frameIndex = 0;
-    const intervalId = window.setInterval(() => {
-      frameIndex = (frameIndex + 1) % WORKING_GLYPH_FRAMES.length;
-      glyphNode.textContent = WORKING_GLYPH_FRAMES[frameIndex];
-    }, WORKING_GLYPH_FRAME_MS);
-    return () => window.clearInterval(intervalId);
-  }, []);
-
-  return (
-    <span
-      ref={glyphRef}
-      className="working-spinner working-spinner-glyph"
-      aria-hidden
-    >
-      {WORKING_GLYPH_FRAMES[0]}
-    </span>
-  );
-}
-
-function WorkingSpinner() {
-  return isWindowsPlatform() ? <GlyphFrameSpinner /> : <SvgDashSpinner />;
-}
-
-/**
- * 每秒计时器走 ref 直写 textContent（与 GlyphFrameSpinner 同模式），
- * 避免秒级 setState 让整个 WorkingIndicator 每秒重渲染。
- */
-function WorkingClock({ startedAt }: { startedAt: number }) {
-  const clockRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const clockNode = clockRef.current;
-    if (!clockNode) {
-      return undefined;
-    }
-    const update = () => {
-      clockNode.textContent = formatDurationMs(Date.now() - startedAt);
-    };
-    update();
-    const intervalId = window.setInterval(update, 1000);
-    return () => window.clearInterval(intervalId);
-  }, [startedAt]);
-
-  return (
-    <span ref={clockRef} className="working-timer-clock">
-      {formatDurationMs(Math.max(0, Date.now() - startedAt))}
-    </span>
   );
 }
 
@@ -146,8 +60,9 @@ type WorkingIndicatorProps = {
 };
 
 /**
- * Unified working indicator — Claude Code style.
- * Spinner + timer + optional live tokens + fixed "响应中..." status always;
+ * Unified working indicator.
+ * AgentThinking (BoardUI, dot-spin variant) + timer anchored to the turn start
+ * + optional live tokens + fixed "响应中..." status always;
  * special primary / tool activity optional.
  * Does not echo reasoning first-line (that belongs in ReasoningRow).
  * Live tokens are read from the canvas selector so usage jitter stays off the
@@ -318,30 +233,25 @@ export const WorkingIndicator = memo(function WorkingIndicator({
               className="working-proxy-badge"
             />
           )}
-          <WorkingSpinner />
-          <div className="working-timer">
-            {processingStartedAt ? (
-              <WorkingClock startedAt={processingStartedAt} />
-            ) : (
-              <span className="working-timer-clock">{formatDurationMs(0)}</span>
-            )}
-            {liveTokenLabel ? (
-              <>
-                <span className="working-timer-separator" aria-hidden>
-                  ·
-                </span>
-                <span className="working-timer-tokens">{liveTokenLabel}</span>
-              </>
-            ) : null}
-          </div>
-          <span
-            className="working-text"
+          <AgentThinking
+            variant="spin"
+            label={displayPrimaryLabel}
+            startedAt={processingStartedAt}
+            labelClassName="working-text"
+            timerClassName="working-timer-clock"
+            className="working-agent-thinking"
             data-background-task-awaiting={
               isBackgroundTaskAwaiting ? "true" : undefined
             }
-          >
-            {displayPrimaryLabel}
-          </span>
+          />
+          {liveTokenLabel ? (
+            <span className="working-timer">
+              <span className="working-timer-separator" aria-hidden>
+                ·
+              </span>
+              <span className="working-timer-tokens">{liveTokenLabel}</span>
+            </span>
+          ) : null}
           {isBackgroundTaskAwaiting && backgroundTaskRunningCount > 0 ? (
             <span className="working-activity" data-background-task-awaiting>
               {t("messages.backgroundTaskAwaitingContinuation", {

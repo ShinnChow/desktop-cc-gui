@@ -47,6 +47,4 @@ export function buildWorkspaceHeaderGroups(
   }));
 }
 
-export const workspaceHeaderGroupsInternals = {
-  sortByOrderAndName,
-};
+

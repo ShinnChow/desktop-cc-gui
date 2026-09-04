@@ -101,23 +101,5 @@ export type LocalUsageUsageData = {
   totalTokens: number;
 };
 
-export type LocalUsageSessionSummary = {
-  sessionId: string;
-  sessionIdAliases?: string[];
-  parentSessionId?: string | null;
-  timestamp: number;
-  model: string;
-  usage: LocalUsageUsageData;
-  cost: number;
-  summary?: string | null;
-  source?: string | null;
-  provider?: string | null;
-  providerProfileId?: string | null;
-  providerProfileSource?: string | null;
-  providerProfileName?: string | null;
-  providerAvailability?: string | null;
-  physicalPath?: string | null;
-  fileSizeBytes?: number;
-  modifiedLines?: number;
-};
+
 

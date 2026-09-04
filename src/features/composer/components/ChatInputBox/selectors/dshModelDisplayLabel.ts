@@ -22,7 +22,7 @@ export type DshModelDisplayLabelOptions = {
   disambiguate?: boolean;
 };
 
-const SLASH_CATALOG_ENGINES = new Set(["dsh", "pi"]);
+const SLASH_CATALOG_ENGINES = new Set(["dsh", "pi", "omp"]);
 
 export function isSlashCatalogEngine(
   providerId: string | null | undefined,

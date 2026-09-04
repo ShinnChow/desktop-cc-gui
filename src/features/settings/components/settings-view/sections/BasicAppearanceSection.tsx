@@ -1,5 +1,5 @@
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Activity from "lucide-react/dist/esm/icons/activity";
 import AppWindow from "lucide-react/dist/esm/icons/app-window";
@@ -67,7 +67,9 @@ import {
   CODE_FONT_SIZE_DEFAULT,
   DEFAULT_CODE_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
+  clampCodeFontSize,
   listCodeFontSizeSelectOptions,
+  normalizeFontFamily,
 } from "../../../../../utils/fonts";
 import { useDockIconSrc } from "../../../../theme/hooks/useDockIconSrc";
 import {
@@ -96,6 +98,29 @@ import {
 } from "../../../../theme/utils/workspaceWallpaper";
 import { LanguageSelector } from "../../LanguageSelector";
 import { SyntaxAndDiffPreview } from "./SyntaxAndDiffPreview";
+import { HomeAppearanceSettings } from "../../../../home/components/HomeAppearanceSettings";
+import {
+  getContrastingTextColor,
+  HEX_COLOR_PATTERN,
+  normalizeHexColor,
+} from "../../../../../utils/colorUtils";
+import {
+  applyUserMessageBubbleCssVars,
+  DEFAULT_DARK_USER_MSG,
+  DEFAULT_LIGHT_USER_MSG,
+  extractPrimaryFontFamily,
+  formatFontFamilySetting,
+  listLocalUiFonts,
+  USER_MSG_DARK_PRESETS,
+  USER_MSG_LIGHT_PRESETS,
+} from "../settingsViewAppearance";
+import {
+  buildSettingsWithCustomThemePreset,
+  getAllThemePresetOptions,
+  resolveActiveThemePresetId,
+  resolveEffectiveThemeAppearance,
+} from "../../../../theme/utils/themePreset";
+import { useSystemResolvedTheme } from "../hooks/useSystemResolvedTheme";
 
 type BasicAppearanceSectionProps = {
   appSettings: AppSettings;
@@ -104,37 +129,11 @@ type BasicAppearanceSectionProps = {
   onToggleWindowTransparency: (enabled: boolean) => void;
   windowOpacity: number;
   onWindowOpacityChange: (next: number) => void;
-  activeThemePresetId: ThemePresetId;
-  resolvedAppearanceTheme: "light" | "dark";
-  themePresetOptions: ReadonlyArray<{ id: ThemePresetId; label: string }>;
-  onThemePresetChange: (presetId: ThemePresetId) => Promise<void>;
   uiScaleDraft: number;
   handleCommitUiScale: (next: number) => void;
   handleResetUiScale: () => void;
   scaleShortcutTitle: string;
   scaleShortcutText: string;
-  userMsgPresets: ReadonlyArray<{ color: string; label: string }>;
-  isUserMsgPresetActive: (presetColor: string) => boolean;
-  handleUserMsgPresetClick: (presetColor: string) => void;
-  normalizedUserMsgColor: string | null;
-  defaultUserMsgColor: string;
-  handleUserMsgColorPickerChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  userMsgHexDraft: string;
-  handleUserMsgHexInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  handleResetUserMsgColor: () => void;
-  uiFontDraft: string;
-  handleUiFontSelectChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
-  uiFontSelectOptions: string[];
-  defaultUiPrimaryFont: string;
-  setUiFontDraft: (next: string) => void;
-  codeFontDraft: string;
-  codeFontSelectOptions: string[];
-  handleCodeFontSelectChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
-  defaultCodePrimaryFont: string;
-  setCodeFontDraft: (next: string) => void;
-  codeFontSizeDraft: number;
-  setCodeFontSizeDraft: (next: number) => void;
-  handleCommitCodeFontSize: (nextSize: number) => Promise<void>;
 };
 
 const CLIENT_UI_VISIBILITY_ICON_COMPONENTS: Record<ClientUiVisibilityIconKey, LucideIcon> = {
@@ -364,40 +363,306 @@ export function BasicAppearanceSection({
   onToggleWindowTransparency,
   windowOpacity,
   onWindowOpacityChange,
-  activeThemePresetId,
-  resolvedAppearanceTheme,
-  themePresetOptions,
-  onThemePresetChange,
   // Scale props retained for call-site stability; feature locked to 100%.
   uiScaleDraft: _uiScaleDraft,
   handleCommitUiScale: _handleCommitUiScale,
   handleResetUiScale: _handleResetUiScale,
   scaleShortcutTitle: _scaleShortcutTitle,
   scaleShortcutText: _scaleShortcutText,
-  userMsgPresets,
-  isUserMsgPresetActive,
-  handleUserMsgPresetClick,
-  normalizedUserMsgColor,
-  defaultUserMsgColor,
-  handleUserMsgColorPickerChange,
-  userMsgHexDraft,
-  handleUserMsgHexInputChange,
-  handleResetUserMsgColor,
-  uiFontDraft,
-  handleUiFontSelectChange,
-  uiFontSelectOptions,
-  defaultUiPrimaryFont,
-  setUiFontDraft,
-  codeFontDraft,
-  codeFontSelectOptions,
-  handleCodeFontSelectChange,
-  defaultCodePrimaryFont,
-  setCodeFontDraft,
-  codeFontSizeDraft,
-  setCodeFontSizeDraft,
-  handleCommitCodeFontSize,
 }: BasicAppearanceSectionProps) {
   const { t } = useTranslation();
+  const [uiFontDraft, setUiFontDraft] = useState(
+    () =>
+      extractPrimaryFontFamily(appSettings.uiFontFamily) ||
+      extractPrimaryFontFamily(DEFAULT_UI_FONT_FAMILY),
+  );
+  const [uiFontOptions, setUiFontOptions] = useState<string[]>([]);
+  const [codeFontDraft, setCodeFontDraft] = useState(
+    () =>
+      extractPrimaryFontFamily(appSettings.codeFontFamily) ||
+      extractPrimaryFontFamily(DEFAULT_CODE_FONT_FAMILY),
+  );
+  const [codeFontSizeDraft, setCodeFontSizeDraft] = useState(
+    appSettings.codeFontSize,
+  );
+  const [userMsgHexDraft, setUserMsgHexDraft] = useState(() =>
+    normalizeHexColor(appSettings.userMsgColor),
+  );
+  const systemResolvedTheme = useSystemResolvedTheme();
+  const normalizedUserMsgColor = useMemo(
+    () => normalizeHexColor(appSettings.userMsgColor),
+    [appSettings.userMsgColor],
+  );
+  const resolvedAppearanceTheme = useMemo<"light" | "dark">(
+    () =>
+      resolveEffectiveThemeAppearance(
+        {
+          theme: appSettings.theme,
+          lightThemePresetId: appSettings.lightThemePresetId,
+          darkThemePresetId: appSettings.darkThemePresetId,
+          customThemePresetId: appSettings.customThemePresetId,
+        },
+        systemResolvedTheme,
+      ),
+    [
+      appSettings.customThemePresetId,
+      appSettings.darkThemePresetId,
+      appSettings.lightThemePresetId,
+      appSettings.theme,
+      systemResolvedTheme,
+    ],
+  );
+  const activeThemePresetId = useMemo(
+    () =>
+      resolveActiveThemePresetId(
+        {
+          theme: appSettings.theme,
+          darkThemePresetId: appSettings.darkThemePresetId,
+          lightThemePresetId: appSettings.lightThemePresetId,
+          customThemePresetId: appSettings.customThemePresetId,
+        },
+        systemResolvedTheme,
+      ),
+    [
+      appSettings.customThemePresetId,
+      appSettings.darkThemePresetId,
+      appSettings.lightThemePresetId,
+      appSettings.theme,
+      systemResolvedTheme,
+    ],
+  );
+  const themePresetOptions = useMemo(
+    () =>
+      getAllThemePresetOptions().map((preset) => ({
+        id: preset.id,
+        label: t(preset.labelKey),
+      })),
+    [t],
+  );
+  const handleThemePresetChange = useCallback(
+    async (presetId: ThemePresetId) => {
+      await onUpdateAppSettings(
+        buildSettingsWithCustomThemePreset(appSettings, presetId),
+      );
+    },
+    [appSettings, onUpdateAppSettings],
+  );
+  const userMsgPresets = useMemo(
+    () =>
+      resolvedAppearanceTheme === "light"
+        ? USER_MSG_LIGHT_PRESETS
+        : USER_MSG_DARK_PRESETS,
+    [resolvedAppearanceTheme],
+  );
+  const defaultUserMsgColor =
+    resolvedAppearanceTheme === "light"
+      ? DEFAULT_LIGHT_USER_MSG
+      : DEFAULT_DARK_USER_MSG;
+  const defaultUiPrimaryFont = useMemo(
+    () => extractPrimaryFontFamily(DEFAULT_UI_FONT_FAMILY),
+    [],
+  );
+  const uiFontSelectOptions = useMemo(() => {
+    const options = new Set<string>(uiFontOptions);
+    const currentPrimary = extractPrimaryFontFamily(appSettings.uiFontFamily);
+    if (defaultUiPrimaryFont) {
+      options.add(defaultUiPrimaryFont);
+    }
+    if (currentPrimary) {
+      options.add(currentPrimary);
+    }
+    if (uiFontDraft) {
+      options.add(uiFontDraft);
+    }
+    return Array.from(options).sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: "base" }),
+    );
+  }, [
+    appSettings.uiFontFamily,
+    defaultUiPrimaryFont,
+    uiFontDraft,
+    uiFontOptions,
+  ]);
+  const defaultCodePrimaryFont = useMemo(
+    () => extractPrimaryFontFamily(DEFAULT_CODE_FONT_FAMILY),
+    [],
+  );
+  const codeFontSelectOptions = useMemo(() => {
+    const options = new Set<string>(uiFontOptions);
+    const currentPrimary = extractPrimaryFontFamily(appSettings.codeFontFamily);
+    if (defaultCodePrimaryFont) {
+      options.add(defaultCodePrimaryFont);
+    }
+    if (currentPrimary) {
+      options.add(currentPrimary);
+    }
+    if (codeFontDraft) {
+      options.add(codeFontDraft);
+    }
+    return Array.from(options).sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: "base" }),
+    );
+  }, [
+    appSettings.codeFontFamily,
+    codeFontDraft,
+    defaultCodePrimaryFont,
+    uiFontOptions,
+  ]);
+  useEffect(() => {
+    let active = true;
+    void listLocalUiFonts()
+      .then((fonts) => {
+        if (active) {
+          setUiFontOptions(fonts);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setUiFontOptions([]);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  useEffect(() => {
+    const nextPrimaryFont =
+      extractPrimaryFontFamily(appSettings.uiFontFamily) ||
+      extractPrimaryFontFamily(DEFAULT_UI_FONT_FAMILY);
+    setUiFontDraft(nextPrimaryFont);
+  }, [appSettings.uiFontFamily]);
+  useEffect(() => {
+    const nextPrimaryFont =
+      extractPrimaryFontFamily(appSettings.codeFontFamily) ||
+      extractPrimaryFontFamily(DEFAULT_CODE_FONT_FAMILY);
+    setCodeFontDraft(nextPrimaryFont);
+  }, [appSettings.codeFontFamily]);
+  useEffect(() => {
+    setCodeFontSizeDraft(appSettings.codeFontSize);
+  }, [appSettings.codeFontSize]);
+  useEffect(() => {
+    setUserMsgHexDraft(normalizedUserMsgColor);
+  }, [normalizedUserMsgColor]);
+  const handleCommitUiFont = useCallback(
+    async (selectedFontName: string) => {
+      const normalizedFontName = selectedFontName.trim();
+      const nextFont = normalizeFontFamily(
+        formatFontFamilySetting(normalizedFontName),
+        DEFAULT_UI_FONT_FAMILY,
+      );
+      if (nextFont === appSettings.uiFontFamily) {
+        return;
+      }
+      await onUpdateAppSettings({
+        ...appSettings,
+        uiFontFamily: nextFont,
+      });
+    },
+    [appSettings, onUpdateAppSettings],
+  );
+  const handleUiFontSelectChange = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const nextFontName = event.target.value;
+      setUiFontDraft(nextFontName);
+      void handleCommitUiFont(nextFontName);
+    },
+    [handleCommitUiFont],
+  );
+  const handleCommitCodeFont = useCallback(
+    async (selectedFontName: string) => {
+      const normalizedFontName = selectedFontName.trim();
+      const nextFont = normalizeFontFamily(
+        formatFontFamilySetting(normalizedFontName),
+        DEFAULT_CODE_FONT_FAMILY,
+      );
+      if (nextFont === appSettings.codeFontFamily) {
+        return;
+      }
+      await onUpdateAppSettings({
+        ...appSettings,
+        codeFontFamily: nextFont,
+      });
+    },
+    [appSettings, onUpdateAppSettings],
+  );
+  const handleCodeFontSelectChange = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const nextFontName = event.target.value;
+      setCodeFontDraft(nextFontName);
+      void handleCommitCodeFont(nextFontName);
+    },
+    [handleCommitCodeFont],
+  );
+  const handleCommitCodeFontSize = async (nextSize: number) => {
+    const clampedSize = clampCodeFontSize(nextSize);
+    setCodeFontSizeDraft(clampedSize);
+    if (clampedSize === appSettings.codeFontSize) {
+      return;
+    }
+    await onUpdateAppSettings({
+      ...appSettings,
+      codeFontSize: clampedSize,
+    });
+  };
+  const handleSaveUserMsgColor = useCallback(
+    async (nextColor: string) => {
+      const normalized = normalizeHexColor(nextColor);
+      applyUserMessageBubbleCssVars(
+        normalized || null,
+        normalized ? getContrastingTextColor(normalized) : null,
+      );
+      if (normalized === normalizedUserMsgColor) {
+        return;
+      }
+      await onUpdateAppSettings({
+        ...appSettings,
+        userMsgColor: normalized,
+      });
+    },
+    [appSettings, normalizedUserMsgColor, onUpdateAppSettings],
+  );
+  const handleUserMsgPresetClick = useCallback(
+    (presetColor: string) => {
+      const normalizedPreset = presetColor.toLowerCase();
+      const nextColor =
+        normalizedPreset === defaultUserMsgColor ? "" : normalizedPreset;
+      setUserMsgHexDraft(nextColor);
+      void handleSaveUserMsgColor(nextColor);
+    },
+    [defaultUserMsgColor, handleSaveUserMsgColor],
+  );
+  const handleUserMsgColorPickerChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const nextColor = normalizeHexColor(event.target.value);
+      setUserMsgHexDraft(nextColor);
+      void handleSaveUserMsgColor(nextColor);
+    },
+    [handleSaveUserMsgColor],
+  );
+  const handleUserMsgHexInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const nextValue = event.target.value;
+      setUserMsgHexDraft(nextValue);
+      if (HEX_COLOR_PATTERN.test(nextValue)) {
+        void handleSaveUserMsgColor(nextValue);
+      }
+    },
+    [handleSaveUserMsgColor],
+  );
+  const handleResetUserMsgColor = useCallback(() => {
+    setUserMsgHexDraft("");
+    void handleSaveUserMsgColor("");
+  }, [handleSaveUserMsgColor]);
+  const isUserMsgPresetActive = useCallback(
+    (presetColor: string) => {
+      const normalizedPreset = presetColor.toLowerCase();
+      if (!normalizedUserMsgColor && normalizedPreset === defaultUserMsgColor) {
+        return true;
+      }
+      return normalizedUserMsgColor === normalizedPreset;
+    },
+    [defaultUserMsgColor, normalizedUserMsgColor],
+  );
   const clientUiVisibility = useClientUiVisibility();
   const [minimalTranscriptEnabled, setMinimalTranscriptEnabled] = useState(() =>
     readLocalBooleanFlag(MESSAGES_MINIMAL_TRANSCRIPT_FLAG_KEY, true),
@@ -542,6 +807,7 @@ export function BasicAppearanceSection({
 
   return (
     <div className="settings-basic-appearance settings-basic-surface">
+      <HomeAppearanceSettings />
       <div className="settings-basic-group-card settings-basic-group-card--list settings-pref-card">
         <div className="settings-pref-row settings-pref-row--theme">
           <div className="settings-pref-meta">
@@ -958,7 +1224,7 @@ export function BasicAppearanceSection({
                   aria-label={t("settings.themePreset")}
                   value={activeThemePresetId}
                   onChange={(event) =>
-                    void onThemePresetChange(event.target.value as ThemePresetId)
+                    void handleThemePresetChange(event.target.value as ThemePresetId)
                   }
                 >
                   {themePresetOptions.map((option) => (

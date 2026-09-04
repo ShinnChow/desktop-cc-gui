@@ -45,7 +45,7 @@ export function extractClaudeCandidateSessionId(response: Record<string, unknown
 }
 
 export function normalizeEngineScopedEffort(
-  engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder",
+  engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder",
   effort: string | null | undefined,
 ): string | null {
   if (typeof effort !== "string") {
@@ -68,6 +68,10 @@ export function normalizeEngineScopedEffort(
     return DSH_REASONING_EFFORTS.has(trimmed) ? trimmed : null;
   }
   if (engine === "pi") {
+    return PI_REASONING_EFFORTS.has(trimmed) ? trimmed : null;
+  }
+  // omp 与 pi 共享 thinking levels（off/minimal/low/medium/high/xhigh/max）。
+  if (engine === "omp") {
     return PI_REASONING_EFFORTS.has(trimmed) ? trimmed : null;
   }
   return null;

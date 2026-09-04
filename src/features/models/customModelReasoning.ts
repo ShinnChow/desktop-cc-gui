@@ -68,12 +68,4 @@ export function isUserManagedCustomModelSource(
  * 仅对用户管理的自定义 Codex 模型返回默认档；其他 engine / source 返回 null，
  * 避免为 unknown runtime model 伪造 capability。
  */
-export function resolveCustomModelDefaultReasoningEffort(
-  engine: string | null | undefined,
-  source: CustomModelSource,
-): string | null {
-  if (engine !== 'codex' || !isUserManagedCustomModelSource(source)) {
-    return null;
-  }
-  return CUSTOM_MODEL_DEFAULT_REASONING_EFFORT;
-}
+

@@ -47,7 +47,7 @@ interface CheckpointPanelProps extends CodeAnnotationBridgeProps {
   onCommitMessageChange?: (value: string) => void;
   onGenerateCommitMessage?: (
     language?: "zh" | "en",
-    engine?: "codex" | "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi",
+    engine?: "codex" | "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp",
     selectedPaths?: string[],
   ) => void | Promise<void>;
   onCommit?: (selectedPaths?: string[]) => void | Promise<void>;

@@ -294,7 +294,8 @@ export function normalizeEngineType(engine: string): EngineType {
     normalized === "opencode" ||
     normalized === "grok" ||
     normalized === "kimi" ||
-    normalized === "pi"
+    normalized === "pi" ||
+    normalized === "omp"
   ) {
     return normalized;
   }
@@ -321,7 +322,8 @@ export function resolveCatalogEntryEngineIcon(
       sourceEngine === "grok" ||
       sourceEngine === "kimi" ||
       sourceEngine === "opencode" ||
-      sourceEngine === "pi"
+      sourceEngine === "pi" ||
+      sourceEngine === "omp"
     ) {
       return sourceEngine;
     }

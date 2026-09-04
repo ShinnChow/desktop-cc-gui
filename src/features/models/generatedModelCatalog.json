@@ -146,6 +146,17 @@
         "default": true
       }
     ],
+    "omp": [
+      {
+        "id": "auto",
+        "label": "OMP Auto",
+        "description": "Use OMP CLI default model",
+        "provider": "omp",
+        "protocol": "omp",
+        "lifecycle": "stable",
+        "default": true
+      }
+    ],
     "opencode": [
       {
         "id": "opencode/big-pickle",

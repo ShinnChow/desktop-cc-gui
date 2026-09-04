@@ -99,6 +99,15 @@ export function piSessionIdFromThreadId(threadId: string): string | null {
   return id.length > 0 ? id : null;
 }
 
+/** Extract the native omp session id from a mossx thread id (`omp:<id>`). */
+export function ompSessionIdFromThreadId(threadId: string): string | null {
+  if (!threadId.startsWith("omp:")) {
+    return null;
+  }
+  const id = threadId.slice(4).trim();
+  return id.length > 0 ? id : null;
+}
+
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -107,14 +116,8 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-export async function piGetSessionStats(
-  options: CommandOptions,
-): Promise<PiSessionStats> {
-  const raw = await invoke<Record<string, unknown>>("pi_get_session_stats", {
-    workspaceId: options.workspaceId,
-    sessionId: options.sessionId ?? null,
-    providerProfileId: options.providerProfileId ?? null,
-  });
+// pi-family（pi/omp）共享载荷映射：stats/compact 响应形状全等，仅命令名不同。
+function mapSessionStats(raw: Record<string, unknown>): PiSessionStats {
   const contextUsage = raw?.contextUsage as Record<string, unknown> | undefined;
   return {
     sessionId: asString(raw?.sessionId),
@@ -132,6 +135,38 @@ export async function piGetSessionStats(
   };
 }
 
+function mapCompactResult(raw: Record<string, unknown>): PiCompactResult {
+  return {
+    summary: asString(raw?.summary),
+    tokensBefore: asNumber(raw?.tokensBefore),
+    estimatedTokensAfter: asNumber(raw?.estimatedTokensAfter),
+    firstKeptEntryId: asString(raw?.firstKeptEntryId),
+  };
+}
+
+export async function piGetSessionStats(
+  options: CommandOptions,
+): Promise<PiSessionStats> {
+  const raw = await invoke<Record<string, unknown>>("pi_get_session_stats", {
+    workspaceId: options.workspaceId,
+    sessionId: options.sessionId ?? null,
+    providerProfileId: options.providerProfileId ?? null,
+  });
+  return mapSessionStats(raw);
+}
+
+/** omp（pi 协议全等 fork）会话统计：命令面 `omp_get_session_stats`。 */
+export async function ompGetSessionStats(
+  options: CommandOptions,
+): Promise<PiSessionStats> {
+  const raw = await invoke<Record<string, unknown>>("omp_get_session_stats", {
+    workspaceId: options.workspaceId,
+    sessionId: options.sessionId ?? null,
+    providerProfileId: options.providerProfileId ?? null,
+  });
+  return mapSessionStats(raw);
+}
+
 export async function piCompact(
   options: CommandOptions & { customInstructions?: string },
 ): Promise<PiCompactResult> {
@@ -141,12 +176,20 @@ export async function piCompact(
     customInstructions: options.customInstructions ?? null,
     providerProfileId: options.providerProfileId ?? null,
   });
-  return {
-    summary: asString(raw?.summary),
-    tokensBefore: asNumber(raw?.tokensBefore),
-    estimatedTokensAfter: asNumber(raw?.estimatedTokensAfter),
-    firstKeptEntryId: asString(raw?.firstKeptEntryId),
-  };
+  return mapCompactResult(raw);
+}
+
+/** omp 手动压缩：命令面 `omp_compact`（omp 无 fork/tree，仅 compact/stats）。 */
+export async function ompCompact(
+  options: CommandOptions & { customInstructions?: string },
+): Promise<PiCompactResult> {
+  const raw = await invoke<Record<string, unknown>>("omp_compact", {
+    workspaceId: options.workspaceId,
+    sessionId: options.sessionId ?? null,
+    customInstructions: options.customInstructions ?? null,
+    providerProfileId: options.providerProfileId ?? null,
+  });
+  return mapCompactResult(raw);
 }
 
 export async function piFork(

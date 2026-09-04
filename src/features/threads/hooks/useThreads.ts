@@ -10,28 +10,14 @@ import { useAppServerEvents } from "../../app/hooks/useAppServerEvents";
 import { subscribeWebServiceReconnect } from "../../../services/events";
 import { createInitialThreadState, threadReducer } from "./useThreadsReducer";
 import {
-  type PendingMemoryCapture,
-  buildMemoryTurnKey,
-  joinPendingAssistantCompletionText,
-  memoryDebugLog,
-  normalizeAssistantOutputForMemory,
-  normalizeDigestSummaryForMemory,
-  PENDING_MEMORY_STALE_MS,
-  upsertPendingAssistantCompletionSegment,
-} from "./threadMemoryCaptureHelpers";
-import {
   type CodexOwnershipFallbackCandidateInput,
   type PendingAssistantCompletionBucket,
   type PendingMemoryCaptureBucket,
   THREAD_ITEM_CACHE_RECENT_SWITCH_WINDOW_MS,
   THREAD_ITEM_CACHE_TRIM_WATERMARK,
   computeThreadItemCacheMax,
-  deletePendingMemoryEntry,
-  getPendingMemoryEntries,
   isCodexOwnershipFallbackCandidate,
   selectEvictableThreadIds,
-  setPendingMemoryEntry,
-  shouldKeepPendingCaptureForAdditionalAssistantSegments,
 } from "./threadRuntimeOwnershipHelpers";
 import { useThreadStorage } from "./useThreadStorage";
 import { useThreadLinking } from "./useThreadLinking";
@@ -39,12 +25,12 @@ import { useThreadEventHandlers } from "./useThreadEventHandlers";
 import { useThreadActions } from "./useThreadActions";
 import { useThreadMessaging } from "./useThreadMessaging";
 import { usePiResidentPrewarm } from "./usePiResidentPrewarm";
+import { useOmpResidentPrewarm } from "./usePiResidentPrewarm";
 import { useThreadApprovals } from "./useThreadApprovals";
 import type { TurnExecutionSnapshot } from "../../shared-session/target/types";
 import {
   cleanupThreadScopedRefs,
   createWorkspaceScopedMap,
-  workspaceScopedEntries,
   workspaceScopedGet,
   workspaceScopedHas,
   workspaceScopedSet,
@@ -56,7 +42,9 @@ import { useThreadSelectors } from "./useThreadSelectors";
 import { useThreadStatus } from "./useThreadStatus";
 import { registerCollabThreadProcessingMarker } from "../../multi-agent/runtime/collabThreadProcessingBridge";
 import { useThreadUserInput } from "./useThreadUserInput";
-import { useThreadCompletionEmail } from "./useThreadCompletionEmail";
+import { useThreadsCompletionEmail } from "./useThreadsCompletionEmail";
+import { useThreadsMemoryCapture } from "./useThreadsMemoryCapture";
+import { useThreadAutoNaming } from "./useThreadAutoNaming";
 import { useMailDrivenSessionContinuation } from "./useMailDrivenSessionContinuation";
 import { useThreadRealtimeHistoryReconcile } from "./useThreadRealtimeHistoryReconcile";
 import {
@@ -80,10 +68,7 @@ import {
   resolvePendingThreadIdForSession,
   resolvePendingThreadIdForTurn,
 } from "../utils/threadPendingResolution";
-export {
-  resolvePendingThreadIdForSession,
-  resolvePendingThreadIdForTurn,
-} from "../utils/threadPendingResolution";
+
 import {
   isGhostClientSessionIndexDeleteError,
   mapDeleteErrorCode,
@@ -114,26 +99,11 @@ import {
   saveSidebarSnapshotAllThreads,
 } from "../utils/sidebarSnapshot";
 import {
-  generateThreadTitle,
-  listThreadTitles,
-  resumeThread,
   setThreadTitle,
-  projectMemoryCompleteTurn,
   deleteWorkspaceSessions,
   noteWebServiceReconnected,
   tombstoneSessionIndexRows,
 } from "../../../services/tauri";
-import { buildAssistantOutputDigest } from "../../project-memory/utils/outputDigest";
-import {
-  classifyMemoryImportance,
-  classifyMemoryKind,
-} from "../../project-memory/utils/memoryKindClassifier";
-import {
-  shouldMergeOnAssistantCompleted,
-  shouldMergeOnInputCapture,
-} from "../utils/memoryCaptureRace";
-import { buildItemsFromThread } from "../../../utils/threadItems";
-import i18n from "../../../i18n";
 import { clearSharedSessionBindingsForSharedThread } from "../../shared-session/runtime/sharedSessionBridge";
 import { isSharedSessionThreadId } from "../../shared-session/utils/sharedSessionIdentity";
 import {
@@ -141,7 +111,6 @@ import {
 } from "../../shared-session/services/sharedSessions";
 import { isSharedV2SendEnabled } from "../../shared-session/runtime/sharedV2SendFlag";
 import { normalizeSharedSessionEngine } from "../../shared-session/utils/sharedSessionEngines";
-import { type ConversationCompletionEmailMetadata } from "../utils/conversationCompletionEmail";
 import {
   createDomainEventGovernanceConsumer,
   createDomainEventRuntimeController,
@@ -149,24 +118,8 @@ import {
 
 export { computeThreadItemCacheMax } from "./threadRuntimeOwnershipHelpers";
 
-const AUTO_TITLE_REQUEST_TIMEOUT_MS = 8_000;
-const AUTO_TITLE_MAX_ATTEMPTS = 2;
-const AUTO_TITLE_PENDING_STALE_MS = 20_000;
 const THREAD_ERROR_DUPLICATE_WINDOW_MS = 8_000;
 const THREAD_SWITCH_RESUME_DELAY_MS = 24;
-
-function normalizeMemoryTurnId(turnId: string | null | undefined) {
-  return turnId?.trim() || "__unknown_turn__";
-}
-
-function isSameMemoryTurn(
-  leftTurnId: string | null | undefined,
-  rightTurnId: string | null | undefined,
-) {
-  return (
-    normalizeMemoryTurnId(leftTurnId) === normalizeMemoryTurnId(rightTurnId)
-  );
-}
 
 type UseThreadsOptions = {
   activeWorkspace: WorkspaceInfo | null;
@@ -189,7 +142,7 @@ type UseThreadsOptions = {
   steerEnabled?: boolean;
   customPrompts?: CustomPromptOption[];
   onMessageActivity?: () => void;
-  activeEngine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+  activeEngine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   useNormalizedRealtimeAdapters?: boolean;
   useUnifiedHistoryLoader?: boolean;
   sessionAttributionMode?: WorkspaceSessionAttributionMode;
@@ -211,7 +164,7 @@ type UseThreadsOptions = {
   runWithCreateSessionLoading?: <T>(
     params: {
       workspace: WorkspaceInfo;
-      engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+      engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
     },
     action: () => Promise<T>,
   ) => Promise<T>;
@@ -365,6 +318,14 @@ export function useThreads({
   // pi resident 预热：会话激活后延迟 fire-and-forget（双轨契约，见
   // usePiResidentPrewarm.ts）。只读 activeThreadIdByWorkspace 投影，不进根链。
   usePiResidentPrewarm({
+    workspaceId: activeWorkspace?.id ?? null,
+    threadId: activeWorkspace
+      ? (state.activeThreadIdByWorkspace[activeWorkspace.id] ?? null)
+      : null,
+    onDebug,
+  });
+  // omp resident 预热：与 pi 同形（pi-family，见 usePiResidentPrewarm.ts）。
+  useOmpResidentPrewarm({
     workspaceId: activeWorkspace?.id ?? null,
     threadId: activeWorkspace
       ? (state.activeThreadIdByWorkspace[activeWorkspace.id] ?? null)
@@ -606,30 +567,6 @@ export function useThreads({
     }
   }, [onMessageActivity]);
 
-  const getCompletionEmailMetadata = useCallback(
-    (
-      workspaceId: string,
-      threadId: string,
-      turnId: string,
-    ): ConversationCompletionEmailMetadata => {
-      const threadSummary =
-        (threadsByWorkspaceRef.current[workspaceId] ?? []).find(
-          (thread) => thread.id === threadId,
-        ) ?? null;
-      return {
-        workspaceId,
-        workspaceName:
-          activeWorkspace?.id === workspaceId ? activeWorkspace.name : null,
-        workspacePath:
-          activeWorkspace?.id === workspaceId ? activeWorkspace.path : null,
-        threadId,
-        threadName: threadSummary?.name ?? null,
-        turnId,
-        engine: threadSummary?.engineSource ?? activeEngine ?? null,
-      };
-    },
-    [activeEngine, activeWorkspace],
-  );
   const {
     completionEmailIntentByThread,
     armMailDrivenCompletionEmail,
@@ -638,13 +575,15 @@ export function useThreads({
     setActiveTurnIdWithCompletionEmail,
     renameCompletionEmailIntentThread,
     settleCompletionEmailIntent,
-  } = useThreadCompletionEmail({
+  } = useThreadsCompletionEmail({
     activeThreadId,
+    activeWorkspace,
+    activeEngine,
     activeTurnIdByThreadRef,
     itemsByThreadRef,
+    threadsByWorkspaceRef,
     resolveCanonicalThreadId,
     setActiveTurnId,
-    getCompletionEmailMetadata,
     onDebug,
   });
 
@@ -764,7 +703,7 @@ export function useThreads({
   );
 
   const getThreadEngine = useCallback(
-    (workspaceId: string, threadId: string): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | undefined => {
+    (workspaceId: string, threadId: string): "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | undefined => {
       const threads = state.threadsByWorkspace[workspaceId] ?? [];
       const thread = threads.find((t) => t.id === threadId);
       return thread?.engineSource;
@@ -807,7 +746,7 @@ export function useThreads({
   const resolvePendingThreadForSession = useCallback(
     (
       workspaceId: string,
-      engine: "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder",
+      engine: "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder",
     ): string | null => {
       const resolved = resolvePendingThreadIdForSession({
         workspaceId,
@@ -858,7 +797,7 @@ export function useThreads({
   const resolvePendingThreadForTurn = useCallback(
     (
       workspaceId: string,
-      engine: "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder",
+      engine: "claude" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder",
       turnId: string | null | undefined,
     ): string | null =>
       resolvePendingThreadIdForTurn({
@@ -943,97 +882,21 @@ export function useThreads({
     [resolveCanonicalThreadId, threadAliasesRef],
   );
 
-  const renamePendingMemoryCaptureKey = useCallback(
-    (oldThreadId: string, newThreadId: string) => {
-      renameCompletionEmailIntentThread(oldThreadId, newThreadId);
-      rememberThreadAlias(oldThreadId, newThreadId);
-      const oldCanonicalThreadId = resolveCanonicalThreadId(oldThreadId);
-      const newCanonicalThreadId = resolveCanonicalThreadId(newThreadId);
-      const pendingEntries = workspaceScopedEntries(
-        pendingMemoryCaptureRef.current,
-      ).flatMap(({ workspaceId, threadId, value }) =>
-        Object.entries(value)
-          .filter(
-            ([, entry]) =>
-              entry.threadId === oldThreadId ||
-              entry.threadId === oldCanonicalThreadId,
-          )
-          .map(([key, pending]) => ({ workspaceId, threadId, key, pending })),
-      );
-      if (pendingEntries.length > 0) {
-        memoryDebugLog("rename pending capture key", {
-          oldThreadId,
-          newThreadId,
-          count: pendingEntries.length,
-        });
-        pendingEntries.forEach(({ workspaceId, threadId, key, pending }) => {
-          deletePendingMemoryEntry(
-            pendingMemoryCaptureRef.current,
-            workspaceId,
-            threadId,
-            key,
-          );
-          setPendingMemoryEntry(
-            pendingMemoryCaptureRef.current,
-            workspaceId,
-            newCanonicalThreadId,
-            buildMemoryTurnKey(newCanonicalThreadId, pending.turnId),
-            {
-              ...pending,
-              threadId: newCanonicalThreadId,
-            },
-          );
-        });
-      }
-      const completedEntries = workspaceScopedEntries(
-        pendingAssistantCompletionRef.current,
-      ).flatMap(({ workspaceId, threadId, value }) =>
-        Object.entries(value)
-          .filter(
-            ([, entry]) =>
-              entry.threadId === oldThreadId ||
-              entry.threadId === oldCanonicalThreadId,
-          )
-          .map(([key, completed]) => ({
-            workspaceId,
-            threadId,
-            key,
-            completed,
-          })),
-      );
-      if (completedEntries.length === 0) {
-        return;
-      }
-      memoryDebugLog("rename pending assistant completion key", {
-        oldThreadId,
-        newThreadId,
-        count: completedEntries.length,
-      });
-      completedEntries.forEach(({ workspaceId, threadId, key, completed }) => {
-        deletePendingMemoryEntry(
-          pendingAssistantCompletionRef.current,
-          workspaceId,
-          threadId,
-          key,
-        );
-        setPendingMemoryEntry(
-          pendingAssistantCompletionRef.current,
-          workspaceId,
-          newCanonicalThreadId,
-          buildMemoryTurnKey(newCanonicalThreadId, completed.turnId),
-          {
-            ...completed,
-            threadId: newCanonicalThreadId,
-          },
-        );
-      });
-    },
-    [
-      rememberThreadAlias,
-      renameCompletionEmailIntentThread,
-      resolveCanonicalThreadId,
-    ],
-  );
+  const {
+    renamePendingMemoryCaptureKey,
+    handleInputMemoryCaptured,
+    handleAgentMessageCompletedForMemory,
+  } = useThreadsMemoryCapture({
+    collectRelatedThreadIds,
+    dispatch,
+    getCustomName,
+    rememberThreadAlias,
+    renameCompletionEmailIntentThread,
+    resolveCanonicalThreadId,
+    pendingMemoryCaptureRef,
+    pendingAssistantCompletionRef,
+    state,
+  });
 
   // Mirrors the side-state migration the Claude pending rebind performs in
   // useThreadTurnEvents (alias table, custom names, auto-title, memory keys)
@@ -1352,714 +1215,17 @@ export function useThreads({
     });
   }, [dispatch, resolveCanonicalThreadId, state.activeThreadIdByWorkspace]);
 
-  const autoNameThread = useCallback(
-    async (
-      workspaceId: string,
-      threadId: string,
-      sourceText: string,
-      options?: { force?: boolean; clearPendingOnSkip?: boolean },
-    ): Promise<string | null> => {
-      const key = makeCustomNameKey(workspaceId, threadId);
-      const hasCustomName = Boolean(customNamesRef.current[key]);
-      if (hasCustomName && !options?.force) {
-        onDebug?.({
-          id: `${Date.now()}-thread-title-skip-custom`,
-          timestamp: Date.now(),
-          source: "client",
-          label: "thread/title skipped",
-          payload: { workspaceId, threadId, reason: "has-custom-name" },
-        });
-        if (options?.clearPendingOnSkip) {
-          clearAutoTitlePending(workspaceId, threadId);
-        }
-        return null;
-      }
-
-      const message = sourceText.trim();
-      if (!message) {
-        onDebug?.({
-          id: `${Date.now()}-thread-title-skip-empty`,
-          timestamp: Date.now(),
-          source: "client",
-          label: "thread/title skipped",
-          payload: { workspaceId, threadId, reason: "empty-source-text" },
-        });
-        if (options?.clearPendingOnSkip) {
-          clearAutoTitlePending(workspaceId, threadId);
-        }
-        return null;
-      }
-
-      const pendingStartedAt = getAutoTitlePendingStartedAt(
-        workspaceId,
-        threadId,
-      );
-      if (pendingStartedAt) {
-        const pendingAgeMs = Date.now() - pendingStartedAt;
-        if (pendingAgeMs >= AUTO_TITLE_PENDING_STALE_MS) {
-          onDebug?.({
-            id: `${Date.now()}-thread-title-pending-timeout-reset`,
-            timestamp: Date.now(),
-            source: "client",
-            label: "thread/title pending reset",
-            payload: {
-              workspaceId,
-              threadId,
-              pendingStartedAt,
-              pendingAgeMs,
-              reason: "timeout",
-            },
-          });
-          clearAutoTitlePending(workspaceId, threadId);
-        } else {
-          onDebug?.({
-            id: `${Date.now()}-thread-title-skip-pending`,
-            timestamp: Date.now(),
-            source: "client",
-            label: "thread/title skipped",
-            payload: {
-              workspaceId,
-              threadId,
-              reason: "already-pending",
-              pendingStartedAt,
-              pendingAgeMs,
-            },
-          });
-          return null;
-        }
-      }
-
-      if (isAutoTitlePending(workspaceId, threadId)) {
-        onDebug?.({
-          id: `${Date.now()}-thread-title-skip-pending-after-reset`,
-          timestamp: Date.now(),
-          source: "client",
-          label: "thread/title skipped",
-          payload: {
-            workspaceId,
-            threadId,
-            reason: "already-pending-after-reset",
-          },
-        });
-        return null;
-      }
-
-      markAutoTitlePending(workspaceId, threadId);
-      const markAt = getAutoTitlePendingStartedAt(workspaceId, threadId);
-      onDebug?.({
-        id: `${Date.now()}-thread-title-generate-start`,
-        timestamp: Date.now(),
-        source: "client",
-        label: "thread/title generate",
-        payload: {
-          workspaceId,
-          threadId,
-          force: Boolean(options?.force),
-          pendingStartedAt: markAt,
-        },
-      });
-
-      try {
-        const applyGeneratedTitle = (
-          title: string,
-          source: "generated" | "recovered",
-        ) => {
-          saveCustomName(workspaceId, threadId, title);
-          const nextKey = makeCustomNameKey(workspaceId, threadId);
-          customNamesRef.current[nextKey] = title;
-          dispatch({
-            type: "setThreadName",
-            workspaceId,
-            threadId,
-            name: title,
-          });
-          onDebug?.({
-            id: `${Date.now()}-thread-title-${source}-success`,
-            timestamp: Date.now(),
-            source: "server",
-            label:
-              source === "generated"
-                ? "thread/title generated"
-                : "thread/title recovered",
-            payload: { workspaceId, threadId, title, source },
-          });
-          return title;
-        };
-
-        const generateWithTimeout = async (
-          preferredLanguage: "zh" | "en",
-        ): Promise<string> =>
-          await new Promise((resolve, reject) => {
-            const timeoutId = setTimeout(() => {
-              reject(new Error("auto-title-timeout"));
-            }, AUTO_TITLE_REQUEST_TIMEOUT_MS);
-
-            void generateThreadTitle(
-              workspaceId,
-              threadId,
-              message,
-              preferredLanguage,
-            ).then(
-              (value) => {
-                clearTimeout(timeoutId);
-                resolve(value);
-              },
-              (error) => {
-                clearTimeout(timeoutId);
-                reject(error);
-              },
-            );
-          });
-
-        const language = i18n.language.toLowerCase().startsWith("zh")
-          ? "zh"
-          : "en";
-        for (
-          let attempt = 1;
-          attempt <= AUTO_TITLE_MAX_ATTEMPTS;
-          attempt += 1
-        ) {
-          const attemptStartedAt = Date.now();
-          try {
-            onDebug?.({
-              id: `${Date.now()}-thread-title-attempt-start`,
-              timestamp: Date.now(),
-              source: "client",
-              label: "thread/title attempt",
-              payload: {
-                workspaceId,
-                threadId,
-                attempt,
-                maxAttempts: AUTO_TITLE_MAX_ATTEMPTS,
-                timeoutMs: AUTO_TITLE_REQUEST_TIMEOUT_MS,
-                language,
-              },
-            });
-
-            const generated = await generateWithTimeout(language);
-            const title = generated.trim();
-            if (!title) {
-              throw new Error("empty-generated-title");
-            }
-            return applyGeneratedTitle(title, "generated");
-          } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            const isTimeout = errorMessage.includes("auto-title-timeout");
-            const elapsedMs = Date.now() - attemptStartedAt;
-
-            onDebug?.({
-              id: `${Date.now()}-thread-title-attempt-failed`,
-              timestamp: Date.now(),
-              source: isTimeout ? "client" : "error",
-              label: "thread/title attempt failed",
-              payload: {
-                workspaceId,
-                threadId,
-                attempt,
-                maxAttempts: AUTO_TITLE_MAX_ATTEMPTS,
-                isTimeout,
-                elapsedMs,
-                error: errorMessage,
-              },
-            });
-
-            if (isTimeout) {
-              await new Promise((resolve) => setTimeout(resolve, 1200));
-            }
-
-            try {
-              const mappedTitles = await listThreadTitles(workspaceId);
-              const recovered = mappedTitles[threadId]?.trim();
-              if (recovered) {
-                return applyGeneratedTitle(recovered, "recovered");
-              }
-            } catch (recoveryError) {
-              onDebug?.({
-                id: `${Date.now()}-thread-title-recovery-check-error`,
-                timestamp: Date.now(),
-                source: "error",
-                label: "thread/title recovery error",
-                payload:
-                  recoveryError instanceof Error
-                    ? recoveryError.message
-                    : String(recoveryError),
-              });
-            }
-
-            if (attempt < AUTO_TITLE_MAX_ATTEMPTS) {
-              onDebug?.({
-                id: `${Date.now()}-thread-title-retry`,
-                timestamp: Date.now(),
-                source: "client",
-                label: "thread/title retry",
-                payload: {
-                  workspaceId,
-                  threadId,
-                  nextAttempt: attempt + 1,
-                  maxAttempts: AUTO_TITLE_MAX_ATTEMPTS,
-                },
-              });
-              continue;
-            }
-
-            onDebug?.({
-              id: `${Date.now()}-thread-title-generate-error`,
-              timestamp: Date.now(),
-              source: "error",
-              label: "thread/title generate error",
-              payload: {
-                workspaceId,
-                threadId,
-                attempt,
-                maxAttempts: AUTO_TITLE_MAX_ATTEMPTS,
-                error: errorMessage,
-              },
-            });
-            return null;
-          }
-        }
-
-        return null;
-      } catch (error) {
-        onDebug?.({
-          id: `${Date.now()}-thread-title-generate-error`,
-          timestamp: Date.now(),
-          source: "error",
-          label: "thread/title generate error",
-          payload: {
-            workspaceId,
-            threadId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        });
-        return null;
-      } finally {
-        clearAutoTitlePending(workspaceId, threadId);
-      }
-    },
-    [
-      clearAutoTitlePending,
+  const { autoNameThread, triggerAutoThreadTitle, isThreadAutoNaming } =
+    useThreadAutoNaming({
       customNamesRef,
       dispatch,
+      onDebug,
+      clearAutoTitlePending,
       getAutoTitlePendingStartedAt,
       isAutoTitlePending,
       markAutoTitlePending,
-      onDebug,
-    ],
-  );
-
-  const mergeMemoryFromPendingCapture = useCallback(
-    (
-      pending: Omit<PendingMemoryCapture, "createdAt">,
-      payload: { threadId: string; itemId: string; text: string },
-    ) => {
-      const normalizedAssistantOutput = normalizeAssistantOutputForMemory(
-        payload.text,
-      );
-      const digest = buildAssistantOutputDigest(normalizedAssistantOutput);
-      const normalizedSummary = digest
-        ? normalizeDigestSummaryForMemory(digest.summary) || digest.summary
-        : "";
-      const mergedDetail = [
-        `用户输入：\n${pending.inputText}`,
-        `AI 回复：\n${normalizedAssistantOutput}`,
-      ].join("\n\n");
-      const classifiedKind = classifyMemoryKind(mergedDetail);
-      const mergedKind =
-        classifiedKind === "note" ? "conversation" : classifiedKind;
-      const mergedImportance = classifyMemoryImportance(mergedDetail);
-
-      const mergeWrite = async () => {
-        try {
-          await projectMemoryCompleteTurn({
-            workspaceId: pending.workspaceId,
-            threadId: payload.threadId,
-            turnId: pending.turnId,
-            memoryId: pending.memoryId,
-            kind: mergedKind,
-            userInput: pending.inputText,
-            assistantResponse: normalizedAssistantOutput,
-            assistantMessageId: payload.itemId,
-            title: digest?.title ?? "",
-            summary: normalizedSummary,
-            importance: mergedImportance,
-            workspaceName: pending.workspaceName,
-            workspacePath: pending.workspacePath,
-            engine: pending.engine,
-          });
-          memoryDebugLog("merge write completed turn memory", {
-            threadId: payload.threadId,
-            turnId: pending.turnId,
-            itemId: payload.itemId,
-            assistantResponseLength: normalizedAssistantOutput.length,
-          });
-        } catch (completeErr) {
-          if (import.meta.env.DEV) {
-            console.warn("[project-memory] merge complete failed:", {
-              threadId: payload.threadId,
-              error: completeErr,
-            });
-          }
-          memoryDebugLog("merge complete failed", {
-            threadId: payload.threadId,
-            error:
-              completeErr instanceof Error
-                ? completeErr.message
-                : String(completeErr),
-          });
-        }
-      };
-
-      void mergeWrite();
-    },
-    [],
-  );
-
-  /** 输入侧采集成功后，将 pending 数据存入 ref（仅保留该 thread 最新一条） */
-  const handleInputMemoryCaptured = useCallback(
-    (payload: {
-      workspaceId: string;
-      threadId: string;
-      turnId: string;
-      inputText: string;
-      memoryId: string | null;
-      workspaceName: string | null;
-      workspacePath: string | null;
-      engine: string | null;
-    }) => {
-      const canonicalThreadId = resolveCanonicalThreadId(payload.threadId);
-      const normalizedPayload = {
-        ...payload,
-        threadId: canonicalThreadId,
-      };
-      const captureKey = buildMemoryTurnKey(canonicalThreadId, payload.turnId);
-      setPendingMemoryEntry(
-        pendingMemoryCaptureRef.current,
-        payload.workspaceId,
-        canonicalThreadId,
-        captureKey,
-        {
-          ...normalizedPayload,
-          createdAt: Date.now(),
-        },
-      );
-      const completedThreadIds = collectRelatedThreadIds(canonicalThreadId);
-      const completedEntry = completedThreadIds
-        .flatMap((threadId) =>
-          getPendingMemoryEntries(
-            pendingAssistantCompletionRef.current,
-            payload.workspaceId,
-            [threadId],
-          )
-            .filter(({ entry: completion }) => {
-              if (!completion.turnId || !payload.turnId) {
-                return true;
-              }
-              return completion.turnId === payload.turnId;
-            })
-            .map(({ key, threadId, entry: completion }) => ({
-              key,
-              threadId,
-              completion,
-            })),
-        )
-        .find((entry) => Boolean(entry.completion));
-      const nowMs = Date.now();
-      if (
-        completedEntry?.completion &&
-        shouldMergeOnInputCapture(
-          completedEntry.completion.createdAt,
-          nowMs,
-          PENDING_MEMORY_STALE_MS,
-        )
-      ) {
-        const keepPendingCapture =
-          shouldKeepPendingCaptureForAdditionalAssistantSegments(
-            normalizedPayload,
-          );
-        completedThreadIds.forEach((threadId) => {
-          getPendingMemoryEntries(
-            pendingAssistantCompletionRef.current,
-            payload.workspaceId,
-            [threadId],
-          ).forEach(({ key, entry }) => {
-            if (isSameMemoryTurn(entry.turnId, payload.turnId)) {
-              if (!keepPendingCapture) {
-                deletePendingMemoryEntry(
-                  pendingAssistantCompletionRef.current,
-                  payload.workspaceId,
-                  threadId,
-                  key,
-                );
-              }
-            }
-          });
-          getPendingMemoryEntries(
-            pendingMemoryCaptureRef.current,
-            payload.workspaceId,
-            [threadId],
-          ).forEach(({ key, entry }) => {
-            if (isSameMemoryTurn(entry.turnId, payload.turnId)) {
-              const isSameCanonicalEntry = key === captureKey;
-              if (!keepPendingCapture || !isSameCanonicalEntry) {
-                deletePendingMemoryEntry(
-                  pendingMemoryCaptureRef.current,
-                  payload.workspaceId,
-                  threadId,
-                  key,
-                );
-              }
-            }
-          });
-        });
-        memoryDebugLog(
-          "capture resolved after assistant completion, merging now",
-          {
-            threadId: canonicalThreadId,
-            itemId: completedEntry.completion.itemId,
-            memoryId: normalizedPayload.memoryId,
-          },
-        );
-        mergeMemoryFromPendingCapture(normalizedPayload, {
-          ...completedEntry.completion,
-          threadId: canonicalThreadId,
-          text: joinPendingAssistantCompletionText(completedEntry.completion),
-        });
-        return;
-      }
-      if (completedEntry) {
-        deletePendingMemoryEntry(
-          pendingAssistantCompletionRef.current,
-          payload.workspaceId,
-          completedEntry.threadId,
-          completedEntry.key,
-        );
-      }
-      memoryDebugLog("input captured", {
-        threadId: canonicalThreadId,
-        turnId: payload.turnId,
-        memoryId: payload.memoryId,
-      });
-    },
-    [
-      collectRelatedThreadIds,
-      mergeMemoryFromPendingCapture,
-      resolveCanonicalThreadId,
-    ],
-  );
-
-  /**
-   * 回合融合写入 —— assistant 输出完成后，与 pending 输入采集合并写入。
-   * 优先 update（若输入侧已产生 memoryId），失败则回退 create。
-   */
-  const handleAgentMessageCompletedForMemory = useCallback(
-    (payload: {
-      workspaceId: string;
-      threadId: string;
-      turnId?: string | null;
-      itemId: string;
-      text: string;
-    }) => {
-      const canonicalThreadId = resolveCanonicalThreadId(payload.threadId);
-      const completionTurnId = payload.turnId?.trim() || null;
-      const sharedThread = (
-        state.threadsByWorkspace[payload.workspaceId] ?? []
-      ).find((thread) => thread.id === canonicalThreadId);
-      if (sharedThread?.threadKind === "shared" && sharedThread.engineSource) {
-        dispatch({
-          type: "upsertItem",
-          workspaceId: payload.workspaceId,
-          threadId: canonicalThreadId,
-          item: {
-            id: payload.itemId,
-            kind: "message",
-            role: "assistant",
-            text: payload.text,
-            engineSource: sharedThread.engineSource,
-            isFinal: true,
-          },
-          hasCustomName: Boolean(
-            getCustomName(payload.workspaceId, canonicalThreadId),
-          ),
-        });
-      }
-      const relatedThreadIds = collectRelatedThreadIds(canonicalThreadId);
-      const pendingEntry = relatedThreadIds
-        .flatMap((threadId) =>
-          getPendingMemoryEntries(
-            pendingMemoryCaptureRef.current,
-            payload.workspaceId,
-            [threadId],
-          )
-            .filter(({ entry: capture }) => {
-              if (!completionTurnId || !capture.turnId) {
-                return true;
-              }
-              return capture.turnId === completionTurnId;
-            })
-            .map(({ key, threadId, entry: capture }) => ({
-              key,
-              threadId,
-              capture,
-            })),
-        )
-        .find((entry) => Boolean(entry.capture));
-      if (!pendingEntry?.capture) {
-        const completionKey = buildMemoryTurnKey(
-          canonicalThreadId,
-          completionTurnId,
-        );
-        const existingBucket = workspaceScopedGet(
-          pendingAssistantCompletionRef.current,
-          payload.workspaceId,
-          canonicalThreadId,
-        );
-        setPendingMemoryEntry(
-          pendingAssistantCompletionRef.current,
-          payload.workspaceId,
-          canonicalThreadId,
-          completionKey,
-          upsertPendingAssistantCompletionSegment(
-            existingBucket?.[completionKey],
-            {
-              ...payload,
-              threadId: canonicalThreadId,
-              turnId: completionTurnId,
-            },
-            Date.now(),
-          ),
-        );
-        memoryDebugLog("assistant completed but no pending capture", {
-          threadId: canonicalThreadId,
-          turnId: completionTurnId,
-          itemId: payload.itemId,
-        });
-        return;
-      }
-      if (
-        !shouldMergeOnAssistantCompleted(
-          pendingEntry.capture.createdAt,
-          Date.now(),
-          PENDING_MEMORY_STALE_MS,
-        )
-      ) {
-        deletePendingMemoryEntry(
-          pendingMemoryCaptureRef.current,
-          payload.workspaceId,
-          pendingEntry.threadId,
-          pendingEntry.key,
-        );
-        memoryDebugLog("pending capture is stale, skip merge", {
-          threadId: pendingEntry.threadId,
-          turnId: pendingEntry.capture.turnId,
-          itemId: payload.itemId,
-        });
-        return;
-      }
-      const completionKey = buildMemoryTurnKey(
-        canonicalThreadId,
-        pendingEntry.capture.turnId,
-      );
-      const previousCompletion = workspaceScopedGet(
-        pendingAssistantCompletionRef.current,
-        payload.workspaceId,
-        canonicalThreadId,
-      )?.[completionKey];
-      const previousAssistantText = previousCompletion
-        ? joinPendingAssistantCompletionText(previousCompletion)
-        : "";
-      const nextCompletion = upsertPendingAssistantCompletionSegment(
-        previousCompletion,
-        {
-          ...payload,
-          threadId: canonicalThreadId,
-          turnId: pendingEntry.capture.turnId,
-        },
-        Date.now(),
-      );
-      setPendingMemoryEntry(
-        pendingAssistantCompletionRef.current,
-        payload.workspaceId,
-        canonicalThreadId,
-        completionKey,
-        nextCompletion,
-      );
-      const mergedAssistantText =
-        joinPendingAssistantCompletionText(nextCompletion);
-      if (previousAssistantText === mergedAssistantText) {
-        memoryDebugLog(
-          "assistant completed text unchanged, skip memory rewrite",
-          {
-            threadId: canonicalThreadId,
-            turnId: pendingEntry.capture.turnId,
-            itemId: payload.itemId,
-          },
-        );
-        return;
-      }
-      const keepPendingCapture =
-        shouldKeepPendingCaptureForAdditionalAssistantSegments(
-          pendingEntry.capture,
-        );
-      relatedThreadIds.forEach((threadId) => {
-        getPendingMemoryEntries(
-          pendingMemoryCaptureRef.current,
-          payload.workspaceId,
-          [threadId],
-        ).forEach(({ key, entry }) => {
-          if (isSameMemoryTurn(entry.turnId, pendingEntry.capture.turnId)) {
-            const isSameCanonicalEntry = key === pendingEntry.key;
-            if (!keepPendingCapture || !isSameCanonicalEntry) {
-              deletePendingMemoryEntry(
-                pendingMemoryCaptureRef.current,
-                payload.workspaceId,
-                threadId,
-                key,
-              );
-            }
-          }
-        });
-        getPendingMemoryEntries(
-          pendingAssistantCompletionRef.current,
-          payload.workspaceId,
-          [threadId],
-        ).forEach(({ key, entry }) => {
-          if (isSameMemoryTurn(entry.turnId, pendingEntry.capture.turnId)) {
-            if (keepPendingCapture) {
-              setPendingMemoryEntry(
-                pendingAssistantCompletionRef.current,
-                payload.workspaceId,
-                threadId,
-                key,
-                nextCompletion,
-              );
-            } else {
-              deletePendingMemoryEntry(
-                pendingAssistantCompletionRef.current,
-                payload.workspaceId,
-                threadId,
-                key,
-              );
-            }
-          }
-        });
-      });
-      mergeMemoryFromPendingCapture(pendingEntry.capture, {
-        ...payload,
-        threadId: canonicalThreadId,
-        text: mergedAssistantText,
-      });
-    },
-    [
-      collectRelatedThreadIds,
-      dispatch,
-      getCustomName,
-      mergeMemoryFromPendingCapture,
-      resolveCanonicalThreadId,
-      state.threadsByWorkspace,
-    ],
-  );
+      state,
+    });
 
   const {
     handleFusionStalled,
@@ -2958,105 +2124,6 @@ export function useThreads({
     [clearAutoTitlePending, customNamesRef, dispatch],
   );
 
-  const triggerAutoThreadTitle = useCallback(
-    async (
-      workspaceId: string,
-      threadId: string,
-      options?: { force?: boolean },
-    ) => {
-      const items = state.itemsByThread[threadId] ?? [];
-      const userMessage = items.find(
-        (item) => item.kind === "message" && item.role === "user",
-      );
-      let text =
-        userMessage && userMessage.kind === "message" ? userMessage.text : "";
-
-      if (!text.trim() && !threadId.startsWith("claude:")) {
-        try {
-          const response = (await resumeThread(
-            workspaceId,
-            threadId,
-          )) as Record<string, unknown> | null;
-          const result = (response?.result ?? response) as Record<
-            string,
-            unknown
-          > | null;
-          const thread = (result?.thread ?? response?.thread ?? null) as Record<
-            string,
-            unknown
-          > | null;
-          if (thread) {
-            const loadedItems = buildItemsFromThread(thread);
-            const loadedFirstUserMessage = loadedItems.find(
-              (item) => item.kind === "message" && item.role === "user",
-            );
-            if (
-              loadedFirstUserMessage &&
-              loadedFirstUserMessage.kind === "message" &&
-              loadedFirstUserMessage.text.trim()
-            ) {
-              text = loadedFirstUserMessage.text;
-              onDebug?.({
-                id: `${Date.now()}-thread-title-manual-source-resume`,
-                timestamp: Date.now(),
-                source: "client",
-                label: "thread/title manual source",
-                payload: { workspaceId, threadId, source: "thread/resume" },
-              });
-            }
-          }
-        } catch (error) {
-          onDebug?.({
-            id: `${Date.now()}-thread-title-manual-source-resume-error`,
-            timestamp: Date.now(),
-            source: "error",
-            label: "thread/title manual source error",
-            payload: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-
-      if (!text.trim()) {
-        const fallbackName =
-          state.threadsByWorkspace[workspaceId]
-            ?.find((thread) => thread.id === threadId)
-            ?.name?.trim() ?? "";
-        if (fallbackName && !/^agent\s+\d+$/i.test(fallbackName)) {
-          text = fallbackName;
-          onDebug?.({
-            id: `${Date.now()}-thread-title-manual-source-name`,
-            timestamp: Date.now(),
-            source: "client",
-            label: "thread/title manual source",
-            payload: { workspaceId, threadId, source: "thread/name" },
-          });
-        }
-      }
-
-      if (!text.trim()) {
-        onDebug?.({
-          id: `${Date.now()}-thread-title-manual-missing-source`,
-          timestamp: Date.now(),
-          source: "client",
-          label: "thread/title manual skipped",
-          payload: { workspaceId, threadId, reason: "no-user-message-found" },
-        });
-      }
-      const generated = await autoNameThread(workspaceId, threadId, text, {
-        force: options?.force ?? true,
-        clearPendingOnSkip: true,
-      });
-      return generated;
-    },
-    [autoNameThread, onDebug, state.itemsByThread, state.threadsByWorkspace],
-  );
-
-  const isThreadAutoNaming = useCallback(
-    (workspaceId: string, threadId: string) =>
-      isAutoTitlePending(workspaceId, threadId),
-    [isAutoTitlePending],
-  );
-
   const getSingleProcessingCodexThreadId = useCallback(
     (workspaceId: string) => {
       const candidates = Array.from(
@@ -3204,6 +2271,7 @@ export function useThreads({
               thread.engineSource === "kimi" ||
               thread.engineSource === "opencode" ||
               thread.engineSource === "pi" ||
+              thread.engineSource === "omp" ||
               thread.engineSource === "dsh" ||
               thread.engineSource === "qoder"
                 ? thread.engineSource
@@ -3216,6 +2284,7 @@ export function useThreads({
               thread.selectedEngine === "kimi" ||
               thread.selectedEngine === "opencode" ||
               thread.selectedEngine === "pi" ||
+              thread.selectedEngine === "omp" ||
               thread.selectedEngine === "dsh" ||
               thread.selectedEngine === "qoder"
                 ? thread.selectedEngine
@@ -3251,7 +2320,7 @@ export function useThreads({
           message: string;
           willRetry: boolean;
           suppressMessage?: boolean;
-          engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | null;
+          engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | null;
           executionTargetSnapshot?: TurnExecutionSnapshot;
         },
       ) => {
@@ -3268,7 +2337,7 @@ export function useThreads({
           source: string;
           startedAtMs: number | null;
           timeoutMs: number | null;
-          engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder" | null;
+          engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | null;
         },
       ) => {
         handlers.onTurnStalled?.(workspaceId, threadId, turnId, payload);

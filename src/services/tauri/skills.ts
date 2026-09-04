@@ -45,9 +45,7 @@ export async function getEnabledCuratedSkillIds() {
   return invoke<string[]>("get_enabled_curated_skill_ids");
 }
 
-export async function getCuratedSkillBodies() {
-  return invoke<Array<[string, string]>>("get_curated_skill_bodies");
-}
+
 
 export async function getClaudeCommandsList(workspaceId?: string | null) {
   return traceStartupInvoke(

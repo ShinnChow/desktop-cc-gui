@@ -12,19 +12,16 @@ export {
   sendUserMessage,
   startReview,
 } from "./tauri/messaging";
-export { localUsageSnapshot } from "./tauri/usage";
+
 export {
   ttDetectCli,
   ttEnsureServer,
   ttInstallCli,
-  ttProxyRequest,
-  ttServerStatus,
 } from "./tauri/tokentracker";
-export type { TtCliStatus, TtInstallResult, TtServerStatus } from "../types";
+
 export {
   cancelCodexLogin,
   discoverCodexModels,
-  generateRunMetadata,
   getAccountInfo,
   getAccountRateLimits,
   getCodingPlanQuota,
@@ -33,18 +30,12 @@ export {
   runCodexLogin,
 } from "./tauri/modelCatalog";
 export type {
-  CodingPlanBalanceItem,
-  CodingPlanBalanceSnapshot,
   CodingPlanQuotaSnapshot,
-  CodingPlanQuotaWindow,
-  CodingPlanUsageSummary,
 } from "./tauri/modelCatalog";
 export {
   getClaudeCommandsList,
-  getCuratedSkillBodies,
   getCuratedSkills,
   getEnabledCuratedSkillIds,
-  getOpenCodeAgentsList,
   getOpenCodeCommandsList,
   getSkillsList,
   setCuratedSkillEnabled,
@@ -52,7 +43,7 @@ export {
   stopClaudeCommandsWatch,
   claudeCommandCreate,
 } from "./tauri/skills";
-export type { CreatedClaudeCommand } from "./tauri/skills";
+
 export {
   connectOpenCodeProvider,
   exportOpenCodeSession,
@@ -66,7 +57,6 @@ export {
   getOpenCodeLspReferences,
   getOpenCodeLspSymbols,
   getOpenCodeMcpStatus,
-  getOpenCodeProviderCatalog,
   getOpenCodeProviderHealth,
   getOpenCodeSessionList,
   getOpenCodeStats,
@@ -75,7 +65,7 @@ export {
   setOpenCodeMcpToggle,
   shareOpenCodeSession,
 } from "./tauri/openCode";
-export type { LspLocation, LspPosition, LspRange } from "./tauri/openCode";
+
 export {
   createPrompt,
   deletePrompt,
@@ -106,13 +96,10 @@ export type {
   CommitMessageRepositorySelection,
 } from "./tauri/commitMessage";
 export { generatePullRequestContent } from "./tauri/pullRequestContent";
-export type {
-  PullRequestGeneratedContent,
-} from "./tauri/pullRequestContent";
+
 export {
   generateCommitMessage,
   generateCommitMessageWithEngine,
-  getCommitMessagePrompt,
 } from "./tauri/commitMessage";
 export {
   addAgentConfig,
@@ -120,14 +107,12 @@ export {
   deleteAgentConfig,
   exportAgentConfigs,
   getBuiltInAgentPrompt,
-  getSelectedAgentConfig,
   listAgentConfigs,
   listBuiltInAgents,
   previewImportAgentConfigs,
   resolveEnabledBuiltInAgent,
   setBuiltInAgentDivisionEnabled,
   setBuiltInAgentEnabled,
-  setSelectedAgentConfig,
   updateAgentConfig,
 } from "./tauri/agents";
 export {
@@ -138,29 +123,20 @@ export {
 } from "./tauri/threadTitles";
 export { getPendingOpenPaths } from "./tauri/openPaths";
 export { setMainWindowOpacity } from "./tauri/window";
-export { saveMermaidPngFile } from "./tauri/mermaidExport";
-export type { WindowOpacityApplyResult } from "./tauri/window";
+
+
 export type {
   WorkspaceSessionCatalogEntry,
   WorkspaceSessionCatalogQuery,
   WorkspaceSessionCatalogPage,
   WorkspaceSessionCatalogSourceStatus,
-  WorkspaceSessionCatalogDiagnostic,
   WorkspaceSessionArchiveEvidence,
-  WorkspaceSessionSourceCacheMetrics,
   WorkspaceSessionSourceCompleteness,
   WorkspaceSessionProjectionSummary,
-  WorkspaceSessionBatchMutationResult,
   WorkspaceSessionBatchMutationResponse,
   WorkspaceSessionFolder,
-  WorkspaceSessionFolderTree,
-  WorkspaceSessionFolderMutation,
-  WorkspaceSessionAssignmentResponse,
   AutoSessionMetadata,
-  NativeHistorySourceInput,
-  ProviderContinuationTargetInput,
   NativeProviderContinuationInput,
-  NativeProviderContinuationResponse,
 } from "./tauri/sessionManagement";
 export {
   assignWorkspaceSessionFolders,
@@ -184,38 +160,38 @@ export {
   renameWorkspaceSessionFolder,
   unarchiveWorkspaceSessionsV2,
 } from "./tauri/sessionManagement";
-export type { SessionArchiveV2Target } from "./tauri/sessionManagement";
+
 export type {
-  SessionIndexEngine,
-  SessionIndexListPage,
   SessionIndexRow,
-  SessionIndexSyncReport,
-  SharedNativeVisibilityProjection,
 } from "./tauri/sessionIndex";
 export {
   invalidateSessionIndexForWorkspace,
   listSessionIndexForWorkspace,
-  syncSessionIndexForWorkspace,
-  claudeForkIndexTwinSessionId,
-  isLocalPendingDraftSessionId,
   scheduleTombstoneClaudeForkIndexRow,
-  scheduleTombstoneLocalPendingDraftIndexRow,
   tombstoneSessionIndexRows,
-  upsertSessionIndexRows,
   rememberSessionIndexWorkspacePath,
   writeClientCreatedSessionIndex,
-  writeRemappedClientSessionIndex,
 } from "./tauri/sessionIndex";
-export type { CodexRuntimeReloadResult, DockIconApplyResult, ImportedWorkspaceWallpaper, SettingsRecoveryNotice, WallpaperMarketCategory, WallpaperMarketItem, WallpaperMarketSearchResult } from "./tauri/settings";
-export { downloadWorkspaceWallpaper, getAppSettings, getCodexConfigPath, getCodexUnifiedExecExternalStatus, importWorkspaceWallpaper, readWorkspaceWallpaperBytes, readWorkspaceWallpaperPreview, reloadCodexRuntimeConfig, removeWorkspaceWallpaper, restoreCodexUnifiedExecOfficialDefault, searchWorkspaceWallpaperMarket, setCodexUnifiedExecOfficialOverride, setDockIcon, takeSettingsRecoveryNotice, updateAppSettings } from "./tauri/settings";
 export type {
-  AgentMdResponse,
-  ClaudeMdResponse,
-  GlobalAgentsResponse,
-  GlobalCodexAuthResponse,
-  GlobalCodexConfigResponse,
-  TextFileResponse,
-} from "./tauri/textFiles";
+  WallpaperMarketCategory,
+  WallpaperMarketItem,
+} from "./tauri/settings";
+export {
+  downloadWorkspaceWallpaper,
+  getAppSettings,
+  getCodexUnifiedExecExternalStatus,
+  importWorkspaceWallpaper,
+  readWorkspaceWallpaperBytes,
+  readWorkspaceWallpaperPreview,
+  reloadCodexRuntimeConfig,
+  removeWorkspaceWallpaper,
+  restoreCodexUnifiedExecOfficialDefault,
+  searchWorkspaceWallpaperMarket,
+  setCodexUnifiedExecOfficialOverride,
+  takeSettingsRecoveryNotice,
+  updateAppSettings,
+} from "./tauri/settings";
+
 export {
   readAgentMd,
   readClaudeMd,
@@ -229,40 +205,18 @@ export {
   writeGlobalCodexConfigToml,
 } from "./tauri/textFiles";
 export { getComputerUseBridgeStatus, runComputerUseActivationProbe, runComputerUseCodexBroker, runComputerUseHostContractDiagnostics } from "./tauri/computerUse";
-export {
-  getRendererStabilitySnapshot,
-  recordRendererHeartbeat,
-} from "./tauri/rendererStability";
-export {
-  loadBaiduTongjiScript,
-  sendBaiduTongjiBeacon,
-} from "./tauri/baiduTongji";
-export type {
-  RendererHeartbeatInput,
-  RendererHeartbeatStatus,
-  RendererPlatformHookSupport,
-  RendererStabilitySnapshot,
-  RendererSupportState,
-} from "./tauri/rendererStability";
+
+
+
 export {
   captureBrowserAgentSnapshot,
-  captureBrowserAgentSnapshotV2,
-  cleanupBrowserAgentEvidence,
-  cleanupBrowserAgentSessions,
   closeBrowserAgentSession,
   createBrowserAgentSession,
-  generateBrowserAgentCodeCandidates,
-  getBrowserAgentPlatformCapability,
-  getBrowserAgentSettings,
   getBrowserAgentStatus,
   hideBrowserAgentWebview,
-  listBrowserAgentEvidence,
   listBrowserAgentSessions,
   mountBrowserAgentWebview,
   openBrowserAgentWindow,
-  refreshBrowserAgentSnapshot,
-  routeBrowserAgentProvider,
-  runBrowserAgentAction,
   syncBrowserAgentWebviewBounds,
   showBrowserAgentTabContextMenuOverlay,
   startBrowserAgentElementSelect,
@@ -270,63 +224,12 @@ export {
   updateBrowserAgentSession,
   validateBrowserAgentUrl,
 } from "./tauri/browserAgent";
-export type {
-  BrowserActionAuditEntry,
-  BrowserActionRequest,
-  BrowserActionResult,
-  BrowserActionTarget,
-  BrowserEvidenceCleanupResult,
-  BrowserEvidenceRecord,
-  BrowserAgentFeaturePhase,
-  BrowserAgentSettings,
-  BrowserAgentStatus,
-  BrowserContextAttachment,
-  BrowserContextSnapshot,
-  BrowserCodeCandidate,
-  BrowserSession,
-  BrowserSessionCleanupResult,
-  BrowserSessionStatus,
-  BrowserUrlValidationResult,
-  CreateBrowserSessionRequest,
-  UpdateBrowserSessionRequest,
-  BrowserDiagnostic,
-  BrowserElementBounds,
-  BrowserFormSummary,
-  BrowserLandmark,
-  BrowserNetworkSummary,
-  BrowserPlatformCapability,
-  BrowserPrivacyReport,
-  BrowserProviderRouteDecision,
-  BrowserSnapshotBudget,
-  BrowserTextNode,
-} from "../features/browser-agent/types";
-export { previewCodexLaunchProfile, runClaudeDoctor, runCodexDoctor, runDshDoctor, runGrokDoctor, runKimiDoctor, runOpenCodeDoctor, runPiDoctor, runQoderDoctor } from "./tauri/doctor";
+
+export { previewCodexLaunchProfile, runClaudeDoctor, runCodexDoctor, runDshDoctor, runGrokDoctor, runKimiDoctor, runOmpDoctor, runOpenCodeDoctor, runPiDoctor, runQoderDoctor } from "./tauri/doctor";
 export { cancelDshHost, ensureDshHost } from "./tauri/dshHost";
 export type { DshHostEnsureResult } from "./tauri/dshHost";
 export { getCliInstallPlan, getCliVersionStatus, runCliInstaller } from "./tauri/cliInstaller";
-export type {
-  ComputerUseActivationFailureKind,
-  ComputerUseActivationOutcome,
-  ComputerUseActivationResult,
-  ComputerUseAuthorizationBackendMode,
-  ComputerUseAuthorizationContinuityKind,
-  ComputerUseAuthorizationContinuityStatus,
-  ComputerUseAuthorizationHostRole,
-  ComputerUseAuthorizationHostSnapshot,
-  ComputerUseAuthorizationLaunchMode,
-  ComputerUseBrokerFailureKind,
-  ComputerUseBrokerOutcome,
-  ComputerUseBrokerRequest,
-  ComputerUseBrokerResult,
-  ComputerUseBridgeStatus,
-  ComputerUseHostContractDiagnosticsKind,
-  ComputerUseHostContractDiagnosticsResult,
-  ComputerUseHostContractEvidence,
-  ComputerUseOfficialParentHandoffDiscovery,
-  ComputerUseOfficialParentHandoffEvidence,
-  ComputerUseOfficialParentHandoffKind,
-  ComputerUseOfficialParentHandoffMethod,
-} from "../types";
+
 export {
   closeTerminalSession,
   openTerminalSession,
@@ -355,27 +258,14 @@ export {
   projectMemoryUpdate,
   projectMemoryUpdateSettings,
 } from "./tauri/projectMemory";
-export {
-  projectMemoryEmbedHealth,
-  projectMemoryEmbedText,
-  projectMemoryEmbedIndexList,
-  projectMemoryEmbedIndexUpsert,
-  projectMemoryEmbedIndexDelete,
-  projectMemoryEmbedIndexClear,
-} from "./tauri/projectMemoryEmbed";
-export type {
-  ProjectMemoryEmbedHealthDto,
-  ProjectMemoryEmbedResultDto,
-  ProjectMemoryEmbedIndexRecordDto,
-} from "./tauri/projectMemoryEmbed";
+
+
 export type {
   NormalizedConversationTurnPayload,
   ProjectMemoryDiagnosticsResult,
-  ProjectMemoryHealthState,
   ProjectMemoryItem,
   ProjectMemoryListResult,
   ProjectMemoryReconcileResult,
-  ProjectMemoryReviewState,
   ProjectMemorySettings,
 } from "./tauri/projectMemory";
 export {
@@ -388,7 +278,6 @@ export {
   noteCardUpdate,
 } from "./tauri/noteCards";
 export type {
-  NoteCardAttachment,
   NoteCardPreviewAttachment,
   WorkspaceNoteCard,
   WorkspaceNoteCardListResult,
@@ -448,19 +337,10 @@ export {
   updateOpenCodeProvider,
 } from "./tauri/vendors";
 export type {
-  CcSwitchAppType,
   CcSwitchProvider,
-  CcSwitchProviderList,
   GeminiVendorPreflightCheck,
-  GeminiVendorPreflightResult,
-  GeminiVendorSettings,
-  VendorModelListResult,
 } from "./tauri/vendors";
-export type {
-  OpenAppPresetProbeResult,
-  OpenAppTargetProbeResult,
-  WorktreeSetupStatus,
-} from "./tauri/workspaceRuntime";
+
 export {
   addClone,
   addWorkspace,
@@ -469,7 +349,6 @@ export {
   appendClientErrorLog,
   connectWorkspace,
   ensureRuntimeReady,
-  ensureWorkspacePathDir,
   exportDiagnosticsBundle,
   getOpenAppIcon,
   probeOpenAppPresets,
@@ -486,21 +365,16 @@ export {
   openFolderInFileManager,
   prewarmCodexDiskRuntime,
   queryTurnReconciliationStatus,
-  readPanelLockPasswordFile,
   removeWorkspace,
   removeWorktree,
   renameWorktree,
   renameWorktreeUpstream,
   updateWorkspaceCodexBin,
   updateWorkspaceSettings,
-  writePanelLockPasswordFile,
 } from "./tauri/workspaceRuntime";
 export type {
   CreateGitPrWorkflowOptions,
-  GitPullOptions,
   GitPullStrategyOption,
-  GitPushOptions,
-  GitResetMode,
 } from "./tauri/git";
 export {
   checkoutGitBranch,
@@ -513,8 +387,6 @@ export {
   deleteGitBranch,
   fetchGit,
   getGitBranchCompareCommits,
-  getGitBranchDiffBetweenBranches,
-  getGitBranchDiffFileBetweenBranches,
   getGitCommitDetails,
   getGitCommitDiff,
   getGitCommitHistory,
@@ -541,7 +413,6 @@ export {
   rebaseGitBranch,
   renameGitBranch,
   resetGitCommit,
-  resolveGitCommitRef,
   revertCommit,
   revertGitAll,
   revertGitFile,
@@ -555,20 +426,11 @@ export {
   updateGitBranch,
 } from "./tauri/git";
 export type {
-  DetachedExternalChangeMonitorStatus,
-  EngineTaskOutputArtifactTailResponse,
-  ExportRewindFilesParams,
   ExportRewindFilesResult,
-  ExternalSpecFileResponse,
   FilePreviewHandle,
-  WorkspaceCommandResult,
   WorkspaceDirectoryChildState,
   WorkspaceDirectoryEntry,
-  WorkspaceDirectorySpecialKind,
-  WorkspaceFileItemKind,
   WorkspaceFileListingBudgetMetadata,
-  WorkspaceFileListingCacheState,
-  WorkspaceFileOperationResult,
   WorkspaceFilesResponse,
   WorkspaceFileScanState,
   WorkspaceTextSearchFileResult,
@@ -579,15 +441,12 @@ export {
   clearDetachedExternalChangeMonitor,
   compactProjectCanvasFiles,
   configureDetachedExternalChangeMonitor,
-  copyWorkspaceItem,
   createWorkspaceDirectory,
   duplicateWorkspaceItem,
   exportRewindFiles,
   getWorkspaceDirectoryChildren,
   getWorkspaceFiles,
-  listExternalAbsoluteDirectoryChildren,
   listExternalSpecTree,
-  pasteExternalWorkspaceItems,
   pasteWorkspaceItem,
   readEngineTaskOutputArtifact,
   readExternalAbsoluteFile,
@@ -631,10 +490,6 @@ export {
 export type { WebAssetsStatus } from "./tauri/appServer";
 export type {
   DaemonStatus,
-  EngineActiveProcessDiagnostics,
-  EngineOsChildLivenessEvidence,
-  EngineStaleChildCandidate,
-  EngineWorkspaceActiveProcessDiagnostics,
   WebServerStatus,
 } from "./tauri/appServer";
 export {
@@ -645,14 +500,12 @@ export {
 export {
   deleteClaudeSession,
   deleteCodexSession,
-  deleteCodexSessions,
   deleteGeminiSession,
   deleteGrokSession,
   deleteKimiSession,
-  deleteDshSession,
-  deleteQoderSession,
   deleteOpenCodeSession,
   deletePiSession,
+  deleteOmpSession,
   forkClaudeSession,
   forkDshSession,
   forkClaudeSessionFromMessage,
@@ -665,6 +518,7 @@ export {
   listGrokSessions,
   listKimiSessions,
   listPiSessions,
+  listOmpSessions,
   listDshSessions,
   listQoderSessions,
   listMcpServerStatus,
@@ -675,6 +529,7 @@ export {
   loadGrokSession,
   loadKimiSession,
   loadPiSession,
+  loadOmpSession,
   loadDshSession,
   loadQoderSession,
   resumeThread,
@@ -682,9 +537,6 @@ export {
   startThread,
 } from "./tauri/session";
 export type {
-  ClaudeSessionSummaryPayload,
   GlobalMcpServerEntry,
-  ThreadListPayload,
-  ThreadListResultPayload,
 } from "./tauri/session";
 export { isWebServiceRuntime } from "./tauri/runtimeMode";

@@ -306,9 +306,7 @@ export function readStreamingScheduleTier(): RenderScheduleTier {
   return RENDER_SCHEDULE_TIER_DEFAULT;
 }
 
-export function isStreamingScheduleAggressiveEnabled(): boolean {
-  return readStreamingScheduleTier() === "aggressive";
-}
+
 
 export function isToolOutputBudgetEnabled(): boolean {
   const fallback = isTestMode

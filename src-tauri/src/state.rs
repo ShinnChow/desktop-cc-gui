@@ -138,6 +138,15 @@ impl AppState {
                 },
             )
             .await;
+        self.engine_manager
+            .set_engine_config(
+                EngineType::Omp,
+                EngineConfig {
+                    bin_path: settings.omp_bin.clone(),
+                    ..Default::default()
+                },
+            )
+            .await;
 
         self.engine_manager
             .set_engine_config(

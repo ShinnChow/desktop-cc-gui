@@ -399,6 +399,7 @@ export function assembleAppShellDomainContexts(
       grokDoctor: source.grokDoctor,
       opencodeDoctor: source.opencodeDoctor,
       piDoctor: source.piDoctor,
+      ompDoctor: source.ompDoctor,
       qoderDoctor: source.qoderDoctor,
       editorHighlightTarget: source.editorHighlightTarget,
       editorNavigationTarget: source.editorNavigationTarget,

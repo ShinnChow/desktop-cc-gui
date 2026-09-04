@@ -10,13 +10,11 @@ import { clampUiScale, UI_SCALE_DEFAULT } from "../../../utils/uiScale";
  * Legacy cold-start defer constants kept for tests that still import them.
  * UI scale is permanently locked to 100%; phase-2 ≠1 apply no longer exists.
  */
-export const UI_SCALE_COLD_START_MAX_DELAY_MS = 12_000;
-export const UI_SCALE_AFTER_FORCE_ENTER_DELAY_MS = 2_000;
+
+
 
 /** @internal test-only (no-op; scale is locked). */
-export function setUiScaleColdStartDeferForTests(_enabled: boolean): void {
-  // Scale feature removed — cold-start defer path retired.
-}
+
 
 type UseUiScaleShortcutsOptions = {
   settings: AppSettings;

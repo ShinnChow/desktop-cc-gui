@@ -24,32 +24,9 @@ export type DirectoryGrantScope = "once" | "session" | "workspace";
  * Session-level request to expand L1 allowlist (outside workspace roots).
  * Distinct from file/command ApprovalRequest semantics.
  */
-export type DirectoryGrantRequest = {
-  workspace_id: string;
-  request_id: number | string;
-  /** App-server method, typically `item/directoryGrant/requestApproval`. */
-  method: string;
-  path: string;
-  canonical_path: string;
-  suggested_root: string;
-  default_scope: DirectoryGrantScope;
-  scope: DirectoryGrantScope;
-  engine?: string | null;
-  os?: string | null;
-  is_sensitive_root?: boolean;
-  message?: string | null;
-  thread_id?: string | null;
-  turn_id?: string | null;
-  tool_name?: string | null;
-  retry_context?: Record<string, unknown> | null;
-  params: Record<string, unknown>;
-  shared_runtime_owner?: SharedRuntimeControlOwner;
-};
 
-export type DirectoryGrantDecision = {
-  decision: "accept" | "decline";
-  scope: DirectoryGrantScope;
-};
+
+
 
 export type RequestUserInputOption = {
   label: string;

@@ -1,6 +1,6 @@
 import type { AppSettings, OpenAppTarget } from "../../../types";
-import { DEFAULT_OPEN_APP_ID } from "../constants";
-import { getClientStoreSync } from "../../../services/clientStorage";
+
+
 import { openWorkspaceIn, revealInFileManager } from "../../../services/tauri";
 import {
   isAbsoluteFsPath,
@@ -77,13 +77,4 @@ export function getOpenAppTargets(settings: AppSettings): OpenAppTarget[] {
   return normalizeOpenAppTargets(settings.openAppTargets ?? []);
 }
 
-export function getSelectedOpenAppId(settings: AppSettings): string {
-  const targets = getOpenAppTargets(settings);
-  const selected =
-    settings.selectedOpenAppId ||
-    getClientStoreSync<string>("app", "openWorkspaceApp") ||
-    DEFAULT_OPEN_APP_ID;
-  return targets.some((target) => target.id === selected)
-    ? selected
-    : targets[0]?.id ?? DEFAULT_OPEN_APP_ID;
-}
+

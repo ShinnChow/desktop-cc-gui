@@ -410,7 +410,7 @@ export function useMessagesRuntimeState({
     // 思考或工具行一旦渲染就不再是「等待首段」静默窗，标签必须立即让位，
     // 否则流已到而文案仍称等待（2026-08-28 真机反馈）。其余引擎维持只有
     // assistant message 才算 chunk 到达的既有语义。
-    const reasoningOrToolCountsAsChunk = activeEngine === "pi";
+    const reasoningOrToolCountsAsChunk = activeEngine === "pi" || activeEngine === "omp";
     for (
       let index = latestUserIndex + 1;
       index < deferredRenderSourceItems.length;
@@ -485,7 +485,8 @@ export function useMessagesRuntimeState({
     (activeEngine === "codex" ||
       activeEngine === "qoder" ||
       activeEngine === "dsh" ||
-      activeEngine === "pi")
+      activeEngine === "pi" ||
+      activeEngine === "omp")
       ? labels.waitingForFirstText
       : null;
   const primaryWorkingLabel = isContextCompacting

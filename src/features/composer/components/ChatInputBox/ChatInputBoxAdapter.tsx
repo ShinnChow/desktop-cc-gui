@@ -875,7 +875,7 @@ function attachmentToGeminiImageInput(attachment: Attachment): string | null {
 
 function attachmentsToImageInputs(
   attachments: Attachment[] | undefined,
-  provider: 'claude' | 'codex' | 'gemini' | 'grok' | 'kimi' | 'opencode' | 'pi' | 'dsh' | 'qoder' = 'claude',
+  provider: 'claude' | 'codex' | 'gemini' | 'grok' | 'kimi' | 'opencode' | 'pi' | 'omp' | 'dsh' | 'qoder' = 'claude',
 ): string[] | undefined {
   if (!attachments || attachments.length === 0) {
     return undefined;
@@ -895,7 +895,7 @@ function attachmentsToImageInputs(
 /**
  * Maps Composer engine types to ChatInputBox provider IDs
  */
-type ChatInputProvider = 'claude' | 'codex' | 'gemini' | 'grok' | 'kimi' | 'opencode' | 'pi' | 'dsh' | 'qoder';
+type ChatInputProvider = 'claude' | 'codex' | 'gemini' | 'grok' | 'kimi' | 'opencode' | 'pi' | 'omp' | 'dsh' | 'qoder';
 
 function engineToProvider(engine?: EngineType): ChatInputProvider {
   switch (engine) {
@@ -911,6 +911,8 @@ function engineToProvider(engine?: EngineType): ChatInputProvider {
       return 'kimi';
     case 'pi':
       return 'pi';
+    case 'omp':
+      return 'omp';
     case 'dsh':
       return 'dsh';
     case 'qoder':
@@ -2012,6 +2014,7 @@ export const ChatInputBoxAdapter = memo(forwardRef<ChatInputBoxHandle, ChatInput
         grok: isEngineEnabled('grok'),
         kimi: isEngineEnabled('kimi'),
         pi: isEngineEnabled('pi'),
+        omp: isEngineEnabled('omp'),
         dsh: isEngineEnabled('dsh'),
         qoder: isEngineEnabled('qoder'),
       } as const;
@@ -2042,6 +2045,7 @@ export const ChatInputBoxAdapter = memo(forwardRef<ChatInputBoxHandle, ChatInput
         grok: resolveStatusLabel('grok'),
         kimi: resolveStatusLabel('kimi'),
         pi: resolveStatusLabel('pi'),
+        omp: isSharedSession ? sharedUnsupported : resolveStatusLabel('omp'),
         dsh: isSharedSession ? sharedUnsupported : resolveStatusLabel('dsh'),
         qoder: resolveStatusLabel('qoder'),
       } as const;
@@ -2060,6 +2064,7 @@ export const ChatInputBoxAdapter = memo(forwardRef<ChatInputBoxHandle, ChatInput
         kimi: 'Kimi CLI',
         opencode: 'OpenCode',
         pi: 'PI CLI',
+        omp: 'OMP CLI',
         dsh: 'DeepSeek Harness',
         qoder: 'Qoder CLI',
       };
@@ -2088,6 +2093,7 @@ export const ChatInputBoxAdapter = memo(forwardRef<ChatInputBoxHandle, ChatInput
         grok: resolveVersion('grok'),
         kimi: resolveVersion('kimi'),
         pi: resolveVersion('pi'),
+        omp: resolveVersion('omp'),
         dsh: resolveVersion('dsh'),
         qoder: resolveVersion('qoder'),
       } as const;

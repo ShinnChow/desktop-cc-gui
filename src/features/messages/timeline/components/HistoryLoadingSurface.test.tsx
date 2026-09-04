@@ -23,7 +23,7 @@ describe("HistoryLoadingSurface", () => {
     expect(status.querySelector(".messages-history-loading-traveler")).toBeTruthy();
     expect(status.querySelector(".messages-history-loading-nodes")).toBeNull();
     expect(status.querySelector(".messages-history-loading-phases")).toBeNull();
-    expect(status.querySelector(".working-spinner")).toBeNull();
+    expect(status.querySelector(".agent-thinking")).toBeNull();
   });
 
   it("pins Shared spine nodes to the real restore phase", () => {

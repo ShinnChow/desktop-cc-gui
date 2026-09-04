@@ -45,6 +45,12 @@ export async function runPiDoctor(
   return invoke<CodexDoctorResult>("pi_doctor", { piBin });
 }
 
+export async function runOmpDoctor(
+  ompBin: string | null,
+): Promise<CodexDoctorResult> {
+  return invoke<CodexDoctorResult>("omp_doctor", { ompBin });
+}
+
 export async function runDshDoctor(
   dshBin: string | null,
 ): Promise<CodexDoctorResult> {

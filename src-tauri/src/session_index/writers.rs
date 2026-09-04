@@ -1451,7 +1451,17 @@ fn peek_engine_disk_newest_mtime(engine: &str, workspace_path: &Path) -> Option<
                 .or_else(|| newest_child_mtime_ms(&home, 2))
         }
         "pi" => {
-            let sessions = crate::engine::pi_history::resolve_pi_sessions_root(None);
+            let sessions = crate::engine::pi_history::resolve_pi_family_sessions_root(
+                crate::engine::EngineType::Pi,
+                None,
+            );
+            newest_child_mtime_ms(&sessions, 2)
+        }
+        "omp" => {
+            let sessions = crate::engine::pi_history::resolve_pi_family_sessions_root(
+                crate::engine::EngineType::Omp,
+                None,
+            );
             newest_child_mtime_ms(&sessions, 2)
         }
         "dsh" => {
@@ -1534,9 +1544,9 @@ pub(crate) fn gemini_home_fingerprint() -> String {
     mtime_fingerprint(&home)
 }
 
-pub(crate) fn pi_home_fingerprint() -> String {
-    let sessions = crate::engine::pi_history::resolve_pi_sessions_root(None);
-    // 禁止把 sessions 的父目录（~/.pi/agent）算进指纹：常驻 pi 进程会持续
+fn pi_family_home_fingerprint(engine: crate::engine::EngineType) -> String {
+    let sessions = crate::engine::pi_history::resolve_pi_family_sessions_root(engine, None);
+    // 禁止把 sessions 的父目录（~/.pi|~/.omp/agent）算进指纹：常驻 pi 族进程会持续
     // 改写 agent 目录下的运行态文件（models-store.json / memory / npm），
     // 目录 mtime 永远在变 → 每个 import tick 指纹必然失配 → 全量重扫
     // 数千个会话文件把 CPU 烧满（2026-08-29 静置后创建会话卡死事故实证）。
@@ -1564,6 +1574,14 @@ pub(crate) fn pi_home_fingerprint() -> String {
         parts.extend(child_prints);
     }
     parts.join("|")
+}
+
+pub(crate) fn pi_home_fingerprint() -> String {
+    pi_family_home_fingerprint(crate::engine::EngineType::Pi)
+}
+
+pub(crate) fn omp_home_fingerprint() -> String {
+    pi_family_home_fingerprint(crate::engine::EngineType::Omp)
 }
 
 pub(crate) fn grok_home_fingerprint() -> String {
@@ -1687,10 +1705,15 @@ pub(crate) fn rows_from_gemini_summaries(
         .collect()
 }
 
-pub(crate) fn rows_from_pi_summaries(
+pub(crate) fn rows_from_pi_family_summaries(
+    engine: crate::engine::EngineType,
     workspace_path: &Path,
     sessions: &[crate::engine::pi_history::PiSessionSummary],
 ) -> Vec<SessionIndexRow> {
+    let cli_label = engine
+        .pi_family_spec()
+        .map(|spec| spec.cli_label)
+        .unwrap_or("PI");
     let workspace_key = normalize_path_key(&workspace_path.to_string_lossy());
     sessions
         .iter()
@@ -1698,13 +1721,13 @@ pub(crate) fn rows_from_pi_summaries(
             let title = {
                 let trimmed = session.first_message.trim();
                 if trimmed.is_empty() {
-                    "PI Session".to_string()
+                    format!("{cli_label} Session")
                 } else {
                     truncate_title(trimmed, 80)
                 }
             };
             SessionIndexRow {
-                engine: "pi".into(),
+                engine: engine.icon().into(),
                 session_id: session.session_id.clone(),
                 title,
                 native_title: None,
@@ -1720,6 +1743,20 @@ pub(crate) fn rows_from_pi_summaries(
             }
         })
         .collect()
+}
+
+pub(crate) fn rows_from_pi_summaries(
+    workspace_path: &Path,
+    sessions: &[crate::engine::pi_history::PiSessionSummary],
+) -> Vec<SessionIndexRow> {
+    rows_from_pi_family_summaries(crate::engine::EngineType::Pi, workspace_path, sessions)
+}
+
+pub(crate) fn rows_from_omp_summaries(
+    workspace_path: &Path,
+    sessions: &[crate::engine::pi_history::PiSessionSummary],
+) -> Vec<SessionIndexRow> {
+    rows_from_pi_family_summaries(crate::engine::EngineType::Omp, workspace_path, sessions)
 }
 
 pub(crate) fn rows_from_qoder_summaries(

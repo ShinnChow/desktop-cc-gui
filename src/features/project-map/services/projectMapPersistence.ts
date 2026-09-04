@@ -1,40 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { normalizeEngineForExecution } from "../../../utils/engineExecutionPolicy";
 
-import type {
-  ProjectMapAutoIngestionSettings,
-  ProjectMapCandidate,
-  ProjectMapDiagramArtifact,
-  ProjectMapDiagramDocument,
-  ProjectMapDataset,
-  ProjectMapEvidenceRecord,
-  ProjectMapGraphIntegrityIssueKind,
-  ProjectMapGraphRepairActionKind,
-  ProjectMapGraphRepairSummary,
-  ProjectMapLens,
-  ProjectMapManifest,
-  ProjectMapMemoryIngestionCursor,
-  ProjectMapNode,
-  ProjectMapNodeDetail,
-  ProjectMapProfile,
-  ProjectMapRelatedArtifact,
-  ProjectMapRelation,
-  ProjectMapRelationshipReadResponse,
-  ProjectMapRelationshipReadSection,
-  ProjectMapRelationshipScanOptions,
-  ProjectMapRelationshipScanResponse,
-  ProjectMapRelationshipWriteSnapshotInput,
-  ProjectMapRefreshReasonKind,
-  ProjectMapRefreshSummary,
-  ProjectMapRunMetadata,
-  ProjectMapSource,
-  ProjectMapSourceType,
-  ProjectMapStorageLocation,
-  ProjectMapStaleReason,
-  ProjectMapTourMetadata,
-  ProjectMapTourStep,
-  ProjectMapViewState,
-} from "../types";
+import type { ProjectMapAutoIngestionSettings, ProjectMapCandidate, ProjectMapDiagramArtifact, ProjectMapDiagramDocument, ProjectMapDataset, ProjectMapEvidenceRecord, ProjectMapGraphIntegrityIssueKind, ProjectMapGraphRepairActionKind, ProjectMapGraphRepairSummary, ProjectMapLens, ProjectMapManifest, ProjectMapMemoryIngestionCursor, ProjectMapNode, ProjectMapNodeDetail, ProjectMapProfile, ProjectMapRelatedArtifact, ProjectMapRelation, ProjectMapRelationshipReadResponse, ProjectMapRelationshipReadSection, ProjectMapRelationshipScanOptions, ProjectMapRelationshipScanResponse, ProjectMapRefreshReasonKind, ProjectMapRefreshSummary, ProjectMapRunMetadata, ProjectMapSource, ProjectMapSourceType, ProjectMapStorageLocation, ProjectMapStaleReason, ProjectMapTourMetadata, ProjectMapTourStep, ProjectMapViewState } from "../types";
 import { normalizeProjectMapNodeTopology } from "../utils/incrementalGeneration";
 import { deriveProjectMapStorageKey } from "../utils/storageKey";
 import {
@@ -1058,16 +1025,7 @@ export async function writeProjectMapDataset(input: {
   );
 }
 
-export async function writeProjectMapFiles(input: ProjectMapWriteSnapshotInput): Promise<void> {
-  await withProjectMapWriteTimeout(
-    invoke("project_map_write_snapshot", {
-      workspaceId: input.workspaceId,
-      files: input.files,
-      createBackup: input.createBackup ?? false,
-      storageMode: input.storageLocation,
-    }),
-  );
-}
+
 
 export async function scanProjectMapRelationships(input: {
   workspaceId: string;
@@ -1093,25 +1051,6 @@ export async function readProjectMapRelationships(input: {
   });
 }
 
-export async function writeProjectMapRelationshipFiles(
-  input: ProjectMapRelationshipWriteSnapshotInput,
-): Promise<void> {
-  await withProjectMapWriteTimeout(
-    invoke("project_map_relationship_write_snapshot", {
-      workspaceId: input.workspaceId,
-      files: input.files,
-      createBackup: input.createBackup ?? false,
-      storageMode: input.storageLocation,
-    }),
-  );
-}
 
-export async function clearProjectMapRelationships(input: {
-  workspaceId: string;
-  storageLocation?: ProjectMapStorageLocation;
-}): Promise<void> {
-  await invoke("project_map_relationship_clear", {
-    workspaceId: input.workspaceId,
-    storageMode: input.storageLocation,
-  });
-}
+
+

@@ -284,14 +284,16 @@
   margin-right: 4px;
 }
 
-.settings-agents-header {
+.settings-agents-header,
+.settings-send-shortcut-option-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
-.settings-agents-actions {
+.settings-agents-actions,
+.settings-override-field {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -307,7 +309,9 @@
   border-radius: 8px;
 }
 
-.settings-icon-button svg {
+.settings-icon-button svg,
+.settings-group-drag-handle svg,
+.settings-group-folder-indicator svg {
   width: 14px;
   height: 14px;
 }
@@ -366,7 +370,9 @@
   background: rgba(107, 37, 37, 0.32);
 }
 
-.settings-agent-list {
+.settings-agent-list,
+.settings-agent-icon-groups,
+.settings-open-apps {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -454,12 +460,6 @@
   color: var(--text-subtle);
   margin-top: 2px;
   text-align: right;
-}
-
-.settings-agent-icon-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .settings-agent-icon-group {
@@ -573,7 +573,8 @@
   border-bottom: 1px solid var(--border-muted);
 }
 
-.settings-agent-table-head.is-import {
+.settings-agent-table-head.is-import,
+.settings-agent-table-row.is-import {
   grid-template-columns: 26px minmax(120px, 1fr) minmax(160px, 1fr) minmax(70px, auto);
 }
 
@@ -597,10 +598,6 @@
   background: var(--surface-card);
   font-size: 12px;
   cursor: pointer;
-}
-
-.settings-agent-table-row.is-import {
-  grid-template-columns: 26px minmax(120px, 1fr) minmax(160px, 1fr) minmax(70px, auto);
 }
 
 .settings-agent-table-checkbox {
@@ -861,13 +858,10 @@
   border-radius: 999px;
 }
 
-.settings-projects {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.settings-groups {
+.settings-projects,
+.settings-groups,
+.settings-project-group,
+.settings-overrides {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -934,11 +928,6 @@
   cursor: grabbing;
 }
 
-.settings-group-drag-handle svg {
-  width: 14px;
-  height: 14px;
-}
-
 /* 分组名称区域 */
 .settings-group-name {
   flex: 1;
@@ -971,11 +960,6 @@
   flex-shrink: 0;
 }
 
-.settings-group-folder-indicator svg {
-  width: 14px;
-  height: 14px;
-}
-
 /* 添加分组按钮（底部） */
 .settings-group-create {
   display: flex;
@@ -984,13 +968,10 @@
   margin-top: 8px;
 }
 
-.settings-project-group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.settings-project-group + .settings-project-group {
+.settings-project-group + .settings-project-group,
+.settings-toggle-row + .settings-toggle-row,
+.settings-toggle-row + .settings-field,
+.settings-sound-config {
   margin-top: 12px;
 }
 
@@ -1013,14 +994,16 @@
   border: 1px solid var(--border-muted);
 }
 
-.settings-project-info {
+.settings-project-info,
+.settings-override-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
 }
 
-.settings-project-name {
+.settings-project-name,
+.settings-toggle-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-strong);
@@ -1037,18 +1020,6 @@
 .settings-project-actions {
   display: inline-flex;
   gap: 6px;
-}
-
-.settings-overrides {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.settings-open-apps {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .settings-open-app-row {
@@ -1170,25 +1141,12 @@
   background: var(--surface-card);
 }
 
-.settings-override-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
 .settings-override-actions {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
   min-width: 280px;
-}
-
-.settings-override-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .settings-doctor {
@@ -1292,14 +1250,6 @@
   }
 }
 
-.settings-toggle-row + .settings-toggle-row {
-  margin-top: 12px;
-}
-
-.settings-toggle-row + .settings-field {
-  margin-top: 12px;
-}
-
 .settings-send-shortcut-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1320,7 +1270,11 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.settings-send-shortcut-option:hover {
+.settings-send-shortcut-option:hover,
+.history-editor-textarea:focus,
+.history-editor-importance-input:focus,
+.history-editor-btn:hover,
+.settings-project-sessions-workspace-trigger:hover {
   border-color: var(--border-strong);
 }
 
@@ -1333,13 +1287,6 @@
 .settings-send-shortcut-option.is-active {
   border-color: color-mix(in srgb, #2088ff 65%, var(--border-muted));
   box-shadow: 0 0 0 1px color-mix(in srgb, #2088ff 30%, transparent);
-}
-
-.settings-send-shortcut-option-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 .settings-send-shortcut-option-title {
@@ -1386,17 +1333,14 @@
   margin-top: 2px;
 }
 
-.settings-sound-config {
-  margin-top: 12px;
-}
-
 .settings-sound-select-row {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.settings-sound-select-wrap {
+.settings-sound-select-wrap,
+.settings-sound-custom-path-row .settings-input {
   flex: 1 1 auto;
 }
 
@@ -1411,18 +1355,8 @@
   gap: 8px;
 }
 
-.settings-sound-custom-path-row .settings-input {
-  flex: 1 1 auto;
-}
-
 .settings-scale-row > div:first-child {
   min-width: 0;
-}
-
-.settings-toggle-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
 }
 
 .settings-toggle-subtitle {
@@ -1491,7 +1425,10 @@
   font-size: 13px;
 }
 
-.history-expand-btn:hover {
+.history-expand-btn:hover,
+.settings-project-sessions-expand-btn:hover,
+.settings-project-sessions-header-btn:hover,
+.settings-project-sessions-btn:hover:not(:disabled) {
   color: var(--text-default);
 }
 
@@ -1596,7 +1533,8 @@
   transition: opacity 0.15s;
 }
 
-.history-item:hover .history-item-actions {
+.history-item:hover .history-item-actions,
+.settings-project-sessions-item.is-selected .settings-project-sessions-item-engine {
   opacity: 1;
 }
 
@@ -1613,7 +1551,8 @@
   color: var(--text-muted);
 }
 
-.history-item-btn:hover {
+.history-item-btn:hover,
+.history-editor-close:hover {
   background: var(--surface-hover, rgba(255, 255, 255, 0.1));
   color: var(--text-default);
 }
@@ -1683,11 +1622,6 @@
   color: var(--text-muted);
 }
 
-.history-editor-close:hover {
-  background: var(--surface-hover, rgba(255, 255, 255, 0.1));
-  color: var(--text-default);
-}
-
 .history-editor-field {
   margin-bottom: 12px;
 }
@@ -1713,10 +1647,6 @@
   resize: vertical;
   outline: none;
   font-family: inherit;
-}
-
-.history-editor-textarea:focus {
-  border-color: var(--border-strong);
 }
 
 .history-editor-importance {
@@ -1760,10 +1690,6 @@
   outline: none;
 }
 
-.history-editor-importance-input:focus {
-  border-color: var(--border-strong);
-}
-
 .history-editor-hint {
   display: flex;
   align-items: center;
@@ -1789,10 +1715,6 @@
   border: 1px solid var(--border-muted);
   background: none;
   color: var(--text-default);
-}
-
-.history-editor-btn:hover {
-  border-color: var(--border-strong);
 }
 
 .history-editor-btn--primary {
@@ -1839,10 +1761,6 @@
 
 .settings-project-sessions.is-open .settings-project-sessions-expand-btn {
   padding: 4px 0;
-}
-
-.settings-project-sessions-expand-btn:hover {
-  color: var(--text-default);
 }
 
 .settings-project-sessions.is-open .settings-project-sessions-expand-btn.is-open {
@@ -1929,10 +1847,6 @@
   padding: 0 10px;
   font-size: 13px;
   cursor: pointer;
-}
-
-.settings-project-sessions-workspace-trigger:hover {
-  border-color: var(--border-strong);
 }
 
 .settings-project-sessions-workspace-picker.is-open .settings-project-sessions-workspace-trigger {
@@ -2053,11 +1967,8 @@
   gap: 6px;
 }
 
-.settings-project-sessions-header-btn:hover {
-  color: var(--text-default);
-}
-
-.settings-project-sessions-header-btn:disabled {
+.settings-project-sessions-header-btn:disabled,
+.settings-project-sessions-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -2089,15 +2000,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-
-.settings-project-sessions-btn:hover:not(:disabled) {
-  color: var(--text-default);
-}
-
-.settings-project-sessions-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .settings-project-sessions-btn.is-danger {
@@ -2225,10 +2127,6 @@
   display: block;
   width: 14px;
   height: 14px;
-}
-
-.settings-project-sessions-item.is-selected .settings-project-sessions-item-engine {
-  opacity: 1;
 }
 
 @media (max-width: 960px) {

@@ -1653,6 +1653,8 @@ describe("useLayoutNodes client UI visibility", () => {
 
     expect(target).toBeTruthy();
     expect(toolbar?.classList.contains("has-git-mode-slot")).toBe(true);
+    expect(toolbar?.hasAttribute("data-tauri-drag-region")).toBe(true);
+    expect(target?.getAttribute("data-tauri-drag-region")).toBe("false");
     expect(toolbar?.firstElementChild).toBe(target);
     expect(target?.nextElementSibling?.getAttribute("data-testid")).toBe(
       "panel-tabs",

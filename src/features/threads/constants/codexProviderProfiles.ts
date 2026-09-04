@@ -12,12 +12,14 @@ export const OPENCODE_LOCAL_PROVIDER_PROFILE_ID = "__local_opencode_json__";
 export const OPENCODE_LOCAL_PROVIDER_PROFILE_NAME = LOCAL_PROVIDER_PROFILE_DISPLAY_NAME;
 export const PI_LOCAL_PROVIDER_PROFILE_ID = "__local_pi__";
 export const PI_LOCAL_PROVIDER_PROFILE_NAME = LOCAL_PROVIDER_PROFILE_DISPLAY_NAME;
+export const OMP_LOCAL_PROVIDER_PROFILE_ID = "__local_omp__";
+export const OMP_LOCAL_PROVIDER_PROFILE_NAME = LOCAL_PROVIDER_PROFILE_DISPLAY_NAME;
 /** DSH has no mossx provider profiles; this id is a synthetic local host slot. */
 export const DSH_LOCAL_PROVIDER_PROFILE_ID = "__dsh_host_catalog__";
 export const DSH_LOCAL_PROVIDER_PROFILE_NAME = LOCAL_PROVIDER_PROFILE_DISPLAY_NAME;
 /** Historic Qoder local sentinel. Existing sessions resolve to Qoder Global. */
 export const QODER_LOCAL_PROVIDER_PROFILE_ID = "__local_qoder__";
-export const QODER_LOCAL_PROVIDER_PROFILE_NAME = LOCAL_PROVIDER_PROFILE_DISPLAY_NAME;
+
 /** Fixed distribution bindings; unlike ordinary native local profiles, these
  * must survive model/session selection to keep Global and CN isolated. */
 export const QODER_GLOBAL_PROVIDER_PROFILE_ID = "__qoder_global__";

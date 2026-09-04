@@ -12,15 +12,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ask, open } from "@tauri-apps/plugin-dialog";
-import type { DropResult } from "@hello-pangea/dnd";
+import { open } from "@tauri-apps/plugin-dialog";
 import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
 import TerminalSquare from "lucide-react/dist/esm/icons/terminal-square";
@@ -39,31 +31,20 @@ import Bot from "lucide-react/dist/esm/icons/bot";
 import type {
   AppSettings,
   CodexDoctorResult,
-  ThemePresetId,
   ThreadSummary,
   WorkspaceSettings,
-  OpenAppTarget,
   WorkspaceGroup,
   WorkspaceInfo,
 } from "../../../types";
 import { loadSettingsStyles } from "../../../styles/featureStyleLoaders";
 import { useFeatureStylesReady } from "../../../styles/useFeatureStylesReady";
 import wxqImage from "../../../assets/wxq.png";
-import { buildShortcutValue } from "../../../utils/shortcuts";
 import { clampUiScale } from "../../../utils/uiScale";
 import {
   exportDiagnosticsBundle,
   reloadCodexRuntimeConfig,
   runDshDoctor,
 } from "../../../services/tauri";
-import {
-  DEFAULT_CODE_FONT_FAMILY,
-  DEFAULT_UI_FONT_FAMILY,
-  clampCodeFontSize,
-  normalizeFontFamily,
-} from "../../../utils/fonts";
-import { DEFAULT_OPEN_APP_ID } from "../../app/constants";
-import { writeClientStoreValue } from "../../../services/clientStorage";
 import { VendorSettingsPanel } from "../../vendors/components/VendorSettingsPanel";
 import { AgentSettingsSection } from "./AgentSettingsSection";
 import { CommitSection } from "./CommitSection";
@@ -74,28 +55,13 @@ import Settings from "lucide-react/dist/esm/icons/settings";
 import MoreHorizontalIcon from "lucide-react/dist/esm/icons/more-horizontal";
 import Users from "lucide-react/dist/esm/icons/users";
 import {
-  normalizeHexColor,
-  HEX_COLOR_PATTERN,
-  getContrastingTextColor,
-} from "../../../utils/colorUtils";
-import {
   isHistoryCompletionEnabled,
   setHistoryCompletionEnabled,
 } from "../../composer/hooks/useInputHistoryStore";
 import {
-  buildOpenAppDrafts,
   COMPOSER_PRESET_CONFIGS,
-  createOpenAppId,
   type ComposerPreset,
-  type OpenAppDraft,
 } from "./settings-view/actions/settingsViewActions";
-import {
-  buildSettingsWithCustomThemePreset,
-  getAllThemePresetOptions,
-  resolveActiveThemePresetId,
-  resolveEffectiveThemeAppearance,
-} from "../../theme/utils/themePreset";
-import { useSystemResolvedTheme } from "./settings-view/hooks/useSystemResolvedTheme";
 import { ProjectsSection } from "./settings-view/sections/ProjectsSection";
 import { ComposerSection } from "./settings-view/sections/ComposerSection";
 import { ShortcutsSection } from "./settings-view/sections/ShortcutsSection";
@@ -168,25 +134,12 @@ import { EmbedModelSection } from "./settings-view/sections/EmbedModelSection";
 import { ExperimentalToggleRow } from "./settings-view/components/ExperimentalToggleRow";
 import { BasicBehaviorSection } from "./settings-view/sections/BasicBehaviorSection";
 import {
-  buildShortcutDrafts,
-  shortcutDraftKeyBySetting,
-  type ShortcutDrafts,
-  type ShortcutSettingKey,
-} from "./settings-view/settingsViewShortcuts";
-import {
-  applyUserMessageBubbleCssVars,
-  DEFAULT_DARK_USER_MSG,
-  DEFAULT_LIGHT_USER_MSG,
-  extractPrimaryFontFamily,
-  formatFontFamilySetting,
-  listLocalUiFonts,
   SettingsViewSection,
-  USER_MSG_DARK_PRESETS,
-  USER_MSG_LIGHT_PRESETS,
 } from "./settings-view/settingsViewAppearance";
 import {
   TEMPORARILY_DISABLED_SIDEBAR_SECTIONS as BASE_DISABLED_SIDEBAR_SECTIONS,
 } from "./settings-view/settingsViewConstants";
+import { useSettingsDoctorRunners } from "./settings-view/hooks/useDoctorRunner";
 import type { SettingsHighlightTarget } from "../../app/hooks/useSettingsModalState";
 
 export type SettingsViewProps = {
@@ -238,6 +191,7 @@ export type SettingsViewProps = {
     opencodeBin: string | null,
   ) => Promise<CodexDoctorResult>;
   onRunPiDoctor?: (piBin: string | null) => Promise<CodexDoctorResult>;
+  onRunOmpDoctor?: (ompBin: string | null) => Promise<CodexDoctorResult>;
   onRunQoderDoctor?: (qoderBin: string | null) => Promise<CodexDoctorResult>;
   onRunDoctor?: (
     codexBin: string | null,
@@ -389,6 +343,7 @@ export function SettingsView({
   onRunGrokDoctor,
   onRunOpenCodeDoctor,
   onRunPiDoctor,
+  onRunOmpDoctor,
   onRunQoderDoctor,
   onRunDoctor,
   activeWorkspace,
@@ -439,42 +394,13 @@ export function SettingsView({
   const [remoteTokenDraft, setRemoteTokenDraft] = useState(
     appSettings.remoteBackendToken ?? "",
   );
-  const [uiFontDraft, setUiFontDraft] = useState(
-    () =>
-      extractPrimaryFontFamily(appSettings.uiFontFamily) ||
-      extractPrimaryFontFamily(DEFAULT_UI_FONT_FAMILY),
-  );
-  const [uiFontOptions, setUiFontOptions] = useState<string[]>([]);
-  const [codeFontDraft, setCodeFontDraft] = useState(
-    () =>
-      extractPrimaryFontFamily(appSettings.codeFontFamily) ||
-      extractPrimaryFontFamily(DEFAULT_CODE_FONT_FAMILY),
-  );
-  const [codeFontSizeDraft, setCodeFontSizeDraft] = useState(
-    appSettings.codeFontSize,
-  );
   const [uiScaleDraft, setUiScaleDraft] = useState(
     clampUiScale(appSettings.uiScale),
-  );
-  const [userMsgHexDraft, setUserMsgHexDraft] = useState(() =>
-    normalizeHexColor(appSettings.userMsgColor),
   );
   const [notificationSoundPathDraft, setNotificationSoundPathDraft] = useState(
     appSettings.notificationSoundCustomPath ?? "",
   );
-  const systemResolvedTheme = useSystemResolvedTheme();
-  const [groupDrafts, setGroupDrafts] = useState<Record<string, string>>({});
-  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
-  const [newGroupName, setNewGroupName] = useState("");
-  const [createGroupOpen, setCreateGroupOpen] = useState(false);
-  const [groupError, setGroupError] = useState<string | null>(null);
   const [highlightedRow, setHighlightedRow] = useState<string | null>(null);
-  const [openAppDrafts, setOpenAppDrafts] = useState<OpenAppDraft[]>(() =>
-    buildOpenAppDrafts(appSettings.openAppTargets),
-  );
-  const [openAppSelectedId, setOpenAppSelectedId] = useState(
-    appSettings.selectedOpenAppId,
-  );
   const [historyCompletionEnabled, setHistoryCompletionEnabledState] = useState(
     () => isHistoryCompletionEnabled(),
   );
@@ -507,38 +433,56 @@ export function SettingsView({
     setHistoryCompletionEnabledState(next);
     setHistoryCompletionEnabled(next);
   }, [historyCompletionEnabled]);
-  const [doctorState, setDoctorState] = useState<{
-    status: "idle" | "running" | "done";
-    result: CodexDoctorResult | null;
-  }>({ status: "idle", result: null });
-  const [claudeDoctorState, setClaudeDoctorState] = useState<{
-    status: "idle" | "running" | "done";
-    result: CodexDoctorResult | null;
-  }>({ status: "idle", result: null });
-  const [kimiDoctorState, setKimiDoctorState] = useState<{
-    status: "idle" | "running" | "done";
-    result: CodexDoctorResult | null;
-  }>({ status: "idle", result: null });
-  const [grokDoctorState, setGrokDoctorState] = useState<{
-    status: "idle" | "running" | "done";
-    result: CodexDoctorResult | null;
-  }>({ status: "idle", result: null });
-  const [openCodeDoctorState, setOpenCodeDoctorState] = useState<{
-    status: "idle" | "running" | "done";
-    result: CodexDoctorResult | null;
-  }>({ status: "idle", result: null });
-  const [dshDoctorState, setDshDoctorState] = useState<{
-    status: "idle" | "running" | "done";
-    result: CodexDoctorResult | null;
-  }>({ status: "idle", result: null });
-  const [piDoctorState, setPiDoctorState] = useState<{
-    status: "idle" | "running" | "done";
-    result: CodexDoctorResult | null;
-  }>({ status: "idle", result: null });
-  const [qoderDoctorState, setQoderDoctorState] = useState<{
-    status: "idle" | "running" | "done";
-    result: CodexDoctorResult | null;
-  }>({ status: "idle", result: null });
+  const { runners: doctorRunners, reportInstallerResult } =
+    useSettingsDoctorRunners({
+      codex: {
+        resolveBin: () => appSettings.codexBin ?? null,
+        runDoctor: runCodexDoctor
+          ? (bin) => runCodexDoctor(bin, appSettings.codexArgs ?? null)
+          : null,
+        unavailableMessage: "Codex doctor is not available.",
+      },
+      claude: {
+        resolveBin: () => appSettings.claudeBin ?? null,
+        runDoctor: onRunClaudeDoctor ?? null,
+        unavailableMessage: "Claude doctor is not available.",
+      },
+      kimi: {
+        resolveBin: () => appSettings.kimiBin ?? null,
+        runDoctor: onRunKimiDoctor ?? null,
+        unavailableMessage: "Kimi doctor is not available.",
+      },
+      grok: {
+        resolveBin: () => appSettings.grokBin ?? null,
+        runDoctor: onRunGrokDoctor ?? null,
+        unavailableMessage: "Grok doctor is not available.",
+      },
+      opencode: {
+        resolveBin: () => appSettings.opencodeBin ?? null,
+        runDoctor: onRunOpenCodeDoctor ?? null,
+        unavailableMessage: "OpenCode doctor is not available.",
+      },
+      dsh: {
+        resolveBin: () => appSettings.dshBin ?? null,
+        runDoctor: (bin) => runDshDoctor(bin),
+        unavailableMessage: "DSH doctor is not available.",
+      },
+      pi: {
+        resolveBin: () => appSettings.piBin ?? null,
+        runDoctor: onRunPiDoctor ?? null,
+        unavailableMessage: "PI doctor is not available.",
+      },
+      omp: {
+        resolveBin: () => appSettings.ompBin ?? null,
+        runDoctor: onRunOmpDoctor ?? null,
+        unavailableMessage: "OMP doctor is not available.",
+      },
+      qoder: {
+        resolveBin: () => appSettings.qoderBin ?? null,
+        runDoctor: onRunQoderDoctor ?? null,
+        unavailableMessage: "Qoder doctor is not available.",
+      },
+    });
   const [codexRuntimeReloadState, setCodexRuntimeReloadState] = useState<{
     status: "idle" | "reloading" | "applied" | "failed";
     message: string | null;
@@ -551,128 +495,6 @@ export function SettingsView({
   const diagnosticsBundleRequestIdRef = useRef(0);
   const diagnosticsBundleMountedRef = useRef(true);
 
-  const [shortcutDrafts, setShortcutDrafts] = useState<ShortcutDrafts>(() =>
-    buildShortcutDrafts(appSettings),
-  );
-  const normalizedUserMsgColor = useMemo(
-    () => normalizeHexColor(appSettings.userMsgColor),
-    [appSettings.userMsgColor],
-  );
-  const resolvedAppearanceTheme = useMemo<"light" | "dark">(
-    () =>
-      resolveEffectiveThemeAppearance(
-        {
-          theme: appSettings.theme,
-          lightThemePresetId: appSettings.lightThemePresetId,
-          darkThemePresetId: appSettings.darkThemePresetId,
-          customThemePresetId: appSettings.customThemePresetId,
-        },
-        systemResolvedTheme,
-      ),
-    [
-      appSettings.customThemePresetId,
-      appSettings.darkThemePresetId,
-      appSettings.lightThemePresetId,
-      appSettings.theme,
-      systemResolvedTheme,
-    ],
-  );
-  const activeThemePresetId = useMemo(
-    () =>
-      resolveActiveThemePresetId(
-        {
-          theme: appSettings.theme,
-          darkThemePresetId: appSettings.darkThemePresetId,
-          lightThemePresetId: appSettings.lightThemePresetId,
-          customThemePresetId: appSettings.customThemePresetId,
-        },
-        systemResolvedTheme,
-      ),
-    [
-      appSettings.customThemePresetId,
-      appSettings.darkThemePresetId,
-      appSettings.lightThemePresetId,
-      appSettings.theme,
-      systemResolvedTheme,
-    ],
-  );
-  const themePresetOptions = useMemo(
-    () =>
-      getAllThemePresetOptions().map((preset) => ({
-        id: preset.id,
-        label: t(preset.labelKey),
-      })),
-    [t],
-  );
-  const handleThemePresetChange = useCallback(
-    async (presetId: ThemePresetId) => {
-      await onUpdateAppSettings(
-        buildSettingsWithCustomThemePreset(appSettings, presetId),
-      );
-    },
-    [appSettings, onUpdateAppSettings],
-  );
-  const userMsgPresets = useMemo(
-    () =>
-      resolvedAppearanceTheme === "light"
-        ? USER_MSG_LIGHT_PRESETS
-        : USER_MSG_DARK_PRESETS,
-    [resolvedAppearanceTheme],
-  );
-  const defaultUserMsgColor =
-    resolvedAppearanceTheme === "light"
-      ? DEFAULT_LIGHT_USER_MSG
-      : DEFAULT_DARK_USER_MSG;
-  const defaultUiPrimaryFont = useMemo(
-    () => extractPrimaryFontFamily(DEFAULT_UI_FONT_FAMILY),
-    [],
-  );
-  const uiFontSelectOptions = useMemo(() => {
-    const options = new Set<string>(uiFontOptions);
-    const currentPrimary = extractPrimaryFontFamily(appSettings.uiFontFamily);
-    if (defaultUiPrimaryFont) {
-      options.add(defaultUiPrimaryFont);
-    }
-    if (currentPrimary) {
-      options.add(currentPrimary);
-    }
-    if (uiFontDraft) {
-      options.add(uiFontDraft);
-    }
-    return Array.from(options).sort((left, right) =>
-      left.localeCompare(right, undefined, { sensitivity: "base" }),
-    );
-  }, [
-    appSettings.uiFontFamily,
-    defaultUiPrimaryFont,
-    uiFontDraft,
-    uiFontOptions,
-  ]);
-  const defaultCodePrimaryFont = useMemo(
-    () => extractPrimaryFontFamily(DEFAULT_CODE_FONT_FAMILY),
-    [],
-  );
-  const codeFontSelectOptions = useMemo(() => {
-    const options = new Set<string>(uiFontOptions);
-    const currentPrimary = extractPrimaryFontFamily(appSettings.codeFontFamily);
-    if (defaultCodePrimaryFont) {
-      options.add(defaultCodePrimaryFont);
-    }
-    if (currentPrimary) {
-      options.add(currentPrimary);
-    }
-    if (codeFontDraft) {
-      options.add(codeFontDraft);
-    }
-    return Array.from(options).sort((left, right) =>
-      left.localeCompare(right, undefined, { sensitivity: "base" }),
-    );
-  }, [
-    appSettings.codeFontFamily,
-    codeFontDraft,
-    defaultCodePrimaryFont,
-    uiFontOptions,
-  ]);
   const selectedNotificationSound = useMemo(() => {
     const raw = appSettings.notificationSoundId?.trim();
     if (!raw) {
@@ -749,7 +571,6 @@ export function SettingsView({
     },
     [],
   );
-  const shouldShowWorkspaceSelector = false;
   const hasCodexHomeOverrides = useMemo(
     () => projects.some((workspace) => workspace.settings.codexHome != null),
     [projects],
@@ -767,23 +588,6 @@ export function SettingsView({
       active = false;
     };
   }, [t]);
-  useEffect(() => {
-    let active = true;
-    void listLocalUiFonts()
-      .then((fonts) => {
-        if (active) {
-          setUiFontOptions(fonts);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setUiFontOptions([]);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
   useEffect(() => {
     diagnosticsBundleMountedRef.current = true;
     return () => {
@@ -806,45 +610,14 @@ export function SettingsView({
   }, [appSettings.remoteBackendToken]);
 
   useEffect(() => {
-    const nextPrimaryFont =
-      extractPrimaryFontFamily(appSettings.uiFontFamily) ||
-      extractPrimaryFontFamily(DEFAULT_UI_FONT_FAMILY);
-    setUiFontDraft(nextPrimaryFont);
-  }, [appSettings.uiFontFamily]);
-
-  useEffect(() => {
-    const nextPrimaryFont =
-      extractPrimaryFontFamily(appSettings.codeFontFamily) ||
-      extractPrimaryFontFamily(DEFAULT_CODE_FONT_FAMILY);
-    setCodeFontDraft(nextPrimaryFont);
-  }, [appSettings.codeFontFamily]);
-
-  useEffect(() => {
-    setCodeFontSizeDraft(appSettings.codeFontSize);
-  }, [appSettings.codeFontSize]);
-
-  useEffect(() => {
     setUiScaleDraft(clampedUiScale);
   }, [clampedUiScale]);
-
-  useEffect(() => {
-    setUserMsgHexDraft(normalizedUserMsgColor);
-  }, [normalizedUserMsgColor]);
 
   useEffect(() => {
     setNotificationSoundPathDraft(
       appSettings.notificationSoundCustomPath ?? "",
     );
   }, [appSettings.notificationSoundCustomPath]);
-
-  useEffect(() => {
-    setOpenAppDrafts(buildOpenAppDrafts(appSettings.openAppTargets));
-    setOpenAppSelectedId(appSettings.selectedOpenAppId);
-  }, [appSettings.openAppTargets, appSettings.selectedOpenAppId]);
-
-  useEffect(() => {
-    setShortcutDrafts(buildShortcutDrafts(appSettings));
-  }, [appSettings]);
 
   useEffect(() => {
     if (sessionWorkspaceOptions.length === 0) {
@@ -869,16 +642,6 @@ export function SettingsView({
       return sessionWorkspaceOptions[0]?.id ?? null;
     });
   }, [activeWorkspace, sessionWorkspaceOptions]);
-
-  useEffect(() => {
-    setGroupDrafts((prev) => {
-      const next: Record<string, string> = {};
-      workspaceGroups.forEach((group) => {
-        next[group.id] = prev[group.id] ?? group.name;
-      });
-      return next;
-    });
-  }, [workspaceGroups]);
 
   useEffect(() => {
     if (initialSection) {
@@ -1072,126 +835,6 @@ export function SettingsView({
     handleCommitUiScale(1);
   }, [handleCommitUiScale]);
 
-  const handleCommitUiFont = useCallback(
-    async (selectedFontName: string) => {
-      const normalizedFontName = selectedFontName.trim();
-      const nextFont = normalizeFontFamily(
-        formatFontFamilySetting(normalizedFontName),
-        DEFAULT_UI_FONT_FAMILY,
-      );
-      if (nextFont === appSettings.uiFontFamily) {
-        return;
-      }
-      await onUpdateAppSettings({
-        ...appSettings,
-        uiFontFamily: nextFont,
-      });
-    },
-    [appSettings, onUpdateAppSettings],
-  );
-
-  const handleUiFontSelectChange = useCallback(
-    (event: React.ChangeEvent<HTMLSelectElement>) => {
-      const nextFontName = event.target.value;
-      setUiFontDraft(nextFontName);
-      void handleCommitUiFont(nextFontName);
-    },
-    [handleCommitUiFont],
-  );
-
-  const handleCommitCodeFont = useCallback(
-    async (selectedFontName: string) => {
-      const normalizedFontName = selectedFontName.trim();
-      const nextFont = normalizeFontFamily(
-        formatFontFamilySetting(normalizedFontName),
-        DEFAULT_CODE_FONT_FAMILY,
-      );
-      if (nextFont === appSettings.codeFontFamily) {
-        return;
-      }
-      await onUpdateAppSettings({
-        ...appSettings,
-        codeFontFamily: nextFont,
-      });
-    },
-    [appSettings, onUpdateAppSettings],
-  );
-
-  const handleCodeFontSelectChange = useCallback(
-    (event: React.ChangeEvent<HTMLSelectElement>) => {
-      const nextFontName = event.target.value;
-      setCodeFontDraft(nextFontName);
-      void handleCommitCodeFont(nextFontName);
-    },
-    [handleCommitCodeFont],
-  );
-
-  const handleCommitCodeFontSize = async (nextSize: number) => {
-    const clampedSize = clampCodeFontSize(nextSize);
-    setCodeFontSizeDraft(clampedSize);
-    if (clampedSize === appSettings.codeFontSize) {
-      return;
-    }
-    await onUpdateAppSettings({
-      ...appSettings,
-      codeFontSize: clampedSize,
-    });
-  };
-
-  const handleSaveUserMsgColor = useCallback(
-    async (nextColor: string) => {
-      const normalized = normalizeHexColor(nextColor);
-      applyUserMessageBubbleCssVars(
-        normalized || null,
-        normalized ? getContrastingTextColor(normalized) : null,
-      );
-      if (normalized === normalizedUserMsgColor) {
-        return;
-      }
-      await onUpdateAppSettings({
-        ...appSettings,
-        userMsgColor: normalized,
-      });
-    },
-    [appSettings, normalizedUserMsgColor, onUpdateAppSettings],
-  );
-
-  const handleUserMsgPresetClick = useCallback(
-    (presetColor: string) => {
-      const normalizedPreset = presetColor.toLowerCase();
-      const nextColor =
-        normalizedPreset === defaultUserMsgColor ? "" : normalizedPreset;
-      setUserMsgHexDraft(nextColor);
-      void handleSaveUserMsgColor(nextColor);
-    },
-    [defaultUserMsgColor, handleSaveUserMsgColor],
-  );
-
-  const handleUserMsgColorPickerChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const nextColor = normalizeHexColor(event.target.value);
-      setUserMsgHexDraft(nextColor);
-      void handleSaveUserMsgColor(nextColor);
-    },
-    [handleSaveUserMsgColor],
-  );
-
-  const handleUserMsgHexInputChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const nextValue = event.target.value;
-      setUserMsgHexDraft(nextValue);
-      if (HEX_COLOR_PATTERN.test(nextValue)) {
-        void handleSaveUserMsgColor(nextValue);
-      }
-    },
-    [handleSaveUserMsgColor],
-  );
-
-  const handleResetUserMsgColor = useCallback(() => {
-    setUserMsgHexDraft("");
-    void handleSaveUserMsgColor("");
-  }, [handleSaveUserMsgColor]);
-
   const handleNotificationSoundOptionChange = useCallback(
     (nextSound: string | null) => {
       if (!nextSound) {
@@ -1242,151 +885,6 @@ export function SettingsView({
     });
   }, [appSettings, onUpdateAppSettings]);
 
-  const isUserMsgPresetActive = useCallback(
-    (presetColor: string) => {
-      const normalizedPreset = presetColor.toLowerCase();
-      if (!normalizedUserMsgColor && normalizedPreset === defaultUserMsgColor) {
-        return true;
-      }
-      return normalizedUserMsgColor === normalizedPreset;
-    },
-    [defaultUserMsgColor, normalizedUserMsgColor],
-  );
-
-  const normalizeOpenAppTargets = useCallback(
-    (drafts: OpenAppDraft[]): OpenAppTarget[] =>
-      drafts.map(({ argsText, ...target }) => ({
-        ...target,
-        label: target.label.trim(),
-        appName: (target.appName?.trim() ?? "") || null,
-        command: (target.command?.trim() ?? "") || null,
-        args: argsText.trim() ? argsText.trim().split(/\s+/) : [],
-      })),
-    [],
-  );
-
-  const handleCommitOpenApps = useCallback(
-    async (drafts: OpenAppDraft[], selectedId = openAppSelectedId) => {
-      const nextTargets = normalizeOpenAppTargets(drafts);
-      const nextSelectedId =
-        nextTargets.find((target) => target.id === selectedId)?.id ??
-        nextTargets[0]?.id ??
-        DEFAULT_OPEN_APP_ID;
-      setOpenAppDrafts(buildOpenAppDrafts(nextTargets));
-      setOpenAppSelectedId(nextSelectedId);
-      await onUpdateAppSettings({
-        ...appSettings,
-        openAppTargets: nextTargets,
-        selectedOpenAppId: nextSelectedId,
-      });
-    },
-    [
-      appSettings,
-      normalizeOpenAppTargets,
-      onUpdateAppSettings,
-      openAppSelectedId,
-    ],
-  );
-
-  const handleOpenAppDraftChange = (
-    index: number,
-    updates: Partial<OpenAppDraft>,
-  ) => {
-    setOpenAppDrafts((prev) => {
-      const next = [...prev];
-      const current = next[index];
-      if (!current) {
-        return prev;
-      }
-      next[index] = { ...current, ...updates };
-      return next;
-    });
-  };
-
-  const handleOpenAppKindChange = (
-    index: number,
-    kind: OpenAppTarget["kind"],
-  ) => {
-    setOpenAppDrafts((prev) => {
-      const next = [...prev];
-      const current = next[index];
-      if (!current) {
-        return prev;
-      }
-      next[index] = {
-        ...current,
-        kind,
-        appName: kind === "app" ? (current.appName ?? "") : null,
-        command: kind === "command" ? (current.command ?? "") : null,
-        argsText: kind === "finder" ? "" : current.argsText,
-      };
-      void handleCommitOpenApps(next);
-      return next;
-    });
-  };
-
-  const handleMoveOpenApp = (index: number, direction: "up" | "down") => {
-    const nextIndex = direction === "up" ? index - 1 : index + 1;
-    if (nextIndex < 0 || nextIndex >= openAppDrafts.length) {
-      return;
-    }
-    const next = [...openAppDrafts];
-    const [moved] = next.splice(index, 1);
-    next.splice(nextIndex, 0, moved);
-    setOpenAppDrafts(next);
-    void handleCommitOpenApps(next);
-  };
-
-  const handleDeleteOpenApp = (index: number) => {
-    if (openAppDrafts.length <= 1) {
-      return;
-    }
-    const removed = openAppDrafts[index];
-    const next = openAppDrafts.filter((_, draftIndex) => draftIndex !== index);
-    const nextSelected =
-      removed?.id === openAppSelectedId
-        ? (next[0]?.id ?? DEFAULT_OPEN_APP_ID)
-        : openAppSelectedId;
-    setOpenAppDrafts(next);
-    void handleCommitOpenApps(next, nextSelected);
-  };
-
-  const handleAddOpenApp = (initial?: Partial<OpenAppDraft>): string => {
-    const kind = initial?.kind ?? "app";
-    const preferredId = initial?.id?.trim();
-    const id =
-      preferredId && !openAppDrafts.some((item) => item.id === preferredId)
-        ? preferredId
-        : createOpenAppId();
-    const newTarget: OpenAppDraft = {
-      id,
-      label: initial?.label?.trim() || t("settings.newApp"),
-      kind,
-      appName:
-        kind === "app"
-          ? (initial?.appName ?? "")
-          : kind === "finder"
-            ? null
-            : (initial?.appName ?? null),
-      command:
-        kind === "command"
-          ? (initial?.command ?? "")
-          : (initial?.command ?? null),
-      args: initial?.args ?? [],
-      argsText: initial?.argsText ?? "",
-    };
-    const next = [...openAppDrafts, newTarget];
-    setOpenAppDrafts(next);
-    void handleCommitOpenApps(next, newTarget.id);
-    return newTarget.id;
-  };
-
-  const handleSelectOpenAppDefault = (id: string) => {
-    setOpenAppSelectedId(id);
-    writeClientStoreValue("app", "openWorkspaceApp", id);
-    void handleCommitOpenApps(openAppDrafts, id);
-  };
-
   const handleComposerPresetChange = (preset: ComposerPreset) => {
     const config = COMPOSER_PRESET_CONFIGS[preset];
     void onUpdateAppSettings({
@@ -1406,220 +904,6 @@ export function SettingsView({
       ...appSettings,
       composerSendShortcut: shortcut,
     });
-  };
-
-  const handleRunDoctor = async () => {
-    const codexBin = appSettings.codexBin ?? null;
-    const codexArgs = appSettings.codexArgs ?? null;
-    setDoctorState({ status: "running", result: null });
-    try {
-      if (!runCodexDoctor) {
-        throw new Error("Codex doctor is not available.");
-      }
-      const result = await runCodexDoctor(codexBin, codexArgs);
-      setDoctorState({ status: "done", result });
-    } catch (error) {
-      setDoctorState({
-        status: "done",
-        result: {
-          ok: false,
-          codexBin,
-          version: null,
-          appServerOk: false,
-          details: error instanceof Error ? error.message : String(error),
-          path: null,
-          nodeOk: false,
-          nodeVersion: null,
-          nodeDetails: null,
-        },
-      });
-    }
-  };
-
-  const handleRunClaudeDoctor = async () => {
-    const claudeBin = appSettings.claudeBin ?? null;
-    setClaudeDoctorState({ status: "running", result: null });
-    try {
-      if (!onRunClaudeDoctor) {
-        throw new Error("Claude doctor is not available.");
-      }
-      const result = await onRunClaudeDoctor(claudeBin);
-      setClaudeDoctorState({ status: "done", result });
-    } catch (error) {
-      setClaudeDoctorState({
-        status: "done",
-        result: {
-          ok: false,
-          codexBin: claudeBin,
-          version: null,
-          appServerOk: false,
-          details: error instanceof Error ? error.message : String(error),
-          path: null,
-          nodeOk: false,
-          nodeVersion: null,
-          nodeDetails: null,
-        },
-      });
-    }
-  };
-
-  const handleRunKimiDoctor = async () => {
-    const kimiBin = appSettings.kimiBin ?? null;
-    setKimiDoctorState({ status: "running", result: null });
-    try {
-      if (!onRunKimiDoctor) {
-        throw new Error("Kimi doctor is not available.");
-      }
-      const result = await onRunKimiDoctor(kimiBin);
-      setKimiDoctorState({ status: "done", result });
-    } catch (error) {
-      setKimiDoctorState({
-        status: "done",
-        result: {
-          ok: false,
-          codexBin: kimiBin,
-          version: null,
-          appServerOk: false,
-          details: error instanceof Error ? error.message : String(error),
-          path: null,
-          nodeOk: false,
-          nodeVersion: null,
-          nodeDetails: null,
-        },
-      });
-    }
-  };
-
-  const handleRunGrokDoctor = async () => {
-    const grokBin = appSettings.grokBin ?? null;
-    setGrokDoctorState({ status: "running", result: null });
-    try {
-      if (!onRunGrokDoctor) {
-        throw new Error("Grok doctor is not available.");
-      }
-      const result = await onRunGrokDoctor(grokBin);
-      setGrokDoctorState({ status: "done", result });
-    } catch (error) {
-      setGrokDoctorState({
-        status: "done",
-        result: {
-          ok: false,
-          codexBin: grokBin,
-          version: null,
-          appServerOk: false,
-          details: error instanceof Error ? error.message : String(error),
-          path: null,
-          nodeOk: false,
-          nodeVersion: null,
-          nodeDetails: null,
-        },
-      });
-    }
-  };
-
-  const handleRunOpenCodeDoctor = async () => {
-    const openCodeBin = appSettings.opencodeBin ?? null;
-    setOpenCodeDoctorState({ status: "running", result: null });
-    try {
-      if (!onRunOpenCodeDoctor) {
-        throw new Error("OpenCode doctor is not available.");
-      }
-      const result = await onRunOpenCodeDoctor(openCodeBin);
-      setOpenCodeDoctorState({ status: "done", result });
-    } catch (error) {
-      setOpenCodeDoctorState({
-        status: "done",
-        result: {
-          ok: false,
-          codexBin: openCodeBin,
-          version: null,
-          appServerOk: false,
-          details: error instanceof Error ? error.message : String(error),
-          path: null,
-          nodeOk: false,
-          nodeVersion: null,
-          nodeDetails: null,
-        },
-      });
-    }
-  };
-
-  const handleRunDshDoctor = async () => {
-    const dshBin = appSettings.dshBin ?? null;
-    setDshDoctorState({ status: "running", result: null });
-    try {
-      const result = await runDshDoctor(dshBin);
-      setDshDoctorState({ status: "done", result });
-    } catch (error) {
-      setDshDoctorState({
-        status: "done",
-        result: {
-          ok: false,
-          codexBin: dshBin,
-          version: null,
-          appServerOk: false,
-          details: error instanceof Error ? error.message : String(error),
-          path: null,
-          nodeOk: false,
-          nodeVersion: null,
-          nodeDetails: null,
-        },
-      });
-    }
-  };
-
-  const handleRunPiDoctor = async () => {
-    const piBin = appSettings.piBin ?? null;
-    setPiDoctorState({ status: "running", result: null });
-    try {
-      if (!onRunPiDoctor) {
-        throw new Error("PI doctor is not available.");
-      }
-      const result = await onRunPiDoctor(piBin);
-      setPiDoctorState({ status: "done", result });
-    } catch (error) {
-      setPiDoctorState({
-        status: "done",
-        result: {
-          ok: false,
-          codexBin: piBin,
-          version: null,
-          appServerOk: false,
-          details: error instanceof Error ? error.message : String(error),
-          path: null,
-          nodeOk: false,
-          nodeVersion: null,
-          nodeDetails: null,
-        },
-      });
-    }
-  };
-
-  const handleRunQoderDoctor = async () => {
-    const qoderBin = appSettings.qoderBin ?? null;
-    setQoderDoctorState({ status: "running", result: null });
-    try {
-      if (!onRunQoderDoctor) {
-        throw new Error("Qoder doctor is not available.");
-      }
-      const result = await onRunQoderDoctor(qoderBin);
-      setQoderDoctorState({ status: "done", result });
-    } catch (error) {
-      setQoderDoctorState({
-        status: "done",
-        result: {
-          ok: false,
-          codexBin: qoderBin,
-          version: null,
-          appServerOk: false,
-          details: error instanceof Error ? error.message : String(error),
-          path: null,
-          nodeOk: false,
-          nodeVersion: null,
-          nodeDetails: null,
-        },
-      });
-    }
   };
 
   const handleReloadCodexRuntimeConfig = useCallback(async () => {
@@ -1676,171 +960,6 @@ export function SettingsView({
       });
     }
   }, [t]);
-
-  const updateShortcut = async (
-    key: ShortcutSettingKey,
-    value: string | null,
-  ) => {
-    const draftKey = shortcutDraftKeyBySetting[key];
-    setShortcutDrafts((prev) => ({
-      ...prev,
-      [draftKey]: value ?? "",
-    }));
-    await onUpdateAppSettings({
-      ...appSettings,
-      [key]: value,
-    });
-  };
-
-  const handleShortcutKeyDown = (
-    event: React.KeyboardEvent<HTMLElement>,
-    key: ShortcutSettingKey,
-  ) => {
-    if (event.key === "Tab" && key !== "composerCollaborationShortcut") {
-      return;
-    }
-    if (event.key === "Tab" && !event.shiftKey) {
-      return;
-    }
-    event.preventDefault();
-    if (event.key === "Backspace" || event.key === "Delete") {
-      void updateShortcut(key, null);
-      return;
-    }
-    const value = buildShortcutValue(event.nativeEvent);
-    if (!value) {
-      return;
-    }
-    // Blur after a successful capture so the recorder exits recording mode
-    // and the recorded value shows immediately.
-    const target = event.currentTarget;
-    void updateShortcut(key, value);
-    target.blur();
-  };
-
-  const trimmedGroupName = newGroupName.trim();
-  const canCreateGroup = Boolean(trimmedGroupName);
-
-  const handleCreateGroup = async () => {
-    setGroupError(null);
-    try {
-      const created = await onCreateWorkspaceGroup(newGroupName);
-      if (created) {
-        setNewGroupName("");
-        setCreateGroupOpen(false);
-      }
-    } catch (error) {
-      setGroupError(error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const handleRenameGroup = async (group: WorkspaceGroup) => {
-    const draft = groupDrafts[group.id] ?? "";
-    const trimmed = draft.trim();
-    if (!trimmed || trimmed === group.name) {
-      setGroupDrafts((prev) => ({
-        ...prev,
-        [group.id]: group.name,
-      }));
-      return;
-    }
-    setGroupError(null);
-    try {
-      await onRenameWorkspaceGroup(group.id, trimmed);
-    } catch (error) {
-      setGroupError(error instanceof Error ? error.message : String(error));
-      setGroupDrafts((prev) => ({
-        ...prev,
-        [group.id]: group.name,
-      }));
-    }
-  };
-
-  const updateGroupCopiesFolder = async (
-    groupId: string,
-    copiesFolder: string | null,
-  ) => {
-    setGroupError(null);
-    try {
-      await onUpdateAppSettings({
-        ...appSettings,
-        workspaceGroups: appSettings.workspaceGroups.map((entry) =>
-          entry.id === groupId ? { ...entry, copiesFolder } : entry,
-        ),
-      });
-    } catch (error) {
-      setGroupError(error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const handleChooseGroupCopiesFolder = async (group: WorkspaceGroup) => {
-    const selection = await open({ multiple: false, directory: true });
-    if (!selection || Array.isArray(selection)) {
-      return;
-    }
-    await updateGroupCopiesFolder(group.id, selection);
-  };
-
-  const handleClearGroupCopiesFolder = async (group: WorkspaceGroup) => {
-    if (!group.copiesFolder) {
-      return;
-    }
-    await updateGroupCopiesFolder(group.id, null);
-  };
-
-  const handleDeleteGroup = async (group: WorkspaceGroup) => {
-    const groupProjects =
-      groupedWorkspaces.find((entry) => entry.id === group.id)?.workspaces ??
-      [];
-    const detail =
-      groupProjects.length > 0
-        ? `\n\n${t("settings.deleteGroupWarning")} "${ungroupedLabel}".`
-        : "";
-    const confirmed = await ask(
-      `${t("common.delete")} "${group.name}"?${detail}`,
-      {
-        title: t("settings.deleteGroupTitle"),
-        kind: "warning",
-        okLabel: t("common.delete"),
-        cancelLabel: t("common.cancel"),
-      },
-    );
-    if (!confirmed) {
-      return;
-    }
-    setGroupError(null);
-    try {
-      await onDeleteWorkspaceGroup(group.id);
-    } catch (error) {
-      setGroupError(error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) {
-      return;
-    }
-    const sourceIndex = result.source.index;
-    const destinationIndex = result.destination.index;
-    if (sourceIndex === destinationIndex) {
-      return;
-    }
-
-    const newGroups = Array.from(workspaceGroups);
-    const [moved] = newGroups.splice(sourceIndex, 1);
-    newGroups.splice(destinationIndex, 0, moved);
-
-    // Update sortOrder based on the new index to persist the order
-    const updatedGroups = newGroups.map((group, index) => ({
-      ...group,
-      sortOrder: index,
-    }));
-
-    void onUpdateAppSettings({
-      ...appSettings,
-      workspaceGroups: updatedGroups,
-    });
-  };
 
   const activeSectionHeader = useMemo(() => {
     switch (activeSection) {
@@ -2059,36 +1178,6 @@ export function SettingsView({
                 : ""
             }${activeSection === "shortcuts" ? " settings-content--shortcuts" : ""}`}
           >
-          {shouldShowWorkspaceSelector && (
-            <div className="settings-workspace-picker">
-              <div className="settings-workspace-picker-label">
-                {t("settings.workspacePickerLabel")}
-              </div>
-              {projects.length > 0 ? (
-                <div className="settings-select-wrap">
-                  <Select
-                    value={selectedSettingsWorkspace?.id ?? ""}
-                    onValueChange={(value) => setSettingsWorkspaceId(value || null)}
-                  >
-                    <SelectTrigger aria-label={t("settings.workspacePickerLabel")}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((workspace) => (
-                        <SelectItem key={workspace.id} value={workspace.id}>
-                          {workspace.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="settings-inline-muted">
-                  {t("settings.workspacePickerEmpty")}
-                </div>
-              )}
-            </div>
-          )}
           {activeSection === "basic" && (
             <section
               className="settings-section settings-section-basic"
@@ -2183,54 +1272,19 @@ export function SettingsView({
                   }
                   windowOpacity={windowOpacity ?? 88}
                   onWindowOpacityChange={onWindowOpacityChange ?? (() => undefined)}
-                  activeThemePresetId={activeThemePresetId}
-                  resolvedAppearanceTheme={resolvedAppearanceTheme}
-                  themePresetOptions={themePresetOptions}
-                  onThemePresetChange={handleThemePresetChange}
                   uiScaleDraft={uiScaleDraft}
                   handleCommitUiScale={handleCommitUiScale}
                   handleResetUiScale={handleResetUiScale}
                   scaleShortcutTitle={scaleShortcutTitle}
                   scaleShortcutText={scaleShortcutText}
-                  userMsgPresets={userMsgPresets}
-                  isUserMsgPresetActive={isUserMsgPresetActive}
-                  handleUserMsgPresetClick={handleUserMsgPresetClick}
-                  normalizedUserMsgColor={normalizedUserMsgColor}
-                  defaultUserMsgColor={defaultUserMsgColor}
-                  handleUserMsgColorPickerChange={
-                    handleUserMsgColorPickerChange
-                  }
-                  userMsgHexDraft={userMsgHexDraft}
-                  handleUserMsgHexInputChange={handleUserMsgHexInputChange}
-                  handleResetUserMsgColor={handleResetUserMsgColor}
-                  uiFontDraft={uiFontDraft}
-                  handleUiFontSelectChange={handleUiFontSelectChange}
-                  uiFontSelectOptions={uiFontSelectOptions}
-                  defaultUiPrimaryFont={defaultUiPrimaryFont}
-                  setUiFontDraft={setUiFontDraft}
-                  codeFontDraft={codeFontDraft}
-                  codeFontSelectOptions={codeFontSelectOptions}
-                  handleCodeFontSelectChange={handleCodeFontSelectChange}
-                  defaultCodePrimaryFont={defaultCodePrimaryFont}
-                  setCodeFontDraft={setCodeFontDraft}
-                  codeFontSizeDraft={codeFontSizeDraft}
-                  setCodeFontSizeDraft={setCodeFontSizeDraft}
-                  handleCommitCodeFontSize={handleCommitCodeFontSize}
                 />
               )}
               <OpenAppsSection
                 active={basicSubTab === "open-apps"}
                 t={t}
-                openAppDrafts={openAppDrafts}
+                appSettings={appSettings}
+                onUpdateAppSettings={onUpdateAppSettings}
                 openAppIconById={openAppIconById}
-                openAppSelectedId={openAppSelectedId}
-                handleOpenAppDraftChange={handleOpenAppDraftChange}
-                handleCommitOpenApps={handleCommitOpenApps}
-                handleOpenAppKindChange={handleOpenAppKindChange}
-                handleSelectOpenAppDefault={handleSelectOpenAppDefault}
-                handleMoveOpenApp={handleMoveOpenApp}
-                handleDeleteOpenApp={handleDeleteOpenApp}
-                handleAddOpenApp={handleAddOpenApp}
               />
               {basicSubTab === "web-service" && (
                 <WebServiceSettings
@@ -2253,9 +1307,8 @@ export function SettingsView({
             <ShortcutsSection
               active
               t={t}
-              shortcutDrafts={shortcutDrafts}
-              handleShortcutKeyDown={handleShortcutKeyDown}
-              updateShortcut={updateShortcut}
+              appSettings={appSettings}
+              onUpdateAppSettings={onUpdateAppSettings}
             />
           )}
           {activeSection === "project-management" && (
@@ -2284,23 +1337,12 @@ export function SettingsView({
               <ProjectsSection
                 active={projectManagementSubTab === "groups"}
                 t={t}
-                createGroupOpen={createGroupOpen}
-                setCreateGroupOpen={setCreateGroupOpen}
-                newGroupName={newGroupName}
-                setNewGroupName={setNewGroupName}
-                canCreateGroup={canCreateGroup}
-                handleCreateGroup={handleCreateGroup}
-                groupError={groupError}
+                appSettings={appSettings}
+                onUpdateAppSettings={onUpdateAppSettings}
+                onCreateWorkspaceGroup={onCreateWorkspaceGroup}
+                onRenameWorkspaceGroup={onRenameWorkspaceGroup}
+                onDeleteWorkspaceGroup={onDeleteWorkspaceGroup}
                 workspaceGroups={workspaceGroups}
-                handleDragEnd={handleDragEnd}
-                renamingGroupId={renamingGroupId}
-                setRenamingGroupId={setRenamingGroupId}
-                groupDrafts={groupDrafts}
-                setGroupDrafts={setGroupDrafts}
-                handleRenameGroup={handleRenameGroup}
-                handleChooseGroupCopiesFolder={handleChooseGroupCopiesFolder}
-                handleClearGroupCopiesFolder={handleClearGroupCopiesFolder}
-                handleDeleteGroup={handleDeleteGroup}
                 groupedWorkspaces={groupedWorkspaces}
                 onAssignWorkspaceGroup={onAssignWorkspaceGroup}
                 ungroupedLabel={ungroupedLabel}
@@ -2453,22 +1495,24 @@ export function SettingsView({
                 t={t}
                 appSettings={appSettings}
                 onUpdateAppSettings={onUpdateAppSettings}
-                handleRunClaudeDoctor={handleRunClaudeDoctor}
-                claudeDoctorState={claudeDoctorState}
-                handleRunKimiDoctor={handleRunKimiDoctor}
-                kimiDoctorState={kimiDoctorState}
-                handleRunGrokDoctor={handleRunGrokDoctor}
-                grokDoctorState={grokDoctorState}
-                handleRunOpenCodeDoctor={handleRunOpenCodeDoctor}
-                openCodeDoctorState={openCodeDoctorState}
-                handleRunDshDoctor={handleRunDshDoctor}
-                dshDoctorState={dshDoctorState}
-                handleRunPiDoctor={handleRunPiDoctor}
-                piDoctorState={piDoctorState}
-                handleRunQoderDoctor={handleRunQoderDoctor}
-                qoderDoctorState={qoderDoctorState}
-                handleRunDoctor={handleRunDoctor}
-                doctorState={doctorState}
+                handleRunClaudeDoctor={doctorRunners.claude.run}
+                claudeDoctorState={doctorRunners.claude.state}
+                handleRunKimiDoctor={doctorRunners.kimi.run}
+                kimiDoctorState={doctorRunners.kimi.state}
+                handleRunGrokDoctor={doctorRunners.grok.run}
+                grokDoctorState={doctorRunners.grok.state}
+                handleRunOpenCodeDoctor={doctorRunners.opencode.run}
+                openCodeDoctorState={doctorRunners.opencode.state}
+                handleRunDshDoctor={doctorRunners.dsh.run}
+                dshDoctorState={doctorRunners.dsh.state}
+                handleRunPiDoctor={doctorRunners.pi.run}
+                piDoctorState={doctorRunners.pi.state}
+                handleRunOmpDoctor={doctorRunners.omp.run}
+                ompDoctorState={doctorRunners.omp.state}
+                handleRunQoderDoctor={doctorRunners.qoder.run}
+                qoderDoctorState={doctorRunners.qoder.state}
+                handleRunDoctor={doctorRunners.codex.run}
+                doctorState={doctorRunners.codex.state}
                 remoteHostDraft={remoteHostDraft}
                 setRemoteHostDraft={setRemoteHostDraft}
                 remoteTokenDraft={remoteTokenDraft}
@@ -2479,28 +1523,7 @@ export function SettingsView({
                 activeWorkspace={activeWorkspace}
                 onUpdateWorkspaceCodexBin={onUpdateWorkspaceCodexBin}
                 onUpdateWorkspaceSettings={onUpdateWorkspaceSettings}
-                onInstallerDoctorResult={(engine, result) => {
-                  if (!result) {
-                    return;
-                  }
-                  if (engine === "codex") {
-                    setDoctorState({ status: "done", result });
-                  } else if (engine === "kimi") {
-                    setKimiDoctorState({ status: "done", result });
-                  } else if (engine === "grok") {
-                    setGrokDoctorState({ status: "done", result });
-                  } else if (engine === "opencode") {
-                    setOpenCodeDoctorState({ status: "done", result });
-                  } else if (engine === "dsh") {
-                    setDshDoctorState({ status: "done", result });
-                  } else if (engine === "pi") {
-                    setPiDoctorState({ status: "done", result });
-                  } else if (engine === "qoder") {
-                    setQoderDoctorState({ status: "done", result });
-                  } else {
-                    setClaudeDoctorState({ status: "done", result });
-                  }
-                }}
+                onInstallerDoctorResult={reportInstallerResult}
               />
             </section>
           )}

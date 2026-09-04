@@ -7,22 +7,14 @@ import {
   deleteOpenCodeProvider,
   switchOpenCodeProvider,
 } from "../../../services/tauri";
-import {
-  useVendorProviderManagement,
-  type VendorProviderDialogState,
-  type VendorProviderDeleteConfirmState,
-  type VendorProviderLoadOptions,
-  type VendorProviderManagementAdapter,
-} from "./useVendorProviderManagement";
+import { useVendorProviderManagement, type VendorProviderManagementAdapter } from "./useVendorProviderManagement";
 
 /** List load options. `silent` skips list-level loading UI (switch / external events). */
-export type OpenCodeProviderLoadOptions = VendorProviderLoadOptions;
 
-export type OpenCodeProviderDialogState =
-  VendorProviderDialogState<OpenCodeProviderConfig>;
 
-export type DeleteOpenCodeConfirmState =
-  VendorProviderDeleteConfirmState<OpenCodeProviderConfig>;
+
+
+
 
 const OPENCODE_ADAPTER: VendorProviderManagementAdapter<
   OpenCodeProviderConfig,
@@ -65,6 +57,4 @@ export function useOpenCodeProviderManagement() {
   };
 }
 
-export type UseOpenCodeProviderManagementReturn = ReturnType<
-  typeof useOpenCodeProviderManagement
->;
+

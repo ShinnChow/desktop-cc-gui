@@ -121,7 +121,7 @@ export function isSessionCatalogNotReadyError(error: unknown): boolean {
 
 export function resolveEnginePrefix(
   threadId: string,
-): "claude" | "gemini" | "kimi" | "grok" | "opencode" | "pi" | "dsh" | "qoder" | "codex" {
+): "claude" | "gemini" | "kimi" | "grok" | "opencode" | "pi" | "omp" | "dsh" | "qoder" | "codex" {
   if (threadId.startsWith("claude:") || threadId.startsWith("claude-pending-")) {
     return "claude";
   }
@@ -133,6 +133,9 @@ export function resolveEnginePrefix(
   }
   if (threadId.startsWith("pi:") || threadId.startsWith("pi-pending-")) {
     return "pi";
+  }
+  if (threadId.startsWith("omp:") || threadId.startsWith("omp-pending-")) {
+    return "omp";
   }
   if (threadId.startsWith("grok:") || threadId.startsWith("grok-pending-")) {
     return "grok";
@@ -277,7 +280,7 @@ export function filterClaudeLiveSubagentSourceItems(
 }
 
 /** @deprecated 别名：历史命名保留，逻辑已跨引擎 */
-export const filterLiveSubagentSourceItems = filterClaudeLiveSubagentSourceItems;
+
 
 /**
  * 在会话列表中为当前父会话注入 live 子代理行（pending + 已有真实子会话的 parent 链接投影）。
@@ -466,4 +469,4 @@ export function buildClaudeLiveSubagentRows(
 }
 
 /** @deprecated 别名：历史命名保留，逻辑已跨引擎 */
-export const buildLiveSubagentRows = buildClaudeLiveSubagentRows;
+

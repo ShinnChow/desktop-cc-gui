@@ -2,17 +2,8 @@ import { buildConversationItem } from "../../../utils/threadItems";
 import { isGeneratedImageToolName } from "../../../utils/generatedImageArtifacts";
 import { hydrateToolSnapshotWithEventParams } from "./toolSnapshotHydration";
 import type { ConversationItem } from "../../../types";
-import type {
-  ConversationEngine,
-  NormalizedThreadEvent,
-  RealtimeAdapter,
-} from "../contracts/conversationCurtainContracts";
+import type { ConversationEngine, NormalizedThreadEvent } from "../contracts/conversationCurtainContracts";
 import { inferEngineFromLegacyThreadId } from "../contracts/engineRuntimeIdentity";
-
-type RawRealtimeAdapterInput = {
-  workspaceId: string;
-  message: Record<string, unknown>;
-};
 
 type CommonMapOptions = {
   allowTextDeltaAlias?: boolean;
@@ -697,5 +688,5 @@ export function mapCommonRealtimeEvent(
   return null;
 }
 
-export type EngineRealtimeAdapter = RealtimeAdapter;
-export type { RawRealtimeAdapterInput };
+
+

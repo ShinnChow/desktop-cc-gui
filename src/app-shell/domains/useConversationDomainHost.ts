@@ -103,6 +103,4 @@ export function useConversationDomainHost(input: {
   };
 }
 
-export type ConversationDomainHost = ReturnType<
-  typeof useConversationDomainHost
->;
+

@@ -171,14 +171,14 @@ impl EngineProtocol for BuiltinEngineProtocol {
             EngineType::Codex => EngineProtocolFamily::AppServerJsonRpc,
             EngineType::Dsh => EngineProtocolFamily::DshHostRpc,
             EngineType::Qoder => EngineProtocolFamily::AcpStdio,
-            EngineType::Pi => EngineProtocolFamily::PiRpc,
+            EngineType::Pi | EngineType::Omp => EngineProtocolFamily::PiRpc,
             _ => EngineProtocolFamily::StreamJsonCli,
         }
     }
 
     fn execution_model(&self) -> EngineExecutionModel {
         match self.engine {
-            EngineType::Codex | EngineType::Dsh | EngineType::Pi => {
+            EngineType::Codex | EngineType::Dsh | EngineType::Pi | EngineType::Omp => {
                 EngineExecutionModel::Persistent
             }
             _ => EngineExecutionModel::OneShot,
@@ -220,6 +220,7 @@ impl EngineAdapterRegistry {
             EngineType::Kimi,
             EngineType::OpenCode,
             EngineType::Pi,
+            EngineType::Omp,
             EngineType::Dsh,
             EngineType::Qoder,
         ] {
@@ -289,17 +290,7 @@ impl EngineAdapterRegistry {
 }
 
 pub fn engine_id(engine: EngineType) -> &'static str {
-    match engine {
-        EngineType::Claude => "claude",
-        EngineType::Codex => "codex",
-        EngineType::Gemini => "gemini",
-        EngineType::Grok => "grok",
-        EngineType::Kimi => "kimi",
-        EngineType::OpenCode => "opencode",
-        EngineType::Pi => "pi",
-        EngineType::Dsh => "dsh",
-        EngineType::Qoder => "qoder",
-    }
+    engine.icon()
 }
 
 #[cfg(test)]

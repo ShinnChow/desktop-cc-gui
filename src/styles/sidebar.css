@@ -26,7 +26,15 @@
 }
 
 .sidebar-primary-nav-item:hover,
-.sidebar-primary-nav-item:focus-visible {
+.sidebar-primary-nav-item:focus-visible,
+.sidebar-primary-nav-mode-item.is-active:hover,
+.sidebar-primary-nav-mode-item.is-active:focus-visible,
+.renderer-context-menu-submenu-trigger.is-open,
+.sidebar-workspace-menu-item:hover,
+.sidebar-workspace-menu-item:focus-visible,
+.renderer-context-menu-item:hover,
+.renderer-context-menu-item:focus-visible,
+.workspace-add-option:hover {
   background: var(--surface-hover);
 }
 
@@ -38,11 +46,6 @@
 .sidebar-primary-nav-mode-item.is-active {
   background: transparent;
   font-weight: 400;
-}
-
-.sidebar-primary-nav-mode-item.is-active:hover,
-.sidebar-primary-nav-mode-item.is-active:focus-visible {
-  background: var(--surface-hover);
 }
 
 .sidebar-primary-nav-subitem {
@@ -60,7 +63,13 @@
 }
 
 .sidebar-primary-nav-item.is-disabled:hover,
-.sidebar-primary-nav-item.is-disabled:focus-visible {
+.sidebar-primary-nav-item.is-disabled:focus-visible,
+.sidebar-settings-dropdown-option > .sidebar-settings-dropdown-item:hover:not(:disabled),
+.sidebar-settings-dropdown-option > .sidebar-settings-dropdown-item:focus-visible:not(:disabled),
+.workspace-row.active .workspace-header-content:hover,
+.workspace-row.context-active .workspace-header-content:hover,
+.sidebar-workspace-menu-item.is-unavailable:hover,
+.sidebar-workspace-menu-item.is-unavailable:focus-visible {
   background: transparent;
 }
 
@@ -84,7 +93,13 @@
 }
 
 .sidebar-primary-nav-item-bottom > .sidebar-primary-nav-text,
-.sidebar-primary-nav-item-bottom > .sidebar-settings-chevron {
+.sidebar-primary-nav-item-bottom > .sidebar-settings-chevron,
+.sidebar-market-rail-spacer,
+.sidebar-market-rail.is-collapsed .sidebar-market-rail-text,
+.worktree-list.collapsed,
+.thread-source-badge,
+.thread-row[data-tooltip]::after,
+.thread-row[data-tooltip]:hover::after {
   display: none;
 }
 
@@ -95,12 +110,20 @@
 }
 
 .sidebar-primary-nav-item-bottom:hover,
-.sidebar-primary-nav-item-bottom:focus-visible {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-
-.sidebar-primary-nav-item-bottom.is-active {
+.sidebar-primary-nav-item-bottom:focus-visible,
+.sidebar-primary-nav-item-bottom.is-active,
+.sidebar-settings-dropdown-option:hover,
+.sidebar-settings-dropdown-option:focus-within,
+.sidebar-settings-dropdown-option.is-active,
+.sidebar-settings-dropdown-item:hover:not(:disabled),
+.sidebar-settings-dropdown-item:focus-visible:not(:disabled),
+.workspace-header-content:hover,
+.sidebar-workspace-menu-group-toggle:hover,
+.sidebar-workspace-menu-item-refresh:hover,
+.sidebar-workspace-menu-item-refresh:focus-visible,
+.workspace-session-folder-row:hover,
+.workspace-session-folder-row:focus-within,
+.thread-row:hover {
   background: var(--surface-hover);
   color: var(--text-strong);
 }
@@ -210,15 +233,16 @@
 }
 
 /* 运行时提示固定入口：有失败时恢复对号→叹号的红色态（与 dock bubble is-has-error 对齐） */
-.sidebar-settings-pinned-item.is-runtime-notice-error {
-  color: #fda4af;
-}
-
+.sidebar-settings-pinned-item.is-runtime-notice-error,
 .sidebar-settings-runtime-notice-icon.is-has-error {
   color: #fda4af;
 }
 
-.sidebar-settings-runtime-notice-icon.is-idle {
+.sidebar-settings-runtime-notice-icon.is-idle,
+.workspace-folder-btn.is-session-running,
+.workspace-folder-btn.is-session-running:hover,
+.workspace-folder-btn.is-session-running[aria-expanded="true"],
+.workspace-collapse-toggle.is-session-running {
   color: inherit;
 }
 
@@ -263,13 +287,6 @@
   color: var(--text-muted);
 }
 
-.sidebar-settings-dropdown-option:hover,
-.sidebar-settings-dropdown-option:focus-within,
-.sidebar-settings-dropdown-option.is-active {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-
 .sidebar-settings-dropdown-item {
   width: 100%;
   display: flex;
@@ -295,18 +312,14 @@
   padding-right: 4px;
 }
 
-.sidebar-settings-dropdown-option > .sidebar-settings-dropdown-item:hover:not(:disabled),
-.sidebar-settings-dropdown-option > .sidebar-settings-dropdown-item:focus-visible:not(:disabled) {
-  background: transparent;
-}
-
-.sidebar-settings-dropdown-item:hover:not(:disabled),
-.sidebar-settings-dropdown-item:focus-visible:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-
-.sidebar-settings-dropdown-item.is-active {
+.sidebar-settings-dropdown-item.is-active,
+.workspace-row.active .workspace-name-text,
+.workspace-row.context-active .workspace-name-text,
+.workspace-folder-btn:hover,
+.workspace-folder-btn[aria-expanded="true"],
+.worktree-row .connect:hover,
+.workspace-session-folder-row:hover .workspace-session-folder-icon,
+.workspace-session-folder-row:focus-within .workspace-session-folder-icon {
   color: var(--text-strong);
 }
 
@@ -385,7 +398,8 @@
   margin-right: 0;
 }
 
-.workspace-group + .workspace-group {
+.workspace-group + .workspace-group,
+.sidebar-workspace-menu-group + .sidebar-workspace-menu-group {
   margin-top: 6px;
 }
 
@@ -494,7 +508,9 @@
   transition: transform 0.15s ease;
 }
 
-.group-toggle.expanded .group-toggle-icon {
+.group-toggle.expanded .group-toggle-icon,
+.sidebar-workspace-menu-group-chevron.is-expanded,
+.worktree-toggle.expanded .worktree-toggle-icon {
   transform: rotate(90deg);
 }
 
@@ -643,7 +659,9 @@
   padding: 0;
 }
 
-.workspace-row::before {
+.workspace-row::before,
+.workspace-row.context-active::after,
+.workspace-children-inner .thread-row.is-subagent::before {
   content: none;
 }
 
@@ -657,10 +675,6 @@
 .workspace-row.context-active {
   background: color-mix(in srgb, var(--surface-hover) 40%, transparent);
   color: var(--text-strong);
-}
-
-.workspace-row.context-active::after {
-  content: none;
 }
 
 .workspace-header-content {
@@ -678,21 +692,7 @@
     color 0.16s ease;
 }
 
-.workspace-header-content:hover {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-
 /* Keep hover quiet when already selected */
-.workspace-row.active .workspace-header-content:hover,
-.workspace-row.context-active .workspace-header-content:hover {
-  background: transparent;
-}
-
-.workspace-row.active .workspace-name-text,
-.workspace-row.context-active .workspace-name-text {
-  color: var(--text-strong);
-}
 
 .workspace-tree-toggle {
   border: none;
@@ -709,7 +709,10 @@
   transition: opacity 0.15s ease;
 }
 
-.workspace-tree-toggle:hover {
+.workspace-tree-toggle:hover,
+.workspace-session-folder-row:hover .workspace-session-folder-collapse:not(:disabled),
+.workspace-session-folder-row:focus-within .workspace-session-folder-collapse:not(:disabled),
+.thread-row:hover .thread-pin-icon {
   opacity: 1;
 }
 
@@ -740,12 +743,6 @@
   padding: 0;
   margin-left: 0;
   cursor: pointer;
-}
-
-.workspace-folder-btn.is-session-running,
-.workspace-folder-btn.is-session-running:hover,
-.workspace-folder-btn.is-session-running[aria-expanded="true"] {
-  color: inherit;
 }
 
 .workspace-folder-btn .codicon {
@@ -782,11 +779,6 @@
   animation: sidebar-thread-engine-spin 0.9s linear infinite;
 }
 
-.workspace-folder-btn:hover,
-.workspace-folder-btn[aria-expanded="true"] {
-  color: var(--text-strong);
-}
-
 .workspace-collapse-toggle {
   position: relative;
   flex: 0 0 auto;
@@ -812,10 +804,6 @@
   color: var(--text-strong);
 }
 
-.workspace-collapse-toggle.is-session-running {
-  color: inherit;
-}
-
 .workspace-collapse-toggle:focus-visible {
   outline: 1px solid color-mix(in srgb, var(--border-accent) 62%, transparent);
   outline-offset: 1px;
@@ -838,11 +826,7 @@
   transform: scale(1);
 }
 
-.workspace-collapse-toggle-affordance-icon {
-  opacity: 0;
-  transform: scale(0.88);
-}
-
+.workspace-collapse-toggle-affordance-icon,
 .workspace-row:hover .workspace-collapse-toggle-folder-icon,
 .workspace-collapse-toggle:focus-visible .workspace-collapse-toggle-folder-icon {
   opacity: 0;
@@ -1058,7 +1042,8 @@
   -ms-overflow-style: none;
 }
 
-.sidebar-workspace-menu::-webkit-scrollbar {
+.sidebar-workspace-menu::-webkit-scrollbar,
+.sidebar-workspace-submenu::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
@@ -1068,10 +1053,6 @@
   z-index: 1601;
   width: min(260px, calc(100vw - 24px));
   min-width: 0;
-}
-
-.sidebar-workspace-menu-group + .sidebar-workspace-menu-group {
-  margin-top: 6px;
 }
 
 .workspace-session-folder-menu-backdrop {
@@ -1104,11 +1085,6 @@
   cursor: pointer;
 }
 
-.sidebar-workspace-menu-group-toggle:hover {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-
 .sidebar-workspace-menu-group-toggle:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
@@ -1117,10 +1093,6 @@
 .sidebar-workspace-menu-group-chevron {
   flex: 0 0 auto;
   transition: transform 0.16s ease;
-}
-
-.sidebar-workspace-menu-group-chevron.is-expanded {
-  transform: rotate(90deg);
 }
 
 .sidebar-workspace-menu-group-hint {
@@ -1250,10 +1222,6 @@
   justify-content: space-between;
 }
 
-.renderer-context-menu-submenu-trigger.is-open {
-  background: var(--surface-hover);
-}
-
 .renderer-context-menu-submenu-chevron {
   color: var(--text-muted);
   flex: 0 0 auto;
@@ -1273,38 +1241,22 @@
   min-width: 0;
 }
 
-.sidebar-workspace-menu-item:hover,
-.sidebar-workspace-menu-item:focus-visible,
-.renderer-context-menu-item:hover,
-.renderer-context-menu-item:focus-visible {
-  background: var(--surface-hover);
-}
-
 .sidebar-workspace-menu-item:disabled,
 .renderer-context-menu-item:disabled {
   cursor: not-allowed;
 }
 
-.sidebar-workspace-menu-item.is-unavailable {
+.sidebar-workspace-menu-item.is-unavailable,
+.sidebar-workspace-menu-item.is-deprecated,
+.workspace-session-folder-draft-input::placeholder,
+.thread-pin-toggle.is-pinned {
   color: var(--text-muted);
-}
-
-.sidebar-workspace-menu-item.is-unavailable:hover,
-.sidebar-workspace-menu-item.is-unavailable:focus-visible {
-  background: transparent;
 }
 
 .sidebar-workspace-menu-item.is-danger,
-.renderer-context-menu-item.is-danger {
-  color: var(--danger-strong, #d64545);
-}
-
+.renderer-context-menu-item.is-danger,
 .renderer-context-menu-item.is-danger .renderer-context-menu-item-icon {
   color: var(--danger-strong, #d64545);
-}
-
-.sidebar-workspace-menu-item.is-deprecated {
-  color: var(--text-muted);
 }
 
 .sidebar-workspace-menu-item-icon {
@@ -1324,10 +1276,7 @@
   color: #f97316;
 }
 
-.sidebar-workspace-menu-item-icon-engine-codex {
-  color: currentColor;
-}
-
+.sidebar-workspace-menu-item-icon-engine-codex,
 .sidebar-workspace-menu-item-icon-engine-opencode {
   color: currentColor;
 }
@@ -1369,7 +1318,8 @@
 }
 
 .sidebar-workspace-menu-item-provider
-  + .sidebar-workspace-menu-item-submenu-icon {
+  + .sidebar-workspace-menu-item-submenu-icon,
+.thread-list-nested {
   margin-left: 0;
 }
 
@@ -1401,12 +1351,6 @@
   backdrop-filter: blur(14px);
 }
 
-.sidebar-workspace-submenu::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
 .sidebar-workspace-submenu-title {
   display: flex;
   align-items: center;
@@ -1427,13 +1371,7 @@
   line-height: 1.35;
 }
 
-.sidebar-workspace-menu-item-deprecated {
-  font-size: 12px;
-  color: var(--text-faint, var(--text-muted));
-  margin-left: 1px;
-  font-weight: 520;
-}
-
+.sidebar-workspace-menu-item-deprecated,
 .sidebar-workspace-menu-item-unavailable {
   font-size: 12px;
   color: var(--text-faint, var(--text-muted));
@@ -1484,21 +1422,12 @@
   stroke: currentColor;
 }
 
-.sidebar-workspace-menu-item-refresh:hover,
-.sidebar-workspace-menu-item-refresh:focus-visible {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-
 .sidebar-workspace-menu-item-refresh:disabled {
   opacity: 0.7;
   cursor: wait;
 }
 
-.sidebar-workspace-menu-item-refresh.is-refreshing svg {
-  animation: sidebar-workspace-menu-spin 0.85s linear infinite;
-}
-
+.sidebar-workspace-menu-item-refresh.is-refreshing svg,
 .sidebar-workspace-menu-item.is-refreshing
   .sidebar-workspace-menu-item-icon svg {
   animation: sidebar-workspace-menu-spin 0.85s linear infinite;
@@ -1544,10 +1473,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.sidebar-market-rail-spacer {
-  display: none;
 }
 
 .sidebar-market-rail-item {
@@ -1652,7 +1577,8 @@
   background: color-mix(in srgb, var(--border-subtle) 90%, transparent);
 }
 
-.sidebar-market-rail-text {
+.sidebar-market-rail-text,
+.thread-continuation-family-label > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1678,10 +1604,6 @@
 
 .sidebar-market-rail.is-collapsed .sidebar-market-rail-section {
   align-items: center;
-}
-
-.sidebar-market-rail.is-collapsed .sidebar-market-rail-text {
-  display: none;
 }
 
 .sidebar-market-rail.is-collapsed .sidebar-market-rail-divider {
@@ -1719,10 +1641,6 @@
   padding: 6px 8px;
   border-radius: 6px;
   cursor: pointer;
-}
-
-.workspace-add-option:hover {
-  background: var(--surface-hover);
 }
 
 .worktree-section {
@@ -1843,10 +1761,6 @@
   pointer-events: none;
 }
 
-.worktree-list.collapsed {
-  display: none;
-}
-
 .worktree-card {
   display: flex;
   flex-direction: column;
@@ -1924,12 +1838,7 @@
   opacity: 1;
 }
 
-.worktree-row.active {
-  background: var(--worktree-selected-bg);
-  border-color: var(--worktree-selected-border);
-  color: var(--text-strong);
-}
-
+.worktree-row.active,
 .worktree-row.context-active {
   background: var(--worktree-selected-bg);
   border-color: var(--worktree-selected-border);
@@ -2057,20 +1966,12 @@
   transition: transform 0.15s ease;
 }
 
-.worktree-toggle.expanded .worktree-toggle-icon {
-  transform: rotate(90deg);
-}
-
 .worktree-row .connect {
   color: var(--text-faint);
   font-size: 9.5px;
   line-height: 1;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-.worktree-row .connect:hover {
-  color: var(--text-strong);
 }
 
 .worktree-deleting {
@@ -2228,12 +2129,7 @@
   padding: 0 4px;
 }
 
-.sidebar-pinned-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
+.sidebar-pinned-list,
 .sidebar-pinned-day {
   display: flex;
   flex-direction: column;
@@ -2261,7 +2157,9 @@
 }
 
 .sidebar-pinned-section-header:hover,
-.sidebar-pinned-section-header:focus-visible {
+.sidebar-pinned-section-header:focus-visible,
+.sidebar-pinned-day-header:hover,
+.sidebar-pinned-day-header:focus-visible {
   background: var(
     --desktop-sidebar-background,
     var(--surface-sidebar-opaque, var(--surface-sidebar))
@@ -2283,20 +2181,8 @@
   top: 30px;
 }
 
-.sidebar-pinned-day-header:hover,
-.sidebar-pinned-day-header:focus-visible {
-  background: var(
-    --desktop-sidebar-background,
-    var(--surface-sidebar-opaque, var(--surface-sidebar))
-  );
-}
-
 .sidebar-pinned-day-label {
   font-variant-numeric: tabular-nums;
-}
-
-.thread-list-nested {
-  margin-left: 0;
 }
 
 .workspace-session-folder-tree {
@@ -2334,12 +2220,6 @@
   cursor: pointer;
 }
 
-.workspace-session-folder-row:hover,
-.workspace-session-folder-row:focus-within {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-
 .workspace-session-folder-draft {
   display: flex;
   align-items: center;
@@ -2365,18 +2245,9 @@
   -webkit-app-region: no-drag;
 }
 
-.workspace-session-folder-draft-input::placeholder {
-  color: var(--text-muted);
-}
-
 .workspace-session-folder-icon {
   flex-shrink: 0;
   color: var(--text-muted);
-}
-
-.workspace-session-folder-row:hover .workspace-session-folder-icon,
-.workspace-session-folder-row:focus-within .workspace-session-folder-icon {
-  color: var(--text-strong);
 }
 
 /* Chevron-only collapse — match .workspace-tree-toggle quiet affordance */
@@ -2413,11 +2284,6 @@
 .workspace-session-folder-collapse:not(:disabled):focus-visible {
   opacity: 1;
   color: var(--text-strong);
-}
-
-.workspace-session-folder-row:hover .workspace-session-folder-collapse:not(:disabled),
-.workspace-session-folder-row:focus-within .workspace-session-folder-collapse:not(:disabled) {
-  opacity: 1;
 }
 
 .workspace-session-folder-name {
@@ -2689,12 +2555,6 @@
   -webkit-app-region: no-drag;
 }
 
-.thread-continuation-family-label > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .thread-continuation-family-label svg {
   width: 13px;
   height: 13px;
@@ -2805,9 +2665,6 @@
 
 /* subagent 行属于其父会话而非 workspace：不画弯钩
    （竖线连续性由容器贯穿线负责）。 */
-.workspace-children-inner .thread-row.is-subagent::before {
-  content: none;
-}
 
 /* worktree 卡片挂在贯穿线上：左缘即线位（margin-left =
    --workspace-tree-rail-x），卡片半透明背景会隐约透出线（≈20%
@@ -2823,11 +2680,6 @@
 .thread-row.has-pin-toggle:focus-within,
 .thread-row.has-pin-toggle.is-pinned-thread {
   padding-left: calc(18px + var(--thread-indent, 0px));
-}
-
-.thread-row:hover {
-  background: var(--surface-hover);
-  color: var(--text-strong);
 }
 
 /* Soft neutral fill — same recipe as .workspace-row.active */
@@ -2952,10 +2804,6 @@
   background: color-mix(in srgb, var(--surface-hover) 76%, transparent);
 }
 
-.thread-pin-toggle.is-pinned {
-  color: var(--text-muted);
-}
-
 .thread-pin-toggle-icon {
   width: 12px;
   height: 12px;
@@ -2968,11 +2816,8 @@
   -webkit-mask-repeat: no-repeat;
 }
 
-.thread-row:hover .thread-pin-icon {
-  opacity: 1;
-}
-
-.thread-status.processing {
+.thread-status.processing,
+.thread-runtime-dot--processing {
   background: #2f80ed;
   box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.16);
   animation: sidebar-thread-status-breathe 1.8s ease-in-out infinite;
@@ -3052,10 +2897,6 @@
   margin-right: 2px;
 }
 
-.thread-source-badge {
-  display: none;
-}
-
 .thread-name {
   flex: 1;
   min-width: 0;
@@ -3092,13 +2933,6 @@
 }
 
 /* Tooltip for truncated thread names */
-.thread-row[data-tooltip]::after {
-  display: none;
-}
-
-.thread-row[data-tooltip]:hover::after {
-  display: none;
-}
 
 .thread-meta {
   display: flex;
@@ -3135,12 +2969,6 @@
   border-radius: 50%;
   flex-shrink: 0;
   transform-origin: center;
-}
-
-.thread-runtime-dot--processing {
-  background: #2f80ed;
-  box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.16);
-  animation: sidebar-thread-status-breathe 1.8s ease-in-out infinite;
 }
 
 :root[data-theme="light"] .thread-runtime-dot--processing {
@@ -3264,27 +3092,18 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .workspace-folder-btn.is-session-running {
-    animation: none;
-  }
-
-  .worktree-node-icon.is-session-running {
-    animation: none;
-  }
-
-  .thread-status.processing,
-  .thread-runtime-dot--processing,
-  .thread-runtime-dot--bg-running,
-  .thread-engine-badge.is-processing {
+  .workspace-folder-btn.is-session-running,
+.worktree-node-icon.is-session-running,
+.thread-status.processing,
+.thread-runtime-dot--processing,
+.thread-runtime-dot--bg-running,
+.thread-engine-badge.is-processing,
+.thread-engine-badge.is-processing > * {
     animation: none;
   }
 
   .thread-runtime-dot--processing {
     opacity: 1;
-  }
-
-  .thread-engine-badge.is-processing > * {
-    animation: none;
   }
 }
 

@@ -70,7 +70,73 @@
 }
 
 /* WebView2: blur over WebGL composites black. */
-:root[data-platform="windows"] .workspace-wallpaper::after {
+:root[data-platform="windows"] .workspace-wallpaper::after,
+:root[data-platform="windows"][data-workspace-wallpaper] .settings-embedded :is(
+  .settings-basic-group-card,
+  .settings-pref-card,
+  .settings-basic-shadcn-card,
+  .settings-toggle-row,
+  .settings-group-list,
+  .settings-project-row,
+  .settings-open-app-row,
+  .settings-override-row,
+  .settings-doctor,
+  .settings-agent-card,
+  .settings-agent-table-row,
+  .settings-prompt-editor-card,
+  .settings-prompt-card,
+  .settings-email-card,
+  .settings-mail-session-row,
+  .settings-mail-timeline-row,
+  .settings-shortcuts-detail,
+  .vendor-group-card,
+  .vendor-provider-group,
+  .vendor-summary-card,
+  .vendor-provider-table-frame,
+  .vendor-plugin-model-entry,
+  .vendor-empty,
+  .vendor-codex-runtime-card,
+  .curated-section,
+  .curated-section-row,
+  .settings-agent-library-tabs,
+  .settings-project-sessions-attribution-panel,
+  .mref-rules-card,
+  .mref-model-card,
+  [data-slot="card"]
+),
+:root[data-workspace-wallpaper] .app.reduced-transparency .settings-embedded :is(
+  .settings-basic-group-card,
+  .settings-pref-card,
+  .settings-basic-shadcn-card,
+  .settings-toggle-row,
+  .settings-group-list,
+  .settings-project-row,
+  .settings-open-app-row,
+  .settings-override-row,
+  .settings-doctor,
+  .settings-agent-card,
+  .settings-agent-table-row,
+  .settings-prompt-editor-card,
+  .settings-prompt-card,
+  .settings-email-card,
+  .settings-mail-session-row,
+  .settings-mail-timeline-row,
+  .settings-shortcuts-detail,
+  .vendor-group-card,
+  .vendor-provider-group,
+  .vendor-summary-card,
+  .vendor-provider-table-frame,
+  .vendor-plugin-model-entry,
+  .vendor-empty,
+  .vendor-codex-runtime-card,
+  .curated-section,
+  .curated-section-row,
+  .settings-agent-library-tabs,
+  .settings-project-sessions-attribution-panel,
+  .mref-rules-card,
+  .mref-model-card,
+  [data-slot="card"]
+) {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -448,11 +514,7 @@
   .built-in-agent-search,
   .settings-shortcuts-row--selected,
   .vendor-engine-tab-active
-) {
-  background: var(--settings-wallpaper-control);
-  border-color: var(--settings-wallpaper-card-border);
-}
-
+),
 :root[data-workspace-wallpaper] .settings-embedded .settings-shortcuts-kbd-group--large .settings-shortcuts-kbd {
   background: var(--settings-wallpaper-control);
   border-color: var(--settings-wallpaper-card-border);
@@ -490,82 +552,10 @@
   --settings-wallpaper-control: color-mix(in srgb, #121212 48%, transparent);
 }
 
-:root[data-platform="windows"][data-workspace-wallpaper] .settings-embedded :is(
-  .settings-basic-group-card,
-  .settings-pref-card,
-  .settings-basic-shadcn-card,
-  .settings-toggle-row,
-  .settings-group-list,
-  .settings-project-row,
-  .settings-open-app-row,
-  .settings-override-row,
-  .settings-doctor,
-  .settings-agent-card,
-  .settings-agent-table-row,
-  .settings-prompt-editor-card,
-  .settings-prompt-card,
-  .settings-email-card,
-  .settings-mail-session-row,
-  .settings-mail-timeline-row,
-  .settings-shortcuts-detail,
-  .vendor-group-card,
-  .vendor-provider-group,
-  .vendor-summary-card,
-  .vendor-provider-table-frame,
-  .vendor-plugin-model-entry,
-  .vendor-empty,
-  .vendor-codex-runtime-card,
-  .curated-section,
-  .curated-section-row,
-  .settings-agent-library-tabs,
-  .settings-project-sessions-attribution-panel,
-  .mref-rules-card,
-  .mref-model-card,
-  [data-slot="card"]
-) {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-:root[data-workspace-wallpaper] .app.reduced-transparency .settings-embedded :is(
-  .settings-basic-group-card,
-  .settings-pref-card,
-  .settings-basic-shadcn-card,
-  .settings-toggle-row,
-  .settings-group-list,
-  .settings-project-row,
-  .settings-open-app-row,
-  .settings-override-row,
-  .settings-doctor,
-  .settings-agent-card,
-  .settings-agent-table-row,
-  .settings-prompt-editor-card,
-  .settings-prompt-card,
-  .settings-email-card,
-  .settings-mail-session-row,
-  .settings-mail-timeline-row,
-  .settings-shortcuts-detail,
-  .vendor-group-card,
-  .vendor-provider-group,
-  .vendor-summary-card,
-  .vendor-provider-table-frame,
-  .vendor-plugin-model-entry,
-  .vendor-empty,
-  .vendor-codex-runtime-card,
-  .curated-section,
-  .curated-section-row,
-  .settings-agent-library-tabs,
-  .settings-project-sessions-attribution-panel,
-  .mref-rules-card,
-  .mref-model-card,
-  [data-slot="card"]
-) {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
 :root[data-workspace-wallpaper] .settings-embedded .settings-pref-segment.is-active,
-:root[data-workspace-wallpaper] .settings-embedded .settings-web-btn {
+:root[data-workspace-wallpaper] .settings-embedded .settings-web-btn,
+:root[data-workspace-wallpaper] .composer-input,
+:root[data-workspace-wallpaper] .composer-input:focus-within {
   background: #ffffff;
 }
 
@@ -583,11 +573,6 @@
 :root[data-workspace-wallpaper][data-theme="dark"] .settings-nav.active,
 :root[data-workspace-wallpaper][data-theme="dim"] .settings-nav.active {
   background: color-mix(in srgb, #ffffff 10%, transparent);
-}
-
-:root[data-workspace-wallpaper] .composer-input,
-:root[data-workspace-wallpaper] .composer-input:focus-within {
-  background: #ffffff;
 }
 
 :root[data-workspace-wallpaper][data-theme="dark"] .composer-input,

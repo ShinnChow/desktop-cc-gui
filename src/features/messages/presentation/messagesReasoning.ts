@@ -543,7 +543,7 @@ export function dedupeAdjacentReasoningItems(
     }
     // 段号不同 = 中间发生过工具调用，保持分开；同段的相邻思考走正常去重/合并。
     if (reasoningSegmentNumber(previous.id) !== reasoningSegmentNumber(item.id)) {
-      if (engine === "gemini" || engine === "grok" || engine === "kimi" || engine === "opencode" || engine === "dsh" || engine === "pi" || engine === "qoder") {
+      if (engine === "gemini" || engine === "grok" || engine === "kimi" || engine === "opencode" || engine === "dsh" || engine === "pi" || engine === "omp" || engine === "qoder") {
         if (
           isGenericPlaceholderReasoningItem(previous) &&
           isGenericPlaceholderReasoningItem(item)

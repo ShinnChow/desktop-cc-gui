@@ -1,6 +1,7 @@
 name: Large File Governance Sentry
 
 on:
+  pull_request:
   schedule:
     - cron: "0 2 * * 1"
   workflow_dispatch:

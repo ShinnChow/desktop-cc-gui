@@ -28,7 +28,8 @@
   color: var(--text-muted);
 }
 
-.pi-auth-subhead-spacer {
+.pi-auth-subhead-spacer,
+.pi-auth-foot-spacer {
   flex: 1;
 }
 
@@ -104,7 +105,8 @@
   height: 16px;
 }
 
-.pi-auth-brand-icon-fallback {
+.pi-auth-brand-icon-fallback,
+.pi-auth-status-idle {
   color: var(--text-muted);
 }
 
@@ -166,10 +168,6 @@
 
 .pi-auth-status-env .pi-auth-dot {
   background: var(--accent, #2563eb);
-}
-
-.pi-auth-status-idle {
-  color: var(--text-muted);
 }
 
 .pi-auth-status-idle .pi-auth-dot {
@@ -348,10 +346,6 @@
   border: 1px solid var(--settings-basic-border);
   padding: 1px 6px;
   border-radius: 4px;
-}
-
-.pi-auth-foot-spacer {
-  flex: 1;
 }
 
 .pi-auth-foot-prio {

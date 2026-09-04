@@ -44,11 +44,11 @@ export const STARTUP_GATE_MIN_VISIBLE_MS = 8_000;
 export const STARTUP_GATE_MAX_VISIBLE_MS = 20_000;
 
 /** @deprecated Prefer STARTUP_GATE_FORCE_DISMISS_MS */
-export const WINDOWS_STARTUP_GATE_FORCE_DISMISS_MS = STARTUP_GATE_FORCE_DISMISS_MS;
+
 /** @deprecated Prefer STARTUP_GATE_MIN_VISIBLE_MS */
-export const WINDOWS_STARTUP_GATE_MIN_VISIBLE_MS = STARTUP_GATE_MIN_VISIBLE_MS;
+
 /** @deprecated Prefer STARTUP_GATE_MAX_VISIBLE_MS */
-export const WINDOWS_STARTUP_GATE_MAX_VISIBLE_MS = STARTUP_GATE_MAX_VISIBLE_MS;
+
 
 function nowMs(): number {
   return typeof performance !== "undefined" ? performance.now() : Date.now();

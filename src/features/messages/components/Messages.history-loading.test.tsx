@@ -54,7 +54,7 @@ describe("Messages history loading", () => {
     expect(screen.getByRole("progressbar")).toBeTruthy();
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBeNull();
     expect(document.querySelector(".messages-history-loading-traveler")).toBeTruthy();
-    expect(document.querySelector(".working-spinner")).toBeNull();
+    expect(document.querySelector(".agent-thinking")).toBeNull();
     expect(screen.queryByText("messages.emptyThread")).toBeNull();
     expect(document.querySelector(".messages-timeline-root.is-history-loading")).toBeTruthy();
   });

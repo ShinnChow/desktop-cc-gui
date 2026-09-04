@@ -3,7 +3,7 @@
 /**
  * Supported AI coding CLI engine types
  */
-export type EngineType = "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+export type EngineType = "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
 
 /**
  * Feature capabilities for each engine
@@ -68,27 +68,12 @@ export type EngineStatus = {
 /**
  * Engine configuration options
  */
-export type EngineConfig = {
-  binPath: string | null;
-  homeDir: string | null;
-  customArgs: string | null;
-};
+
 
 /**
  * Parameters for sending a message to an engine
  */
-export type EngineSendMessageParams = {
-  text: string;
-  model: string | null;
-  images: string[] | null;
-  continueSession: boolean;
-  sessionId: string | null;
-  forkSessionId?: string | null;
-  accessMode: string | null;
-  agent?: string | null;
-  variant?: string | null;
-  dshAgentPreset?: string | null;
-};
+
 
 /**
  * Unified engine event types for streaming

@@ -1,22 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
-  BrowserActionRequest,
-  BrowserActionResult,
-  BrowserEvidenceCleanupResult,
-  BrowserEvidenceRecord,
-  BrowserAgentSettings,
   BrowserAgentStatus,
   BrowserSession,
-  BrowserSessionCleanupResult,
   BrowserContextSnapshot,
-  BrowserCodeCandidate,
   BrowserUrlValidationResult,
   CreateBrowserSessionRequest,
   UpdateBrowserSessionRequest,
   BrowserWebviewBounds,
   BrowserWebviewMountRequest,
-  BrowserPlatformCapability,
-  BrowserProviderRouteDecision,
   BrowserTabContextMenuRequest,
 } from "../../features/browser-agent/types";
 
@@ -24,25 +15,11 @@ export async function getBrowserAgentStatus(): Promise<BrowserAgentStatus> {
   return invoke<BrowserAgentStatus>("get_browser_agent_status");
 }
 
-export async function getBrowserAgentSettings(): Promise<BrowserAgentSettings> {
-  return invoke<BrowserAgentSettings>("get_browser_agent_settings");
-}
 
-export async function getBrowserAgentPlatformCapability(): Promise<BrowserPlatformCapability> {
-  return invoke<BrowserPlatformCapability>(
-    "get_browser_agent_platform_capability",
-  );
-}
 
-export async function routeBrowserAgentProvider(
-  requestedCapability: BrowserProviderRouteDecision["requestedCapability"],
-  userOverride = false,
-): Promise<BrowserProviderRouteDecision> {
-  return invoke<BrowserProviderRouteDecision>("route_browser_agent_provider", {
-    requestedCapability,
-    userOverride,
-  });
-}
+
+
+
 
 export async function validateBrowserAgentUrl(
   url: string,
@@ -82,13 +59,7 @@ export async function closeBrowserAgentSession(
   });
 }
 
-export async function cleanupBrowserAgentSessions(
-  maxClosedAgeMs?: number | null,
-): Promise<BrowserSessionCleanupResult> {
-  return invoke<BrowserSessionCleanupResult>("cleanup_browser_agent_sessions", {
-    maxClosedAgeMs,
-  });
-}
+
 
 export async function mountBrowserAgentWebview(
   request: BrowserWebviewMountRequest,
@@ -144,21 +115,9 @@ export async function stopBrowserAgentElementSelect(
   });
 }
 
-export async function listBrowserAgentEvidence(
-  workspaceId?: string | null,
-): Promise<BrowserEvidenceRecord[]> {
-  return invoke<BrowserEvidenceRecord[]>("list_browser_agent_evidence", {
-    workspaceId,
-  });
-}
 
-export async function cleanupBrowserAgentEvidence(
-  now?: number | null,
-): Promise<BrowserEvidenceCleanupResult> {
-  return invoke<BrowserEvidenceCleanupResult>("cleanup_browser_agent_evidence", {
-    now,
-  });
-}
+
+
 
 export async function captureBrowserAgentSnapshot(
   browserSessionId: string,
@@ -168,34 +127,10 @@ export async function captureBrowserAgentSnapshot(
   });
 }
 
-export async function captureBrowserAgentSnapshotV2(
-  browserSessionId: string,
-): Promise<BrowserContextSnapshot> {
-  return invoke<BrowserContextSnapshot>("capture_browser_agent_snapshot_v2", {
-    browserSessionId,
-  });
-}
 
-export async function refreshBrowserAgentSnapshot(
-  browserSessionId: string,
-): Promise<BrowserContextSnapshot> {
-  return invoke<BrowserContextSnapshot>("refresh_browser_agent_snapshot", {
-    browserSessionId,
-  });
-}
 
-export async function generateBrowserAgentCodeCandidates(
-  snapshot: BrowserContextSnapshot,
-): Promise<BrowserCodeCandidate[]> {
-  return invoke<BrowserCodeCandidate[]>("generate_browser_agent_code_candidates", {
-    snapshot,
-  });
-}
 
-export async function runBrowserAgentAction(
-  request: BrowserActionRequest,
-): Promise<BrowserActionResult> {
-  return invoke<BrowserActionResult>("run_browser_agent_action", {
-    request,
-  });
-}
+
+
+
+

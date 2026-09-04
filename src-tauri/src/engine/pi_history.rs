@@ -431,11 +431,16 @@ fn find_pi_file_with_suffix(dir: &Path, suffix: &str) -> Option<PathBuf> {
 
 /// Locate `*_{sessionId}.jsonl` under the workspace encoded-cwd, then a bounded
 /// root scan. Session ids are globally unique; miss must stay unconfirmed.
-pub(crate) fn locate_pi_session_file(workspace_path: &Path, session_id: &str) -> Option<PathBuf> {
-    locate_pi_session_file_with_home(workspace_path, session_id, None)
+pub(crate) fn locate_pi_family_session_file(
+    engine: crate::engine::EngineType,
+    workspace_path: &Path,
+    session_id: &str,
+) -> Option<PathBuf> {
+    locate_pi_family_session_file_with_home(engine, workspace_path, session_id, None)
 }
 
-fn locate_pi_session_file_with_home(
+fn locate_pi_family_session_file_with_home(
+    engine: crate::engine::EngineType,
     workspace_path: &Path,
     session_id: &str,
     home_dir: Option<&str>,
@@ -449,7 +454,7 @@ fn locate_pi_session_file_with_home(
         return None;
     }
     let suffix = format!("_{session_id}.jsonl");
-    let root = resolve_pi_sessions_root(home_dir);
+    let root = resolve_pi_family_sessions_root(engine, home_dir);
     for variant in build_workspace_path_variants(workspace_path) {
         let encoded = encode_pi_cwd_dir_name(&variant);
         if let Some(found) = find_pi_file_with_suffix(&root.join(encoded), &suffix) {
@@ -514,7 +519,13 @@ pub(crate) fn scan_pi_jsonl_user_prompt(path: &Path) -> PiUserPromptScan {
     }
 }
 
-pub fn resolve_pi_sessions_root(home_override: Option<&str>) -> PathBuf {
+/// pi 族 sessions root 解析（add-omp-engine）：env 覆盖优先级不变
+/// （`PI_CODING_AGENT_SESSION_DIR` / `PI_CODING_AGENT_DIR` 对 omp 同样生效，
+/// spike E8），仅 fallback 的 home 目录名按引擎身份（`.pi` / `.omp`）。
+pub fn resolve_pi_family_sessions_root(
+    engine: crate::engine::EngineType,
+    home_override: Option<&str>,
+) -> PathBuf {
     if let Ok(override_dir) = std::env::var("PI_CODING_AGENT_SESSION_DIR") {
         let trimmed = override_dir.trim();
         if !trimmed.is_empty() {
@@ -530,9 +541,13 @@ pub fn resolve_pi_sessions_root(home_override: Option<&str>) -> PathBuf {
             return PathBuf::from(trimmed).join("sessions");
         }
     }
+    let home_dir_name = engine
+        .pi_family_spec()
+        .map(|spec| spec.home_dir_name)
+        .unwrap_or(".pi");
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".pi")
+        .join(home_dir_name)
         .join("agent")
         .join("sessions")
 }
@@ -631,7 +646,10 @@ fn attachment_title_marker(paths: &[String]) -> String {
     }
 }
 
-async fn read_session_summary(file: &Path) -> Option<PiSessionSummary> {
+async fn read_session_summary(
+    engine: crate::engine::EngineType,
+    file: &Path,
+) -> Option<PiSessionSummary> {
     let file_handle = fs::File::open(file).await.ok()?;
     let mut lines = AsyncBufReader::new(file_handle).lines();
     let mut header: Option<SessionHeader> = None;
@@ -729,7 +747,7 @@ async fn read_session_summary(file: &Path) -> Option<PiSessionSummary> {
             } else {
                 header.session_id.clone()
             };
-            format!("PI session {short}")
+            format!("{} session {short}", pi_family_cli_label(engine))
         });
     let file_size = fs::metadata(file).await.ok().map(|m| m.len());
 
@@ -740,11 +758,19 @@ async fn read_session_summary(file: &Path) -> Option<PiSessionSummary> {
         created_at,
         message_count,
         file_size_bytes: file_size,
-        engine: Some("pi".to_string()),
+        engine: Some(engine.icon().to_string()),
         canonical_session_id: None,
         attribution_status: None,
         parent_session_id: header.parent_session_id,
     })
+}
+
+/// pi 族 CLI 短名（标题兜底文案用）。
+fn pi_family_cli_label(engine: crate::engine::EngineType) -> &'static str {
+    engine
+        .pi_family_spec()
+        .map(|spec| spec.cli_label)
+        .unwrap_or("PI")
 }
 
 /// 列表路径专用的有界 summary：只读文件头部（默认 64KB）拿 header + 首条
@@ -754,6 +780,7 @@ async fn read_session_summary(file: &Path) -> Option<PiSessionSummary> {
 /// sample 实证：codemoss 工作区单个目录就压着 120MB+ 的会话文件）。
 /// message_count 降级为「有无消息」标记：空会话清剪只判 ==0，语义保留。
 async fn read_session_summary_for_list(
+    engine: crate::engine::EngineType,
     file: &Path,
     max_head_bytes: u64,
 ) -> Option<PiSessionSummary> {
@@ -834,7 +861,7 @@ async fn read_session_summary_for_list(
             } else {
                 header.session_id.clone()
             };
-            format!("PI session {short}")
+            format!("{} session {short}", pi_family_cli_label(engine))
         });
     let file_size = fs::metadata(file).await.ok().map(|m| m.len());
 
@@ -845,7 +872,7 @@ async fn read_session_summary_for_list(
         created_at,
         message_count: if has_message { 1 } else { 0 },
         file_size_bytes: file_size,
-        engine: Some("pi".to_string()),
+        engine: Some(engine.icon().to_string()),
         canonical_session_id: None,
         attribution_status: None,
         parent_session_id: header.parent_session_id,
@@ -900,12 +927,13 @@ async fn list_all_session_files(root: &Path) -> Result<Vec<PathBuf>, String> {
 /// F1（fix-session-load-bridge-freeze）：raw-string 返回通道。
 /// 对象图过 WKWebView 桥按对象数逐个同步转换（2140 条 / ~3MB 实测冻结主线程
 /// 6683ms）；字符串成本 O(len)。序列化在 tokio 线程，不占 UI。前端一次 parse。
-pub async fn load_pi_session_payload_json(
+pub async fn load_pi_family_session_payload_json(
+    engine: crate::engine::EngineType,
     workspace_path: &Path,
     session_id: &str,
     home_dir: Option<&str>,
 ) -> Result<String, String> {
-    let result = load_pi_session(workspace_path, session_id, home_dir).await?;
+    let result = load_pi_family_session(engine, workspace_path, session_id, home_dir).await?;
     serde_json::to_string(&result).map_err(|error| error.to_string())
 }
 
@@ -1037,15 +1065,18 @@ async fn resolve_session_file(
 /// Resolve a session id to its JSONL file path (for RPC `switch_session`).
 /// Allows cwd-mismatch fallback: the resident must be able to align to any
 /// session of this workspace profile, even when cwd metadata drifts.
-pub async fn resolve_pi_session_file_by_id(
+pub async fn resolve_pi_family_session_file_by_id(
+    engine: crate::engine::EngineType,
     home_dir: Option<&str>,
     session_id: &str,
     workspace_path: &Path,
 ) -> Result<Option<PathBuf>, String> {
-    if let Some(path) = locate_pi_session_file_with_home(workspace_path, session_id, home_dir) {
+    if let Some(path) =
+        locate_pi_family_session_file_with_home(engine, workspace_path, session_id, home_dir)
+    {
         return Ok(Some(path));
     }
-    let root = resolve_pi_sessions_root(home_dir);
+    let root = resolve_pi_family_sessions_root(engine, home_dir);
     resolve_session_file(&root, session_id, workspace_path, true).await
 }
 
@@ -1255,13 +1286,14 @@ pub async fn list_pi_derived_lanes(
     Ok(lanes)
 }
 
-pub async fn list_pi_sessions(
+pub async fn list_pi_family_sessions(
+    engine: crate::engine::EngineType,
     workspace_path: &Path,
     limit: Option<usize>,
     home_dir: Option<&str>,
 ) -> Result<Vec<PiSessionSummary>, String> {
     let scan = async {
-        let root = resolve_pi_sessions_root(home_dir);
+        let root = resolve_pi_family_sessions_root(engine, home_dir);
         let workspace_variants = build_workspace_path_variants(workspace_path);
         let files = list_all_session_files(&root).await?;
         let mut sessions = Vec::new();
@@ -1288,7 +1320,7 @@ pub async fn list_pi_sessions(
                     continue;
                 }
             }
-            let Some(summary) = read_session_summary_for_list(&file, 64 * 1024).await else {
+            let Some(summary) = read_session_summary_for_list(engine, &file, 64 * 1024).await else {
                 continue;
             };
             sessions.push(summary);
@@ -1449,16 +1481,18 @@ fn convert_assistant_message(
     out
 }
 
-pub async fn load_pi_session(
+pub async fn load_pi_family_session(
+    engine: crate::engine::EngineType,
     workspace_path: &Path,
     session_id: &str,
     home_dir: Option<&str>,
 ) -> Result<PiSessionLoadResult, String> {
     let session_id = normalize_session_id(session_id)?;
-    let root = resolve_pi_sessions_root(home_dir);
+    let root = resolve_pi_family_sessions_root(engine, home_dir);
     let Some(file) = resolve_session_file(&root, &session_id, workspace_path, true).await? else {
         return Err(format!(
-            "[SESSION_NOT_FOUND] PI session not found: {session_id}"
+            "[SESSION_NOT_FOUND] {} session not found: {session_id}",
+            pi_family_cli_label(engine)
         ));
     };
 
@@ -1632,13 +1666,14 @@ pub async fn load_pi_session(
     Ok(PiSessionLoadResult { messages, usage })
 }
 
-pub async fn delete_pi_session(
+pub async fn delete_pi_family_session(
+    engine: crate::engine::EngineType,
     workspace_path: &Path,
     session_id: &str,
     home_dir: Option<&str>,
 ) -> Result<(), String> {
     let session_id = normalize_session_id(session_id)?;
-    let root = resolve_pi_sessions_root(home_dir);
+    let root = resolve_pi_family_sessions_root(engine, home_dir);
     // session id 全局唯一（UUID），cwd 只是归属提示：list/load 都放宽匹配，
     // delete 必须同样放宽，否则 header 缺 cwd 的会话「能列出却删不掉」，
     // 前端把 SESSION_NOT_FOUND 当成功吞下后文件残留，重启 rescan 即复活。
@@ -1705,14 +1740,14 @@ mod tests {
         .unwrap();
 
         let agent_dir = dir.to_string_lossy().to_string();
-        let list = list_pi_sessions(&project, Some(10), Some(&agent_dir))
+        let list = list_pi_family_sessions(crate::engine::EngineType::Pi, &project, Some(10), Some(&agent_dir))
             .await
             .expect("list");
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].session_id, session_id);
         assert!(list[0].first_message.contains("hello"));
 
-        let loaded = load_pi_session(&project, session_id, Some(&agent_dir))
+        let loaded = load_pi_family_session(crate::engine::EngineType::Pi, &project, session_id, Some(&agent_dir))
             .await
             .expect("load");
         assert_eq!(loaded.messages.len(), 3); // user + reasoning + text
@@ -1721,7 +1756,7 @@ mod tests {
         assert_eq!(loaded.messages[2].text, "pong");
         assert_eq!(loaded.usage.as_ref().unwrap().input_tokens, Some(10));
 
-        delete_pi_session(&project, session_id, Some(&agent_dir))
+        delete_pi_family_session(crate::engine::EngineType::Pi, &project, session_id, Some(&agent_dir))
             .await
             .expect("delete");
         assert!(!file.exists());
@@ -1778,7 +1813,7 @@ mod tests {
         drop(handle);
 
         let agent_dir = dir.to_string_lossy().to_string();
-        let loaded = load_pi_session(&project, session_id, Some(&agent_dir))
+        let loaded = load_pi_family_session(crate::engine::EngineType::Pi, &project, session_id, Some(&agent_dir))
             .await
             .expect("load");
         assert_eq!(loaded.messages.len(), 4); // user + call + result + notification
@@ -1835,7 +1870,7 @@ mod tests {
         .unwrap();
 
         let agent_dir = dir.to_string_lossy().to_string();
-        delete_pi_session(&project, session_id, Some(&agent_dir))
+        delete_pi_family_session(crate::engine::EngineType::Pi, &project, session_id, Some(&agent_dir))
             .await
             .expect("delete must fall back to the globally-unique session id");
         assert!(!file.exists());
@@ -1880,7 +1915,7 @@ mod tests {
         .unwrap();
 
         let agent_dir = dir.to_string_lossy().to_string();
-        let loaded = load_pi_session(&project, session_id, Some(&agent_dir))
+        let loaded = load_pi_family_session(crate::engine::EngineType::Pi, &project, session_id, Some(&agent_dir))
             .await
             .expect("load");
         assert_eq!(loaded.messages.len(), 2);
@@ -1939,7 +1974,7 @@ mod tests {
         .unwrap();
 
         let agent_dir = dir.to_string_lossy().to_string();
-        let loaded = load_pi_session(&project, session_id, Some(&agent_dir))
+        let loaded = load_pi_family_session(crate::engine::EngineType::Pi, &project, session_id, Some(&agent_dir))
             .await
             .expect("load");
         assert_eq!(loaded.messages.len(), 2);
@@ -1996,7 +2031,7 @@ mod tests {
         .unwrap();
 
         let agent_dir = dir.to_string_lossy().to_string();
-        let loaded = load_pi_session(&project, session_id, Some(&agent_dir))
+        let loaded = load_pi_family_session(crate::engine::EngineType::Pi, &project, session_id, Some(&agent_dir))
             .await
             .expect("load");
         assert_eq!(loaded.messages.len(), 1);
@@ -2085,7 +2120,7 @@ mod title_attachment_tests {
             "<file name=\"/Users/me/二期文档/设计报告.md\"></file>\n分析这份文档",
         )
         .await;
-        let summary = read_session_summary(&file).await.expect("summary");
+        let summary = read_session_summary(crate::engine::EngineType::Pi, &file).await.expect("summary");
         assert_eq!(summary.first_message, "分析这份文档");
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2105,7 +2140,7 @@ mod title_attachment_tests {
             "重写发布记录\n\n<file path=\"/abs/CHANGELOG.md\">\n# Changelog\n</file>",
         )
         .await;
-        let summary = read_session_summary(&file).await.expect("summary");
+        let summary = read_session_summary(crate::engine::EngineType::Pi, &file).await.expect("summary");
         // 标题只取用户文本（@ref 回填仅 load 展示路径；design D4）。
         assert_eq!(summary.first_message, "重写发布记录");
         let _ = std::fs::remove_dir_all(&dir);
@@ -2126,7 +2161,7 @@ mod title_attachment_tests {
             "<file name=\"/Users/me/截图/paste.png\"></file>\n",
         )
         .await;
-        let summary = read_session_summary(&file).await.expect("summary");
+        let summary = read_session_summary(crate::engine::EngineType::Pi, &file).await.expect("summary");
         assert_eq!(summary.first_message, "[图片]");
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2224,7 +2259,8 @@ mod session_file_index_tests {
         std::fs::create_dir_all(&project).expect("mkdir project");
         write_session_file(&root, "--proj--", "019fe705-index-json", &project).await;
 
-        let payload_json = load_pi_session_payload_json(
+        let payload_json = load_pi_family_session_payload_json(
+            crate::engine::EngineType::Pi,
             &project,
             "019fe705-index-json",
             Some(dir.to_string_lossy().as_ref()),

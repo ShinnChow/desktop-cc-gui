@@ -300,9 +300,7 @@ export function buildMessagesScrollKey(
   return `${scrollKeyForItems(items)}-${activeUserInputRequestId ?? "no-input"}`;
 }
 
-export function isMessagesScrollNearBottom(node: HTMLDivElement, thresholdPx: number) {
-  return node.scrollHeight - node.scrollTop - node.clientHeight <= thresholdPx;
-}
+
 
 export function resolveActiveMessageAnchor(
   container: HTMLDivElement | null,
@@ -387,7 +385,7 @@ export function resolveVisibleMessageItems(options: {
   // 必须先丢掉这些不可见工具，再做相邻 reasoning 合并——对话中与完成后同一条路径。
   const canvasVisible = filterCanvasHiddenProcessTools(filtered, activeEngine);
   const appendReasoningRuns =
-    activeEngine === "claude" || activeEngine === "gemini" || activeEngine === "grok" || activeEngine === "kimi" || activeEngine === "opencode" || activeEngine === "dsh" || activeEngine === "pi" || activeEngine === "qoder";
+    activeEngine === "claude" || activeEngine === "gemini" || activeEngine === "grok" || activeEngine === "kimi" || activeEngine === "opencode" || activeEngine === "dsh" || activeEngine === "pi" || activeEngine === "omp" || activeEngine === "qoder";
   const deduped = dedupeAdjacentReasoningItems(
     canvasVisible,
     reasoningMetaById,

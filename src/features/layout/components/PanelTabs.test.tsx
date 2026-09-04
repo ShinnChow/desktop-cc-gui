@@ -32,6 +32,7 @@ describe("PanelTabs", () => {
     const filesButton = screen.getByRole("button", { name: "panels.files" });
     const moreButton = screen.getByRole("button", { name: "common.moreActions" });
 
+    expect(screen.getByRole("tablist").hasAttribute("data-tauri-drag-region")).toBe(true);
     expect(filesButton.getAttribute("data-tauri-drag-region")).toBe("false");
     expect(moreButton.getAttribute("data-tauri-drag-region")).toBe("false");
 

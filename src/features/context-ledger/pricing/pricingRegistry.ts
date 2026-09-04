@@ -49,9 +49,7 @@ function isPricingStale(
   return ageMs > staleAfterDays * 24 * 60 * 60 * 1000;
 }
 
-export function listPricingSources() {
-  return PRICING_FIXTURES.flatMap((fixture) => fixture.sources);
-}
+
 
 export function lookupPricingSource(
   input: PricingLookupInput,

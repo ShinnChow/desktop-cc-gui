@@ -386,6 +386,62 @@ pub(crate) async fn run_pi_doctor_with_settings(
     }))
 }
 
+/// omp doctor：镜像 pi doctor（版本探测 + home 目录存在性），唯身份差异：
+/// `ompBin` 设置键、`omp` 默认 binary、`~/.omp/agent` home。omp 把 provider
+/// 配置收进 config.yml + SQLite（无 auth.json / models.json），故无任何
+/// auth-file 断言——pi doctor 本来也只测版本与 home 存在性，无需删改。
+pub(crate) async fn run_omp_doctor_with_settings(
+    omp_bin: Option<String>,
+    settings: &AppSettings,
+) -> Result<Value, String> {
+    let default_bin = settings.omp_bin.clone();
+    let resolved = omp_bin
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .or(default_bin);
+    let requested_bin = resolved
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "omp".to_string());
+    let path_env = build_codex_path_env(Some(requested_bin.as_str()));
+    let debug_info = get_cli_debug_info(Some(requested_bin.as_str()));
+    let version_result = check_cli_binary(&requested_bin, path_env.clone()).await;
+    let (version, cli_error, fallback_retried) = match version_result {
+        Ok(Some(version)) => (Some(version), None, false),
+        Ok(None) => (Some("unknown".to_string()), None, true),
+        Err(error) => (None, Some(error), false),
+    };
+    let launch_context = resolve_codex_launch_context(Some(requested_bin.as_str()));
+    let (node_ok, node_version, node_details) = probe_node_runtime(path_env.as_ref()).await;
+    let environment_diagnosis =
+        build_engine_environment_diagnosis("omp", Some(requested_bin.as_str()), &debug_info);
+    let home = dirs::home_dir().map(|h| h.join(".omp").join("agent"));
+    let home_exists = home.as_ref().map(|p| p.is_dir()).unwrap_or(false);
+    Ok(json!({
+        "ok": version.is_some(),
+        "codexBin": resolved,
+        "version": version,
+        "appServerOk": false,
+        "details": cli_error,
+        "path": path_env,
+        "nodeOk": node_ok,
+        "nodeVersion": node_version,
+        "nodeDetails": node_details,
+        "resolvedBinaryPath": launch_context.resolved_bin,
+        "wrapperKind": launch_context.wrapper_kind,
+        "pathEnvUsed": launch_context.path_env,
+        "proxyEnvSnapshot": debug_info.get("proxyEnvSnapshot").cloned().unwrap_or(Value::Null),
+        "appServerProbeStatus": Value::Null,
+        "fallbackRetried": fallback_retried,
+        "environmentDiagnosis": environment_diagnosis,
+        "proxyDiagnosis": debug_info.get("proxyDiagnosis").cloned().unwrap_or(Value::Null),
+        "networkDiagnosis": Value::Null,
+        "ompHomeExists": home_exists,
+        "ompHome": home.map(|p| p.to_string_lossy().to_string()),
+        "debug": debug_info,
+    }))
+}
+
 pub(crate) async fn run_qoder_doctor_with_settings(
     qoder_bin: Option<String>,
     settings: &AppSettings,

@@ -489,6 +489,8 @@ export function VendorSettingsPanel({
         return { path: appSettings.opencodeBin ?? null, args: null };
       case "pi":
         return { path: appSettings.piBin ?? null, args: null };
+      case "omp":
+        return { path: appSettings.ompBin ?? null, args: null };
       case "dsh":
         return { path: appSettings.dshBin ?? null, args: null };
       case "qoder":
@@ -534,6 +536,12 @@ export function VendorSettingsPanel({
           await onUpdateAppSettings({
             ...appSettings,
             piBin: payload.path,
+          });
+          break;
+        case "omp":
+          await onUpdateAppSettings({
+            ...appSettings,
+            ompBin: payload.path,
           });
           break;
         case "dsh":
@@ -1113,6 +1121,7 @@ export function VendorSettingsPanel({
         grokHasConfig,
         openCodeHasConfig,
         piHasConfig: Boolean(appSettings.piBin?.trim()),
+        ompHasConfig: Boolean(appSettings.ompBin?.trim()),
         dshHasConfig: Boolean(appSettings.dshBin?.trim()),
         qoderHasConfig: Boolean(
           appSettings.qoderBin?.trim() ||
@@ -1123,6 +1132,7 @@ export function VendorSettingsPanel({
       }),
     [
       appSettings.piBin,
+      appSettings.ompBin,
       appSettings.dshBin,
       appSettings.qoderBin,
       appSettings.qoderCnBin,
@@ -1846,6 +1856,40 @@ export function VendorSettingsPanel({
               })}
             >
               <PiProviderAuthSection piBin={appSettings.piBin ?? null} />
+            </VendorSettingsSection>
+          </div>
+          </CliLifecycleProvider>
+        ) : activeCli === "omp" ? (
+          <CliLifecycleProvider key="omp" engine="omp" active>
+          <div className="vendor-tab-content vendor-tab-content-dense">
+            <CliBrandHeader
+              id="omp"
+              title="OMP CLI"
+              description={t("settings.ompDescription", {
+                defaultValue:
+                  "Install and configure the OMP CLI used by ccgui. Auth and models stay in ~/.omp.",
+              })}
+              helpLabel={t("settings.vendor.openCliDocs", {
+                defaultValue: "Official docs",
+              })}
+              href={CLI_DOCS_HREF_BY_ID.omp}
+              actions={<CliLifecycleHeaderActions />}
+            />
+            <CliLifecycleInstallerPanel />
+            <VendorSettingsSection
+              label={t("settings.vendor.engineSettings", {
+                defaultValue: "Engine settings",
+              })}
+            >
+              <div className="vendor-group-card">
+                <div className="settings-help" style={{ padding: "8px 12px" }}>
+                  {t("settings.ompCliLifecycleHint", {
+                    defaultValue:
+                      "Install, update, or uninstall the local OMP CLI. Auth and models stay in ~/.omp.",
+                  })}
+                </div>
+                {renderCustomPathEntry("omp")}
+              </div>
             </VendorSettingsSection>
           </div>
           </CliLifecycleProvider>

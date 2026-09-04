@@ -39,10 +39,6 @@ class HookDiagnosticsStore {
 
 export const hookDiagnostics = new HookDiagnosticsStore();
 
-export function getFastMarkdownHookDiagnostics(): FastMarkdownHookDiagnostics {
-  return hookDiagnostics.snapshot();
-}
 
-export function resetFastMarkdownHookDiagnostics(): void {
-  hookDiagnostics.reset();
-}
+
+

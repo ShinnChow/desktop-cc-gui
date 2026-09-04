@@ -8,7 +8,7 @@ import { unionIndexWithNewerLastGood } from "./useThreadActions.lastGoodSnapshot
 import { mergePreservedSharedThreadsForIndexFirstPaint } from "./sharedNativeVisibility";
 import { stripHiddenSharedBindingSummaries } from "./useThreadActions.helpers";
 
-const DEFERRED_UNREADY_NATIVE_ENGINES = new Set(["grok", "pi", "qoder"]);
+const DEFERRED_UNREADY_NATIVE_ENGINES = new Set(["grok", "pi", "omp", "qoder"]);
 
 /**
  * Native `listThreadsForWorkspace` projection extract.

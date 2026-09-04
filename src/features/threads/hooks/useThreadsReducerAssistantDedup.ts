@@ -142,8 +142,4 @@ export function findEquivalentCodexAssistantMessageIndex(
 }
 
 /** @internal test helper — documents the intentional streaming ban. */
-export function getAssistantEquivalenceMinChars(mode: AssistantEquivalenceMatchMode) {
-  return mode === "streaming"
-    ? STREAMING_EQUIVALENCE_MIN_CHARS
-    : SETTLED_EQUIVALENCE_MIN_CHARS;
-}
+

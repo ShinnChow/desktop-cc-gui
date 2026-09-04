@@ -300,6 +300,9 @@ function validatePolicy(policy, label, { requireMatch }) {
     throw new Error(`Invalid threshold order in large-file policy: ${label}`);
   }
   validateGrowthAllowance(policy.growthAllowanceLines, `${label}.growthAllowanceLines`);
+  if (policy.strictReduction != null && typeof policy.strictReduction !== "boolean") {
+    throw new Error(`Invalid strictReduction in large-file policy: ${label}`);
+  }
 
   if (requireMatch) {
     validatePolicyMatch(policy.match, label);
@@ -507,6 +510,7 @@ function classifyPolicyFile(
       delta,
       growthAllowanceLines,
       thresholdSource: "new-file-ratchet",
+      strictReduction: policy.strictReduction === true,
     };
   }
 
@@ -563,6 +567,7 @@ function classifyPolicyFile(
     delta,
     growthAllowanceLines,
     thresholdSource: usesRatchetThreshold ? "new-file-ratchet" : "policy",
+    strictReduction: policy.strictReduction === true,
   };
 }
 
@@ -815,8 +820,11 @@ export async function main(argv = process.argv.slice(2)) {
   }
 }
 
-function isBlockingLargeFileFinding(item) {
+export function isBlockingLargeFileFinding(item) {
   if (item.status === "new" || item.status === "regressed" || item.status === "oversized") {
+    return true;
+  }
+  if (item.status === "retained" && item.strictReduction === true) {
     return true;
   }
   return item.status === "captured" && item.severity === "fail";

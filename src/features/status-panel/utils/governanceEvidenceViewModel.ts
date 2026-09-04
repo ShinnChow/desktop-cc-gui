@@ -53,6 +53,4 @@ export function groupGovernanceEvidence(
   }));
 }
 
-export const governanceEvidenceViewModelInternals = {
-  groupIdForEvidence,
-};
+

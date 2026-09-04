@@ -6,10 +6,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import {
-  useOptionalRuntimeThreadContext,
-  type RuntimeThreadProviderValue,
-} from "./runtimeThreadProvider";
+import { type RuntimeThreadProviderValue } from "./runtimeThreadProvider";
 
 /**
  * T2.2：Composer 子树 mid-churn Context。
@@ -65,13 +62,7 @@ export function ComposerProvider(props: {
   );
 }
 
-export function useComposerContext(): ComposerProviderValue {
-  const value = useContext(ComposerContext);
-  if (!value) {
-    throw new Error("useComposerContext must be used within ComposerProvider");
-  }
-  return value;
-}
+
 
 export function useOptionalComposerContext(): ComposerProviderValue | null {
   return useContext(ComposerContext);
@@ -94,15 +85,7 @@ export function resolveComposerCanInterrupt(input: {
   return input.propCanInterrupt;
 }
 
-export function useComposerCanInterrupt(propFallback: boolean): boolean {
-  const composer = useOptionalComposerContext();
-  const runtime = useOptionalRuntimeThreadContext();
-  return resolveComposerCanInterrupt({
-    propCanInterrupt: propFallback,
-    composerValue: composer,
-    runtimeThreadValue: runtime,
-  });
-}
+
 
 export function useMemoizedComposerProviderValue(
   input: ComposerProviderValue,

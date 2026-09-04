@@ -22,8 +22,8 @@ use super::qoder::QoderSession;
 use super::qoder_provider_profile::{QoderDistributionSettings, QoderProviderLaunchProfile};
 use super::status::{
     detect_all_engines_scoped, detect_claude_status, detect_codex_status, detect_grok_status,
-    detect_kimi_status, detect_opencode_status_with_options, detect_pi_status_with_options,
-    detect_qoder_status_with_options,
+    detect_kimi_status, detect_omp_status_with_options, detect_opencode_status_with_options,
+    detect_pi_status_with_options, detect_qoder_status_with_options,
 };
 use super::status::EngineStatusEventSink;
 use super::{disabled_engine_status, AuthState, EngineConfig, EngineStatus, EngineType};
@@ -66,6 +66,10 @@ pub struct EngineManager {
 
     /// PI sessions per workspace/provider runtime.
     pi_sessions: Mutex<HashMap<String, PiSessionEntry>>,
+
+    /// OMP sessions per workspace/provider runtime（add-omp-engine：与 pi 同型
+    /// 共享 PiSession 实现，按引擎分集合归属）。
+    omp_sessions: Mutex<HashMap<String, PiSessionEntry>>,
 
     /// Qoder sessions per workspace/provider runtime.
     qoder_sessions: Mutex<HashMap<String, QoderSessionEntry>>,
@@ -268,6 +272,7 @@ impl EngineManager {
             kimi_sessions: Mutex::new(HashMap::new()),
             grok_sessions: Mutex::new(HashMap::new()),
             pi_sessions: Mutex::new(HashMap::new()),
+            omp_sessions: Mutex::new(HashMap::new()),
             qoder_sessions: Mutex::new(HashMap::new()),
             qoder_distribution_settings: RwLock::new(QoderDistributionSettings::default()),
             engine_configs: RwLock::new(HashMap::new()),
@@ -355,6 +360,7 @@ impl EngineManager {
             EngineType::Kimi => detect_kimi_status(bin).await,
             EngineType::Grok => detect_grok_status(bin).await,
             EngineType::Pi => detect_pi_status_with_options(bin, false).await,
+            EngineType::Omp => detect_omp_status_with_options(bin, false).await,
             EngineType::Qoder => detect_qoder_status_with_options(bin, false).await,
             EngineType::Dsh => {
                 crate::engine::dsh::detect_dsh_status(
@@ -397,6 +403,7 @@ impl EngineManager {
             kimi_bin,
             grok_bin,
             pi_bin,
+            omp_bin,
             qoder_bin,
             dsh_settings,
         ) = {
@@ -424,6 +431,9 @@ impl EngineManager {
                     .get(&EngineType::Pi)
                     .and_then(|c| c.bin_path.clone()),
                 configs
+                    .get(&EngineType::Omp)
+                    .and_then(|c| c.bin_path.clone()),
+                configs
                     .get(&EngineType::Qoder)
                     .and_then(|c| c.bin_path.clone()),
                 crate::engine::dsh::runtime_settings_from_engine_config(
@@ -440,6 +450,7 @@ impl EngineManager {
             kimi_bin.as_deref(),
             grok_bin.as_deref(),
             pi_bin.as_deref(),
+            omp_bin.as_deref(),
             qoder_bin.as_deref(),
             &dsh_settings,
             gemini_enabled,
@@ -1219,27 +1230,41 @@ impl EngineManager {
         }
     }
 
-    pub async fn get_or_create_pi_session_for_runtime(
+    /// pi 族会话集合选择器（pi / omp 分集合，防跨引擎串台）。
+    fn pi_family_sessions(
         &self,
+        engine: EngineType,
+    ) -> &Mutex<HashMap<String, PiSessionEntry>> {
+        match engine {
+            EngineType::Omp => &self.omp_sessions,
+            _ => &self.pi_sessions,
+        }
+    }
+
+    /// pi 族共享实现（add-omp-engine）：pi / omp 仅身份与集合不同。
+    pub(crate) async fn get_or_create_pi_family_session_for_runtime(
+        &self,
+        engine: EngineType,
         workspace_id: &str,
         workspace_path: &Path,
         runtime_key: &str,
         home_dir: Option<&Path>,
     ) -> Arc<PiSession> {
         {
-            let sessions = self.pi_sessions.lock().await;
+            let sessions = self.pi_family_sessions(engine).lock().await;
             if let Some(entry) = sessions.get(runtime_key) {
                 return entry.session.clone();
             }
         }
         let config =
-            pi_engine_config_with_home(self.get_engine_config(EngineType::Pi).await, home_dir);
+            pi_engine_config_with_home(self.get_engine_config(engine).await, home_dir);
         let session = Arc::new(PiSession::new(
+            engine,
             workspace_id.to_string(),
             workspace_path.to_path_buf(),
             config,
         ));
-        let mut sessions = self.pi_sessions.lock().await;
+        let mut sessions = self.pi_family_sessions(engine).lock().await;
         if let Some(entry) = sessions.get(runtime_key) {
             return entry.session.clone();
         }
@@ -1253,24 +1278,8 @@ impl EngineManager {
         session
     }
 
-    pub async fn get_pi_session(&self, workspace_id: &str) -> Option<Arc<PiSession>> {
-        let sessions = self.pi_sessions.lock().await;
-        sessions
-            .values()
-            .find(|entry| entry.workspace_id == workspace_id)
-            .map(|entry| entry.session.clone())
-    }
-
-    pub async fn get_pi_session_for_runtime(&self, runtime_key: &str) -> Option<Arc<PiSession>> {
-        self.pi_sessions
-            .lock()
-            .await
-            .get(runtime_key)
-            .map(|entry| entry.session.clone())
-    }
-
-    pub async fn get_pi_sessions(&self, workspace_id: &str) -> Vec<Arc<PiSession>> {
-        let sessions = self.pi_sessions.lock().await;
+    async fn get_pi_family_sessions(&self, engine: EngineType, workspace_id: &str) -> Vec<Arc<PiSession>> {
+        let sessions = self.pi_family_sessions(engine).lock().await;
         sessions
             .values()
             .filter(|entry| entry.workspace_id == workspace_id)
@@ -1278,12 +1287,13 @@ impl EngineManager {
             .collect()
     }
 
-    pub async fn interrupt_pi_sessions(
+    async fn interrupt_pi_family_sessions(
         &self,
+        engine: EngineType,
         workspace_id: &str,
         turn_id: Option<&str>,
     ) -> Result<(), String> {
-        let sessions = self.get_pi_sessions(workspace_id).await;
+        let sessions = self.get_pi_family_sessions(engine, workspace_id).await;
         let mut errors = Vec::new();
         for session in sessions {
             let result = match turn_id {
@@ -1298,18 +1308,121 @@ impl EngineManager {
             Ok(())
         } else {
             Err(format!(
-                "failed to interrupt {} PI runtime(s): {}",
+                "failed to interrupt {} {} runtime(s): {}",
                 errors.len(),
+                engine.icon(),
                 errors.join("; ")
             ))
         }
     }
 
-    pub async fn drop_pi_resident_by_session_id(&self, session_id: &str) {
-        let sessions = self.pi_sessions.lock().await;
+    async fn drop_pi_family_resident_by_session_id(&self, engine: EngineType, session_id: &str) {
+        let sessions = self.pi_family_sessions(engine).lock().await;
         for entry in sessions.values() {
             entry.session.drop_resident(session_id).await;
         }
+    }
+
+    pub async fn get_or_create_pi_session_for_runtime(
+        &self,
+        workspace_id: &str,
+        workspace_path: &Path,
+        runtime_key: &str,
+        home_dir: Option<&Path>,
+    ) -> Arc<PiSession> {
+        self.get_or_create_pi_family_session_for_runtime(
+            EngineType::Pi,
+            workspace_id,
+            workspace_path,
+            runtime_key,
+            home_dir,
+        )
+        .await
+    }
+
+    pub async fn get_or_create_omp_session_for_runtime(
+        &self,
+        workspace_id: &str,
+        workspace_path: &Path,
+        runtime_key: &str,
+        home_dir: Option<&Path>,
+    ) -> Arc<PiSession> {
+        self.get_or_create_pi_family_session_for_runtime(
+            EngineType::Omp,
+            workspace_id,
+            workspace_path,
+            runtime_key,
+            home_dir,
+        )
+        .await
+    }
+
+    pub async fn get_pi_session(&self, workspace_id: &str) -> Option<Arc<PiSession>> {
+        let sessions = self.pi_sessions.lock().await;
+        sessions
+            .values()
+            .find(|entry| entry.workspace_id == workspace_id)
+            .map(|entry| entry.session.clone())
+    }
+
+    pub async fn get_omp_session(&self, workspace_id: &str) -> Option<Arc<PiSession>> {
+        let sessions = self.omp_sessions.lock().await;
+        sessions
+            .values()
+            .find(|entry| entry.workspace_id == workspace_id)
+            .map(|entry| entry.session.clone())
+    }
+
+    pub async fn get_pi_session_for_runtime(&self, runtime_key: &str) -> Option<Arc<PiSession>> {
+        self.pi_sessions
+            .lock()
+            .await
+            .get(runtime_key)
+            .map(|entry| entry.session.clone())
+    }
+
+    pub async fn get_omp_session_for_runtime(&self, runtime_key: &str) -> Option<Arc<PiSession>> {
+        self.omp_sessions
+            .lock()
+            .await
+            .get(runtime_key)
+            .map(|entry| entry.session.clone())
+    }
+
+    pub async fn get_pi_sessions(&self, workspace_id: &str) -> Vec<Arc<PiSession>> {
+        self.get_pi_family_sessions(EngineType::Pi, workspace_id).await
+    }
+
+    pub async fn get_omp_sessions(&self, workspace_id: &str) -> Vec<Arc<PiSession>> {
+        self.get_pi_family_sessions(EngineType::Omp, workspace_id).await
+    }
+
+    pub async fn interrupt_pi_sessions(
+        &self,
+        workspace_id: &str,
+        turn_id: Option<&str>,
+    ) -> Result<(), String> {
+        self.interrupt_pi_family_sessions(EngineType::Pi, workspace_id, turn_id)
+            .await
+    }
+
+    pub async fn interrupt_omp_sessions(
+        &self,
+        workspace_id: &str,
+        turn_id: Option<&str>,
+    ) -> Result<(), String> {
+        self.interrupt_pi_family_sessions(EngineType::Omp, workspace_id, turn_id)
+            .await
+    }
+
+    pub async fn drop_pi_resident_by_session_id(&self, session_id: &str) {
+        self.drop_pi_family_resident_by_session_id(EngineType::Pi, session_id)
+            .await;
+    }
+
+    pub async fn drop_omp_resident_by_session_id(&self, session_id: &str) {
+        self.drop_pi_family_resident_by_session_id(EngineType::Omp, session_id)
+            .await;
     }
 
     pub async fn get_or_create_qoder_session_for_runtime(

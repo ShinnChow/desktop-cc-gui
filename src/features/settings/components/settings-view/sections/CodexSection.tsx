@@ -41,6 +41,8 @@ type CodexSectionProps = {
   dshDoctorState: DoctorState;
   handleRunPiDoctor: () => Promise<void>;
   piDoctorState: DoctorState;
+  handleRunOmpDoctor: () => Promise<void>;
+  ompDoctorState: DoctorState;
   handleRunQoderDoctor: () => Promise<void>;
   qoderDoctorState: DoctorState;
   handleRunDoctor: () => Promise<void>;
@@ -81,6 +83,7 @@ type CliValidationTab =
   | "opencode"
   | "dsh"
   | "pi"
+  | "omp"
   | "qoder";
 
 // Deprecated: Gemini CLI validation entry is intentionally hidden.
@@ -441,6 +444,8 @@ export function CodexSection({
   dshDoctorState,
   handleRunPiDoctor,
   piDoctorState,
+  handleRunOmpDoctor,
+  ompDoctorState,
   handleRunQoderDoctor,
   qoderDoctorState,
   handleRunDoctor,
@@ -739,6 +744,8 @@ export function CodexSection({
                       ? "dsh"
                       : value === "pi"
                         ? "pi"
+                        : value === "omp"
+                        ? "omp"
                         : value === "qoder"
                           ? "qoder"
                         : "codex",
@@ -757,6 +764,7 @@ export function CodexSection({
           </TabsTab>
           <TabsTab value="dsh">{t("settings.cliValidationTabDshCli")}</TabsTab>
           <TabsTab value="pi">{t("settings.cliValidationTabPiCli")}</TabsTab>
+          <TabsTab value="omp">{t("settings.cliValidationTabOmpCli")}</TabsTab>
           <TabsTab value="qoder">{t("settings.cliValidationTabQoderCli")}</TabsTab>
         </TabsList>
 
@@ -1211,6 +1219,62 @@ export function CodexSection({
               state={piDoctorState}
               successTitleKey="settings.piLooksGood"
               errorTitleKey="settings.piIssueDetected"
+              showAppServer={false}
+            />
+          </div>
+        </TabsPanel>
+
+        <TabsPanel value="omp">
+          <div className="settings-field">
+            <div className="settings-help">
+              {t("settings.cliPathManagedInVendors")}
+            </div>
+            <div className="settings-help">
+              {t("settings.ompCliLifecycleHint")}
+            </div>
+            <div className="settings-field-actions">
+              <button
+                type="button"
+                className="ghost settings-button-compact"
+                onClick={() => {
+                  void handleRunOmpDoctor();
+                }}
+                disabled={ompDoctorState.status === "running"}
+              >
+                <Stethoscope aria-hidden />
+                {ompDoctorState.status === "running"
+                  ? t("settings.running")
+                  : t("settings.runOmpDoctor")}
+              </button>
+              <button
+                type="button"
+                className="ghost settings-button-compact"
+                onClick={() => {
+                  void requestInstallPlan("omp", ompDoctorState.result);
+                }}
+                disabled={installerBusy}
+              >
+                {resolveInstallerAction(ompDoctorState.result) === "installLatest"
+                  ? t("settings.cliInstallLatest")
+                  : t("settings.cliUpdateLatest")}
+              </button>
+              <button
+                type="button"
+                className="ghost settings-button-compact"
+                onClick={() => {
+                  void requestInstallPlan("omp", ompDoctorState.result, "uninstall");
+                }}
+                disabled={installerBusy || !ompDoctorState.result?.ok}
+              >
+                {t("settings.cliUninstall")}
+              </button>
+            </div>
+
+            <DoctorResultCard
+              t={t}
+              state={ompDoctorState}
+              successTitleKey="settings.ompLooksGood"
+              errorTitleKey="settings.ompIssueDetected"
               showAppServer={false}
             />
           </div>

@@ -54,7 +54,7 @@ pub(crate) mod codes {
 
 /// v2 支持物理删除的 engine 集合（resolve/classify 阶段判定，不进入标记阶段）。
 const SUPPORTED_DELETE_ENGINES: &[&str] = &[
-    "codex", "claude", "gemini", "kimi", "grok", "pi", "qoder", "dsh", "opencode", "shared",
+    "codex", "claude", "gemini", "kimi", "grok", "pi", "omp", "qoder", "dsh", "opencode", "shared",
 ];
 
 #[derive(Debug, Clone, Deserialize)]
@@ -185,6 +185,10 @@ enum PhysicalDeletePlan {
         workspace_path: PathBuf,
         session_id: String,
     },
+    Omp {
+        workspace_path: PathBuf,
+        session_id: String,
+    },
     Qoder {
         workspace_id: String,
         workspace_path: PathBuf,
@@ -211,6 +215,7 @@ struct EngineDeleteConfigs {
     kimi_home_dir: Option<String>,
     grok_home_dir: Option<String>,
     pi_home_dir: Option<String>,
+    omp_home_dir: Option<String>,
     qoder_distribution_settings: crate::engine::qoder_provider_profile::QoderDistributionSettings,
 }
 
@@ -488,7 +493,30 @@ fn build_retry_for_plan(
                 let session_id = session_id.clone();
                 let home = home.clone();
                 Box::pin(async move {
-                    engine::pi_history::delete_pi_session(
+                    engine::pi_history::delete_pi_family_session(
+                        engine::EngineType::Pi,
+                        &workspace_path,
+                        &session_id,
+                        home.as_deref(),
+                    )
+                    .await
+                })
+            }))
+        }
+        PhysicalDeletePlan::Omp {
+            workspace_path,
+            session_id,
+        } => {
+            let workspace_path = workspace_path.clone();
+            let session_id = session_id.clone();
+            let home = configs.omp_home_dir.clone();
+            Some(Arc::new(move || {
+                let workspace_path = workspace_path.clone();
+                let session_id = session_id.clone();
+                let home = home.clone();
+                Box::pin(async move {
+                    engine::pi_history::delete_pi_family_session(
+                        engine::EngineType::Omp,
                         &workspace_path,
                         &session_id,
                         home.as_deref(),
@@ -721,7 +749,31 @@ fn build_delete_execution<'a>(
                     engine_manager
                         .drop_pi_resident_by_session_id(&session_id)
                         .await;
-                    engine::pi_history::delete_pi_session(
+                    engine::pi_history::delete_pi_family_session(
+                        engine::EngineType::Pi,
+                        &workspace_path,
+                        &session_id,
+                        home.as_deref(),
+                    )
+                    .await
+                }),
+            )
+        }
+        "omp" => {
+            let workspace_path = target.owner_workspace_path.clone();
+            let session_id = target.native_session_id.clone();
+            let home = configs.omp_home_dir.clone();
+            (
+                PhysicalDeletePlan::Omp {
+                    workspace_path: workspace_path.clone(),
+                    session_id: session_id.clone(),
+                },
+                Box::pin(async move {
+                    engine_manager
+                        .drop_omp_resident_by_session_id(&session_id)
+                        .await;
+                    engine::pi_history::delete_pi_family_session(
+                        engine::EngineType::Omp,
                         &workspace_path,
                         &session_id,
                         home.as_deref(),
@@ -1041,6 +1093,10 @@ pub(crate) async fn run_session_delete_v2(
             .and_then(|item| item.home_dir),
         pi_home_dir: engine_manager
             .get_engine_config(engine::EngineType::Pi)
+            .await
+            .and_then(|item| item.home_dir),
+        omp_home_dir: engine_manager
+            .get_engine_config(engine::EngineType::Omp)
             .await
             .and_then(|item| item.home_dir),
         qoder_distribution_settings: engine_manager.qoder_distribution_settings().await,

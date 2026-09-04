@@ -16,6 +16,4 @@ export function preloadViewerjs(): Promise<{ default: typeof Viewer }> {
   return viewerjsPromise;
 }
 
-export function _resetPreloadForTest(): void {
-  viewerjsPromise = null;
-}
+

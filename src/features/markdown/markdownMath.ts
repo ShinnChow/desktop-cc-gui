@@ -18,9 +18,7 @@ let cachedRehypeKatex: RehypeKatexPlugin | null = null;
 let katexCssLoaded = false;
 let katexLoadingPromise: Promise<void> | null = null;
 
-export function getCachedKatex() {
-  return cachedKatex;
-}
+
 
 export function getCachedRehypeKatex() {
   return cachedRehypeKatex;

@@ -341,6 +341,4 @@ export function useGeminiVendorManagement() {
   };
 }
 
-export type UseGeminiVendorManagementReturn = ReturnType<
-  typeof useGeminiVendorManagement
->;
+

@@ -110,6 +110,7 @@ export type CliInstallEngine =
   | "kimi"
   | "opencode"
   | "pi"
+  | "omp"
   | "dsh"
   | "qoder";
 

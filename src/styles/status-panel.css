@@ -125,7 +125,8 @@
   transition: color 0.15s ease;
 }
 
-.sp-dock-panel-toggle:hover {
+.sp-dock-panel-toggle:hover,
+.sp-tabs--dock .sp-tab:hover {
   background: transparent;
   color: var(--text-strong);
 }
@@ -160,11 +161,6 @@
   border-radius: 0;
 }
 
-.sp-tabs--dock .sp-tab:hover {
-  background: transparent;
-  color: var(--text-strong);
-}
-
 .sp-tabs--dock .sp-tab-active {
   background: transparent;
   border-color: transparent;
@@ -172,7 +168,8 @@
   color: var(--text-strong);
 }
 
-.sp-tabs--dock .sp-tab-icon {
+.sp-tabs--dock .sp-tab-icon,
+.sp-checkpoint-disclosure-summary::-webkit-details-marker {
   display: none;
 }
 
@@ -247,7 +244,9 @@
   border-radius: 7px;
 }
 
-.sp-tab:hover {
+.sp-tab:hover,
+.sp-checkpoint-suggested-command-copy:hover,
+.sp-policy-audit-row.is-advisory {
   color: var(--text-strong);
 }
 
@@ -400,7 +399,8 @@
   min-width: 0;
 }
 
-.sp-subagent-squad-grid {
+.sp-subagent-squad-grid,
+.sp-subagent-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -412,11 +412,6 @@
 }
 
 /* 兼容旧 class 名（测试/外部样式） */
-.sp-subagent-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 
 .sp-subagent-item {
   display: flex;
@@ -432,7 +427,11 @@
   transition: background 0.1s ease;
 }
 
-.sp-subagent-item:hover {
+.sp-subagent-item:hover,
+.sp-file-item:hover,
+.sp-command-item:hover,
+.sp-checkpoint-validation-command:hover,
+.sp-checkpoint-action:not(:disabled):hover {
   background: var(--surface-hover);
 }
 
@@ -474,15 +473,25 @@ button.sp-subagent-main:focus-visible,
   color: #61afef;
 }
 
-.sp-subagent-running .sp-subagent-icon svg {
+.sp-subagent-running .sp-subagent-icon svg,
+.sp-command-running .sp-command-icon svg,
+.sp-checkpoint-hero-icon .is-spinning {
   animation: sp-spin 1s linear infinite;
 }
 
-.sp-subagent-completed .sp-subagent-icon {
+.sp-subagent-completed .sp-subagent-icon,
+.sp-command-completed .sp-command-icon,
+.sp-checkpoint-badge-ready,
+.sp-checkpoint-validation-status.is-pass,
+.sp-checkpoint-risk-severity.is-low,
+.sp-checkpoint-risk-severity.is-ready,
+.sp-checkpoint-risk-severity.is-informational {
   color: #89d185;
 }
 
-.sp-subagent-error .sp-subagent-icon {
+.sp-subagent-error .sp-subagent-icon,
+.sp-command-error .sp-command-icon,
+.sp-checkpoint-validation-status.is-fail {
   color: #ff6b6b;
 }
 
@@ -508,7 +517,9 @@ button.sp-subagent-main:focus-visible,
 }
 
 /* ─── FileChangesList ─── */
-.sp-file-list {
+.sp-file-list,
+.sp-command-list,
+.sp-cost-token-breakdown {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -548,10 +559,6 @@ button.sp-subagent-main:focus-visible,
   padding: 4px 6px;
   border-radius: 8px;
   transition: background 0.1s ease;
-}
-
-.sp-file-item:hover {
-  background: var(--surface-hover);
 }
 
 .sp-file-badge {
@@ -709,11 +716,6 @@ button.sp-subagent-main:focus-visible,
 }
 
 /* ─── CommandList ─── */
-.sp-command-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
 
 .sp-command-item {
   display: flex;
@@ -727,10 +729,6 @@ button.sp-subagent-main:focus-visible,
   cursor: pointer;
 }
 
-.sp-command-item:hover {
-  background: var(--surface-hover);
-}
-
 .sp-command-icon {
   display: flex;
   align-items: center;
@@ -740,18 +738,6 @@ button.sp-subagent-main:focus-visible,
 
 .sp-command-running .sp-command-icon {
   color: #61afef;
-}
-
-.sp-command-running .sp-command-icon svg {
-  animation: sp-spin 1s linear infinite;
-}
-
-.sp-command-completed .sp-command-icon {
-  color: #89d185;
-}
-
-.sp-command-error .sp-command-icon {
-  color: #ff6b6b;
 }
 
 .sp-command-text {
@@ -784,7 +770,8 @@ button.sp-subagent-main:focus-visible,
   --sp-checkpoint-emphasis-size: 14px;
 }
 
-.sp-checkpoint--compact {
+.sp-checkpoint--compact,
+.sp-session-overview-quota.is-balance-only {
   gap: 6px;
 }
 
@@ -847,10 +834,6 @@ button.sp-subagent-main:focus-visible,
   flex-shrink: 0;
 }
 
-.sp-checkpoint-hero-icon .is-spinning {
-  animation: sp-spin 1s linear infinite;
-}
-
 .sp-checkpoint-hero-copy {
   min-width: 0;
   flex: 1;
@@ -881,7 +864,8 @@ button.sp-subagent-main:focus-visible,
   white-space: nowrap;
 }
 
-.sp-checkpoint-headline-row {
+.sp-checkpoint-headline-row,
+.sp-checkpoint-evidence-summary-main {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -961,16 +945,22 @@ button.sp-subagent-main:focus-visible,
   color: #61afef;
 }
 
-.sp-checkpoint-badge-blocked {
+.sp-checkpoint-badge-blocked,
+.sp-checkpoint-risk-severity.is-high,
+.sp-checkpoint-risk-severity.is-blocked,
+.sp-policy-audit-row.is-blocking .sp-policy-audit-policy,
+.sp-policy-audit-enforcement.is-blocking {
   color: #ff8b72;
 }
 
-.sp-checkpoint-badge-needs_review {
+.sp-checkpoint-badge-needs_review,
+.sp-checkpoint-validation-status.is-not_run,
+.sp-checkpoint-validation-status.is-not_observed,
+.sp-checkpoint-risk-severity.is-medium,
+.sp-checkpoint-risk-severity.is-advisory,
+.sp-checkpoint-risk-severity.is-needs_review,
+.sp-policy-audit-enforcement.is-advisory {
   color: #ffaf55;
-}
-
-.sp-checkpoint-badge-ready {
-  color: #89d185;
 }
 
 .sp-checkpoint-evidence-compact {
@@ -1041,10 +1031,6 @@ button.sp-subagent-main:focus-visible,
   cursor: pointer;
 }
 
-.sp-checkpoint-validation-command:hover {
-  background: var(--surface-hover);
-}
-
 .sp-checkpoint-suggested-command {
   display: inline-flex;
   align-items: center;
@@ -1094,10 +1080,6 @@ button.sp-subagent-main:focus-visible,
   white-space: nowrap;
 }
 
-.sp-checkpoint-suggested-command-copy:hover {
-  color: var(--text-strong);
-}
-
 .sp-checkpoint-disclosure {
   min-width: 0;
 }
@@ -1107,10 +1089,6 @@ button.sp-subagent-main:focus-visible,
   cursor: pointer;
   list-style: none;
   width: 100%;
-}
-
-.sp-checkpoint-disclosure-summary::-webkit-details-marker {
-  display: none;
 }
 
 .sp-checkpoint-disclosure-summary::after {
@@ -1305,7 +1283,9 @@ button.sp-subagent-main:focus-visible,
   );
 }
 
-.sp-checkpoint-commit-message-section .commit-message-error {
+.sp-checkpoint-commit-message-section .commit-message-error,
+.sp-checkpoint-commit-total-stats .is-del,
+.sp-checkpoint-commit-file-stats .is-del {
   color: var(--sp-commit-danger);
 }
 
@@ -1362,11 +1342,6 @@ button.sp-subagent-main:focus-visible,
 .sp-checkpoint-commit-total-stats .is-add,
 .sp-checkpoint-commit-file-stats .is-add {
   color: var(--sp-commit-success);
-}
-
-.sp-checkpoint-commit-total-stats .is-del,
-.sp-checkpoint-commit-file-stats .is-del {
-  color: var(--sp-commit-danger);
 }
 
 .sp-checkpoint-commit-file-list {
@@ -1432,13 +1407,6 @@ button.sp-subagent-main:focus-visible,
   font-family: var(--code-font-family);
   font-size: 9px;
   font-weight: 800;
-}
-
-.sp-checkpoint-evidence-summary-main {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
 }
 
 .sp-checkpoint-evidence-summary-badges {
@@ -1577,21 +1545,8 @@ button.sp-subagent-main:focus-visible,
   color: var(--text-muted);
 }
 
-.sp-checkpoint-validation-status.is-pass {
-  color: #89d185;
-}
-
-.sp-checkpoint-validation-status.is-fail {
-  color: #ff6b6b;
-}
-
 .sp-checkpoint-validation-status.is-running {
   color: #61afef;
-}
-
-.sp-checkpoint-validation-status.is-not_run,
-.sp-checkpoint-validation-status.is-not_observed {
-  color: #ffaf55;
 }
 
 .sp-checkpoint-key-change-label {
@@ -1600,46 +1555,13 @@ button.sp-subagent-main:focus-visible,
   color: var(--text-strong);
 }
 
-.sp-checkpoint-risk-severity.is-high {
-  color: #ff8b72;
-}
-
-.sp-checkpoint-risk-severity.is-medium {
-  color: #ffaf55;
-}
-
-.sp-checkpoint-risk-severity.is-low {
-  color: #89d185;
-}
-
-.sp-checkpoint-risk-severity.is-advisory,
-.sp-checkpoint-risk-severity.is-needs_review {
-  color: #ffaf55;
-}
-
-.sp-checkpoint-risk-severity.is-blocked {
-  color: #ff8b72;
-}
-
-.sp-checkpoint-risk-severity.is-ready,
-.sp-checkpoint-risk-severity.is-informational {
-  color: #89d185;
-}
-
 .sp-checkpoint-risk-severity.is-running {
   color: #61afef;
 }
 
-.sp-policy-audit-row {
+.sp-policy-audit-row,
+.sp-checkpoint-advisory-item {
   align-items: baseline;
-}
-
-.sp-policy-audit-row.is-advisory {
-  color: var(--text-strong);
-}
-
-.sp-policy-audit-row.is-blocking .sp-policy-audit-policy {
-  color: #ff8b72;
 }
 
 .sp-policy-audit-copy {
@@ -1661,14 +1583,6 @@ button.sp-subagent-main:focus-visible,
   font-weight: 700;
 }
 
-.sp-policy-audit-enforcement.is-advisory {
-  color: #ffaf55;
-}
-
-.sp-policy-audit-enforcement.is-blocking {
-  color: #ff8b72;
-}
-
 .sp-policy-audit-source {
   color: var(--text-muted);
   font-size: 10px;
@@ -1682,12 +1596,9 @@ button.sp-subagent-main:focus-visible,
   color: var(--text-faint);
 }
 
-.sp-policy-audit-source.is-missing {
+.sp-policy-audit-source.is-missing,
+.sp-governance-evidence-status.is-unknown {
   color: var(--text-faint);
-}
-
-.sp-checkpoint-advisory-item {
-  align-items: baseline;
 }
 
 .sp-governance-evidence-list {
@@ -1792,10 +1703,6 @@ button.sp-subagent-main:focus-visible,
   color: var(--sp-governance-error);
 }
 
-.sp-governance-evidence-status.is-unknown {
-  color: var(--text-faint);
-}
-
 .sp-governance-evidence-title {
   flex: 0 1 210px;
   min-width: min(100%, 118px);
@@ -1856,12 +1763,6 @@ button.sp-subagent-main:focus-visible,
   padding: 1px 5px;
   font-size: var(--sp-cost-budget-meta-size);
   line-height: 1.2;
-}
-
-.sp-cost-token-breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 .sp-cost-token-breakdown-bar {
@@ -2076,10 +1977,6 @@ button.sp-subagent-main:focus-visible,
   cursor: pointer;
 }
 
-.sp-checkpoint-action:not(:disabled):hover {
-  background: var(--surface-hover);
-}
-
 .sp-checkpoint-action--commit:not(:disabled):hover {
   border-color: transparent;
   background: color-mix(in srgb, var(--text-strong) 8%, transparent);
@@ -2156,7 +2053,8 @@ button.sp-subagent-main:focus-visible,
   animation: sp-session-overview-pulse 1.6s ease-in-out infinite;
 }
 
-.sp-session-overview-dot.is-compacting {
+.sp-session-overview-dot.is-compacting,
+.sp-session-overview-meter-fill.is-high {
   background: var(--warning, #d97706);
 }
 
@@ -2173,15 +2071,18 @@ button.sp-subagent-main:focus-visible,
   color: var(--text-muted);
 }
 
-.sp-session-overview-status.is-running {
+.sp-session-overview-status.is-running,
+.sp-overview-tab-status.is-running {
   color: var(--accent, #2563eb);
 }
 
-.sp-session-overview-status.is-compacting {
+.sp-session-overview-status.is-compacting,
+.sp-overview-tab-status.is-compacting {
   color: var(--warning, #d97706);
 }
 
-.sp-session-overview-status.is-idle {
+.sp-session-overview-status.is-idle,
+.sp-overview-tab-status.is-idle {
   color: var(--success, #16a34a);
 }
 
@@ -2310,10 +2211,6 @@ button.sp-subagent-main:focus-visible,
   background: color-mix(in srgb, #14b8a6 90%, white 6%);
 }
 
-.sp-session-overview-meter-fill.is-high {
-  background: var(--warning, #d97706);
-}
-
 .sp-session-overview-meter-fill.is-critical {
   background: var(--danger, #dc2626);
 }
@@ -2332,9 +2229,6 @@ button.sp-subagent-main:focus-visible,
 }
 
 /* 余额型两行卡：标题 + 额度，去掉 available / 套餐副标题 */
-.sp-session-overview-quota.is-balance-only {
-  gap: 6px;
-}
 
 .sp-session-overview-quota-header {
   display: flex;
@@ -2414,18 +2308,6 @@ button.sp-subagent-main:focus-visible,
   line-height: 1.3;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
-}
-
-.sp-overview-tab-status.is-running {
-  color: var(--accent, #2563eb);
-}
-
-.sp-overview-tab-status.is-compacting {
-  color: var(--warning, #d97706);
-}
-
-.sp-overview-tab-status.is-idle {
-  color: var(--success, #16a34a);
 }
 
 @keyframes sp-session-overview-pulse {

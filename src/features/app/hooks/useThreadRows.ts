@@ -19,13 +19,25 @@ type ThreadRow = {
   hasChildren?: boolean;
 };
 
-type ThreadRowResult = {
+export type ThreadRowResult = {
   pinnedRows: ThreadRow[];
   workspacePinnedRows: ThreadRow[];
   unpinnedRows: ThreadRow[];
   totalRoots: number;
   hasMoreRoots: boolean;
 };
+
+export type GetThreadRows = (
+  threads: ThreadSummary[],
+  isExpanded: boolean,
+  workspaceId: string,
+  getPinTimestamp: (
+    workspaceId: string,
+    threadId: string,
+    scope?: ThreadPinScope,
+  ) => number | null,
+  visibleThreadRootCount?: number,
+) => ThreadRowResult;
 
 function isNativeCodexThread(thread: ThreadSummary): boolean {
   return String(thread.engineSource ?? "").trim().toLowerCase() === "codex";

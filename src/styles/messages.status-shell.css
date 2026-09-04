@@ -196,7 +196,8 @@
   transition: all 0.18s ease;
 }
 
-.messages-live-control-btn span {
+.messages-live-control-btn span,
+.turn-complete-label {
   white-space: nowrap;
 }
 
@@ -254,7 +255,8 @@
  *   ────────────────────────────
  */
 
-.messages-process-phase-drawer {
+.messages-process-phase-drawer,
+.message-agent-task-fold-drawer {
   display: block;
   width: 100%;
   margin: 4px 0 12px;
@@ -366,12 +368,6 @@
 
 .messages-process-phase-slot > .messages-process-phase-slot-inner {
   min-height: 0;
-}
-
-.message-agent-task-fold-drawer {
-  display: block;
-  width: 100%;
-  margin: 4px 0 12px;
 }
 
 .message-agent-task-fold .messages-process-phase-toggle-copy {
@@ -586,10 +582,7 @@
   right: calc(var(--main-panel-padding, 24px) + 6px);
 }
 
-.app.layout-desktop.layout-swapped .messages-live-controls {
-  right: calc(var(--sidebar-width, 210px) + var(--main-panel-padding, 24px) + 6px);
-}
-
+.app.layout-desktop.layout-swapped .messages-live-controls,
 .app.layout-desktop.layout-swapped.right-panel-collapsed .messages-live-controls {
   right: calc(var(--sidebar-width, 210px) + var(--main-panel-padding, 24px) + 6px);
 }
@@ -734,7 +727,10 @@
   letter-spacing: 0.06em;
 }
 
-.messages-history-loading-phase.is-current {
+.messages-history-loading-phase.is-current,
+.working-timer-separator,
+.working-timer-tokens,
+.working-text {
   color: var(--text-muted);
 }
 
@@ -772,28 +768,99 @@
   margin-left: 1px;
 }
 
-/* Claude Code baseline spinner — single unified style for all engines/phases. */
-.working-spinner {
+/* Agent Thinking indicator — ported from BoardUI (dot grid / stars / comet).
+   The active tone color is set inline on the root as --agent-thinking-tone. */
+.agent-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.agent-thinking-dots {
+  display: grid;
+  flex-shrink: 0;
+}
+
+.agent-thinking-dot {
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.agent-thinking-label.is-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    var(--agent-thinking-tone) 42%,
+    var(--text-stronger) 50%,
+    var(--agent-thinking-tone) 58%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: agent-thinking-shimmer 2.4s linear infinite;
+}
+
+.agent-thinking-timer {
+  color: var(--text-stronger);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-thinking-stars {
   position: relative;
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: var(--text-stronger);
-  animation: working-spin 1s linear infinite;
-  will-change: transform;
+  display: block;
+  flex-shrink: 0;
 }
 
-:root[data-theme="light"] .working-spinner {
-  border-color: rgba(0, 0, 0, 0.12);
-  border-top-color: var(--text-stronger);
+.agent-thinking-star {
+  position: absolute;
+  animation: agent-thinking-twinkle 1.4s ease-in-out infinite;
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) .working-spinner {
-    border-color: rgba(0, 0, 0, 0.12);
-    border-top-color: var(--text-stronger);
+.agent-thinking-infinity {
+  flex-shrink: 0;
+}
+
+.agent-thinking-comet {
+  animation: agent-thinking-comet 1.2s linear infinite;
+}
+
+@keyframes agent-thinking-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes agent-thinking-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes agent-thinking-comet {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-thinking-label.is-shimmer {
+    animation: none;
+    background-image: none;
+    color: var(--agent-thinking-tone);
+  }
+  .agent-thinking-star,
+  .agent-thinking-comet {
+    animation: none;
   }
 }
 
@@ -803,15 +870,6 @@
   gap: 6px;
   font-variant-numeric: tabular-nums;
   color: var(--text-stronger);
-}
-
-.working-timer-separator,
-.working-timer-tokens {
-  color: var(--text-muted);
-}
-
-.working-text {
-  color: var(--text-muted);
 }
 
 .working-hint {
@@ -844,53 +902,6 @@
   flex: 1;
   height: 1px;
   background: linear-gradient(90deg, transparent, #3a3a44);
-}
-
-.turn-complete-label {
-  white-space: nowrap;
-}
-
-/* Mac / Linux: 03 SVG dash。走 stroke-dashoffset，不 rotate 整个元素。 */
-.working-spinner-dash {
-  display: block;
-  border: none;
-  border-radius: 0;
-  animation: none;
-  will-change: auto;
-}
-
-.working-spinner-dash circle {
-  fill: none;
-  stroke: var(--text-stronger);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-dasharray: 18 22;
-  animation: working-dash 0.9s linear infinite;
-}
-
-/* Windows: 10 glyph frames. JS mutates textContent; no CSS animation. */
-.working-spinner-glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 0;
-  animation: none;
-  will-change: auto;
-  color: var(--text-stronger);
-  font: 12px/1 "SF Mono", Menlo, Monaco, "Microsoft YaHei Mono", ui-monospace, monospace;
-}
-
-@keyframes working-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes working-dash {
-  to {
-    stroke-dashoffset: -40;
-  }
 }
 
 @keyframes tool-breathing {

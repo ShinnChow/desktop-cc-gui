@@ -5,6 +5,7 @@ import {
   loadGrokSession as loadGrokSessionService,
   loadKimiSession as loadKimiSessionService,
   loadPiSession as loadPiSessionService,
+  loadOmpSession as loadOmpSessionService,
   loadQoderSession as loadQoderSessionService,
   loadDshSession as loadDshSessionService,
   resumeThread as resumeThreadService,
@@ -15,6 +16,7 @@ import { createGeminiHistoryLoader } from "../loaders/geminiHistoryLoader";
 import { createGrokHistoryLoader } from "../loaders/grokHistoryLoader";
 import { createKimiHistoryLoader } from "../loaders/kimiHistoryLoader";
 import { createPiHistoryLoader } from "../loaders/piHistoryLoader";
+import { createOmpHistoryLoader } from "../loaders/ompHistoryLoader";
 import { createQoderHistoryLoader } from "../loaders/qoderHistoryLoader";
 import { createDshHistoryLoader } from "../loaders/dshHistoryLoader";
 import { createOpenCodeHistoryLoader } from "../loaders/opencodeHistoryLoader";
@@ -103,6 +105,14 @@ export function createThreadHistoryLoaderForThread({
       workspaceId,
       workspacePath,
       loadPiSession: loadPiSessionService,
+      onProgress: onHistoryProgress,
+    });
+  }
+  if (targetThreadId.startsWith("omp:")) {
+    return createOmpHistoryLoader({
+      workspaceId,
+      workspacePath,
+      loadOmpSession: loadOmpSessionService,
       onProgress: onHistoryProgress,
     });
   }

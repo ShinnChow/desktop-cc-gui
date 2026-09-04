@@ -29,14 +29,7 @@ export const SIDEBAR_LIST_VIRTUALIZATION_MIN_ROWS = 100;
  */
 export const SIDEBAR_THREAD_ROW_ESTIMATED_HEIGHT_PX = 32;
 
-export type SidebarVirtualItemKind =
-  | "thread"
-  | "pinned"
-  | "folder"
-  | "worktree"
-  | "separator"
-  | "load-more"
-  | "empty";
+
 
 export type SidebarVirtualItem =
   | {

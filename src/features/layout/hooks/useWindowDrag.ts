@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isWindowsPlatform } from "../../../utils/platform";
 
-export function useWindowDrag(targetId: string) {
+export function useWindowDrag(_targetId: string) {
   useEffect(() => {
     const isWindowsDesktop = isWindowsPlatform();
 
@@ -33,6 +33,7 @@ export function useWindowDrag(targetId: string) {
             [
               ".main-topbar",
               ".main-header",
+              ".right-panel-toolbar",
               ".sidebar-topbar-placeholder",
               ".sidebar-topbar-content",
             ].join(","),
@@ -177,16 +178,18 @@ export function useWindowDrag(targetId: string) {
       };
     }
 
-    const el = document.getElementById(targetId);
-    if (!el) {
-      return;
-    }
-
     const handler = (event: MouseEvent) => {
       if (event.buttons !== 1) {
         return;
       }
       if (event.detail > 1) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (
+        !target?.closest(`[data-tauri-drag-region]:not([data-tauri-drag-region="false"])`) ||
+        target.closest('[data-tauri-drag-region="false"]')
+      ) {
         return;
       }
       void (async () => {
@@ -203,9 +206,9 @@ export function useWindowDrag(targetId: string) {
       })();
     };
 
-    el.addEventListener("mousedown", handler);
+    document.addEventListener("mousedown", handler);
     return () => {
-      el.removeEventListener("mousedown", handler);
+      document.removeEventListener("mousedown", handler);
     };
-  }, [targetId]);
+  }, [_targetId]);
 }

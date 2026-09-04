@@ -7,6 +7,7 @@ export type SessionIndexEngine =
   | "grok"
   | "kimi"
   | "pi"
+  | "omp"
   | "opencode"
   | "dsh"
   | "qoder"
@@ -47,13 +48,7 @@ export type SessionIndexListPage = {
   visibility?: SharedNativeVisibilityProjection | null;
 };
 
-export type SessionIndexSyncReport = {
-  upserted: number;
-  engines: string[];
-  durationMs: number;
-  partialSource?: string | null;
-  skippedFresh: boolean;
-};
+
 
 export async function listSessionIndexForWorkspace(
   workspaceId: string,
@@ -76,19 +71,7 @@ export async function listSessionIndexForWorkspace(
   });
 }
 
-export async function syncSessionIndexForWorkspace(
-  workspaceId: string,
-  options?: {
-    limit?: number | null;
-    force?: boolean | null;
-  },
-): Promise<SessionIndexSyncReport> {
-  return invoke<SessionIndexSyncReport>("sync_session_index_for_workspace", {
-    workspaceId,
-    limit: options?.limit ?? null,
-    force: options?.force ?? false,
-  });
-}
+
 
 /** Soft-invalidate SQLite source freshness so next list/sync rescans engines. */
 export async function invalidateSessionIndexForWorkspace(
@@ -126,6 +109,7 @@ function inferEngineFromThreadId(threadId: string): string {
   if (raw.startsWith("kimi:") || raw.startsWith("kimi-pending-")) return "kimi";
   if (raw.startsWith("opencode:") || raw.startsWith("opencode-pending-")) return "opencode";
   if (raw.startsWith("pi:") || raw.startsWith("pi-pending-")) return "pi";
+  if (raw.startsWith("omp:") || raw.startsWith("omp-pending-")) return "omp";
   if (raw.startsWith("dsh:") || raw.startsWith("dsh-pending-")) return "dsh";
   if (raw.startsWith("qoder:") || raw.startsWith("qoder-pending-")) return "qoder";
   return "codex";

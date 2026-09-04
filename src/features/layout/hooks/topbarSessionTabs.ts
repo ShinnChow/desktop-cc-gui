@@ -43,6 +43,7 @@ const DEFAULT_ENGINE_LABEL_BY_TYPE: Record<EngineType, string> = {
   grok: "Grok",
   kimi: "Kimi",
   pi: "PI CLI",
+  omp: "OMP CLI",
   dsh: "DSH",
   qoder: "Qoder CLI",
 };

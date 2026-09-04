@@ -237,7 +237,8 @@
   gap: 3px;
 }
 
-.project-map-api-contract-inspector header > div {
+.project-map-api-contract-inspector header > div,
+.project-map-api-method-tree-card-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
@@ -283,7 +284,8 @@
 .project-map-api-contract-group-rail header span,
 .project-map-api-contract-inspector header span,
 .project-map-api-contract-empty p,
-.project-map-api-contract-empty small {
+.project-map-api-contract-empty small,
+.project-map-api-contract-endpoint-section header span {
   color: var(--project-map-text-muted);
   font-size: 10px;
 }
@@ -327,7 +329,8 @@
 .project-map-api-contract-group-node span,
 .project-map-api-contract-endpoint-node span,
 .project-map-api-contract-tags span,
-.project-map-api-contract-evidence span {
+.project-map-api-contract-evidence span,
+.project-map-api-contract-parameter-card > div:first-child span {
   width: fit-content;
   border-radius: 999px;
   padding: 2px 6px;
@@ -365,12 +368,19 @@
   white-space: nowrap;
 }
 
-.project-map-api-contract-module-tree {
+.project-map-api-contract-module-tree,
+.project-map-api-contract-parameter-list {
   display: grid;
   gap: 8px;
 }
 
-.project-map-api-contract-module-branch {
+.project-map-api-contract-module-branch,
+.project-map-api-contract-evidence,
+.project-map-api-contract-group-summary,
+.project-map-api-contract-inspector-section,
+.project-map-api-contract-response-list,
+.project-map-api-contract-method-chain-list,
+.project-map-api-contract-distribution {
   display: grid;
   gap: 7px;
 }
@@ -472,11 +482,6 @@
   padding: 3px 8px;
   background: color-mix(in srgb, var(--project-map-accent) 18%, transparent);
   color: var(--project-map-accent);
-  font-size: 10px;
-}
-
-.project-map-api-contract-endpoint-section header span {
-  color: var(--project-map-text-muted);
   font-size: 10px;
 }
 
@@ -650,10 +655,7 @@
 }
 
 .project-map-api-contract-overview-list > div:nth-child(3),
-.project-map-api-contract-overview-list > div:nth-child(4) {
-  grid-column: 1 / -1;
-}
-
+.project-map-api-contract-overview-list > div:nth-child(4),
 .project-map-api-contract-invocation-list > div:nth-child(2) {
   grid-column: 1 / -1;
 }
@@ -670,13 +672,6 @@
   font-size: 11px;
   line-height: 1.45;
   overflow-wrap: anywhere;
-}
-
-.project-map-api-contract-evidence,
-.project-map-api-contract-group-summary,
-.project-map-api-contract-inspector-section {
-  display: grid;
-  gap: 7px;
 }
 
 .project-map-api-contract-evidence h5,
@@ -703,27 +698,11 @@
   background: color-mix(in srgb, var(--project-map-border) 42%, transparent);
 }
 
-.project-map-api-contract-parameter-list {
-  display: grid;
-  gap: 8px;
-}
-
 .project-map-api-contract-parameter-card > div:first-child {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 4px 7px;
-}
-
-.project-map-api-contract-parameter-card > div:first-child span {
-  width: fit-content;
-  border-radius: 999px;
-  padding: 2px 6px;
-  background: color-mix(in srgb, var(--project-map-accent) 14%, transparent);
-  color: var(--project-map-accent);
-  font-size: 9px;
-  font-weight: 820;
-  text-transform: uppercase;
 }
 
 .project-map-api-contract-parameter-card > div:first-child strong {
@@ -807,13 +786,6 @@
 
 .project-map-api-contract-schema-table > strong {
   color: var(--project-map-text-strong);
-}
-
-.project-map-api-contract-response-list,
-.project-map-api-contract-method-chain-list,
-.project-map-api-contract-distribution {
-  display: grid;
-  gap: 7px;
 }
 
 .project-map-api-contract-method-chain-card {
@@ -914,13 +886,6 @@
   opacity: .78;
 }
 
-.project-map-api-method-tree-card-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: 8px;
-}
-
 .project-map-api-method-tree-card-main strong {
   min-width: 0;
   overflow: hidden;
@@ -976,14 +941,18 @@
 }
 
 .project-map-api-method-tree-anchors button:hover,
-.project-map-api-method-tree-anchors button:focus-visible {
+.project-map-api-method-tree-anchors button:focus-visible,
+.project-map-api-contract-method-chain-location:hover,
+.project-map-api-contract-method-chain-location:focus-visible {
   background: color-mix(in srgb, var(--project-map-accent) 22%, transparent);
   color: var(--project-map-accent);
   outline: none;
 }
 
 .project-map-api-method-tree-anchors button.is-target:hover,
-.project-map-api-method-tree-anchors button.is-target:focus-visible {
+.project-map-api-method-tree-anchors button.is-target:focus-visible,
+.project-map-api-contract-method-chain-location.is-target:hover,
+.project-map-api-contract-method-chain-location.is-target:focus-visible {
   background: color-mix(in srgb, var(--project-map-success) 22%, transparent);
   color: var(--project-map-success);
 }
@@ -1001,7 +970,9 @@
 }
 
 .project-map-api-method-tree-excerpt:hover,
-.project-map-api-method-tree-excerpt:focus-visible {
+.project-map-api-method-tree-excerpt:focus-visible,
+.project-map-api-contract-method-chain-excerpt:hover,
+.project-map-api-contract-method-chain-excerpt:focus-visible {
   border-color: color-mix(in srgb, var(--project-map-accent) 58%, transparent);
   outline: none;
 }
@@ -1103,19 +1074,6 @@
   color: color-mix(in srgb, var(--project-map-success) 82%, var(--project-map-text-strong));
 }
 
-.project-map-api-contract-method-chain-location:hover,
-.project-map-api-contract-method-chain-location:focus-visible {
-  background: color-mix(in srgb, var(--project-map-accent) 22%, transparent);
-  color: var(--project-map-accent);
-  outline: none;
-}
-
-.project-map-api-contract-method-chain-location.is-target:hover,
-.project-map-api-contract-method-chain-location.is-target:focus-visible {
-  background: color-mix(in srgb, var(--project-map-success) 22%, transparent);
-  color: var(--project-map-success);
-}
-
 .project-map-api-contract-method-chain-excerpt {
   display: block;
   width: 100%;
@@ -1127,12 +1085,6 @@
   color: color-mix(in srgb, var(--project-map-text-strong) 86%, var(--project-map-accent));
   cursor: pointer;
   text-align: left;
-}
-
-.project-map-api-contract-method-chain-excerpt:hover,
-.project-map-api-contract-method-chain-excerpt:focus-visible {
-  border-color: color-mix(in srgb, var(--project-map-accent) 58%, transparent);
-  outline: none;
 }
 
 .project-map-api-contract-method-chain-excerpt code {

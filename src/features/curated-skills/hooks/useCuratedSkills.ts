@@ -80,4 +80,4 @@ export function useCuratedSkills(options: {
   };
 }
 
-export type UseCuratedSkillsResult = ReturnType<typeof useCuratedSkills>;
+

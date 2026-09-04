@@ -273,11 +273,7 @@
   background-repeat: no-repeat;
 }
 
-.composer-select--model {
-  width: 110px;
-  max-width: 110px;
-}
-
+.composer-select--model,
 .composer-select--collab {
   width: 110px;
   max-width: 110px;
@@ -317,17 +313,14 @@
     border-radius: 10px;
   }
 
-  .composer-plan-mode-toggle-label {
+  .composer-plan-mode-toggle-label,
+.composer-mode-badge span {
     display: none;
   }
 
   .composer-plan-mode-toggle {
     margin-left: 2px;
     padding: 0 2px;
-  }
-
-  .composer-mode-badge span {
-    display: none;
   }
 
   .composer-mode-badge {
@@ -339,11 +332,8 @@
 
 /* 小屏/窄容器：隐藏选择器文字，只保留 icon */
 @container composer-footer (max-width: 460px) {
-  .composer-select-value {
-    display: none;
-  }
-
-  .composer-footer-inline-dock {
+  .composer-select-value,
+.composer-footer-inline-dock {
     display: none;
   }
 
@@ -442,7 +432,9 @@
   white-space: nowrap;
 }
 
-.composer-shell-collapsed-strip.is-processing {
+.composer-shell-collapsed-strip.is-processing,
+.composer-memory-chip-remove:hover,
+.composer-context-help-section strong {
   color: var(--text-strong);
 }
 
@@ -922,10 +914,6 @@
   padding: 0;
 }
 
-.composer-memory-chip-remove:hover {
-  color: var(--text-strong);
-}
-
 .composer-context-ledger {
   display: grid;
   gap: 10px;
@@ -1103,12 +1091,15 @@
   gap: 10px;
 }
 
-.composer-context-ledger-batch-copy {
+.composer-context-ledger-batch-copy,
+.composer-context-ledger-detail-copy,
+.composer-context-menu-group-items {
   display: grid;
   gap: 4px;
 }
 
-.composer-context-ledger-batch-actions {
+.composer-context-ledger-batch-actions,
+.composer-context-ledger-detail-meta {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1129,7 +1120,8 @@
   gap: 8px;
 }
 
-.composer-context-ledger-comparison-title {
+.composer-context-ledger-comparison-title,
+.composer-context-ledger-group-title {
   font-size: 11px;
   font-weight: 700;
   color: var(--text-strong);
@@ -1140,7 +1132,11 @@
   color: var(--accent-primary, #2563eb);
 }
 
-.composer-context-ledger-comparison-hint {
+.composer-context-ledger-comparison-hint,
+.composer-context-ledger-block-label,
+.composer-context-ledger-block-estimate,
+.composer-context-ledger-meta-badge,
+.composer-context-ledger-detail-kicker {
   font-size: 10px;
   color: var(--text-faint);
 }
@@ -1176,11 +1172,7 @@
   background: var(--surface-item);
 }
 
-.composer-context-ledger-group--recent_turns {
-  gap: 6px;
-  padding: 8px 10px;
-}
-
+.composer-context-ledger-group--recent_turns,
 .composer-context-ledger-group--attached_resource {
   gap: 6px;
   padding: 8px 10px;
@@ -1191,12 +1183,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-
-.composer-context-ledger-group-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-strong);
 }
 
 .composer-context-ledger-group-count {
@@ -1271,7 +1257,9 @@
   line-height: 1;
 }
 
-.composer-context-ledger-block-select input {
+.composer-context-ledger-block-select input,
+.composer-context-ledger-detail-markdown > *,
+.composer-context-ledger-detail-markdown :where(pre, blockquote) {
   margin: 0;
 }
 
@@ -1314,13 +1302,6 @@
 .composer-context-ledger-block--note_card .composer-context-ledger-block-actions,
 .composer-context-ledger-block--file_reference .composer-context-ledger-block-actions {
   grid-column: 1;
-}
-
-.composer-context-ledger-block-label,
-.composer-context-ledger-block-estimate,
-.composer-context-ledger-meta-badge {
-  font-size: 10px;
-  color: var(--text-faint);
 }
 
 .composer-context-ledger-block-title {
@@ -1422,23 +1403,6 @@
   gap: 12px;
 }
 
-.composer-context-ledger-detail-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.composer-context-ledger-detail-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.composer-context-ledger-detail-kicker {
-  font-size: 10px;
-  color: var(--text-faint);
-}
-
 .composer-context-ledger-detail-title {
   font-size: 12px;
   font-weight: 700;
@@ -1466,10 +1430,6 @@
   color: var(--text-strong);
 }
 
-.composer-context-ledger-detail-markdown > * {
-  margin: 0;
-}
-
 .composer-context-ledger-detail-markdown > * + * {
   margin-top: 6px;
 }
@@ -1491,10 +1451,6 @@
 
 .composer-context-ledger-detail-markdown :where(code) {
   font-size: 11px;
-}
-
-.composer-context-ledger-detail-markdown :where(pre, blockquote) {
-  margin: 0;
 }
 
 .composer-context-ledger-detail-path {
@@ -1555,7 +1511,8 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, #34d399 28%, transparent);
 }
 
-.composer-collapsed-pill:hover {
+.composer-collapsed-pill:hover,
+.composer-context-action-btn:hover {
   border-color: var(--border-strong);
   color: var(--text-strong);
 }
@@ -1633,11 +1590,6 @@
   gap: 5px;
 }
 
-.composer-context-action-btn:hover {
-  border-color: var(--border-strong);
-  color: var(--text-strong);
-}
-
 .composer-context-action-btn--help {
   width: 30px;
   padding-left: 0;
@@ -1647,13 +1599,7 @@
   justify-content: center;
 }
 
-.composer-context-action-btn--skill {
-  border-color: var(--border-subtle);
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--surface-card) 90%, transparent);
-  font-weight: 600;
-}
-
+.composer-context-action-btn--skill,
 .composer-context-action-btn--commons {
   border-color: var(--border-subtle);
   color: var(--text-muted);
@@ -1707,10 +1653,6 @@
 
 .composer-context-help-section--wide {
   grid-column: 1 / -1;
-}
-
-.composer-context-help-section strong {
-  color: var(--text-strong);
 }
 
 .composer-context-help-example {
@@ -1861,11 +1803,6 @@
   color: var(--text-faint);
 }
 
-.composer-context-menu-group-items {
-  display: grid;
-  gap: 4px;
-}
-
 .composer-context-menu-item {
   border: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
   background: color-mix(in srgb, var(--surface-card) 84%, transparent);
@@ -1917,15 +1854,19 @@
   color: var(--text-faint);
 }
 
-.composer-select-value--agent {
+.composer-select-value--agent,
+.composer-select-value--variant {
   font-weight: 600;
 }
 
-.composer-agent-tone--default {
+.composer-agent-tone--default,
+.composer-variant-tone--default,
+.composer-git-repository-token.is-sync {
   color: var(--text-muted);
 }
 
-.composer-agent-tone--0 {
+.composer-agent-tone--0,
+.composer-variant-tone--5 {
   color: color-mix(in srgb, #60a5fa 70%, var(--text-strong));
 }
 
@@ -1933,15 +1874,18 @@
   color: color-mix(in srgb, #34d399 72%, var(--text-strong));
 }
 
-.composer-agent-tone--2 {
+.composer-agent-tone--2,
+.composer-variant-tone--3 {
   color: color-mix(in srgb, #f59e0b 70%, var(--text-strong));
 }
 
-.composer-agent-tone--3 {
+.composer-agent-tone--3,
+.composer-variant-tone--4 {
   color: color-mix(in srgb, #f472b6 68%, var(--text-strong));
 }
 
-.composer-agent-tone--4 {
+.composer-agent-tone--4,
+.composer-variant-tone--0 {
   color: color-mix(in srgb, #a78bfa 70%, var(--text-strong));
 }
 
@@ -1957,18 +1901,6 @@
   color: color-mix(in srgb, #84cc16 72%, var(--text-strong));
 }
 
-.composer-select-value--variant {
-  font-weight: 600;
-}
-
-.composer-variant-tone--default {
-  color: var(--text-muted);
-}
-
-.composer-variant-tone--0 {
-  color: color-mix(in srgb, #a78bfa 70%, var(--text-strong));
-}
-
 .composer-variant-tone--1 {
   color: color-mix(in srgb, #22d3ee 70%, var(--text-strong));
 }
@@ -1977,24 +1909,9 @@
   color: color-mix(in srgb, #34d399 70%, var(--text-strong));
 }
 
-.composer-variant-tone--3 {
-  color: color-mix(in srgb, #f59e0b 70%, var(--text-strong));
-}
-
-.composer-variant-tone--4 {
-  color: color-mix(in srgb, #f472b6 68%, var(--text-strong));
-}
-
-.composer-variant-tone--5 {
-  color: color-mix(in srgb, #60a5fa 70%, var(--text-strong));
-}
-
 @media (max-width: 1280px) {
-  .composer-context-menu-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .composer-context-help-grid {
+  .composer-context-menu-grid,
+.composer-context-help-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2228,7 +2145,9 @@
 }
 
 .composer-git-section-toggle:hover,
-.composer-git-section-toggle:focus-visible {
+.composer-git-section-toggle:focus-visible,
+.composer-git-branch-scope:hover,
+.composer-git-branch-scope:focus-visible {
   background: var(--surface-hover);
   color: var(--text-primary);
   outline: none;
@@ -2249,13 +2168,6 @@
   font-weight: 600;
   line-height: 20px;
   text-align: left;
-}
-
-.composer-git-branch-scope:hover,
-.composer-git-branch-scope:focus-visible {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-  outline: none;
 }
 
 .composer-git-branch-item {
@@ -2284,10 +2196,6 @@
 .composer-git-repository-token.is-branch {
   color: var(--git-branch);
   font-weight: 600;
-}
-
-.composer-git-repository-token.is-sync {
-  color: var(--text-muted);
 }
 
 .composer-git-repository-token.is-clean {

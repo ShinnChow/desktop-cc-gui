@@ -180,6 +180,7 @@ export function useAppShellAssemblyHost() {
     grokDoctor: merged.grokDoctor,
     opencodeDoctor: merged.opencodeDoctor,
     piDoctor: merged.piDoctor,
+    ompDoctor: merged.ompDoctor,
     qoderDoctor: merged.qoderDoctor,
     editorHighlightTarget: merged.editorHighlightTarget,
     editorNavigationTarget: merged.editorNavigationTarget,

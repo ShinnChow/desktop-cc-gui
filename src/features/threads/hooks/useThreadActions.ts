@@ -1,6 +1,5 @@
 import { startTransition, useCallback, useMemo, useRef } from "react";
 import {
-  yieldIfInteractiveInputPending,
   yieldToInteractiveInput,
 } from "../../../utils/interactiveMainThread";
 import type { ThreadSummary, WorkspaceInfo } from "../../../types";
@@ -9,30 +8,20 @@ import {
   listThreadTitles as listThreadTitlesService,
   listThreads as listThreadsService,
   listClaudeSessions as listClaudeSessionsForFallbackSeedService,
-  listGeminiSessions as listGeminiSessionsService,
-  listGrokSessions as listGrokSessionsService,
-  listKimiSessions as listKimiSessionsService,
-  listPiSessions as listPiSessionsService,
-  listQoderSessions as listQoderSessionsService,
-  listDshSessions as listDshSessionsService,
   getOpenCodeSessionList as getOpenCodeSessionListService,
-  listSessionIndexForWorkspace as listSessionIndexForWorkspaceService,
   rememberSessionIndexWorkspacePath,
   scheduleTombstoneClaudeForkIndexRow,
 } from "../../../services/tauri";
 import {
-  buildNativeIndexEarlyPaintSummaries,
   projectNativeIndexRowsToSummaries,
   shouldRememberHideUnreadiness,
 } from "./useThreadActions.nativeIndexProjection";
 import { reconcilePiDerivedHideWithAuthoritativeRows } from "../../pi-session/store/piSessionStore";
 import { debugPiSummaryLayerDrops } from "../../pi-session/store/piSidebarDropDiagnostics";
 import {
-  expandVisibilityHideSet,
   isFullyVerifiedSharedNativeVisibility,
   isUsableSharedNativeVisibility,
   hasVerifiedSharedHide,
-  lastVerifiedSharedHide,
   rememberVerifiedSharedHideIfComplete,
   strengthenVerifiedSharedHide,
   unionHideSets,
@@ -67,6 +56,8 @@ import {
   collectKnownCodexThreadIds,
   normalizeComparableWorkspacePath,
 } from "./useThreadActions.workspacePath";
+import { runThreadListIndexEarlyPaintStage } from "./useThreadActions.indexEarlyPaint";
+import { scheduleEngineAsyncSessionMerges } from "./useThreadActions.engineAsyncMerge";
 import {
   useAutomaticRuntimeRecovery,
   type AutomaticRuntimeRecoverySource,
@@ -92,16 +83,11 @@ import {
   mergeGeminiSessionSummaries,
   mergeGrokSessionSummaries,
   mergeKimiSessionSummaries,
+  mergeOmpSessionSummaries,
   mergePiSessionSummaries,
   mergeQoderSessionSummaries,
   mergeDshSessionSummaries,
   mergeThreadSummaryPreservingStableIdentity,
-  normalizeGeminiSessionSummaries,
-  normalizeGrokSessionSummaries,
-  normalizeKimiSessionSummaries,
-  normalizePiSessionSummaries,
-  normalizeQoderSessionSummaries,
-  normalizeDshSessionSummaries,
   normalizeThreadListPartialSource,
   resolveThreadSourceMeta,
   seedLastGoodClaudeIntoMerged,
@@ -118,14 +104,11 @@ import {
   type GeminiSessionSummary,
   type GrokSessionSummary,
   type KimiSessionSummary,
+  type OmpSessionSummary,
   type PiSessionSummary,
   type QoderSessionSummary,
   type DshSessionSummary,
 } from "./useThreadActions.helpers";
-import {
-  QODER_CN_PROVIDER_PROFILE_ID,
-  QODER_GLOBAL_PROVIDER_PROFILE_ID,
-} from "../constants/codexProviderProfiles";
 import { canonicalQoderThreadId } from "../utils/qoderSessionIdentity";
 import { buildPartialHistoryDiagnostic } from "../utils/stabilityDiagnostics";
 import { buildThreadDebugCorrelation } from "../utils/threadDebugCorrelation";
@@ -140,17 +123,12 @@ import { useLoadOlderThreadsForWorkspace } from "./useThreadActionsLoadOlder";
 import { useThreadHistoryLoadingState } from "./useThreadHistoryLoadingState";
 import {
   GEMINI_SESSION_CACHE_TTL_MS,
-  GEMINI_SESSION_FETCH_TIMEOUT_MS,
   GROK_SESSION_CACHE_TTL_MS,
-  GROK_SESSION_FETCH_TIMEOUT_MS,
   KIMI_SESSION_CACHE_TTL_MS,
-  KIMI_SESSION_FETCH_TIMEOUT_MS,
   DSH_SESSION_CACHE_TTL_MS,
-  DSH_SESSION_FETCH_TIMEOUT_MS,
+  OMP_SESSION_CACHE_TTL_MS,
   PI_SESSION_CACHE_TTL_MS,
-  PI_SESSION_FETCH_TIMEOUT_MS,
   QODER_SESSION_CACHE_TTL_MS,
-  QODER_SESSION_FETCH_TIMEOUT_MS,
   NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
   OPENCODE_FULL_CATALOG_FETCH_TIMEOUT_MS,
   THREAD_LIST_LIVE_REQUEST_TIMEOUT_MS,
@@ -227,6 +205,10 @@ export function useThreadActions({
     Record<string, { fetchedAt: number; sessions: PiSessionSummary[] }>
   >({});
   const piRefreshAttemptedRef = useRef<Record<string, boolean>>({});
+  const ompSessionCacheRef = useRef<
+    Record<string, { fetchedAt: number; sessions: OmpSessionSummary[] }>
+  >({});
+  const ompRefreshAttemptedRef = useRef<Record<string, boolean>>({});
   const qoderSessionCacheRef = useRef<
     Record<string, { fetchedAt: number; sessions: QoderSessionSummary[] }>
   >({});
@@ -406,6 +388,8 @@ export function useThreadActions({
          * 其它引擎仍只在 full-catalog 才扫。
          */
         includePiDiskList?: boolean;
+        /** 与 includePiDiskList 同形：首刷后后台软刷补 omp 单引擎盘扫。 */
+        includeOmpDiskList?: boolean;
         deletedThreadIds?: string[];
         /**
          * 仅做本地摘行（归档/软隐藏路径）：执行 deletedThreadIds 的本地清理后
@@ -463,6 +447,9 @@ export function useThreadActions({
       // pi 盘扫可被独立允许（后台软刷补全独立 main），不等 full-catalog。
       const includePiDiskList =
         includeEngineDiskLists || options?.includePiDiskList === true;
+      // omp 盘扫与 pi 同形（pi-family 独立 main 后台补全）。
+      const includeOmpDiskList =
+        includeEngineDiskLists || options?.includeOmpDiskList === true;
       const deletedThreadIds = [
         ...new Set(
           (options?.deletedThreadIds ?? [])
@@ -557,214 +544,34 @@ export function useThreadActions({
             return abandoned;
           }
         }
-        // Session Index: list-level multi-engine source (SQLite).
-        // CRITICAL UX: on first-paint, await index FIRST and paint immediately.
-        // Do NOT wait for titles/shared/codex live list — that left the sidebar
-        // stuck on stale sidebarSnapshot for seconds (user: old list → late correct).
-        // One display page (20) per engine feeds the mixed top-20 view; older
-        // rows arrive via keyset paging (sidebar 更多).
-        const sessionIndexLimit = resolveInitialThreadListTargetCount(
+        const indexEarlyPaintStage = await runThreadListIndexEarlyPaintStage({
           workspace,
+          options,
           defaultVisibleThreadRootCount,
-        );
-        // Only explicit soft re-sync forces writers; cold first-paint must hit
-        // warm SQLite (ms) so stale sidebarSnapshot is replaced immediately.
-        const forceIndexSync = Boolean(options?.forceSessionIndexSync);
-        const sessionIndexTimeoutMs = isFirstPaintHydration
-          ? forceIndexSync
-            ? 6_000
-            : 2_500
-          : NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS;
-        let sessionIndexPage: Awaited<
-          ReturnType<typeof listSessionIndexForWorkspaceService>
-        > | null = null;
-        if (typeof listSessionIndexForWorkspaceService === "function") {
-          sessionIndexPage = await withTimeout(
-            listSessionIndexForWorkspaceService(workspace.id, {
-              limit: sessionIndexLimit,
-              // Warm SQLite should answer without rescan; force only soft re-sync.
-              syncIfNeeded: !isFirstPaintHydration,
-              forceSync: forceIndexSync,
-            })
-              .then((page) => page ?? null)
-              .catch(() => null),
-            sessionIndexTimeoutMs,
-          );
-          // First-paint 2.5s can expire if a writer is still running. Retry a
-          // warm read so already-indexed native PI rows still reach the sidebar.
-          if (
-            sessionIndexPage === null &&
-            isFirstPaintHydration &&
-            !forceIndexSync
-          ) {
-            sessionIndexPage = await withTimeout(
-              listSessionIndexForWorkspaceService(workspace.id, {
-                limit: sessionIndexLimit,
-                syncIfNeeded: false,
-                forceSync: false,
-              })
-                .then((page) => page ?? null)
-                .catch(() => null),
-              800,
-            );
-          }
+          isFirstPaintHydration,
+          threadsByWorkspace,
+          getCustomName,
+          onDebug,
+          dispatch,
+          isLatestThreadListRequest,
+          abandonIfStale,
+          rememberPartialSource,
+          getLastGoodThreadSummariesWithoutDeleted,
+          appliedThreadListUpdate,
+          visibleThreadCount,
+          authoritativeEmpty,
+        });
+        if (indexEarlyPaintStage.kind === "return") {
+          return indexEarlyPaintStage.value;
         }
-        {
-          const abandoned = abandonIfStale();
-          if (abandoned) {
-            return abandoned;
-          }
-        }
-        // Progressive paint: replace stale snapshot ASAP with index rows.
-        // Urgent dispatch (not startTransition) so WebView paints before heavy work.
-        // Never paint ordinary native Index rows with an empty/unverified hide set.
-        let earlyIndexPaintApplied = false;
-        const indexVisibility = sessionIndexPage?.visibility ?? null;
-        const visibilityHideSet = expandVisibilityHideSet(indexVisibility);
-        const verifiedHideSet = lastVerifiedSharedHide(workspace.id);
-        const canProjectIndexNatives =
-          isUsableSharedNativeVisibility(indexVisibility) ||
-          hasVerifiedSharedHide(workspace.id);
-        const earlyPaintHideSet = unionHideSets(
+        const {
+          sessionIndexPage,
+          earlyIndexPaintApplied,
+          indexVisibility,
           visibilityHideSet,
           verifiedHideSet,
-          expandHiddenSharedBindingIds([...getCollabWorkerNativeHideIds()]),
-        );
-        rememberVerifiedSharedHideIfComplete(
-          workspace.id,
-          indexVisibility,
-          earlyPaintHideSet,
-        );
-        // merge(focus-refresh/restore) 路径在「本地还没有任何行」时同样
-        // 提前画 index 行:否则冷 workspace 要等整条 merge 管线(引擎探测 +
-        // orchestrator 串行)跑完才结束 loading。显隐逻辑与 first-paint 完全
-        // 一致(同一 hideSet + hideReady defer + 同一投影函数),只是时机提前;
-        // 已有行的 merge 不提前画,避免热路径双重 dispatch churn。
-        const mergeColdEarlyPaint =
-          !isFirstPaintHydration &&
-          options?.mergeExistingThreads === true &&
-          (threadsByWorkspace[workspace.id] ?? []).length === 0;
-        if (
-          sessionIndexPage &&
-          Array.isArray(sessionIndexPage.data) &&
-          sessionIndexPage.data.length > 0 &&
-          ((isFirstPaintHydration && !options?.mergeExistingThreads) ||
-            mergeColdEarlyPaint)
-        ) {
-          if (shouldRememberHideUnreadiness(canProjectIndexNatives)) {
-            rememberPartialSource("shared-visibility-unavailable");
-          }
-          // 自愈：index 权威行证明无 parent 的 pi 主线，立即从内存派生
-          // 隐藏集合放归（堵住 fork 静默 no-op 误登记的整局隐藏）。
-          reconcilePiDerivedHideWithAuthoritativeRows(sessionIndexPage.data);
-          const earlyIndexSummaries = buildNativeIndexEarlyPaintSummaries({
-            rows: sessionIndexPage.data,
-            workspaceId: workspace.id,
-            getCustomName,
-            hideSet: earlyPaintHideSet,
-            currentThreads: threadsByWorkspace[workspace.id],
-            lastGood: getLastGoodThreadSummariesWithoutDeleted(),
-            hideReady: canProjectIndexNatives,
-          });
-          debugPiSummaryLayerDrops(
-            "index-early-paint",
-            sessionIndexPage.data,
-            new Set(earlyIndexSummaries.map((summary) => summary.id)),
-            (threadId) =>
-              canProjectIndexNatives
-                ? threadIdInHiddenSharedBindingSet(threadId, earlyPaintHideSet)
-                  ? "shared/collab-hide-set"
-                  : "title-gate"
-                : "hide-not-ready-deferral",
-          );
-          if (earlyIndexSummaries.length > 0) {
-            // Urgent early paint still yields one macrotask when a click is
-            // pending — WebView2 hit-test starvation freezes harder than a
-            // one-tick delay. Staleness is re-checked after the yield below.
-            await yieldIfInteractiveInputPending();
-          }
-          if (earlyIndexSummaries.length > 0 && isLatestThreadListRequest()) {
-            dispatch({
-              type: "setThreads",
-              workspaceId: workspace.id,
-              threads: earlyIndexSummaries,
-              unionMembership: true,
-            });
-            earlyIndexPaintApplied = true;
-            appliedThreadListUpdate = true;
-            onDebug?.({
-              id: `${Date.now()}-client-session-index-early-paint`,
-              timestamp: Date.now(),
-              source: "client",
-              label: "thread/list session-index early-paint",
-              payload: {
-                workspaceId: workspace.id,
-                rowCount: earlyIndexSummaries.length,
-                source: sessionIndexPage.source,
-                syncMs: sessionIndexPage.syncMs ?? null,
-                engines: sessionIndexPage.engines,
-                visibilityAvailable: Boolean(indexVisibility?.available),
-                hiddenCount: earlyPaintHideSet.size,
-              },
-            });
-          }
-        } else if (sessionIndexPage === null) {
-          rememberPartialSource("session-index-timeout");
-        }
-
-        if (options?.sessionIndexOnly) {
-          if (sessionIndexPage === null || !Array.isArray(sessionIndexPage.data)) {
-            return { applied: false, visibleCount: 0, authoritativeEmpty: false };
-          }
-          const hiddenSharedBindingIds = unionHideSets(
-            visibilityHideSet,
-            verifiedHideSet,
-            expandHiddenSharedBindingIds([...getCollabWorkerNativeHideIds()]),
-          );
-          reconcilePiDerivedHideWithAuthoritativeRows(sessionIndexPage.data);
-          const indexSummaries = projectNativeIndexRowsToSummaries(
-            sessionIndexPage.data,
-            {
-              workspaceId: workspace.id,
-              mappedTitles: {},
-              getCustomName,
-              hiddenSharedBindingIds,
-            },
-          );
-          if (isLatestThreadListRequest()) {
-            dispatch({
-              type: "setThreads",
-              workspaceId: workspace.id,
-              threads: indexSummaries,
-              unionMembership: sessionIndexPage.hasMore === true,
-            });
-            const oldest = sessionIndexPage.data.at(-1);
-            dispatch({
-              type: "setThreadListCursor",
-              workspaceId: workspace.id,
-              cursor: resolveThreadListCursorForDisplay({
-                catalogCursor: null,
-                catalogPartialSource: null,
-                runtimeCursor: null,
-                sessionIndexHasMore: sessionIndexPage.hasMore === true,
-                sessionIndexOldestKey: oldest
-                  ? {
-                      updatedAt: Number(oldest.updatedAt) || 0,
-                      sessionId: String(oldest.sessionId ?? "").trim(),
-                    }
-                  : null,
-              }),
-            });
-            appliedThreadListUpdate = true;
-            visibleThreadCount = indexSummaries.length;
-            authoritativeEmpty = sessionIndexPage.data.length === 0;
-          }
-          return {
-            applied: appliedThreadListUpdate,
-            visibleCount: visibleThreadCount,
-            authoritativeEmpty,
-          };
-        }
+        } = indexEarlyPaintStage;
+        appliedThreadListUpdate = indexEarlyPaintStage.appliedThreadListUpdate;
 
         let mappedTitles: Record<string, string> = {};
         try {
@@ -887,6 +694,20 @@ export function useThreadActions({
         const hasFreshPiCache =
           !!cachedPi &&
           Date.now() - cachedPi.fetchedAt <= PI_SESSION_CACHE_TTL_MS;
+        const hasOmpSignal =
+          existingThreads.some(
+            (thread) =>
+              thread.engineSource === "omp" ||
+              thread.id.startsWith("omp:") ||
+              thread.id.startsWith("omp-pending-"),
+          ) ||
+          activeThreadId.startsWith("omp:") ||
+          activeThreadId.startsWith("omp-pending-") ||
+          Object.keys(mappedTitles).some((id) => id.startsWith("omp:"));
+        const cachedOmp = ompSessionCacheRef.current[workspace.id];
+        const hasFreshOmpCache =
+          !!cachedOmp &&
+          Date.now() - cachedOmp.fetchedAt <= OMP_SESSION_CACHE_TTL_MS;
         const hasQoderSignal =
           existingThreads.some(
             (thread) =>
@@ -1916,6 +1737,23 @@ export function useThreadActions({
           );
           allSummaries = mergedFromCache;
         }
+        if (hasFreshOmpCache && cachedOmp.sessions.length > 0) {
+          // omp 无 fork/tree 派生血缘：无 pi 的 derived-hide 自愈/诊断。
+          allSummaries = mergeOmpSessionSummaries(
+            allSummaries,
+            cachedOmp.sessions.filter(
+              (session) =>
+                !threadIdInHiddenSharedBindingSet(
+                  `omp:${session.sessionId}`,
+                  hiddenSharedBindingIds,
+                ),
+            ),
+            workspace.id,
+            mappedTitles,
+            getCustomName,
+            hiddenSharedBindingIds,
+          );
+        }
         if (hasFreshQoderCache && cachedQoder.sessions.length > 0) {
           allSummaries = mergeQoderSessionSummaries(
             allSummaries,
@@ -2232,661 +2070,49 @@ export function useThreadActions({
           };
         }
 
-        const hasAttemptedGeminiRefresh =
-          geminiRefreshAttemptedRef.current[workspace.id] === true;
-        const shouldRefreshGeminiSessions =
-          isLatestThreadListRequest() &&
-          includeEngineDiskLists &&
-          (hasGeminiSignal || !!cachedGemini || !hasAttemptedGeminiRefresh);
-        if (shouldRefreshGeminiSessions) {
-          void (async () => {
-            geminiRefreshAttemptedRef.current[workspace.id] = true;
-            const geminiResult = await withTimeout(
-              listGeminiSessionsService(workspace.path, 50),
-              GEMINI_SESSION_FETCH_TIMEOUT_MS,
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            if (geminiResult === null) {
-              onDebug?.({
-                id: `${Date.now()}-client-gemini-session-timeout`,
-                timestamp: Date.now(),
-                source: "client",
-                label: "thread/list gemini timeout",
-                payload: {
-                  workspaceId: workspace.id,
-                  timeoutMs: GEMINI_SESSION_FETCH_TIMEOUT_MS,
-                },
-              });
-              return;
-            }
-            const normalizedGeminiSessions =
-              normalizeGeminiSessionSummaries(geminiResult);
-            geminiSessionCacheRef.current[workspace.id] = {
-              fetchedAt: Date.now(),
-              sessions: normalizedGeminiSessions,
-            };
-            const currentSnapshot =
-              latestThreadsByWorkspaceRef.current[workspace.id] ?? [];
-            const baselineSummaries =
-              currentSnapshot.length > 0 ? currentSnapshot : allSummaries;
-            // Gemini Shared 已退役，但仍走同一 hide 契约，避免 stale set 误注入。
-            const sharedSessionsForGeminiHide = normalizeSharedSessionSummaries(
-              (await withTimeout(
-                listSharedSessionsService(workspace.id).catch(() => []),
-                NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
-              )) ?? [],
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            // fresh ∪ outer：shared list 失败回空时不得放宽已有 hide 可见性。
-            const freshHiddenSharedBindingIds = expandHiddenSharedBindingIds([
-              ...sharedSessionsForGeminiHide.flatMap(
-                (session) => session.nativeThreadIds,
-              ),
-              ...hiddenSharedBindingIds,
-              ...getCollabWorkerNativeHideIds(),
-            ]);
-            const nextSummaries = mergeGeminiSessionSummaries(
-              baselineSummaries,
-              normalizedGeminiSessions.filter(
-                (session) =>
-                  !threadIdInHiddenSharedBindingSet(
-                    `gemini:${session.sessionId}`,
-                    freshHiddenSharedBindingIds,
-                  ),
-              ),
-              workspace.id,
-              mappedTitles,
-              getCustomName,
-              freshHiddenSharedBindingIds,
-            );
-            const visibleNextSummaries = applySessionArchiveState(
-              stripHiddenSharedBindingSummaries(
-                nextSummaries,
-                freshHiddenSharedBindingIds,
-              ),
-              await archivedSessionMapPromise,
-            );
-            const unchanged =
-              visibleNextSummaries.length === baselineSummaries.length &&
-              visibleNextSummaries.every((entry, index) => {
-                const prev = baselineSummaries[index];
-                return (
-                  !!prev &&
-                  prev.id === entry.id &&
-                  prev.name === entry.name &&
-                  prev.updatedAt === entry.updatedAt &&
-                  prev.engineSource === entry.engineSource &&
-                  prev.threadKind === entry.threadKind
-                );
-              });
-            if (!unchanged) {
-              // Input-aware batch boundary: let a pending click land before
-              // this commit, then re-verify freshness — a newer list request
-              // (or soft-cancel) during the yield must win over this apply.
-              await yieldIfInteractiveInputPending();
-              if (!isLatestThreadListRequest()) {
-                return;
-              }
-              dispatch({
-                type: "setThreads",
-                workspaceId: workspace.id,
-                threads: visibleNextSummaries,
-                unionMembership: true,
-              });
-              latestThreadsByWorkspaceRef.current = {
-                ...latestThreadsByWorkspaceRef.current,
-                [workspace.id]: visibleNextSummaries,
-              };
-            }
-          })();
-        }
-
-        const hasAttemptedKimiRefresh =
-          kimiRefreshAttemptedRef.current[workspace.id] === true;
-        const shouldRefreshKimiSessions =
-          isLatestThreadListRequest() &&
-          includeEngineDiskLists &&
-          (hasKimiSignal || !!cachedKimi || !hasAttemptedKimiRefresh);
-        const hasAttemptedGrokRefresh =
-          grokRefreshAttemptedRef.current[workspace.id] === true;
-        const shouldRefreshGrokSessions =
-          isLatestThreadListRequest() &&
-          includeEngineDiskLists &&
-          (hasGrokSignal || !!cachedGrok || !hasAttemptedGrokRefresh);
-        const hasAttemptedDshRefresh =
-          dshRefreshAttemptedRef.current[workspace.id] === true;
-        // Sidebar first-paint / Index soft re-sync never probes DSH host.
-        // Disk/host list is opt-in only (tests / Session Management).
-        const shouldRefreshDshSessions =
-          isLatestThreadListRequest() &&
-          includeEngineDiskLists &&
-          (hasDshSignal || !!cachedDsh || !hasAttemptedDshRefresh);
-        if (shouldRefreshGrokSessions) {
-          void (async () => {
-            grokRefreshAttemptedRef.current[workspace.id] = true;
-            const grokResult = await withTimeout(
-              listGrokSessionsService(workspace.path, 50),
-              GROK_SESSION_FETCH_TIMEOUT_MS,
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            if (grokResult === null) {
-              onDebug?.({
-                id: `${Date.now()}-client-grok-session-timeout`,
-                timestamp: Date.now(),
-                source: "client",
-                label: "thread/list grok timeout",
-                payload: {
-                  workspaceId: workspace.id,
-                  timeoutMs: GROK_SESSION_FETCH_TIMEOUT_MS,
-                },
-              });
-              return;
-            }
-            const normalizedGrokSessions =
-              normalizeGrokSessionSummaries(grokResult);
-            grokSessionCacheRef.current[workspace.id] = {
-              fetchedAt: Date.now(),
-              sessions: normalizedGrokSessions,
-            };
-            const currentSnapshot =
-              latestThreadsByWorkspaceRef.current[workspace.id] ?? [];
-            const baselineSummaries =
-              currentSnapshot.length > 0 ? currentSnapshot : allSummaries;
-            // 异步 refresh 时 binding 可能已 materialize；必须重建 hide set，
-            // 禁止复用 listThreads 开头的 stale 闭包（创建 Shared 时往往是空集）。
-            const sharedSessionsForRemap = normalizeSharedSessionSummaries(
-              (await withTimeout(
-                listSharedSessionsService(workspace.id).catch(() => []),
-                NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
-              )) ?? [],
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            // fresh ∪ outer：shared list 失败回空时不得放宽已有 hide 可见性。
-            const freshHiddenSharedBindingIds = expandHiddenSharedBindingIds([
-              ...sharedSessionsForRemap.flatMap((session) => session.nativeThreadIds),
-              ...hiddenSharedBindingIds,
-              ...getCollabWorkerNativeHideIds(),
-            ]);
-            const nativeOwnerToShared =
-              buildNativeOwnerToSharedThreadMap(sharedSessionsForRemap);
-            const nextSummaries = mergeGrokSessionSummaries(
-              baselineSummaries,
-              normalizedGrokSessions.filter(
-                (session) =>
-                  !threadIdInHiddenSharedBindingSet(
-                    `grok:${session.sessionId}`,
-                    freshHiddenSharedBindingIds,
-                  ),
-              ),
-              workspace.id,
-              mappedTitles,
-              getCustomName,
-              nativeOwnerToShared,
-              freshHiddenSharedBindingIds,
-            );
-            const visibleNextSummaries = applySessionArchiveState(
-              stripHiddenSharedBindingSummaries(
-                nextSummaries,
-                freshHiddenSharedBindingIds,
-              ),
-              await archivedSessionMapPromise,
-            );
-            const unchanged =
-              visibleNextSummaries.length === baselineSummaries.length &&
-              visibleNextSummaries.every((entry, index) => {
-                const prev = baselineSummaries[index];
-                return (
-                  !!prev &&
-                  prev.id === entry.id &&
-                  prev.name === entry.name &&
-                  prev.updatedAt === entry.updatedAt &&
-                  prev.engineSource === entry.engineSource &&
-                  prev.threadKind === entry.threadKind &&
-                  (prev.parentThreadId ?? null) === (entry.parentThreadId ?? null)
-                );
-              });
-            if (!unchanged) {
-              // Input-aware batch boundary: let a pending click land before
-              // this commit, then re-verify freshness — a newer list request
-              // (or soft-cancel) during the yield must win over this apply.
-              await yieldIfInteractiveInputPending();
-              if (!isLatestThreadListRequest()) {
-                return;
-              }
-              dispatch({
-                type: "setThreads",
-                workspaceId: workspace.id,
-                threads: visibleNextSummaries,
-                unionMembership: true,
-              });
-              latestThreadsByWorkspaceRef.current = {
-                ...latestThreadsByWorkspaceRef.current,
-                [workspace.id]: visibleNextSummaries,
-              };
-            }
-          })();
-        }
-        if (shouldRefreshKimiSessions) {
-          void (async () => {
-            kimiRefreshAttemptedRef.current[workspace.id] = true;
-            const kimiResult = await withTimeout(
-              listKimiSessionsService(workspace.path, 50),
-              KIMI_SESSION_FETCH_TIMEOUT_MS,
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            if (kimiResult === null) {
-              onDebug?.({
-                id: `${Date.now()}-client-kimi-session-timeout`,
-                timestamp: Date.now(),
-                source: "client",
-                label: "thread/list kimi timeout",
-                payload: {
-                  workspaceId: workspace.id,
-                  timeoutMs: KIMI_SESSION_FETCH_TIMEOUT_MS,
-                },
-              });
-              return;
-            }
-            const normalizedKimiSessions =
-              normalizeKimiSessionSummaries(kimiResult);
-            kimiSessionCacheRef.current[workspace.id] = {
-              fetchedAt: Date.now(),
-              sessions: normalizedKimiSessions,
-            };
-            const currentSnapshot =
-              latestThreadsByWorkspaceRef.current[workspace.id] ?? [];
-            const baselineSummaries =
-              currentSnapshot.length > 0 ? currentSnapshot : allSummaries;
-            // 与 Grok 同构：异步路径用 fresh hide set，避免 pending→established
-            // rebind 后仍按 list 开头的空/旧 hide set 注入 native 行。
-            const sharedSessionsForKimiHide = normalizeSharedSessionSummaries(
-              (await withTimeout(
-                listSharedSessionsService(workspace.id).catch(() => []),
-                NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
-              )) ?? [],
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            // fresh ∪ outer：shared list 失败回空时不得放宽已有 hide 可见性。
-            const freshHiddenSharedBindingIds = expandHiddenSharedBindingIds([
-              ...sharedSessionsForKimiHide.flatMap(
-                (session) => session.nativeThreadIds,
-              ),
-              ...hiddenSharedBindingIds,
-              ...getCollabWorkerNativeHideIds(),
-            ]);
-            const nativeOwnerToSharedKimi =
-              buildNativeOwnerToSharedThreadMap(sharedSessionsForKimiHide);
-            // 与 Grok 异步路径对齐：merge 后 parent-id 改挂 shared:（有 parent 才生效）
-            const nextSummaries = remapThreadParentsToSharedOwners(
-              mergeKimiSessionSummaries(
-                baselineSummaries,
-                normalizedKimiSessions.filter(
-                  (session) =>
-                    !threadIdInHiddenSharedBindingSet(
-                      `kimi:${session.sessionId}`,
-                      freshHiddenSharedBindingIds,
-                    ),
-                ),
-                workspace.id,
-                mappedTitles,
-                getCustomName,
-                freshHiddenSharedBindingIds,
-              ),
-              nativeOwnerToSharedKimi,
-            );
-            const visibleNextSummaries = applySessionArchiveState(
-              stripHiddenSharedBindingSummaries(
-                nextSummaries,
-                freshHiddenSharedBindingIds,
-              ),
-              await archivedSessionMapPromise,
-            );
-            const unchanged =
-              visibleNextSummaries.length === baselineSummaries.length &&
-              visibleNextSummaries.every((entry, index) => {
-                const prev = baselineSummaries[index];
-                return (
-                  !!prev &&
-                  prev.id === entry.id &&
-                  prev.name === entry.name &&
-                  prev.updatedAt === entry.updatedAt &&
-                  prev.engineSource === entry.engineSource &&
-                  prev.threadKind === entry.threadKind &&
-                  (prev.parentThreadId ?? null) === (entry.parentThreadId ?? null)
-                );
-              });
-            if (!unchanged) {
-              // Input-aware batch boundary: let a pending click land before
-              // this commit, then re-verify freshness — a newer list request
-              // (or soft-cancel) during the yield must win over this apply.
-              await yieldIfInteractiveInputPending();
-              if (!isLatestThreadListRequest()) {
-                return;
-              }
-              dispatch({
-                type: "setThreads",
-                workspaceId: workspace.id,
-                threads: visibleNextSummaries,
-                unionMembership: true,
-              });
-              latestThreadsByWorkspaceRef.current = {
-                ...latestThreadsByWorkspaceRef.current,
-                [workspace.id]: visibleNextSummaries,
-              };
-            }
-          })();
-        }
-        if (shouldRefreshDshSessions) {
-          void (async () => {
-            dshRefreshAttemptedRef.current[workspace.id] = true;
-            const dshResult = await withTimeout(
-              listDshSessionsService(workspace.path, 50),
-              DSH_SESSION_FETCH_TIMEOUT_MS,
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            if (dshResult === null) {
-              onDebug?.({
-                id: `${Date.now()}-client-dsh-session-timeout`,
-                timestamp: Date.now(),
-                source: "client",
-                label: "thread/list dsh timeout",
-                payload: {
-                  workspaceId: workspace.id,
-                  timeoutMs: DSH_SESSION_FETCH_TIMEOUT_MS,
-                },
-              });
-              return;
-            }
-            const normalizedDshSessions =
-              normalizeDshSessionSummaries(dshResult);
-            dshSessionCacheRef.current[workspace.id] = {
-              fetchedAt: Date.now(),
-              sessions: normalizedDshSessions,
-            };
-            const currentSnapshot =
-              latestThreadsByWorkspaceRef.current[workspace.id] ?? [];
-            const baselineSummaries =
-              currentSnapshot.length > 0 ? currentSnapshot : allSummaries;
-            const nextSummaries = mergeDshSessionSummaries(
-              baselineSummaries,
-              normalizedDshSessions.filter(
-                (session) =>
-                  !threadIdInHiddenSharedBindingSet(
-                    `dsh:${session.sessionId}`,
-                    hiddenSharedBindingIds,
-                  ),
-              ),
-              workspace.id,
-              mappedTitles,
-              getCustomName,
-              hiddenSharedBindingIds,
-            );
-            const visibleNextSummaries = applySessionArchiveState(
-              stripHiddenSharedBindingSummaries(
-                nextSummaries,
-                hiddenSharedBindingIds,
-              ),
-              await archivedSessionMapPromise,
-            );
-            const unchanged =
-              visibleNextSummaries.length === baselineSummaries.length &&
-              visibleNextSummaries.every((entry, index) => {
-                const prev = baselineSummaries[index];
-                return (
-                  !!prev &&
-                  prev.id === entry.id &&
-                  prev.name === entry.name &&
-                  prev.updatedAt === entry.updatedAt &&
-                  prev.engineSource === entry.engineSource &&
-                  prev.threadKind === entry.threadKind
-                );
-              });
-            if (!unchanged) {
-              await yieldIfInteractiveInputPending();
-              if (!isLatestThreadListRequest()) {
-                return;
-              }
-              dispatch({
-                type: "setThreads",
-                workspaceId: workspace.id,
-                threads: visibleNextSummaries,
-                unionMembership: true,
-              });
-              latestThreadsByWorkspaceRef.current = {
-                ...latestThreadsByWorkspaceRef.current,
-                [workspace.id]: visibleNextSummaries,
-              };
-            }
-          })();
-        }
-        const hasAttemptedPiRefresh =
-          piRefreshAttemptedRef.current[workspace.id] === true;
-        // Same as DSH: first-paint never probes PI disk. Index is the read layer.
-        const shouldRefreshPiSessions =
-          isLatestThreadListRequest() &&
-          includePiDiskList &&
-          (hasPiSignal || !!cachedPi || !hasAttemptedPiRefresh);
-        if (shouldRefreshPiSessions) {
-          void (async () => {
-            piRefreshAttemptedRef.current[workspace.id] = true;
-            const piResult = await withTimeout(
-              listPiSessionsService(workspace.path, 50),
-              PI_SESSION_FETCH_TIMEOUT_MS,
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            if (piResult === null) {
-              onDebug?.({
-                id: `${Date.now()}-client-pi-session-timeout`,
-                timestamp: Date.now(),
-                source: "client",
-                label: "thread/list pi timeout",
-                payload: {
-                  workspaceId: workspace.id,
-                  timeoutMs: PI_SESSION_FETCH_TIMEOUT_MS,
-                },
-              });
-              return;
-            }
-            const normalizedPiSessions = normalizePiSessionSummaries(piResult);
-            // 自愈：磁盘 list 是 pi 血缘权威——无 parentSession 的主线立即放归。
-            reconcilePiDerivedHideWithAuthoritativeRows(normalizedPiSessions);
-            piSessionCacheRef.current[workspace.id] = {
-              fetchedAt: Date.now(),
-              sessions: normalizedPiSessions,
-            };
-            const currentSnapshot =
-              latestThreadsByWorkspaceRef.current[workspace.id] ?? [];
-            const baselineSummaries =
-              currentSnapshot.length > 0 ? currentSnapshot : allSummaries;
-            const sharedSessionsForPiHide = normalizeSharedSessionSummaries(
-              (await withTimeout(
-                listSharedSessionsService(workspace.id).catch(() => []),
-                NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
-              )) ?? [],
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            const freshHiddenSharedBindingIds = expandHiddenSharedBindingIds([
-              ...sharedSessionsForPiHide.flatMap(
-                (session) => session.nativeThreadIds,
-              ),
-              ...hiddenSharedBindingIds,
-              ...getCollabWorkerNativeHideIds(),
-            ]);
-            const nextSummaries = mergePiSessionSummaries(
-              baselineSummaries,
-              normalizedPiSessions.filter(
-                (session) =>
-                  !threadIdInHiddenSharedBindingSet(
-                    `pi:${session.sessionId}`,
-                    freshHiddenSharedBindingIds,
-                  ),
-              ),
-              workspace.id,
-              mappedTitles,
-              getCustomName,
-              freshHiddenSharedBindingIds,
-            );
-            debugPiSummaryLayerDrops(
-              "pi-disk-list-merge",
-              normalizedPiSessions,
-              new Set(nextSummaries.map((summary) => summary.id)),
-            );
-            const visibleNextSummaries = applySessionArchiveState(
-              stripHiddenSharedBindingSummaries(
-                nextSummaries,
-                freshHiddenSharedBindingIds,
-              ),
-              await archivedSessionMapPromise,
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            dispatch({
-              type: "setThreads",
-              workspaceId: workspace.id,
-              threads: visibleNextSummaries,
-              unionMembership: true,
-            });
-            latestThreadsByWorkspaceRef.current = {
-              ...latestThreadsByWorkspaceRef.current,
-              [workspace.id]: visibleNextSummaries,
-            };
-          })();
-        }
-        const hasAttemptedQoderRefresh =
-          qoderRefreshAttemptedRef.current[workspace.id] === true;
-        const shouldRefreshQoderSessions =
-          isLatestThreadListRequest() &&
-          includeEngineDiskLists &&
-          (hasQoderSignal || !!cachedQoder || !hasAttemptedQoderRefresh);
-        if (shouldRefreshQoderSessions) {
-          void (async () => {
-            qoderRefreshAttemptedRef.current[workspace.id] = true;
-            const qoderResults = await withTimeout(
-              Promise.all([
-                listQoderSessionsService(
-                  workspace.path,
-                  50,
-                  QODER_GLOBAL_PROVIDER_PROFILE_ID,
-                ),
-                listQoderSessionsService(
-                  workspace.path,
-                  50,
-                  QODER_CN_PROVIDER_PROFILE_ID,
-                ),
-              ]),
-              QODER_SESSION_FETCH_TIMEOUT_MS,
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            if (qoderResults === null) {
-              onDebug?.({
-                id: `${Date.now()}-client-qoder-session-timeout`,
-                timestamp: Date.now(),
-                source: "client",
-                label: "thread/list qoder timeout",
-                payload: {
-                  workspaceId: workspace.id,
-                  timeoutMs: QODER_SESSION_FETCH_TIMEOUT_MS,
-                },
-              });
-              return;
-            }
-            const normalizedQoderSessions = [
-              ...normalizeQoderSessionSummaries(
-                qoderResults[0],
-                QODER_GLOBAL_PROVIDER_PROFILE_ID,
-              ),
-              ...normalizeQoderSessionSummaries(
-                qoderResults[1],
-                QODER_CN_PROVIDER_PROFILE_ID,
-              ),
-            ];
-            qoderSessionCacheRef.current[workspace.id] = {
-              fetchedAt: Date.now(),
-              sessions: normalizedQoderSessions,
-            };
-            const currentSnapshot =
-              latestThreadsByWorkspaceRef.current[workspace.id] ?? [];
-            const baselineSummaries =
-              currentSnapshot.length > 0 ? currentSnapshot : allSummaries;
-            const sharedSessionsForQoderHide = normalizeSharedSessionSummaries(
-              (await withTimeout(
-                listSharedSessionsService(workspace.id).catch(() => []),
-                NATIVE_SESSION_LIST_FETCH_TIMEOUT_MS,
-              )) ?? [],
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            const freshHiddenSharedBindingIds = expandHiddenSharedBindingIds([
-              ...sharedSessionsForQoderHide.flatMap(
-                (session) => session.nativeThreadIds,
-              ),
-              ...hiddenSharedBindingIds,
-              ...getCollabWorkerNativeHideIds(),
-            ]);
-            const nextSummaries = mergeQoderSessionSummaries(
-              baselineSummaries,
-              normalizedQoderSessions.filter((session) => {
-                const threadId = canonicalQoderThreadId(
-                  session.sessionId,
-                  session.providerProfileId,
-                );
-                return (
-                  !!threadId &&
-                  !threadIdInHiddenSharedBindingSet(
-                    threadId,
-                    freshHiddenSharedBindingIds,
-                  )
-                );
-              }),
-              workspace.id,
-              mappedTitles,
-              getCustomName,
-              freshHiddenSharedBindingIds,
-            );
-            const visibleNextSummaries = applySessionArchiveState(
-              stripHiddenSharedBindingSummaries(
-                nextSummaries,
-                freshHiddenSharedBindingIds,
-              ),
-              await archivedSessionMapPromise,
-            );
-            if (!isLatestThreadListRequest()) {
-              return;
-            }
-            dispatch({
-              type: "setThreads",
-              workspaceId: workspace.id,
-              threads: visibleNextSummaries,
-              unionMembership: true,
-            });
-            latestThreadsByWorkspaceRef.current = {
-              ...latestThreadsByWorkspaceRef.current,
-              [workspace.id]: visibleNextSummaries,
-            };
-          })();
-        }
+        scheduleEngineAsyncSessionMerges({
+          workspace,
+          dispatch,
+          getCustomName,
+          onDebug,
+          isLatestThreadListRequest,
+          mappedTitles,
+          allSummaries,
+          hiddenSharedBindingIds,
+          latestThreadsByWorkspaceRef,
+          archivedSessionMapPromise,
+          includeEngineDiskLists,
+          includePiDiskList,
+          includeOmpDiskList,
+          hasGeminiSignal,
+          hasKimiSignal,
+          hasPiSignal,
+          hasOmpSignal,
+          hasQoderSignal,
+          hasGrokSignal,
+          hasDshSignal,
+          cachedGemini,
+          cachedKimi,
+          cachedPi,
+          cachedOmp,
+          cachedQoder,
+          cachedGrok,
+          cachedDsh,
+          geminiSessionCacheRef,
+          kimiSessionCacheRef,
+          piSessionCacheRef,
+          ompSessionCacheRef,
+          qoderSessionCacheRef,
+          grokSessionCacheRef,
+          dshSessionCacheRef,
+          geminiRefreshAttemptedRef,
+          kimiRefreshAttemptedRef,
+          piRefreshAttemptedRef,
+          ompRefreshAttemptedRef,
+          qoderRefreshAttemptedRef,
+          grokRefreshAttemptedRef,
+          dshRefreshAttemptedRef,
+        });
       } catch (error) {
         const fallbackThreads = filterRetainableContinuitySummaries(
           getLastGoodThreadSummaries(workspace.id),

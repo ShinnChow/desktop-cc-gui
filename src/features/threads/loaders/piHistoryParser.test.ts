@@ -46,6 +46,43 @@ describe("parsePiHistoryMessages", () => {
     );
   });
 
+  it("parses omp history rows identically to pi (shared pi-family parser)", () => {
+    // omp 复用 parsePiHistoryMessages（ompHistoryLoader → createPiFamilyHistoryLoader）：
+    // 同一 fixture 仅 id 前缀不同，产出 items 必须逐条同构。
+    const piItems = parsePiHistoryMessages([
+      { id: "user-1", kind: "message", role: "user", text: "hello" },
+      { id: "agent-1", kind: "message", role: "assistant", text: "hi" },
+      {
+        id: "tool-1",
+        kind: "tool",
+        toolType: "bash",
+        toolInput: { command: "ls" },
+        toolOutput: "ok",
+      },
+      { id: "thinking-1", kind: "thinking", text: "hmm" },
+    ]);
+    const ompItems = parsePiHistoryMessages([
+      { id: "user-1", kind: "message", role: "user", text: "hello" },
+      { id: "agent-1", kind: "message", role: "assistant", text: "hi" },
+      {
+        id: "tool-1",
+        kind: "tool",
+        toolType: "bash",
+        toolInput: { command: "ls" },
+        toolOutput: "ok",
+      },
+      { id: "thinking-1", kind: "thinking", text: "hmm" },
+    ]);
+
+    expect(ompItems).toEqual(piItems);
+    expect(ompItems.map((item) => item.kind)).toEqual([
+      "message",
+      "message",
+      "tool",
+      "reasoning",
+    ]);
+  });
+
   it("maps tool entries to command execution items", () => {
     const items = parsePiHistoryMessages([
       {

@@ -7,22 +7,14 @@ import {
   deleteKimiProvider,
   switchKimiProvider,
 } from "../../../services/tauri";
-import {
-  useVendorProviderManagement,
-  type VendorProviderDialogState,
-  type VendorProviderDeleteConfirmState,
-  type VendorProviderLoadOptions,
-  type VendorProviderManagementAdapter,
-} from "./useVendorProviderManagement";
+import { useVendorProviderManagement, type VendorProviderManagementAdapter } from "./useVendorProviderManagement";
 
 /** List load options. `silent` skips list-level loading UI (switch / external events). */
-export type KimiProviderLoadOptions = VendorProviderLoadOptions;
 
-export type KimiProviderDialogState =
-  VendorProviderDialogState<KimiProviderConfig>;
 
-export type DeleteKimiConfirmState =
-  VendorProviderDeleteConfirmState<KimiProviderConfig>;
+
+
+
 
 const KIMI_ADAPTER: VendorProviderManagementAdapter<
   KimiProviderConfig,
@@ -69,6 +61,4 @@ export function useKimiProviderManagement() {
   };
 }
 
-export type UseKimiProviderManagementReturn = ReturnType<
-  typeof useKimiProviderManagement
->;
+

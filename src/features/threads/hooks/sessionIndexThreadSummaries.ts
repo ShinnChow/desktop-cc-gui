@@ -19,7 +19,7 @@ import {
 } from "../utils/qoderSessionIdentity";
 
 const GENERIC_EMPTY_SESSION_TITLE =
-  /^(?:(?:claude|codex|gemini|grok|kimi|pi|qoder|opencode|dsh) session(?:\s+[a-f0-9-]{4,40})?|deepseek harness session)$/i;
+  /^(?:(?:claude|codex|gemini|grok|kimi|pi|omp|qoder|opencode|dsh) session(?:\s+[a-f0-9-]{4,40})?|deepseek harness session)$/i;
 
 const PLACEHOLDER_DRAFT_ENGINES = new Set([
   "claude",
@@ -28,6 +28,7 @@ const PLACEHOLDER_DRAFT_ENGINES = new Set([
   "grok",
   "kimi",
   "pi",
+  "omp",
   "qoder",
   "opencode",
   "dsh",
@@ -64,11 +65,7 @@ export function shouldHidePlaceholderNativeDraftFromSidebar(params: {
   return isWeakSessionDisplayTitle(params.displayName);
 }
 
-export function isEmptyClaudeIndexFallbackTitle(
-  value: string | null | undefined,
-): boolean {
-  return isEmptyNativeIndexFallbackTitle(value);
-}
+
 
 function isEmptyNativeIndexFallbackSummary(summary: {
   engineSource?: ThreadSummary["engineSource"];
@@ -111,6 +108,7 @@ function normalizeEngine(
     value === "grok" ||
     value === "kimi" ||
     value === "pi" ||
+    value === "omp" ||
     value === "qoder" ||
     value === "opencode" ||
     value === "dsh"
@@ -191,6 +189,8 @@ export function sessionIndexRowsToThreadSummaries(
                 ? "Grok Session"
                 : engine === "pi"
                   ? "PI Session"
+                  : engine === "omp"
+                  ? "OMP Session"
                   : engine === "qoder"
                     ? "Qoder Session"
                     : engine === "dsh"
@@ -343,18 +343,7 @@ export function stripEmptyClaudeIndexFallbackSummaries(
   return changed ? next : summaries;
 }
 
-export function filterSessionIndexRowsByEngine(
-  rows: SessionIndexRow[],
-  engine: string,
-): SessionIndexRow[] {
-  const wanted = engine.trim().toLowerCase();
-  if (!wanted) {
-    return [];
-  }
-  return rows.filter(
-    (row) => String(row.engine ?? "").trim().toLowerCase() === wanted,
-  );
-}
+
 
 function summaryEngineKey(summary: ThreadSummary): string {
   const id = String(summary.id ?? "").trim();

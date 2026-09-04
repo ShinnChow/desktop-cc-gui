@@ -1,7 +1,6 @@
 export {
   fileReferenceProvider,
   fileToDropdownItem,
-  resetFileReferenceState,
 } from './fileReferenceProvider';
 
 export {
@@ -14,7 +13,6 @@ export {
   agentToDropdownItem,
   /** @deprecated No-op – kept for backward compatibility */
   setupAgentsCallback,
-  resetAgentsState,
   forceRefreshAgents,
 } from './agentProvider';
 
@@ -25,4 +23,4 @@ export {
   promptToDropdownItem,
 } from './promptProvider';
 
-export type { PromptItem } from './promptProvider';
+

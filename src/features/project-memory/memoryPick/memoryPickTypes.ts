@@ -84,7 +84,7 @@ export type MemoryPickGateUiState = {
 export const PICK_CANDIDATE_LIMIT = 25;
 export const ALWAYS_TOP_K = 3;
 /** @deprecated 历史合同 1s；实际 list 预算见 PICK_LIST_TIMEOUT_MS */
-export const PICK_RETRIEVE_TIMEOUT_MS = 1000;
+
 /**
  * Pick / 统一检索核 list 总预算（ms）。
  * 原 1000 对大库易假超时，与 memoryPickRetrieval 现网对齐为 4s。

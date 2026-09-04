@@ -559,7 +559,7 @@ pub(crate) fn invalidate_source_freshness(
 }
 
 pub(crate) const INDEX_LIST_ENGINES: &[&str] = &[
-    "claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "dsh", "qoder",
+    "claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "omp", "dsh", "qoder",
 ];
 
 /// 侧栏分页过滤（for_sidebar=true 时启用）：pi fork 派生行（parent_session_id
@@ -1237,13 +1237,14 @@ pub(crate) fn delete_engine_session_rows(
 }
 
 pub(crate) fn strip_known_engine_prefix(id: &str) -> &str {
-    const PREFIXES: [&str; 8] = [
+    const PREFIXES: [&str; 9] = [
         "codex:",
         "claude:",
         "kimi:",
         "grok:",
         "opencode:",
         "pi:",
+        "omp:",
         "gemini:",
         "dsh:",
     ];
@@ -2116,7 +2117,7 @@ mod tests {
         let writers = include_str!("writers.rs");
         let commands = include_str!("commands.rs");
         let required = [
-            "claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "dsh", "qoder",
+            "claude", "codex", "gemini", "grok", "kimi", "opencode", "pi", "omp", "dsh", "qoder",
         ];
         let engine_table = store
             .split("const INDEX_LIST_ENGINES")
@@ -2149,6 +2150,7 @@ mod tests {
             "list_gemini_sessions",
             "list_grok_sessions",
             "list_pi_sessions",
+            "list_omp_sessions",
             "list_dsh_sessions",
         ] {
             assert!(commands.contains(command), "commands.rs missing {command}");

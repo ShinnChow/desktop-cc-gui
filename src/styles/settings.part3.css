@@ -134,7 +134,9 @@
       "help";
   }
 
-  .settings-section-basic .settings-field.settings-basic-item.settings-scale-item {
+  .settings-section-basic .settings-field.settings-basic-item.settings-scale-item,
+.settings-section-basic .settings-shortcut-cards,
+.settings-section-basic .settings-color-config-card {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -142,7 +144,9 @@
     flex-wrap: wrap;
   }
 
-  .settings-section-basic .settings-basic-theme-selector {
+  .settings-section-basic .settings-basic-theme-selector,
+.settings-section-basic .settings-basic-language-selector,
+.settings-section-basic .settings-color-custom-row {
     justify-content: flex-start;
     flex-wrap: wrap;
   }
@@ -151,36 +155,15 @@
     justify-content: flex-start;
   }
 
-  .settings-section-basic .settings-basic-theme-preset-select-wrap {
+  .settings-section-basic .settings-basic-theme-preset-select-wrap,
+.settings-section-basic .settings-basic-theme-preset-select {
     width: 100%;
-  }
-
-  .settings-section-basic .settings-basic-theme-preset-select {
-    width: 100%;
-  }
-
-  .settings-section-basic .settings-basic-language-selector {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .settings-section-basic .settings-shortcut-cards {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .settings-section-basic .settings-color-config-card {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .settings-section-basic .settings-color-preset-grid,
   .settings-section-basic .settings-color-custom-row,
   .settings-section-basic .settings-color-hint {
     grid-column: 1;
-  }
-
-  .settings-section-basic .settings-color-custom-row {
-    justify-content: flex-start;
-    flex-wrap: wrap;
   }
 }
 

@@ -48,7 +48,8 @@
   gap: 8px;
 }
 
-.settings-about-wechat-label {
+.settings-about-wechat-label,
+.settings-shortcut-card-desc {
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -137,11 +138,6 @@
   font-weight: 600;
   color: var(--text-strong);
   margin-bottom: 4px;
-}
-
-.settings-shortcut-card-desc {
-  font-size: 12px;
-  color: var(--text-muted);
 }
 
 /* Placeholder / Coming Soon */
@@ -287,7 +283,8 @@
   background: var(--surface-card);
 }
 
-.settings-email-card .settings-card-switch-meta {
+.settings-email-card .settings-card-switch-meta,
+.settings-mail-session-main {
   min-width: 0;
 }
 
@@ -374,10 +371,6 @@
   padding-right: 4px;
 }
 
-.settings-mail-session-main {
-  min-width: 0;
-}
-
 .settings-mail-session-main strong,
 .settings-mail-session-main .settings-help {
   overflow-wrap: anywhere;
@@ -401,11 +394,8 @@
 }
 
 @media (max-width: 760px) {
-  .settings-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-mail-session-row {
+  .settings-form-grid,
+.settings-mail-session-row {
     grid-template-columns: 1fr;
   }
 
@@ -493,7 +483,9 @@
 }
 
 .settings-prompt-search-row .settings-input,
-.settings-prompt-search-row input {
+.settings-prompt-search-row input,
+.settings-select-wrap,
+.settings-select-wrap .settings-select {
   width: 100%;
 }
 
@@ -646,7 +638,11 @@
     margin-left: 0;
   }
 
-  .settings-sidebar .settings-nav-label {
+  .settings-sidebar .settings-nav-label,
+.settings-shortcuts-layout[data-mobile-pane="list"]
+    .settings-shortcuts-detail,
+.settings-shortcuts-layout[data-mobile-pane="detail"]
+    .settings-shortcuts-list {
     display: none;
   }
 }
@@ -678,11 +674,10 @@
 }
 
 .settings-content.settings-content--providers
-  > [data-slot="scroll-area-scrollbar"] {
-  display: none !important;
-}
-
-.settings-content.settings-content--providers > [data-slot="scroll-area-corner"] {
+  > [data-slot="scroll-area-scrollbar"],
+.settings-content.settings-content--providers > [data-slot="scroll-area-corner"],
+.settings-content
+  > [data-slot="scroll-area-scrollbar"][data-orientation="horizontal"] {
   display: none !important;
 }
 
@@ -696,13 +691,6 @@
    * their own overflow box (see the wrapper pin below). Clipping x here also
    * guarantees no native horizontal scrollbar can appear. */
   overflow-x: hidden !important;
-}
-
-.settings-content
-  > [data-slot="scroll-area-scrollbar"][data-orientation="horizontal"] {
-  /* Horizontal scrolling is disabled on the page viewport, so the overlay
-   * indicator would be dead weight. */
-  display: none !important;
 }
 
 .settings-content
@@ -854,7 +842,8 @@
   gap: 8px;
 }
 
-.settings-basic-field-icon {
+.settings-basic-field-icon,
+.settings-color-config-icon {
   width: 16px;
   height: 16px;
   color: var(--text-strong);
@@ -1267,7 +1256,8 @@
 }
 
 /* Already on default: reset is a no-op, so fade it out. */
-.settings-shortcuts-detail-reset:disabled {
+.settings-shortcuts-detail-reset:disabled,
+.settings-shortcuts-reset-all:disabled {
   opacity: 0.55;
   cursor: default;
 }
@@ -1304,11 +1294,6 @@
   color: var(--settings-basic-text);
 }
 
-.settings-shortcuts-reset-all:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
 /*
  * Master–detail under 900px: show list OR detail, never both stacked.
  * data-mobile-pane is set by ShortcutsSection; desktop ignores it.
@@ -1318,16 +1303,6 @@
     grid-template-columns: 1fr;
     min-height: 0;
     height: 100%;
-  }
-
-  .settings-shortcuts-layout[data-mobile-pane="list"]
-    .settings-shortcuts-detail {
-    display: none;
-  }
-
-  .settings-shortcuts-layout[data-mobile-pane="detail"]
-    .settings-shortcuts-list {
-    display: none;
   }
 
   .settings-shortcuts-layout[data-mobile-pane="detail"]
@@ -1441,14 +1416,6 @@
   width: min(220px, 100%);
 }
 
-.settings-select-wrap {
-  width: 100%;
-}
-
-.settings-select-wrap .settings-select {
-  width: 100%;
-}
-
 .settings-color-config-card {
   margin-bottom: 12px;
   padding: 14px 16px;
@@ -1462,12 +1429,6 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
-}
-
-.settings-color-config-icon {
-  width: 16px;
-  height: 16px;
-  color: var(--text-strong);
 }
 
 .settings-color-config-title {

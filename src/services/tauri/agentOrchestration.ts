@@ -48,25 +48,7 @@ export async function sharedAgentListAll(
   return invoke("shared_agent_list_all", { workspaceId, threadId });
 }
 
-export async function sharedAgentRecordPlan(
-  workspaceId: string,
-  threadId: string,
-  runId: string,
-  attemptId: string,
-): Promise<
-  | AgentProjectionV1
-  | {
-      projection: AgentProjectionV1;
-      stageAttempt?: AgentPreparedAttempt | null;
-    }
-> {
-  return invoke("shared_agent_record_plan", {
-    workspaceId,
-    threadId,
-    runId,
-    attemptId,
-  });
-}
+
 
 export async function sharedAgentApprove(
   workspaceId: string,
@@ -107,19 +89,7 @@ export async function sharedAgentRecordExecute(
   });
 }
 
-export async function sharedAgentRecordReview(
-  workspaceId: string,
-  threadId: string,
-  runId: string,
-  attemptId: string,
-): Promise<AgentProjectionV1> {
-  return invoke("shared_agent_record_review", {
-    workspaceId,
-    threadId,
-    runId,
-    attemptId,
-  });
-}
+
 
 export async function sharedAgentCancel(
   workspaceId: string,

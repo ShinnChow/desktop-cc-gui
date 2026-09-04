@@ -374,7 +374,7 @@ export function useThreadActionsSessionRuntime({
       workspaceId: string,
       options?: {
         activate?: boolean;
-        engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+        engine?: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
         folderId?: string | null;
         autoSession?: AutoSessionMetadata | null;
         providerProfileId?: string | null;
@@ -435,6 +435,7 @@ export function useThreadActionsSessionRuntime({
         engine === "kimi" ||
         engine === "opencode" ||
         engine === "pi" ||
+        engine === "omp" ||
         engine === "qoder" ||
         engine === "dsh"
       ) {

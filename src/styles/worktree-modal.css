@@ -338,7 +338,8 @@
   color: color-mix(in srgb, var(--text-faint), #ffffff 6%);
 }
 
-.worktree-modal-hint {
+.worktree-modal-hint,
+.worktree-modal-actions-hint {
   font-size: 12px;
   line-height: 1.35;
   color: var(--text-subtle);
@@ -924,12 +925,6 @@
   line-height: 1.35;
   color: var(--text-strong);
   overflow-wrap: anywhere;
-}
-
-.worktree-modal-actions-hint {
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--text-subtle);
 }
 
 .worktree-modal-actions {

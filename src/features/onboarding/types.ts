@@ -52,6 +52,7 @@ export const FIRST_RUN_PRIMARY_ENGINES: readonly CliInstallEngine[] = [
 export const FIRST_RUN_MORE_ENGINES: readonly CliInstallEngine[] = [
   "grok",
   "pi",
+  "omp",
   "qoder",
 ];
 

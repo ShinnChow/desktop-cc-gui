@@ -46,30 +46,9 @@ export function setNotificationActionHandler(
   actionHandler = handler;
 }
 
-export function getCachedSystemNotificationPermissionState() {
-  return lastPermissionState;
-}
 
-export async function getSystemNotificationPermissionState(): Promise<SystemNotificationPermissionState> {
-  if (!isTauri()) {
-    lastPermissionState = { status: "unsupported", canSend: false };
-    return lastPermissionState;
-  }
-  try {
-    const state = await invoke<SystemNotificationPermissionState>(
-      "system_notification_permission_state",
-    );
-    lastPermissionState = state;
-    return state;
-  } catch (error) {
-    lastPermissionState = {
-      status: "error",
-      canSend: false,
-    };
-    console.warn("[systemNotification] permission_state failed", error);
-    return lastPermissionState;
-  }
-}
+
+
 
 /**
  * Request OS notification authorization when needed.

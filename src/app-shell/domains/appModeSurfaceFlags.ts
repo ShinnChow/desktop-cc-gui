@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+
 import type { AppMode } from "../../types";
 
 /**
@@ -21,6 +21,4 @@ export function resolveAppModeSurfaceFlags(appMode: AppMode) {
   };
 }
 
-export function useAppModeSurfaceFlags(appMode: AppMode) {
-  return useMemo(() => resolveAppModeSurfaceFlags(appMode), [appMode]);
-}
+

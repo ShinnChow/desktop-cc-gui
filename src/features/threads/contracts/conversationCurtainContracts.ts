@@ -13,6 +13,7 @@ export type ConversationEngine =
   | "kimi"
   | "opencode"
   | "pi"
+  | "omp"
   | "dsh"
   | "qoder";
 

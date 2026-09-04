@@ -184,7 +184,7 @@ export type TurnReconciliationStatusSource =
 
 export type TurnReconciliationStatusRequest = {
   workspaceId: string;
-  engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+  engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   threadId: string;
   turnId: string | null;
   runtimeSessionId: string | null;
@@ -195,7 +195,7 @@ export type TurnReconciliationStatusRequest = {
 
 export type TurnReconciliationStatusResponse = {
   workspaceId: string;
-  engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "dsh" | "qoder";
+  engine: "claude" | "codex" | "gemini" | "grok" | "kimi" | "opencode" | "pi" | "omp" | "dsh" | "qoder";
   threadId: string;
   turnId: string | null;
   runtimeSessionId: string | null;

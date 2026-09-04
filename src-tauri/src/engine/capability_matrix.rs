@@ -21,24 +21,14 @@ pub const CAPABILITY_KEYS: [&str; 15] = [
 ];
 
 pub fn capability_state(engine_type: EngineType, capability: &str) -> &'static str {
-    let features = match engine_type {
-        EngineType::Claude => EngineFeatures::claude(),
-        EngineType::Codex => EngineFeatures::codex(),
-        EngineType::Gemini => EngineFeatures::gemini(),
-        EngineType::Grok => EngineFeatures::grok(),
-        EngineType::OpenCode => EngineFeatures::opencode(),
-        EngineType::Kimi => EngineFeatures::kimi(),
-        EngineType::Pi => EngineFeatures::pi(),
-        EngineType::Dsh => EngineFeatures::dsh(),
-        EngineType::Qoder => EngineFeatures::qoder(),
-    };
+    let features = engine_type.features();
 
     match capability {
         "streaming.text" => bool_state(features.streaming),
         "streaming.reasoning" => bool_state(features.streaming),
         // PI has tool start/end cards but does not stream tool_execution_update.
         "streaming.tool-output" => {
-            if matches!(engine_type, EngineType::Pi) {
+            if engine_type.is_pi_family() {
                 "unsupported"
             } else {
                 bool_state(features.streaming && features.tools_control)
@@ -201,6 +191,7 @@ mod tests {
             EngineType::OpenCode,
             EngineType::Kimi,
             EngineType::Pi,
+            EngineType::Omp,
             EngineType::Dsh,
             EngineType::Qoder,
         ] {

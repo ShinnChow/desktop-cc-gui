@@ -85,8 +85,4 @@ export async function projectMemoryEmbedIndexDelete(
   });
 }
 
-export async function projectMemoryEmbedIndexClear(
-  workspaceId: string,
-): Promise<void> {
-  return invoke("project_memory_embed_index_clear", { workspaceId });
-}
+

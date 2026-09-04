@@ -97,6 +97,4 @@ export function useGitSurfaceRepositoryActionsHost({
   };
 }
 
-export type GitSurfaceRepositoryActionsHost = ReturnType<
-  typeof useGitSurfaceRepositoryActionsHost
->;
+

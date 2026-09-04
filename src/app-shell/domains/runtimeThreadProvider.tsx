@@ -73,15 +73,7 @@ export function RuntimeThreadProvider(props: {
   );
 }
 
-export function useRuntimeThreadContext(): RuntimeThreadProviderValue {
-  const value = useContext(RuntimeThreadContext);
-  if (!value) {
-    throw new Error(
-      "useRuntimeThreadContext must be used within RuntimeThreadProvider",
-    );
-  }
-  return value;
-}
+
 
 /** Provider 外返回 null（单测 / 非 shell 边界兼容）。 */
 export function useOptionalRuntimeThreadContext(): RuntimeThreadProviderValue | null {

@@ -495,8 +495,7 @@ export function createClientUiVisibilityQueries(
   };
 }
 
-export const DEFAULT_CLIENT_UI_VISIBILITY_QUERIES =
-  createClientUiVisibilityQueries(DEFAULT_CLIENT_UI_VISIBILITY_PREFERENCE);
+
 
 export function getClientUiControlDefinition(
   controlId: ClientUiControlId,

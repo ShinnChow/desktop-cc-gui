@@ -24,7 +24,9 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
 }
 
-.built-in-agent-catalog {
+.built-in-agent-catalog,
+.built-in-agent-results,
+.built-in-agent-card .settings-agent-card-main {
   min-width: 0;
 }
 
@@ -166,10 +168,6 @@
   background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
 }
 
-.built-in-agent-results {
-  min-width: 0;
-}
-
 .built-in-agent-result-count {
   margin-bottom: 8px;
 }
@@ -178,10 +176,6 @@
   gap: 16px;
   content-visibility: auto;
   contain-intrinsic-size: auto 74px;
-}
-
-.built-in-agent-card .settings-agent-card-main {
-  min-width: 0;
 }
 
 .built-in-agent-card .settings-agent-card-actions {

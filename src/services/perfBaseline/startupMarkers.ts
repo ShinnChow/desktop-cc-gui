@@ -88,14 +88,7 @@ export function recordStartupPerfMarker(name: StartupPerfMarkerName) {
   return marker;
 }
 
-export function getStartupPerfSnapshotForTests() {
-  return {
-    schemaVersion: PERF_BASELINE_SCHEMA_VERSION,
-    source: "startup-perf-markers" as const,
-    markers: startupPerfMarkers.slice(),
-    platform: getPlatformLabel(),
-  };
-}
+
 
 export function resetStartupPerfMarkersForTests() {
   startupPerfMarkers.length = 0;

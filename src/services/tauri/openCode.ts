@@ -84,7 +84,7 @@ export function isOpenCodeCliUnavailableError(error: unknown): boolean {
 }
 
 /** @deprecated Use {@link isOpenCodeCliUnavailableError}. */
-export const isOpenCodeSessionListUnavailableError = isOpenCodeCliUnavailableError;
+
 
 export type GetOpenCodeSessionListOptions = {
   /**
@@ -210,17 +210,7 @@ export async function getOpenCodeProviderHealth(workspaceId: string, provider?: 
   });
 }
 
-export async function getOpenCodeProviderCatalog(workspaceId: string) {
-  return invoke<
-    Array<{
-      id: string;
-      label: string;
-      description?: string | null;
-      category: "popular" | "other";
-      recommended: boolean;
-    }>
-  >("opencode_provider_catalog", { workspaceId });
-}
+
 
 export async function connectOpenCodeProvider(workspaceId: string, providerId?: string | null) {
   return invoke<{
@@ -470,15 +460,9 @@ export type LspPosition = {
   character: number;
 };
 
-export type LspRange = {
-  start: LspPosition;
-  end: LspPosition;
-};
 
-export type LspLocation = {
-  uri: string;
-  range: LspRange;
-};
+
+
 
 export async function getOpenCodeLspDefinition(
   workspaceId: string,

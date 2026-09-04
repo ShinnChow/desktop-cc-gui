@@ -152,7 +152,8 @@
   color: var(--intent-canvas-muted);
 }
 
-.intent-canvas-manager-hero .intent-canvas-manager-actions button.is-icon svg {
+.intent-canvas-manager-hero .intent-canvas-manager-actions button.is-icon svg,
+.intent-canvas-attachment-remove svg {
   width: 15px;
   height: 15px;
 }
@@ -173,7 +174,8 @@
   box-shadow: none;
 }
 
-.intent-canvas-manager-hero .intent-canvas-manager-actions button.is-primary svg {
+.intent-canvas-manager-hero .intent-canvas-manager-actions button.is-primary svg,
+.intent-canvas-rail-toggle svg {
   width: 14px;
   height: 14px;
 }
@@ -357,7 +359,14 @@
   opacity: 0.72;
 }
 
-.intent-canvas-era.is-stale .intent-canvas-home-card:hover {
+.intent-canvas-era.is-stale .intent-canvas-home-card:hover,
+.intent-canvas-home-card:hover .intent-canvas-home-card-selection,
+.intent-canvas-home-card:focus-within .intent-canvas-home-card-selection,
+.intent-canvas-home-card.is-selected .intent-canvas-home-card-selection,
+.intent-canvas-home-card:has(.intent-canvas-action-popover-shell) .intent-canvas-home-card-selection,
+.intent-canvas-home-card:hover .intent-canvas-card-actions,
+.intent-canvas-home-card:focus-within .intent-canvas-card-actions,
+.intent-canvas-home-card:has(.intent-canvas-action-popover-shell) .intent-canvas-card-actions {
   opacity: 1;
 }
 
@@ -404,13 +413,6 @@
   opacity: 0;
   cursor: pointer;
   transition: opacity 120ms ease;
-}
-
-.intent-canvas-home-card:hover .intent-canvas-home-card-selection,
-.intent-canvas-home-card:focus-within .intent-canvas-home-card-selection,
-.intent-canvas-home-card.is-selected .intent-canvas-home-card-selection,
-.intent-canvas-home-card:has(.intent-canvas-action-popover-shell) .intent-canvas-home-card-selection {
-  opacity: 1;
 }
 
 .intent-canvas-home-card-selection input {
@@ -582,12 +584,6 @@
   gap: 2px;
   opacity: 0;
   transition: opacity 120ms ease;
-}
-
-.intent-canvas-home-card:hover .intent-canvas-card-actions,
-.intent-canvas-home-card:focus-within .intent-canvas-card-actions,
-.intent-canvas-home-card:has(.intent-canvas-action-popover-shell) .intent-canvas-card-actions {
-  opacity: 1;
 }
 
 .intent-canvas-card-actions button {
@@ -879,11 +875,6 @@
   white-space: nowrap;
 }
 
-.intent-canvas-rail-toggle svg {
-  width: 14px;
-  height: 14px;
-}
-
 .intent-canvas-rail-toggle svg.is-flipped {
   transform: rotate(180deg);
 }
@@ -934,7 +925,9 @@
   cursor: pointer;
 }
 
-.intent-canvas-source-link-notice:hover:not(:disabled) {
+.intent-canvas-source-link-notice:hover:not(:disabled),
+.intent-canvas-source-action:hover:not(:disabled),
+.intent-canvas-source-refresh:hover:not(:disabled) {
   border-color: var(--intent-canvas-accent-soft);
   color: var(--text-accent);
   background: color-mix(in srgb, var(--intent-canvas-accent), transparent 90%);
@@ -979,13 +972,6 @@
   box-shadow: none;
   text-align: left;
   min-width: 0;
-}
-
-.intent-canvas-source-action:hover:not(:disabled),
-.intent-canvas-source-refresh:hover:not(:disabled) {
-  border-color: var(--intent-canvas-accent-soft);
-  color: var(--text-accent);
-  background: color-mix(in srgb, var(--intent-canvas-accent), transparent 90%);
 }
 
 .intent-canvas-source-action:disabled,
@@ -1263,11 +1249,6 @@
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
-}
-
-.intent-canvas-attachment-remove svg {
-  width: 15px;
-  height: 15px;
 }
 
 .intent-canvas-manager .is-spinning,

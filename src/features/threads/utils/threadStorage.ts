@@ -112,20 +112,9 @@ export function saveCustomNamesBatch(
   return persistCustomNames(updated);
 }
 
-export function loadAutoTitlePending(): AutoTitlePendingMap {
-  const raw = getClientStoreSync<AutoTitlePendingMap>("threads", "autoTitlePending") ?? {};
-  const normalized: AutoTitlePendingMap = {};
-  Object.entries(raw).forEach(([key, value]) => {
-    if (key.trim() && value === true) {
-      normalized[key] = true;
-    }
-  });
-  return normalized;
-}
 
-export function saveAutoTitlePending(value: AutoTitlePendingMap): void {
-  writeClientStoreValue("threads", "autoTitlePending", value);
-}
+
+
 
 export function normalizeThreadAliases(raw: unknown): ThreadAliasMap {
   if (!isPlainRecord(raw)) {

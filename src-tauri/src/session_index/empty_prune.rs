@@ -28,7 +28,7 @@ use crate::engine::grok_history::{
     candidate_encoded_cwd_names, first_user_prompt_from_line, resolve_grok_base_dir,
     session_dir_looks_valid,
 };
-use crate::engine::pi_history::{locate_pi_session_file, scan_pi_jsonl_user_prompt, PiUserPromptScan};
+use crate::engine::pi_history::{locate_pi_family_session_file, scan_pi_jsonl_user_prompt, PiUserPromptScan};
 use crate::state::AppState;
 use std::sync::Arc;
 
@@ -47,6 +47,7 @@ const ENGINE_SESSION_PREFIXES: &[&str] = &[
     "kimi session",
     "opencode session",
     "pi session",
+    "omp session",
     "dsh session",
 ];
 const JSONL_SCAN_LINE_LIMIT: usize = 80;
@@ -247,7 +248,7 @@ fn is_prune_engine(engine: &str) -> bool {
         engine,
         // qoder history is ACP-based with no vendor disk sessions root
         // (add-qoder-engine design: skip prune/fingerprint wiring).
-        "claude" | "codex" | "gemini" | "grok" | "kimi" | "pi" | "dsh"
+        "claude" | "codex" | "gemini" | "grok" | "kimi" | "pi" | "omp" | "dsh"
     )
 }
 
@@ -282,6 +283,7 @@ fn confirm_disk_empty(row: &SessionIndexRow, workspace_path: &Path) -> DiskEmpty
         "claude" => confirm_claude_empty(row, workspace_path),
         "grok" => confirm_grok_empty(row, workspace_path),
         "pi" => confirm_pi_empty(row, workspace_path),
+        "omp" => confirm_omp_empty(row, workspace_path),
         "codex" => confirm_codex_empty(row),
         "gemini" | "kimi" => confirm_physical_path_empty(row),
         _ => DiskEmptyVerdict::Unknown,
@@ -459,7 +461,19 @@ fn locate_grok_session_dir(workspace_path: &Path, session_id: &str) -> Option<Pa
 }
 
 fn confirm_pi_empty(row: &SessionIndexRow, workspace_path: &Path) -> DiskEmptyVerdict {
-    let Some(path) = locate_pi_session_file(workspace_path, &row.session_id) else {
+    confirm_pi_family_empty(crate::engine::EngineType::Pi, row, workspace_path)
+}
+
+fn confirm_omp_empty(row: &SessionIndexRow, workspace_path: &Path) -> DiskEmptyVerdict {
+    confirm_pi_family_empty(crate::engine::EngineType::Omp, row, workspace_path)
+}
+
+fn confirm_pi_family_empty(
+    engine: crate::engine::EngineType,
+    row: &SessionIndexRow,
+    workspace_path: &Path,
+) -> DiskEmptyVerdict {
+    let Some(path) = locate_pi_family_session_file(engine, workspace_path, &row.session_id) else {
         return DiskEmptyVerdict::Unknown;
     };
     match scan_pi_jsonl_user_prompt(&path) {
@@ -689,7 +703,7 @@ fn still_empty_before_delete(target: &PruneTarget) -> bool {
             ),
             None => false,
         },
-        "pi" => match target_physical_path(target) {
+        "pi" | "omp" => match target_physical_path(target) {
             Some(path) => matches!(
                 scan_pi_jsonl_user_prompt(&path),
                 PiUserPromptScan::ScannedEmpty
@@ -852,8 +866,22 @@ async fn delete_engine_session(
             .await
         }
         "pi" => {
-            crate::engine::pi_history::delete_pi_session(workspace_path, &target.session_id, None)
-                .await
+            crate::engine::pi_history::delete_pi_family_session(
+                crate::engine::EngineType::Pi,
+                workspace_path,
+                &target.session_id,
+                None,
+            )
+            .await
+        }
+        "omp" => {
+            crate::engine::pi_history::delete_pi_family_session(
+                crate::engine::EngineType::Omp,
+                workspace_path,
+                &target.session_id,
+                None,
+            )
+            .await
         }
         "dsh" => {
             return match delete_dsh_session_via_existing_host(dsh_client, &target.session_id).await

@@ -1,11 +1,6 @@
 import type { TFunction } from "i18next";
 
-import type {
-  ProjectMapNode,
-  ProjectMapNodeKind,
-  ProjectMapRunMetadata,
-  ProjectMapSource,
-} from "../types";
+import type { ProjectMapNode, ProjectMapNodeKind, ProjectMapRunMetadata } from "../types";
 
 export const PROJECT_MAP_ACTIVE_RUN_STATUSES = new Set<ProjectMapRunMetadata["status"]>([
   "pending",
@@ -40,14 +35,7 @@ export function translateProjectMapNodeKind(
   });
 }
 
-export function translateProjectMapSourceType(
-  t: TFunction,
-  sourceType: ProjectMapSource["type"] | string,
-): string {
-  return t(`projectMap.sourceType.${sourceType}`, {
-    defaultValue: String(sourceType).toUpperCase(),
-  });
-}
+
 
 export function getProjectMapRunActionLabel(
   t: TFunction,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { OpenAppTarget } from "@/types";
+import type { AppSettings, OpenAppTarget } from "@/types";
 import { getOpenAppPresetsForHost } from "../../../../app/constants/openAppPresets";
 import { useOpenAppIcons } from "../../../../app/hooks/useOpenAppIcons";
 import { useOpenAppTargetHealth } from "../../../../app/hooks/useOpenAppTargetHealth";
@@ -32,21 +32,20 @@ import {
 import { useKnownOpenAppIcons } from "../../../../app/hooks/useKnownOpenAppIcons";
 import { resolveOpenAppDisplayIcon } from "../../../../app/utils/openAppIcons";
 import { pickApplicationPath } from "../../../../../services/tauri/filePickers";
-import type { OpenAppDraft } from "../actions/settingsViewActions";
+import { DEFAULT_OPEN_APP_ID } from "../../../../app/constants";
+import { writeClientStoreValue } from "../../../../../services/clientStorage";
+import {
+  buildOpenAppDrafts,
+  createOpenAppId,
+  type OpenAppDraft,
+} from "../actions/settingsViewActions";
 
 type OpenAppsSectionProps = {
   active: boolean;
   t: (key: string) => string;
-  openAppDrafts: OpenAppDraft[];
+  appSettings: AppSettings;
+  onUpdateAppSettings: (next: AppSettings) => Promise<void>;
   openAppIconById: Record<string, string>;
-  openAppSelectedId: string;
-  handleOpenAppDraftChange: (index: number, patch: Partial<OpenAppDraft>) => void;
-  handleCommitOpenApps: (drafts: OpenAppDraft[]) => Promise<void>;
-  handleOpenAppKindChange: (index: number, kind: OpenAppTarget["kind"]) => void;
-  handleSelectOpenAppDefault: (id: string) => void;
-  handleMoveOpenApp: (index: number, direction: "up" | "down") => void;
-  handleDeleteOpenApp: (index: number) => void;
-  handleAddOpenApp: (initial?: Partial<OpenAppDraft>) => string | void;
 };
 
 function kindLabel(
@@ -98,19 +97,18 @@ function healthActionTitle(
 export function OpenAppsSection({
   active,
   t,
-  openAppDrafts,
+  appSettings,
+  onUpdateAppSettings,
   openAppIconById,
-  openAppSelectedId,
-  handleOpenAppDraftChange,
-  handleCommitOpenApps,
-  handleOpenAppKindChange,
-  handleSelectOpenAppDefault,
-  handleMoveOpenApp,
-  handleDeleteOpenApp,
-  handleAddOpenApp,
 }: OpenAppsSectionProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addPickerOpen, setAddPickerOpen] = useState(false);
+  const [openAppDrafts, setOpenAppDrafts] = useState<OpenAppDraft[]>(() =>
+    buildOpenAppDrafts(appSettings.openAppTargets),
+  );
+  const [openAppSelectedId, setOpenAppSelectedId] = useState(
+    appSettings.selectedOpenAppId,
+  );
   // Built-in open-app PNGs load lazily; this re-renders once they are cached
   // so resolveOpenAppDisplayIcon calls below pick up the real logos.
   useKnownOpenAppIcons();
@@ -163,6 +161,145 @@ export function OpenAppsSection({
         appName: "",
         command: null,
       });
+
+  useEffect(() => {
+    setOpenAppDrafts(buildOpenAppDrafts(appSettings.openAppTargets));
+    setOpenAppSelectedId(appSettings.selectedOpenAppId);
+  }, [appSettings.openAppTargets, appSettings.selectedOpenAppId]);
+
+  const normalizeOpenAppTargets = useCallback(
+    (drafts: OpenAppDraft[]): OpenAppTarget[] =>
+      drafts.map(({ argsText, ...target }) => ({
+        ...target,
+        label: target.label.trim(),
+        appName: (target.appName?.trim() ?? "") || null,
+        command: (target.command?.trim() ?? "") || null,
+        args: argsText.trim() ? argsText.trim().split(/\s+/) : [],
+      })),
+    [],
+  );
+
+  const handleCommitOpenApps = useCallback(
+    async (drafts: OpenAppDraft[], selectedId = openAppSelectedId) => {
+      const nextTargets = normalizeOpenAppTargets(drafts);
+      const nextSelectedId =
+        nextTargets.find((target) => target.id === selectedId)?.id ??
+        nextTargets[0]?.id ??
+        DEFAULT_OPEN_APP_ID;
+      setOpenAppDrafts(buildOpenAppDrafts(nextTargets));
+      setOpenAppSelectedId(nextSelectedId);
+      await onUpdateAppSettings({
+        ...appSettings,
+        openAppTargets: nextTargets,
+        selectedOpenAppId: nextSelectedId,
+      });
+    },
+    [
+      appSettings,
+      normalizeOpenAppTargets,
+      onUpdateAppSettings,
+      openAppSelectedId,
+    ],
+  );
+
+  const handleOpenAppDraftChange = (
+    index: number,
+    updates: Partial<OpenAppDraft>,
+  ) => {
+    setOpenAppDrafts((prev) => {
+      const next = [...prev];
+      const current = next[index];
+      if (!current) {
+        return prev;
+      }
+      next[index] = { ...current, ...updates };
+      return next;
+    });
+  };
+
+  const handleOpenAppKindChange = (
+    index: number,
+    kind: OpenAppTarget["kind"],
+  ) => {
+    setOpenAppDrafts((prev) => {
+      const next = [...prev];
+      const current = next[index];
+      if (!current) {
+        return prev;
+      }
+      next[index] = {
+        ...current,
+        kind,
+        appName: kind === "app" ? (current.appName ?? "") : null,
+        command: kind === "command" ? (current.command ?? "") : null,
+        argsText: kind === "finder" ? "" : current.argsText,
+      };
+      void handleCommitOpenApps(next);
+      return next;
+    });
+  };
+
+  const handleMoveOpenApp = (index: number, direction: "up" | "down") => {
+    const nextIndex = direction === "up" ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= openAppDrafts.length) {
+      return;
+    }
+    const next = [...openAppDrafts];
+    const [moved] = next.splice(index, 1);
+    next.splice(nextIndex, 0, moved);
+    setOpenAppDrafts(next);
+    void handleCommitOpenApps(next);
+  };
+
+  const handleDeleteOpenApp = (index: number) => {
+    if (openAppDrafts.length <= 1) {
+      return;
+    }
+    const removed = openAppDrafts[index];
+    const next = openAppDrafts.filter((_, draftIndex) => draftIndex !== index);
+    const nextSelected =
+      removed?.id === openAppSelectedId
+        ? (next[0]?.id ?? DEFAULT_OPEN_APP_ID)
+        : openAppSelectedId;
+    setOpenAppDrafts(next);
+    void handleCommitOpenApps(next, nextSelected);
+  };
+
+  const handleAddOpenApp = (initial?: Partial<OpenAppDraft>): string => {
+    const kind = initial?.kind ?? "app";
+    const preferredId = initial?.id?.trim();
+    const id =
+      preferredId && !openAppDrafts.some((item) => item.id === preferredId)
+        ? preferredId
+        : createOpenAppId();
+    const newTarget: OpenAppDraft = {
+      id,
+      label: initial?.label?.trim() || t("settings.newApp"),
+      kind,
+      appName:
+        kind === "app"
+          ? (initial?.appName ?? "")
+          : kind === "finder"
+            ? null
+            : (initial?.appName ?? null),
+      command:
+        kind === "command"
+          ? (initial?.command ?? "")
+          : (initial?.command ?? null),
+      args: initial?.args ?? [],
+      argsText: initial?.argsText ?? "",
+    };
+    const next = [...openAppDrafts, newTarget];
+    setOpenAppDrafts(next);
+    void handleCommitOpenApps(next, newTarget.id);
+    return newTarget.id;
+  };
+
+  const handleSelectOpenAppDefault = (id: string) => {
+    setOpenAppSelectedId(id);
+    writeClientStoreValue("app", "openWorkspaceApp", id);
+    void handleCommitOpenApps(openAppDrafts, id);
+  };
 
   const closeEditor = () => {
     setEditingId(null);

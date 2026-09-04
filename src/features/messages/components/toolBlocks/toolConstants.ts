@@ -1,14 +1,10 @@
 import i18n from "../../../../i18n";
 import {
-  BASH_TOOL_NAMES,
   EDIT_CONTENT_KEYS,
   EDIT_TOOL_NAMES,
   EDIT_NEW_KEYS,
   EDIT_OLD_KEYS,
   EDIT_PATH_KEYS,
-  READ_TOOL_NAMES,
-  SEARCH_TOOL_NAMES,
-  WEB_TOOL_NAMES,
   asRecord,
   buildCommandSummary,
   extractCommandFromTitle,
@@ -22,8 +18,6 @@ import {
   isReadTool,
   isSearchTool,
   isWebTool,
-  looksLikePathOnlyValue,
-  normalizeCommandValue,
   parseToolArgs,
   pickStringField,
   resolveToolStatus,
@@ -33,15 +27,11 @@ import { isSubagentTool } from "../../../subagent-ui";
 import type { ToolStatusTone } from "../../../../utils/toolSemantics";
 
 export {
-  BASH_TOOL_NAMES,
   EDIT_CONTENT_KEYS,
   EDIT_TOOL_NAMES,
   EDIT_NEW_KEYS,
   EDIT_OLD_KEYS,
   EDIT_PATH_KEYS,
-  READ_TOOL_NAMES,
-  SEARCH_TOOL_NAMES,
-  WEB_TOOL_NAMES,
   asRecord,
   buildCommandSummary,
   extractCommandFromTitle,
@@ -55,8 +45,6 @@ export {
   isReadTool,
   isSearchTool,
   isWebTool,
-  looksLikePathOnlyValue,
-  normalizeCommandValue,
   parseToolArgs,
   pickStringField,
   resolveToolStatus,
@@ -70,31 +58,7 @@ export type { ToolStatusTone };
  */
 
 // 工具图标映射 (使用 Lucide 图标名称)
-export const TOOL_ICON_MAP: Record<string, string> = {
-  // 读取
-  read: 'FileText',
-  read_file: 'FileText',
-  // 编辑
-  edit: 'FileEdit',
-  write: 'FilePlus',
-  notebookedit: 'FileCode',
-  // 终端
-  bash: 'Terminal',
-  shell: 'Terminal',
-  terminal: 'Terminal',
-  // 搜索
-  grep: 'Search',
-  glob: 'FolderSearch',
-  search: 'Search',
-  find: 'FolderSearch',
-  // 网络
-  webfetch: 'Globe',
-  websearch: 'Globe',
-  // 其他
-  task: 'ListTodo',
-  todowrite: 'ListChecks',
-  diff: 'Diff',
-};
+
 
 // 工具显示名称映射 - 工厂函数，接受 t 翻译函数
 export function getToolDisplayNames(t: (key: string) => string): Record<string, string> {

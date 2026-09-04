@@ -115,7 +115,8 @@
   cursor: pointer;
 }
 
-.browser-agent-editor-close:hover {
+.browser-agent-editor-close:hover,
+.browser-agent-editor-urlbar .browser-agent-dock-icon:hover:not(:disabled) {
   background: var(--surface-hover);
   color: var(--text-strong);
 }
@@ -240,11 +241,6 @@
   border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
-}
-
-.browser-agent-editor-urlbar .browser-agent-dock-icon:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-strong);
 }
 
 .browser-agent-editor-urlbar .browser-agent-dock-icon.is-on {

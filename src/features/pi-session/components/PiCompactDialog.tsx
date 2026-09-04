@@ -13,6 +13,9 @@ import {
   formatContextPercent,
 } from "@/components/ai-elements/context";
 import {
+  ompCompact,
+  ompGetSessionStats,
+  ompSessionIdFromThreadId,
   piCompact,
   piGetSessionStats,
   piSessionIdFromThreadId,
@@ -20,6 +23,8 @@ import {
 } from "../api/piSessionRpc";
 
 type PiCompactEntryProps = {
+  /** pi-family 引擎身份（omp 与 pi 共享本组件，默认 pi）。 */
+  engine?: "pi" | "omp";
   workspaceId: string;
   threadId: string;
   disabled?: boolean;
@@ -33,6 +38,7 @@ type PiCompactEntryProps = {
  * PiCompactDialog（占用统计 + 压缩指令），替换其他引擎的「上下文 等待回传」弹层。
  */
 export function PiCompactEntry({
+  engine = "pi",
   workspaceId,
   threadId,
   disabled = false,
@@ -61,6 +67,7 @@ export function PiCompactEntry({
         <ContextUsageIcon usedPercent={percentage} />
       </button>
       <PiCompactDialog
+        engine={engine}
         open={open}
         workspaceId={workspaceId}
         threadId={threadId}
@@ -76,6 +83,8 @@ export function PiCompactEntry({
 }
 
 type PiCompactDialogProps = {
+  /** pi-family 引擎身份（omp 与 pi 共享本组件，默认 pi）。 */
+  engine?: "pi" | "omp";
   open: boolean;
   workspaceId: string;
   threadId: string;
@@ -114,6 +123,7 @@ export function compactErrorToNotice(message: string): string | null {
  * custom instructions (RPC `compact.customInstructions`).
  */
 export function PiCompactDialog({
+  engine = "pi",
   open,
   workspaceId,
   threadId,
@@ -123,6 +133,11 @@ export function PiCompactDialog({
   onCompacted,
 }: PiCompactDialogProps) {
   const { t } = useTranslation();
+  // pi-family 命令路由：omp 与 pi 的 stats/compact RPC 面全等，仅命令名不同。
+  const getSessionStats = engine === "omp" ? ompGetSessionStats : piGetSessionStats;
+  const runCompact = engine === "omp" ? ompCompact : piCompact;
+  const sessionIdFromThreadId =
+    engine === "omp" ? ompSessionIdFromThreadId : piSessionIdFromThreadId;
   const [stats, setStats] = useState<PiSessionStats | null>(null);
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
@@ -137,13 +152,13 @@ export function PiCompactDialog({
     setError(null);
     setNotice(null);
     setDone(false);
-    void piGetSessionStats({
+    void getSessionStats({
       workspaceId,
-      sessionId: piSessionIdFromThreadId(threadId),
+      sessionId: sessionIdFromThreadId(threadId),
     })
       .then(setStats)
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
-  }, [open, workspaceId, threadId]);
+  }, [open, workspaceId, threadId, getSessionStats, sessionIdFromThreadId]);
 
   useEffect(() => {
     if (!open) {
@@ -236,7 +251,7 @@ export function PiCompactDialog({
     >
       <h3>
         ⤓ {t("piSession.compact.dialogTitle")}
-        <span className="mono">pi RPC: compact</span>
+        <span className="mono">{engine} RPC: compact</span>
       </h3>
       <div className="pi-stat-row">
         <div className="pi-stat">
@@ -290,9 +305,9 @@ export function PiCompactDialog({
             setBusy(true);
             setError(null);
             setNotice(null);
-            void piCompact({
+            void runCompact({
               workspaceId,
-              sessionId: piSessionIdFromThreadId(threadId),
+              sessionId: sessionIdFromThreadId(threadId),
               customInstructions: instructions,
             })
               .then((result) => {
@@ -308,9 +323,9 @@ export function PiCompactDialog({
                   tokensBefore: result.tokensBefore,
                   estimatedTokensAfter: result.estimatedTokensAfter,
                 });
-                void piGetSessionStats({
+                void getSessionStats({
                   workspaceId,
-                  sessionId: piSessionIdFromThreadId(threadId),
+                  sessionId: sessionIdFromThreadId(threadId),
                 })
                   .then(setStats)
                   .catch(() => {

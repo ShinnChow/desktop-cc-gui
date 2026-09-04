@@ -268,11 +268,8 @@
     padding: 0 8px;
   }
 
-  .release-notes-modal-date {
-    font-size: 12px;
-  }
-
-  .release-notes-markdown {
+  .release-notes-modal-date,
+.release-notes-markdown {
     font-size: 12px;
   }
 

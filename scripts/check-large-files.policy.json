@@ -23,7 +23,7 @@
     },
     {
       "id": "bridge-runtime-critical",
-      "description": "Bridge, runtime, and app-shell orchestration files get the strictest growth control.",
+      "description": "Bridge, runtime, and app-shell orchestration files get the strictest growth control. strictReduction enabled 2026-08-31 after Wave6 W6-A split engine/status.rs (3020->70 shell + status/ 11 modules); group retained is now zero and retained entries block.",
       "priority": "P0",
       "warnThreshold": 2200,
       "failThreshold": 2600,
@@ -50,11 +50,12 @@
           "src-tauri/src/computer_use/",
           "src/app-shell/"
         ]
-      }
+      },
+      "strictReduction": true
     },
     {
       "id": "settings-view-sections",
-      "description": "Settings view sections regrew after the 2026-07 split (SessionManagementSection 2547->2648); hold them below the feature-hotpath gate.",
+      "description": "Settings view sections regrew after the 2026-07 split (SessionManagementSection 2547->2648); hold them below the feature-hotpath gate. strictReduction enabled 2026-08-31 after Wave5 A2 brought the group to zero retained hard debt; retained entries now block.",
       "priority": "P1",
       "warnThreshold": 1500,
       "failThreshold": 2000,
@@ -62,11 +63,12 @@
         "prefixes": [
           "src/features/settings/components/settings-view/sections/"
         ]
-      }
+      },
+      "strictReduction": true
     },
     {
       "id": "feature-hotpath",
-      "description": "High-churn feature slices get earlier warning and a lower hard gate than the default pool.",
+      "description": "High-churn feature slices get earlier warning and a lower hard gate than the default pool. strictReduction enabled 2026-08-31 after Wave6 W6-B1/B2 split GitHistoryPanelView (3012->2340) and useThreadMessaging (2819->2384); group retained is now zero and retained entries block.",
       "priority": "P1",
       "warnThreshold": 2400,
       "failThreshold": 2800,
@@ -84,7 +86,8 @@
           "src/features/workspaces/",
           "src/features/shared-session/"
         ]
-      }
+      },
+      "strictReduction": true
     },
     {
       "id": "styles",

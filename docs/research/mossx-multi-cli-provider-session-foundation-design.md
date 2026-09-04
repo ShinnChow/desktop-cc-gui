@@ -3715,6 +3715,15 @@ User Fork / Provider Continuation
 
 ## 最近校准
 
+### 2026-09-01：OMP CLI 接入（pi-family 参数化复用，第 10 引擎）
+
+| Trigger | Current implementation fact | OpenSpec / code source |
+| --- | --- | --- |
+| engine registry | `EngineType::Omp`（serde `"omp"`，第 10 个 built-in）：protocolFamily 复用 `pi-rpc`、executionModel `persistent`；omp 与 pi 共享全部运行时实现，身份差异收敛于 `EngineType::pi_family_spec()`（bin/home/thread prefix/local profile sentinel）；daemon 影子枚举同步（`engine_bridge.rs`） | `src-tauri/src/engine/mod.rs` `PiFamilySpec`; `src/features/engine/engineIds.json`; `src-tauri/src/engine/adapter_registry.rs`; `src-tauri/src/bin/cc_gui_daemon/engine_bridge.rs`; OpenSpec `add-omp-engine`; Spike `docs/research/mossx-omp-capability-spike.md` |
+| provider binding | omp local sentinel `__local_omp__`；runtime key 形态与 pi 一致（local = workspace_id，named = `{ws}::omp::{profile}`），复用 `pi_family_runtime_key` / `resolve_pi_family_provider_launch_profile` | `src-tauri/src/engine/omp_provider_profile.rs`; `src-tauri/src/engine/pi_provider_profile.rs` |
+| terminal/ACK contract | omp v18.0.11 实测 RPC 命令子集 = pi 减去 `get_tree`/`get_fork_messages`/`get_available_thinking_levels`（Unknown command）；**omp 无 `agent_settled` 事件**——run 以 `agent_end` 收尾，投影层对 omp 将 agent_end 映射为 run settle（errorMessage 作为 fatal），pump 在 agent_end 同点清 streaming | `src-tauri/src/engine/pi/session_rpc.rs`（omp_agent_end_settle）; `src-tauri/src/engine/pi_rpc.rs`（agent_end streaming clear）; Spike E5/E6 |
+| Shared 支持集合 | omp **不进** `SHARED_SESSION_SUPPORTED_ENGINES`（前后端双集合均不含；picker disabled + reason），后置准入参照 `enable-qoder-shared-target` 流程 | `src/features/shared-session/utils/sharedSessionEngines.ts`; `src-tauri/src/shared_sessions.rs`; OpenSpec `add-omp-engine` proposal 决策记录 |
+
 ### 2026-08-28：pi resident 预热（engine_prewarm）与静默期反馈
 
 | Trigger | Current implementation fact | OpenSpec / code source |

@@ -891,6 +891,8 @@ export function ThreadList({
             ? "OpenCode"
           : engineSource === "pi"
             ? "PI CLI"
+            : engineSource === "omp"
+            ? "OMP CLI"
             : engineSource === "dsh"
               ? "DSH"
             : engineSource === "qoder"

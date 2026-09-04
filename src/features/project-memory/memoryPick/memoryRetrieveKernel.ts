@@ -13,13 +13,7 @@ import {
   resolveProjectMemoryCompactTitle,
 } from "../utils/projectMemoryDisplay";
 import type { ProjectMemoryListResult } from "../../../services/tauri";
-import {
-  hybridRerankProjectMemories,
-  retrieveProjectMemorySemanticCandidates,
-  type ProjectMemoryEmbeddingIndexRecord,
-  type ProjectMemoryEmbeddingProvider,
-  type ProjectMemoryRetrievalMode,
-} from "../utils/projectMemorySemanticRetrieval";
+import { retrieveProjectMemorySemanticCandidates, type ProjectMemoryEmbeddingIndexRecord, type ProjectMemoryEmbeddingProvider, type ProjectMemoryRetrievalMode } from "../utils/projectMemorySemanticRetrieval";
 import {
   PICK_CANDIDATE_LIMIT,
   PICK_LIST_TIMEOUT_MS,
@@ -304,27 +298,4 @@ export async function retrieveMemoryCandidatesKernel(params: {
  * 对已加载 pool 做 hybrid 重排（Scout 等可复用）。
  * 无 semanticMatches 时等价于 lexical finalScore 排序。
  */
-export function hybridRerankPoolToCandidates(params: {
-  memories: ProjectMemoryItem[];
-  query: string;
-  limit?: number;
-  semanticMatches?: Array<{ memory: ProjectMemoryItem; vectorScore: number }>;
-}): {
-  candidates: MemoryPickCandidate[];
-  retrievalMode: MemoryRetrieveMode;
-} {
-  const limit = params.limit ?? PICK_CANDIDATE_LIMIT;
-  const ranked = hybridRerankProjectMemories({
-    memories: params.memories,
-    query: params.query,
-    semanticMatches: params.semanticMatches,
-    topK: limit,
-  });
-  const modes = ranked.map((c) => c.retrievalMode);
-  return {
-    candidates: ranked.map((c) =>
-      toCandidate(c.memory, c.score.finalScore),
-    ),
-    retrievalMode: aggregateRetrievalMode(modes),
-  };
-}
+

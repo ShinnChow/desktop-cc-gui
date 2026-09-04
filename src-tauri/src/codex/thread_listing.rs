@@ -296,13 +296,14 @@ fn thread_entry_timestamp(entry: &Value) -> i64 {
 }
 
 fn strip_known_engine_prefix(id: &str) -> &str {
-    const PREFIXES: [&str; 8] = [
+    const PREFIXES: [&str; 9] = [
         "codex:",
         "claude:",
         "kimi:",
         "grok:",
         "opencode:",
         "pi:",
+        "omp:",
         "gemini:",
         "dsh:",
     ];

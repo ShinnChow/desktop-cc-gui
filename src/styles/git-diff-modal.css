@@ -208,11 +208,7 @@
   stroke-width: 2.2;
 }
 
-.git-history-diff-modal-close:hover {
-  color: var(--text-strong, #0f172a);
-  border-color: color-mix(in srgb, var(--border-default) 92%, transparent);
-}
-
+.git-history-diff-modal-close:hover,
 .git-history-diff-modal-actions > .diff-viewer-header-controls.is-external .diff-viewer-header-close-button:hover {
   color: var(--text-strong, #0f172a);
   border-color: color-mix(in srgb, var(--border-default) 92%, transparent);

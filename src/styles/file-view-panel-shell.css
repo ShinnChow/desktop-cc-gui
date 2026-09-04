@@ -91,7 +91,8 @@
   box-shadow: none;
 }
 
-.fvp-tabs-inline .fvp-tabs-track {
+.fvp-tabs-inline .fvp-tabs-track,
+.fvp-tabs-inline .fvp-tab {
   min-height: 24px;
 }
 
@@ -110,10 +111,6 @@
     background 140ms ease,
     border-color 140ms ease,
     color 140ms ease;
-}
-
-.fvp-tabs-inline .fvp-tab {
-  min-height: 24px;
 }
 
 .fvp-tab:hover {

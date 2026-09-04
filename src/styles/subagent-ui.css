@@ -320,7 +320,8 @@ body.subagent-chat-split-resizing * {
   color: var(--status-success, #22c55e);
 }
 
-.subagent-persona-status.is-error {
+.subagent-persona-status.is-error,
+.subagent-session-canvas-status.is-error {
   color: var(--status-error, #ef4444);
 }
 
@@ -491,10 +492,6 @@ body.subagent-chat-split-resizing * {
   word-break: break-word;
   color: var(--text);
   font-family: inherit;
-}
-
-.subagent-session-canvas-status.is-error {
-  color: var(--status-error, #ef4444);
 }
 
 .subagent-session-canvas-error-detail {

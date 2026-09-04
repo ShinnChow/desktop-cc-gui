@@ -498,11 +498,7 @@ export function buildProjectMapMiniMapProjection(input: {
   };
 }
 
-export function getProjectMapGraphPositionMap(
-  positions: ProjectMapGraphNodePosition[],
-): Map<string, ProjectMapGraphNodePosition> {
-  return new Map(positions.map((position) => [position.id, position]));
-}
+
 
 function buildOverviewPositions(
   nodes: ProjectMapNode[],

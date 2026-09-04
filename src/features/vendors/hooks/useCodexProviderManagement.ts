@@ -381,6 +381,4 @@ export function useCodexProviderManagement() {
   };
 }
 
-export type UseCodexProviderManagementReturn = ReturnType<
-  typeof useCodexProviderManagement
->;
+
